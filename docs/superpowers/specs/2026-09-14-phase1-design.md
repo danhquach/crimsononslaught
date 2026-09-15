@@ -31,7 +31,7 @@ browser smoke).
 
 ### Out (phase 2+)
 Gold / meta shop, additional characters, spell evolutions, chests, sound and
-music, real art, mobile / touch controls, saves, multiple arenas, ranged or
+music, real art, mobile / touch controls (gamepad IS in scope), saves, multiple arenas, ranged or
 elite enemies, settings menu.
 
 ## 3. Stack
@@ -113,7 +113,8 @@ src/
 ## 5. Gameplay rules
 
 ### Player
-- Input: WASD + arrow keys. Speed 180 px/s. No dash, no aim.
+- Input: WASD + arrow keys, or gamepad left stick / D-pad (Phaser Gamepad plugin, deadzone 0.2, analog magnitude scales speed). Both live at once; non-zero input wins, keyboard on tie. Speed 180 px/s. No dash, no aim.
+- Gamepad in menus/overlays: A = confirm, D-pad or left stick changes selection. Mouse and keyboard remain primary.
 - HP 100. On contact damage: take damage, 0.5 s invulnerability with flicker.
 - Pickup radius 40 px for XP gems (perk can increase).
 
