@@ -1,0 +1,25 @@
+{
+  "name": "crimson-onslaught",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "echo \"unit tests: Vitest lands with CO-002\"",
+    "test:e2e": "echo \"browser smoke tests: Playwright lands with CO-060\"",
+    "lint": "tsc --noEmit",
+    "format": "echo \"formatting: Prettier lands with CO-002\""
+  },
+  "dependencies": {
+    "phaser": "~3.88.2"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}
