@@ -130,7 +130,7 @@ AC: No overlap registration exists outside `CollisionSystem`; all pairs fire in 
 
 ### CO-040 SpellStats + perk reducer (pure logic)
 Deps: CO-004
-- `src/core/spellStats.ts`: `SpellStats` type per spell, `applyPerk(stats, perkId, rank)` reducer. Perk trees in `config/perks.ts` (4 spells x 12 perks + 3 generic) per spec.
+- `src/core/spellStats.ts`: `SpellStats` type per spell, `applyPerk(stats, perkId, rank)` reducer. Perk trees in `config/perks.ts` (4 spells x 7 ranked nodes in 3 branches + 3 generic) per spec.
 - Boot-time config validation: prereqs exist, maxRank >= 1, tiers ascending.
 AC: Unit test iterates every perk id in every tree: applies without throw, changes only its intended field(s). Validation test catches a bad prereq.
 

@@ -19,7 +19,7 @@ browser smoke).
 ### In
 - 1 character, 1 arena (bounded plane, camera follows player).
 - 4 spells: Fire, Ice, Lightning, Earth. Exactly one chosen per run.
-- Per-spell perk tree (3 branches x 4 tiers) + 3 generic perks, offered as
+- Per-spell perk tree (3 branches, 2–3 ranked nodes each) + 3 generic perks, offered as
   3 random eligible cards on level-up.
 - 3 enemy types (Swarm, Tank, Fast) + 1 boss.
 - Time-based spawn director, 5:00 run timer, boss at 5:00.
@@ -193,7 +193,7 @@ knockback 60, size 14.
 **Generic perks (all spells):** Move speed +10% (x3), Max HP +20 (x3),
 Pickup radius +25% (x2).
 
-Tiers: within a branch, tier N+1 requires tier N owned at rank >= 1.
+Tiers: nodes within a branch are listed in tier order; node N+1 requires node N owned at rank >= 1. Each spell has 7 nodes (18–20 total ranks); with generics, a run can level ~25 times before perks run dry.
 
 ## 6. Rendering
 
