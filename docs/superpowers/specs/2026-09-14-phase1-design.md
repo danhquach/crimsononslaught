@@ -5,7 +5,7 @@ Status: Approved
 
 ## 1. Goal
 
-A minimal Vampire-Survivors-style "bullet heaven" that runs in the browser.
+A minimal auto-battler "bullet heaven" that runs in the browser.
 Phase 1 delivers one complete run loop: pick a spell, survive 5 minutes of
 escalating waves, kill the boss, see results. Everything is playable with
 placeholder shapes; real art is a later drop-in.
