@@ -1,5 +1,8 @@
 # Crimson Onslaught
 
+[![CI](https://github.com/danhquach/crimsononslaught/actions/workflows/ci.yml/badge.svg)](https://github.com/danhquach/crimsononslaught/actions/workflows/ci.yml)
+**Play the latest build:** <https://danhquach.github.io/crimsononslaught/>
+
 A browser-based auto-battler "bullet heaven". You move; your spell fires on
 its own. Survive five minutes of escalating waves, then bring down the boss.
 
@@ -34,12 +37,11 @@ npm run build      # type-check + production build to dist/
 npm run preview    # serve the production build locally
 npm test           # unit tests (Vitest)
 npm run test:e2e   # browser smoke tests (Playwright)
-npm run lint       # ESLint (currently a strict type-check)
-npm run format     # Prettier
+npm run lint       # type-check + ESLint + Prettier check
+npm run format     # Prettier (write)
 ```
 
-`test`, `test:e2e`, `lint`, and `format` are declared now so the workflow is
-stable; the tooling behind them lands with the lint/test ticket (CO-002).
+`test:e2e` is a placeholder until the Playwright smoke test lands (CO-060).
 
 ## Project layout
 
@@ -53,6 +55,14 @@ src/systems/  spawn director, perks, collisions, run state
 src/render/   texture-key layer (placeholder shapes now, sprite atlas later)
 docs/         design spec, ticket list, tuning notes
 ```
+
+## CI and deployment
+
+Every pull request runs `npm run lint`, `npm test`, and `npm run build` in
+GitHub Actions (`.github/workflows/ci.yml`). Pushes to `main` additionally
+deploy `dist/` to GitHub Pages at the URL above. The deploy job needs the
+repository's Pages source set to **GitHub Actions** (Settings → Pages); the
+lint/test/build job does not depend on it.
 
 ## Documentation
 
