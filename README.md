@@ -25,19 +25,21 @@ until the asset pass.
 
 ## Getting started
 
-Requires Node 20+.
+Requires Node 20.19+ (or 22.12+).
 
 ```bash
 npm ci
-npm run dev        # local dev server
-npm run build      # production build to dist/
+npm run dev        # local dev server (http://localhost:5173)
+npm run build      # type-check + production build to dist/
+npm run preview    # serve the production build locally
 npm test           # unit tests (Vitest)
 npm run test:e2e   # browser smoke tests (Playwright)
-npm run lint
+npm run lint       # ESLint (currently a strict type-check)
+npm run format     # Prettier
 ```
 
-The scripts above land with the scaffold ticket; until then this repo is
-docs only.
+`test`, `test:e2e`, `lint`, and `format` are declared now so the workflow is
+stable; the tooling behind them lands with the lint/test ticket (CO-002).
 
 ## Project layout
 

@@ -19,6 +19,8 @@ test-results/
 .claude/agent-memory/
 **/.claude/agent-memory/
 .claude/worktrees/
+# Local editor / preview launch config
+.claude/launch.json
 
 # OS / editor
 .DS_Store
