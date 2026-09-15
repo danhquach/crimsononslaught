@@ -1,0 +1,25 @@
+# Dependencies / build
+node_modules/
+dist/
+.vite/
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+
+# Secrets — never committed
+.env
+.env.*
+!.env.example
+
+# Per-agent scratch memory and worktrees. Local-only: these record absolute
+# paths from the machine that wrote them, so committing them would publish a
+# local username.
+.claude/agent-memory/
+**/.claude/agent-memory/
+.claude/worktrees/
+
+# OS / editor
+.DS_Store
+*.swp
