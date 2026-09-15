@@ -76,10 +76,12 @@ AC: Both outcomes render correct stats; button works with mouse and Enter.
 
 ## Epic C — Core run loop
 
-### CO-020 Arena, camera, player movement
+### CO-020 Arena, camera, player movement (keyboard + gamepad)
 Deps: CO-010
 - 3000x3000 bounded world. `Player` entity: WASD + arrows, speed 180, Arcade body, camera follow with bounds.
-AC: Player cannot leave world; diagonal speed normalized; 60 fps in dev.
+- Gamepad via Phaser's built-in Gamepad plugin: left stick (deadzone 0.2, analog magnitude scales speed) and D-pad move the player. Keyboard and gamepad active simultaneously; whichever input is non-zero wins, keyboard on tie.
+- Menu/overlay button mapping (A = confirm, D-pad/left stick to change selection) wired here as a shared `Input` helper so CO-011 / CO-013 / CO-014 can consume it.
+AC: Player cannot leave world; diagonal speed normalized; 60 fps in dev. With a connected controller: left stick and D-pad move the player, stick below deadzone produces no drift, hot-plugging a pad mid-run works without reload.
 
 ### CO-021 Player HP, damage intake, death
 Deps: CO-020
