@@ -26,4 +26,9 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, SpellSelectScene, GameScene, HudScene, ResultScene, TextureDebugScene],
 };
 
-new Phaser.Game(config);
+/**
+ * Exported so dev tools and browser tests can reach the running game without a
+ * global: `const { game } = await import('/src/main.ts')` resolves to this same
+ * module instance under the Vite dev server.
+ */
+export const game = new Phaser.Game(config);
