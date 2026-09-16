@@ -6,16 +6,19 @@ import {
   type Outcome,
   type ResultPayload,
 } from '../core/scenePayloads';
+import { emitRunEvent } from '../core/runEvents';
 import { addTextButton } from './ui';
 
 /**
  * Stub run: shows the payload it was started with, launches the HUD overlay,
  * and offers Win / Lose buttons that end the run with a full `ResultPayload`.
- * CO-020+ replace the stub body with the world, player and systems.
+ * Emits the run clock on `this.events` (see `core/runEvents.ts`) so the HUD is
+ * live; CO-030's RunState takes over every run event, and CO-020+ replace the
+ * stub body with the world, player and systems.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
-  private startedAt = 0;
+  private elapsedMs = 0;
 
   constructor() {
     super(SCENE.game);
@@ -37,7 +40,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const { spellId, seed } = this.payload;
-    this.startedAt = this.game.getTime();
+    this.elapsedMs = 0;
 
     const { width, height } = this.scale;
     this.add.image(width / 2, height / 2, 'player');
@@ -55,12 +58,19 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch(SCENE.hud);
   }
 
+  /** Run clock accumulates scene delta, so it freezes with the scene when Game is paused. */
+  update(_time: number, delta: number): void {
+    if (!this.payload) return;
+    this.elapsedMs += delta;
+    emitRunEvent(this.events, 'timer', { elapsedMs: this.elapsedMs });
+  }
+
   private endRun(outcome: Outcome): void {
     if (!this.payload) return;
     const payload: ResultPayload = {
       outcome,
       stats: {
-        timeSurvivedMs: this.game.getTime() - this.startedAt,
+        timeSurvivedMs: this.elapsedMs,
         level: 1,
         kills: 0,
         spellId: this.payload.spellId,
