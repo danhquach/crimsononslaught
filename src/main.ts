@@ -1,15 +1,13 @@
 import Phaser from 'phaser';
-import { resolveSeed } from './core/rng';
 import { BootScene } from './scenes/BootScene';
+import { GameScene } from './scenes/GameScene';
+import { HudScene } from './scenes/HudScene';
+import { ResultScene } from './scenes/ResultScene';
+import { SpellSelectScene } from './scenes/SpellSelectScene';
 import { TextureDebugScene } from './scenes/TextureDebugScene';
 
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;
-
-// Run seed: `?seed=<int>` reproduces a run; otherwise a fresh one per load.
-// Logged so a bug report can quote it. Scenes receive it via GameScene.init (CO-010).
-export const RUN_SEED = resolveSeed(window.location.search, Date.now());
-console.info(`[rng] seed=${RUN_SEED}`);
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -24,7 +22,8 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
   },
-  scene: [BootScene, TextureDebugScene],
+  // Flow: Boot -> SpellSelect -> Game (+ Hud overlay) -> Result -> SpellSelect.
+  scene: [BootScene, SpellSelectScene, GameScene, HudScene, ResultScene, TextureDebugScene],
 };
 
 new Phaser.Game(config);
