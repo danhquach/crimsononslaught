@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 
 /**
- * Minimal clickable text button shared by the stub scenes. CO-014 /
- * CO-020 replace or extend this with real cards, keyboard and gamepad input.
+ * Minimal clickable text button shared by the stub scenes and Result.
+ * CO-020 extends this with gamepad confirm via the shared Input helper.
  */
 export function addTextButton(
   scene: Phaser.Scene,

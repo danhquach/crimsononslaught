@@ -156,12 +156,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private applyPick(perkId: string): void {
-    if (!STUB_PERKS.some((p) => p.id === perkId)) {
+    const perk = STUB_PERKS.find((p) => p.id === perkId);
+    if (!perk) {
       console.warn(`[Game] ignoring pick of unknown perk "${perkId}"`);
       return;
     }
     this.owned.set(perkId, (this.owned.get(perkId) ?? 0) + 1);
-    this.perks.push(perkId);
+    // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
+    this.perks.push(perk.name);
   }
 
   private endRun(outcome: Outcome): void {

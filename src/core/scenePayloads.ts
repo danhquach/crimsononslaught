@@ -36,12 +36,13 @@ export interface LevelUpPayload {
 
 export type Outcome = 'win' | 'lose';
 
-/** Summary shown on the result screen (CO-014 fills in real values). */
+/** Summary shown on the result screen (see `core/resultModel.ts`). CO-030's RunState supplies real values. */
 export interface RunStats {
   timeSurvivedMs: number;
   level: number;
   kills: number;
   spellId: SpellId;
+  /** Display names of the perks taken, in pick order; a perk taken at several ranks repeats. */
   perks: readonly string[];
 }
 
