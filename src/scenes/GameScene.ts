@@ -16,7 +16,10 @@ import {
 import { PLAYER_EVENT } from '../core/health';
 import { createRng, type Rng } from '../core/rng';
 import { emitRunEvent } from '../core/runEvents';
+import { ENEMY_TYPES, MAX_LIVE_ENEMIES } from '../config/enemies';
+import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
+import { EnemyPool } from '../systems/EnemyPool';
 import { addTextButton } from './ui';
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
@@ -29,6 +32,11 @@ const ARENA_BORDER = 0x5a1620;
 const GRID_CELL = 200;
 /** Stub buttons and labels sit above the world and ignore the camera scroll. */
 const UI_DEPTH = 10;
+
+/** Debug spawn button: enemies per press, and the ring they appear on around the player. */
+const DEBUG_SPAWN_BATCH = 50;
+const DEBUG_SPAWN_RADIUS_MIN = 500;
+const DEBUG_SPAWN_RADIUS_MAX = 700;
 
 /**
  * Stand-in perk pool until the real trees (CO-040) and offer logic (CO-041)
@@ -75,14 +83,16 @@ const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
  * `core/runEvents.ts`) so the HUD is live. "Level up" drives the level-up flow
  * (pause -> LevelUp overlay -> pick -> resume, or the zero-perk fallback) from
  * a stub perk pool until CO-031 / CO-042 trigger it from XP and the real trees.
- * The player carries HP and damage intake (CO-021); "Hit (10)" stands in for
- * contact damage until enemies land in CO-022, and HP 0 ends the run as a loss
- * (spec §4 step 4). CO-030's RunState takes over every run event, and CO-022+
- * add enemies, gems and spells.
+ * The player carries HP and damage intake (CO-021) and enemies chase and damage
+ * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
+ * "Spawn 50" stands in for the spawn director until CO-025. CO-030's RunState
+ * takes over every run event, and CO-023+ add gems and spells.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
   private player!: Player;
+  private enemies!: EnemyPool;
+  private enemyCountText!: Phaser.GameObjects.Text;
   private rng!: Rng;
   private elapsedMs = 0;
   private level = 1;
@@ -119,14 +129,24 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     this.cameras.main.startFollow(this.player, true);
 
+    this.enemies = new EnemyPool(this);
+    // Spec §5: contact damage. CO-032 moves every overlap into CollisionSystem.
+    this.physics.add.overlap(this.player, this.enemies.group, (_player, enemy) => {
+      if (enemy instanceof Enemy) this.onEnemyContact(enemy);
+    });
+
     const { width, height } = this.scale;
     // Below the HUD's timer and boss bar, which own the top of the screen.
     this.addOverlayText(width / 2, 96, `Game (stub)\nspell ${spellId} · seed ${seed}`);
+    this.enemyCountText = this.addOverlayText(width / 2, 136, '');
+    this.updateEnemyCountText();
     this.addOverlayText(width / 2, height - 40, 'WASD / arrows or gamepad stick / D-pad to move');
 
     const buttons = [
       addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.levelUp()),
-      addTextButton(this, width / 2, height * 0.69, 'Hit (10)', () => this.player.takeDamage(10)),
+      addTextButton(this, width / 2, height * 0.69, `Spawn ${DEBUG_SPAWN_BATCH}`, () =>
+        this.spawnDebugWave(),
+      ),
       addTextButton(this, width * 0.4, height * 0.78, 'Win', () => this.endRun('win')),
       addTextButton(this, width * 0.6, height * 0.78, 'Lose', () => this.endRun('lose')),
     ];
@@ -149,8 +169,39 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     if (!this.payload) return;
     this.player.update(delta);
+    this.enemies.update(delta, this.player);
     this.elapsedMs += delta;
     emitRunEvent(this.events, 'timer', { elapsedMs: this.elapsedMs });
+  }
+
+  /**
+   * Spec §5: each enemy damages the player at most once per 0.5 s. The player's
+   * own invulnerability window (CO-021) gates the damage on top of that.
+   */
+  private onEnemyContact(enemy: Enemy): void {
+    if (!enemy.active) return;
+    if (!enemy.tryContact()) return;
+    this.player.takeDamage(enemy.contactDamage);
+  }
+
+  /**
+   * Debug stand-in for the spawn director (CO-025): a batch of mixed enemies on
+   * a ring around the player. Requests past the live cap come back `null` from
+   * the pool and are simply dropped (spec §5).
+   */
+  private spawnDebugWave(): void {
+    for (let i = 0; i < DEBUG_SPAWN_BATCH; i++) {
+      const angle = this.rng.next() * Math.PI * 2;
+      const radius = this.rng.int(DEBUG_SPAWN_RADIUS_MIN, DEBUG_SPAWN_RADIUS_MAX);
+      const x = Phaser.Math.Clamp(this.player.x + Math.cos(angle) * radius, 0, WORLD_WIDTH);
+      const y = Phaser.Math.Clamp(this.player.y + Math.sin(angle) * radius, 0, WORLD_HEIGHT);
+      this.enemies.spawn(this.rng.pick(ENEMY_TYPES), x, y);
+    }
+    this.updateEnemyCountText();
+  }
+
+  private updateEnemyCountText(): void {
+    this.enemyCountText.setText(`enemies ${this.enemies.liveCount} / ${MAX_LIVE_ENEMIES}`);
   }
 
   /**
@@ -177,8 +228,8 @@ export class GameScene extends Phaser.Scene {
     this.add.rectangle(cx, cy, WORLD_WIDTH, WORLD_HEIGHT).setStrokeStyle(6, ARENA_BORDER);
   }
 
-  private addOverlayText(x: number, y: number, text: string): void {
-    this.add
+  private addOverlayText(x: number, y: number, text: string): Phaser.GameObjects.Text {
+    return this.add
       .text(x, y, text, {
         fontFamily: 'monospace',
         fontSize: '16px',
