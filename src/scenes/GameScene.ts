@@ -13,6 +13,7 @@ import {
   type LevelUpPickPayload,
   type PerkCard,
 } from '../core/levelUp';
+import { PLAYER_EVENT } from '../core/health';
 import { createRng, type Rng } from '../core/rng';
 import { emitRunEvent } from '../core/runEvents';
 import { Player } from '../entities/Player';
@@ -74,8 +75,10 @@ const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
  * `core/runEvents.ts`) so the HUD is live. "Level up" drives the level-up flow
  * (pause -> LevelUp overlay -> pick -> resume, or the zero-perk fallback) from
  * a stub perk pool until CO-031 / CO-042 trigger it from XP and the real trees.
- * CO-030's RunState takes over every run event, and CO-021+ add HP, enemies,
- * gems and spells.
+ * The player carries HP and damage intake (CO-021); "Hit (10)" stands in for
+ * contact damage until enemies land in CO-022, and HP 0 ends the run as a loss
+ * (spec §4 step 4). CO-030's RunState takes over every run event, and CO-022+
+ * add enemies, gems and spells.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
@@ -83,8 +86,6 @@ export class GameScene extends Phaser.Scene {
   private rng!: Rng;
   private elapsedMs = 0;
   private level = 1;
-  private hp = 100;
-  private maxHp = 100;
   private readonly owned = new Map<string, number>();
   private perks: string[] = [];
 
@@ -111,8 +112,6 @@ export class GameScene extends Phaser.Scene {
     this.rng = createRng(seed);
     this.elapsedMs = 0;
     this.level = 1;
-    this.hp = 100;
-    this.maxHp = 100;
     this.owned.clear();
     this.perks = [];
 
@@ -127,6 +126,7 @@ export class GameScene extends Phaser.Scene {
 
     const buttons = [
       addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.levelUp()),
+      addTextButton(this, width / 2, height * 0.69, 'Hit (10)', () => this.player.takeDamage(10)),
       addTextButton(this, width * 0.4, height * 0.78, 'Win', () => this.endRun('win')),
       addTextButton(this, width * 0.6, height * 0.78, 'Lose', () => this.endRun('lose')),
     ];
@@ -134,8 +134,12 @@ export class GameScene extends Phaser.Scene {
 
     const onPick = (pick: LevelUpPickPayload): void => this.applyPick(pick.perkId);
     this.events.on(LEVEL_UP_EVENT.pick, onPick);
+    // Spec §4 step 4: the player reaching 0 HP is the losing end of the run.
+    const onDied = (): void => this.endRun('lose');
+    this.events.once(PLAYER_EVENT.died, onDied);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(LEVEL_UP_EVENT.pick, onPick);
+      this.events.off(PLAYER_EVENT.died, onDied);
     });
 
     this.scene.launch(SCENE.hud);
@@ -144,7 +148,7 @@ export class GameScene extends Phaser.Scene {
   /** Run clock accumulates scene delta, so it freezes with the scene when Game is paused. */
   update(_time: number, delta: number): void {
     if (!this.payload) return;
-    this.player.update();
+    this.player.update(delta);
     this.elapsedMs += delta;
     emitRunEvent(this.events, 'timer', { elapsedMs: this.elapsedMs });
   }
@@ -201,8 +205,7 @@ export class GameScene extends Phaser.Scene {
 
     const resolution = resolveLevelUp(offer);
     if (resolution.kind === 'fallback') {
-      this.maxHp += resolution.maxHpBonus;
-      emitRunEvent(this.events, 'hp', { hp: this.hp, maxHp: this.maxHp });
+      this.player.grantMaxHp(resolution.maxHpBonus);
       return;
     }
     const payload: LevelUpPayload = { offer: resolution.cards };
