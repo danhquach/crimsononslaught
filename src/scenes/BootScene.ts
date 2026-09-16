@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
+import { generatePlaceholderTextures } from '../render/textures';
 
 /**
- * First scene. For now it only shows the title; later tickets add
- * placeholder-texture generation (CO-005) and the hand-off to SpellSelect (CO-010).
+ * First scene: builds the placeholder textures every later scene draws with,
+ * then hands off. Until SpellSelect exists (CO-010) it shows the title;
+ * `?debug=textures` opens the CO-005 texture check instead.
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -10,6 +12,13 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    generatePlaceholderTextures(this);
+
+    if (new URLSearchParams(location.search).get('debug') === 'textures') {
+      this.scene.start('TextureDebug');
+      return;
+    }
+
     const { width, height } = this.scale;
     this.add
       .text(width / 2, height / 2, 'Crimson Onslaught', {

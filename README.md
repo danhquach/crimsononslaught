@@ -25,6 +25,7 @@ until the asset pass.
 - Three enemy archetypes (swarm, fast, tank) on a time-based spawn schedule.
 - Seeded runs: `?seed=<n>` reproduces a run exactly; `?timeScale=<n>` speeds
   it up for testing.
+- Dev switches: `?debug=textures` shows every placeholder texture in a row.
 
 ## Getting started
 
@@ -55,6 +56,36 @@ src/systems/  spawn director, perks, collisions, run state
 src/render/   texture-key layer (placeholder shapes now, sprite atlas later)
 docs/         design spec, ticket list, tuning notes
 ```
+
+## Rendering and swapping in real art
+
+Nothing in the game references an image file. Every visual asks for a
+**texture key** (`player`, `enemy_swarm`, `enemy_fast`, `enemy_tank`, `boss`,
+`gem`, `proj_fire`, `fx_nova`, `fx_bolt`, `boulder`), typed as `TextureKey`
+in `src/config/colors.ts`. At boot, `src/render/textures.ts` generates a
+flat-colored shape for each key with Phaser Graphics. Open
+`http://localhost:5173/?debug=textures` to see all ten.
+
+To replace the placeholders with a sprite atlas:
+
+1. Put the atlas under `public/` (e.g. `public/art/atlas.png` + `atlas.json`).
+2. In `BootScene.preload()`, load it:
+   `this.load.atlas('art', 'art/atlas.png', 'art/atlas.json')`.
+3. Name the atlas frames after the keys, then in `BootScene.create()`, before
+   `generatePlaceholderTextures(this)`, copy each frame into a standalone
+   texture of the same name:
+   ```ts
+   for (const key of TEXTURE_KEYS) {
+     const frame = this.textures.getFrame('art', key);
+     this.textures.createCanvas(key, frame.width, frame.height)?.drawFrame('art', key).refresh();
+   }
+   ```
+4. `generatePlaceholderTextures` skips any key that already exists, so keys
+   can be migrated one at a time; the rest keep their generated shapes.
+
+No entity, spell, or scene code changes — they keep requesting the same keys.
+If a texture needs animation later, add the frames to the atlas and drive
+them with Phaser's animation manager keyed off the same `TextureKey`.
 
 ## CI and deployment
 

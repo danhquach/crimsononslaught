@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { resolveSeed } from './core/rng';
 import { BootScene } from './scenes/BootScene';
+import { TextureDebugScene } from './scenes/TextureDebugScene';
 
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
   },
-  scene: [BootScene],
+  scene: [BootScene, TextureDebugScene],
 };
 
 new Phaser.Game(config);
