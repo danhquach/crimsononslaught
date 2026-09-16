@@ -6,6 +6,7 @@ import {
   type PerkCard,
 } from '../core/levelUp';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
+import { attachMenuInput, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
 const CARD_HEIGHT = 260;
@@ -21,8 +22,8 @@ const BACKDROP_ALPHA = 0.65;
  * cards (name, branch, rank x/y, description). Click a card or press its number
  * key (1–3) to pick; the pick is emitted as `LEVEL_UP_EVENT.pick` on the Game
  * scene's emitter, then Game is resumed and this scene stops. The HUD is a
- * separate parallel scene and stays visible throughout.
- * CO-020 adds gamepad selection via the shared Input helper.
+ * separate parallel scene and stays visible throughout. A gamepad moves the
+ * selection with the D-pad or left stick and picks with A.
  */
 export class LevelUpScene extends Phaser.Scene {
   private cards: readonly PerkCard[] = [];
@@ -61,7 +62,7 @@ export class LevelUpScene extends Phaser.Scene {
       .setOrigin(0.5);
     const keys = this.cards.length === 1 ? '1' : `1–${this.cards.length}`;
     this.add
-      .text(width / 2, 118, `Choose a perk  ·  click a card or press ${keys}`, {
+      .text(width / 2, 118, `Choose a perk  ·  click a card, press ${keys}, or use a gamepad`, {
         fontFamily: 'Georgia, serif',
         fontSize: '18px',
         color: '#cccccc',
@@ -72,9 +73,10 @@ export class LevelUpScene extends Phaser.Scene {
     const rowWidth = n * CARD_WIDTH + (n - 1) * CARD_GAP;
     const firstX = (width - rowWidth) / 2 + CARD_WIDTH / 2;
     const cardY = 160 + CARD_HEIGHT / 2;
-    this.cards.forEach((card, i) => {
-      this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, card, i + 1);
-    });
+    const items = this.cards.map((card, i) =>
+      this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, card, i + 1),
+    );
+    attachMenuInput(this, items);
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       const index = perkIndexForKey(event.key, this.cards.length);
@@ -83,7 +85,7 @@ export class LevelUpScene extends Phaser.Scene {
     });
   }
 
-  private addCard(x: number, y: number, card: PerkCard, hotkey: number): void {
+  private addCard(x: number, y: number, card: PerkCard, hotkey: number): MenuItem {
     const innerWidth = CARD_WIDTH - CARD_PADDING * 2;
     const left = -CARD_WIDTH / 2 + CARD_PADDING;
     const top = -CARD_HEIGHT / 2 + CARD_PADDING;
@@ -124,14 +126,18 @@ export class LevelUpScene extends Phaser.Scene {
 
     this.add.container(x, y, [frame, key, rank, name, branch, description]);
 
+    // Gamepad selection reuses the hover look, so a card reads the same however
+    // it was reached.
+    const highlight = (on: boolean): void => {
+      frame.setFillStyle(on ? CARD_FILL_HOVER : CARD_FILL).setStrokeStyle(on ? 4 : 2, CARD_STROKE);
+    };
+
     frame.setInteractive({ useHandCursor: true });
-    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      frame.setFillStyle(CARD_FILL_HOVER).setStrokeStyle(4, CARD_STROKE);
-    });
-    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      frame.setFillStyle(CARD_FILL).setStrokeStyle(2, CARD_STROKE);
-    });
+    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => highlight(true));
+    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => highlight(false));
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.pick(card));
+
+    return { setSelected: highlight, confirm: () => this.pick(card) };
   }
 
   /** Idempotent: a click and a key press in the same frame pick exactly one perk. */

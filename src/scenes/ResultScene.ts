@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { RESULT_HEADLINES, isConfirmKey, resultRows } from '../core/resultModel';
 import { SCENE, isResultPayload, type ResultPayload } from '../core/scenePayloads';
-import { addTextButton } from './ui';
+import { attachMenuInput } from './input';
+import { addTextButton, textButtonItem } from './ui';
 
 const ROW_HEIGHT = 34;
 const ROW_GAP = 8;
@@ -13,8 +14,8 @@ const BUTTON_MARGIN = 40;
  * Result screen: Victory / Defeat headline and the run's stats (time survived,
  * level, kills, spell, perks taken) from `ResultPayload`. "Play again" returns
  * to SpellSelect on click or Enter; both paths are idempotent within a frame.
- * Started without a valid payload it falls back to SpellSelect (spec §7).
- * CO-020 adds gamepad confirm via the shared Input helper.
+ * A gamepad confirms with A. Started without a valid payload it falls back to
+ * SpellSelect (spec §7).
  */
 export class ResultScene extends Phaser.Scene {
   private payload: ResultPayload | null = null;
@@ -81,9 +82,10 @@ export class ResultScene extends Phaser.Scene {
     });
 
     const buttonY = Math.max(height * 0.82, y + BUTTON_MARGIN);
-    addTextButton(this, width / 2, buttonY, 'Play again', () => this.playAgain());
+    const button = addTextButton(this, width / 2, buttonY, 'Play again', () => this.playAgain());
+    attachMenuInput(this, [textButtonItem(button, () => this.playAgain())]);
     this.add
-      .text(width / 2, buttonY + 40, 'click or press Enter', {
+      .text(width / 2, buttonY + 40, 'click, press Enter, or gamepad A', {
         fontFamily: 'Georgia, serif',
         fontSize: '16px',
         color: '#888888',

@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
+import type { MenuItem } from './input';
 
-/**
- * Minimal clickable text button shared by the stub scenes and Result.
- * CO-020 extends this with gamepad confirm via the shared Input helper.
- */
+const BUTTON_FILL = '#333333';
+const BUTTON_FILL_SELECTED = '#5a1620';
+
+/** Minimal clickable text button shared by the stub scenes and Result. */
 export function addTextButton(
   scene: Phaser.Scene,
   x: number,
@@ -17,7 +18,7 @@ export function addTextButton(
       fontFamily: 'Georgia, serif',
       fontSize: '28px',
       color: '#ffffff',
-      backgroundColor: '#333333',
+      backgroundColor: BUTTON_FILL,
       padding: { x: 16, y: 8 },
       ...style,
     })
@@ -28,4 +29,13 @@ export function addTextButton(
   text.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => text.setAlpha(1));
   text.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, onClick);
   return text;
+}
+
+/** Wrap a text button as a `MenuItem`, so `attachMenuInput` can highlight and confirm it. */
+export function textButtonItem(text: Phaser.GameObjects.Text, onConfirm: () => void): MenuItem {
+  return {
+    setSelected: (selected) =>
+      text.setBackgroundColor(selected ? BUTTON_FILL_SELECTED : BUTTON_FILL),
+    confirm: onConfirm,
+  };
 }

@@ -23,6 +23,11 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
   },
+  // Phaser's Gamepad plugin is off by default; the player and the menus both
+  // read a pad through `scenes/input.ts` (spec §5).
+  input: {
+    gamepad: true,
+  },
   // Flow: Boot -> SpellSelect -> Game (+ Hud overlay, LevelUp overlay on level-up) -> Result -> SpellSelect.
   scene: [
     BootScene,

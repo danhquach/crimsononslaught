@@ -27,6 +27,17 @@ until the asset pass.
   it up for testing.
 - Dev switches: `?debug=textures` shows every placeholder texture in a row.
 
+## Controls
+
+|                    | Keyboard / mouse                                  | Gamepad                                         |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------- |
+| Move               | WASD or arrow keys                                | Left stick (analog, deadzone 0.2) or D-pad      |
+| Menus and overlays | Click, or the number keys / Enter shown on screen | D-pad or left stick to select, **A** to confirm |
+
+Both input sources are live at once, and a pad plugged in mid-run is picked up
+without a reload. Mouse and keyboard stay primary: nothing is highlighted until
+a gamepad is actually used.
+
 ## Getting started
 
 Requires Node 20.19+ (or 22.12+).
