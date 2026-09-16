@@ -1,5 +1,14 @@
 import Phaser from 'phaser';
 import {
+  PLAYER_EVENT,
+  createHealth,
+  flickerAlpha,
+  grantMaxHp,
+  takeDamage,
+  tickHealth,
+  type HealthState,
+} from '../core/health';
+import {
   directionVector,
   moveVelocity,
   padVector,
@@ -7,6 +16,7 @@ import {
   stickVector,
   type Vec2,
 } from '../core/input';
+import { emitRunEvent } from '../core/runEvents';
 import { firstPad } from '../scenes/input';
 
 /** Half the 28 px placeholder circle, so the body matches what is drawn. */
@@ -18,12 +28,18 @@ const BODY_RADIUS = 14;
  * normalized; an Arcade body collides with the world bounds, so the arena edge
  * stops the player rather than a clamp in `update`.
  *
+ * HP and damage intake live in `core/health.ts`: `takeDamage` applies a hit at
+ * most once per 0.5 s, the sprite flickers for that window, and the killing blow
+ * emits `PLAYER_EVENT.died` once. Every HP change is published as a `run:hp`
+ * event, so the HUD never reads this entity.
+ *
  * `update` is driven by `GameScene`, not by Phaser, so a paused Game (level-up
  * overlay) freezes the player with it.
  */
 export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys | undefined;
   private readonly wasd: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key> | undefined;
+  private health: HealthState = createHealth();
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'player');
@@ -40,9 +56,38 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key> | undefined;
   }
 
-  override update(): void {
+  get hp(): number {
+    return this.health.hp;
+  }
+
+  get maxHp(): number {
+    return this.health.maxHp;
+  }
+
+  override update(deltaMs = 0): void {
+    this.setHealth(tickHealth(this.health, deltaMs));
     const { x, y } = moveVelocity(resolveMove(this.keyboardMove(), this.padMove()));
     this.setVelocity(x, y);
+  }
+
+  /** Spec §5: a hit costs HP and grants 0.5 s of invulnerability; hits inside it are ignored. */
+  takeDamage(amount: number): void {
+    const { state, damaged, died } = takeDamage(this.health, amount);
+    this.setHealth(state);
+    if (!damaged) return;
+    emitRunEvent(this.scene.events, 'hp', { hp: state.hp, maxHp: state.maxHp });
+    if (died) this.scene.events.emit(PLAYER_EVENT.died);
+  }
+
+  /** Level-up fallback (spec §5): raise the maximum, leaving current HP alone. */
+  grantMaxHp(bonus: number): void {
+    this.setHealth(grantMaxHp(this.health, bonus));
+    emitRunEvent(this.scene.events, 'hp', { hp: this.health.hp, maxHp: this.health.maxHp });
+  }
+
+  private setHealth(state: HealthState): void {
+    this.health = state;
+    this.setAlpha(flickerAlpha(state));
   }
 
   private keyboardMove(): Vec2 {
