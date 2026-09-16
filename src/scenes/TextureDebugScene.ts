@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS, TEXTURE_KEYS } from '../config/colors';
+import { SCENE } from '../core/scenePayloads';
 
 /**
  * Dev-only check for CO-005: draws every texture key in a row with its label.
@@ -7,7 +8,7 @@ import { PLACEHOLDERS, TEXTURE_KEYS } from '../config/colors';
  */
 export class TextureDebugScene extends Phaser.Scene {
   constructor() {
-    super('TextureDebug');
+    super(SCENE.textureDebug);
   }
 
   create(): void {
