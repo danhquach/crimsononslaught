@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
 /**
- * Minimal clickable text button shared by the stub scenes. CO-011 / CO-014 /
+ * Minimal clickable text button shared by the stub scenes. CO-014 /
  * CO-020 replace or extend this with real cards, keyboard and gamepad input.
  */
 export function addTextButton(
