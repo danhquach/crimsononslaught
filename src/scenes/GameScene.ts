@@ -15,7 +15,19 @@ import {
 } from '../core/levelUp';
 import { createRng, type Rng } from '../core/rng';
 import { emitRunEvent } from '../core/runEvents';
+import { Player } from '../entities/Player';
 import { addTextButton } from './ui';
+
+/** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
+const WORLD_WIDTH = 3000;
+const WORLD_HEIGHT = 3000;
+
+const ARENA_FILL = 0x121212;
+const ARENA_LINE = 0x1f1f1f;
+const ARENA_BORDER = 0x5a1620;
+const GRID_CELL = 200;
+/** Stub buttons and labels sit above the world and ignore the camera scroll. */
+const UI_DEPTH = 10;
 
 /**
  * Stand-in perk pool until the real trees (CO-040) and offer logic (CO-041)
@@ -54,17 +66,20 @@ const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
 ];
 
 /**
- * Stub run: shows the payload it was started with, launches the HUD overlay,
- * and offers Win / Lose buttons that end the run with a full `ResultPayload`.
- * Emits the run clock on `this.events` (see `core/runEvents.ts`) so the HUD is
- * live. "Level up" drives the level-up flow (pause -> LevelUp overlay -> pick
- * -> resume, or the zero-perk fallback) from a stub perk pool until CO-031 /
- * CO-042 trigger it from XP and the real trees. CO-030's RunState takes over
- * every run event, and CO-020+ replace the stub body with the world, player
- * and systems.
+ * The run: a 3000 x 3000 bounded arena with the player at its centre and the
+ * camera following inside the same bounds.
+ *
+ * Still stubbed around that: Win / Lose buttons end the run with a full
+ * `ResultPayload`, and the run clock is emitted on `this.events` (see
+ * `core/runEvents.ts`) so the HUD is live. "Level up" drives the level-up flow
+ * (pause -> LevelUp overlay -> pick -> resume, or the zero-perk fallback) from
+ * a stub perk pool until CO-031 / CO-042 trigger it from XP and the real trees.
+ * CO-030's RunState takes over every run event, and CO-021+ add HP, enemies,
+ * gems and spells.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
+  private player!: Player;
   private rng!: Rng;
   private elapsedMs = 0;
   private level = 1;
@@ -101,19 +116,21 @@ export class GameScene extends Phaser.Scene {
     this.owned.clear();
     this.perks = [];
 
-    const { width, height } = this.scale;
-    this.add.image(width / 2, height / 2, 'player');
-    this.add
-      .text(width / 2, height * 0.3, `Game (stub)\nspell ${spellId} · seed ${seed}`, {
-        fontFamily: 'monospace',
-        fontSize: '20px',
-        align: 'center',
-      })
-      .setOrigin(0.5);
+    this.buildArena();
+    this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
+    this.cameras.main.startFollow(this.player, true);
 
-    addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.levelUp());
-    addTextButton(this, width * 0.4, height * 0.78, 'Win', () => this.endRun('win'));
-    addTextButton(this, width * 0.6, height * 0.78, 'Lose', () => this.endRun('lose'));
+    const { width, height } = this.scale;
+    // Below the HUD's timer and boss bar, which own the top of the screen.
+    this.addOverlayText(width / 2, 96, `Game (stub)\nspell ${spellId} · seed ${seed}`);
+    this.addOverlayText(width / 2, height - 40, 'WASD / arrows or gamepad stick / D-pad to move');
+
+    const buttons = [
+      addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.levelUp()),
+      addTextButton(this, width * 0.4, height * 0.78, 'Win', () => this.endRun('win')),
+      addTextButton(this, width * 0.6, height * 0.78, 'Lose', () => this.endRun('lose')),
+    ];
+    buttons.forEach((button) => button.setScrollFactor(0).setDepth(UI_DEPTH));
 
     const onPick = (pick: LevelUpPickPayload): void => this.applyPick(pick.perkId);
     this.events.on(LEVEL_UP_EVENT.pick, onPick);
@@ -127,8 +144,46 @@ export class GameScene extends Phaser.Scene {
   /** Run clock accumulates scene delta, so it freezes with the scene when Game is paused. */
   update(_time: number, delta: number): void {
     if (!this.payload) return;
+    this.player.update();
     this.elapsedMs += delta;
     emitRunEvent(this.events, 'timer', { elapsedMs: this.elapsedMs });
+  }
+
+  /**
+   * Bounded world: Arcade bounds stop the player at the edge, camera bounds stop
+   * the view there. The grid gives the empty plane enough texture to read motion.
+   */
+  private buildArena(): void {
+    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    const cx = WORLD_WIDTH / 2;
+    const cy = WORLD_HEIGHT / 2;
+    this.add.grid(
+      cx,
+      cy,
+      WORLD_WIDTH,
+      WORLD_HEIGHT,
+      GRID_CELL,
+      GRID_CELL,
+      ARENA_FILL,
+      1,
+      ARENA_LINE,
+      1,
+    );
+    this.add.rectangle(cx, cy, WORLD_WIDTH, WORLD_HEIGHT).setStrokeStyle(6, ARENA_BORDER);
+  }
+
+  private addOverlayText(x: number, y: number, text: string): void {
+    this.add
+      .text(x, y, text, {
+        fontFamily: 'monospace',
+        fontSize: '16px',
+        color: '#cccccc',
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(UI_DEPTH);
   }
 
   /**
