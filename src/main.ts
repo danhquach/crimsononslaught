@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
+import { LevelUpScene } from './scenes/LevelUpScene';
 import { ResultScene } from './scenes/ResultScene';
 import { SpellSelectScene } from './scenes/SpellSelectScene';
 import { TextureDebugScene } from './scenes/TextureDebugScene';
@@ -22,8 +23,16 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
   },
-  // Flow: Boot -> SpellSelect -> Game (+ Hud overlay) -> Result -> SpellSelect.
-  scene: [BootScene, SpellSelectScene, GameScene, HudScene, ResultScene, TextureDebugScene],
+  // Flow: Boot -> SpellSelect -> Game (+ Hud overlay, LevelUp overlay on level-up) -> Result -> SpellSelect.
+  scene: [
+    BootScene,
+    SpellSelectScene,
+    GameScene,
+    HudScene,
+    LevelUpScene,
+    ResultScene,
+    TextureDebugScene,
+  ],
 };
 
 /**

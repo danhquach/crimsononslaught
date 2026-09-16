@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isGamePayload, isResultPayload, isRunStats, type ResultPayload } from './scenePayloads';
+import {
+  isGamePayload,
+  isLevelUpPayload,
+  isResultPayload,
+  isRunStats,
+  type ResultPayload,
+} from './scenePayloads';
 
 const stats = { timeSurvivedMs: 12_345, level: 3, kills: 42, spellId: 'fire', perks: ['a', 'b'] };
 const result: ResultPayload = { outcome: 'win', stats: { ...stats, spellId: 'fire' } };
@@ -57,5 +63,33 @@ describe('isResultPayload', () => {
     expect(isResultPayload({ outcome: 'draw', stats })).toBe(false);
     expect(isResultPayload({ outcome: 'win' })).toBe(false);
     expect(isResultPayload({ outcome: 'win', stats: {} })).toBe(false);
+  });
+});
+
+describe('isLevelUpPayload', () => {
+  const perk = {
+    id: 'fire.power.dmg',
+    name: 'Hotter Flames',
+    branch: 'Power',
+    rank: 1,
+    maxRank: 3,
+    description: '+20% damage.',
+  };
+
+  it('accepts one to three valid cards', () => {
+    expect(isLevelUpPayload({ offer: [perk] })).toBe(true);
+    expect(isLevelUpPayload({ offer: [perk, perk, perk] })).toBe(true);
+  });
+
+  it('rejects an empty offer (Game handles that path without an overlay) and more than three', () => {
+    expect(isLevelUpPayload({ offer: [] })).toBe(false);
+    expect(isLevelUpPayload({ offer: [perk, perk, perk, perk] })).toBe(false);
+  });
+
+  it('rejects missing payload or a malformed card', () => {
+    expect(isLevelUpPayload(undefined)).toBe(false);
+    expect(isLevelUpPayload({})).toBe(false);
+    expect(isLevelUpPayload({ offer: 'perk' })).toBe(false);
+    expect(isLevelUpPayload({ offer: [{ ...perk, rank: 0 }] })).toBe(false);
   });
 });

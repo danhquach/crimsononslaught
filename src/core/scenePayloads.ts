@@ -1,4 +1,5 @@
 import { isSpellId, type SpellId } from '../config/spells';
+import { MAX_OFFER_SIZE, isPerkCard, type PerkCard } from './levelUp';
 
 /**
  * Typed payloads carried across scene transitions (spec §7: transitions always
@@ -14,6 +15,7 @@ export const SCENE = {
   spellSelect: 'SpellSelect',
   game: 'Game',
   hud: 'Hud',
+  levelUp: 'LevelUp',
   result: 'Result',
   textureDebug: 'TextureDebug',
 } as const;
@@ -25,6 +27,11 @@ export const SEED_REGISTRY_KEY = 'seed';
 export interface GamePayload {
   spellId: SpellId;
   seed: number;
+}
+
+/** `Game -> LevelUp` (launched over the paused Game). Never empty: Game handles the zero-perk path itself. */
+export interface LevelUpPayload {
+  offer: readonly PerkCard[];
 }
 
 export type Outcome = 'win' | 'lose';
@@ -52,6 +59,16 @@ const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Num
 
 export function isGamePayload(data: unknown): data is GamePayload {
   return isRecord(data) && isSpellId(data.spellId) && Number.isInteger(data.seed);
+}
+
+export function isLevelUpPayload(data: unknown): data is LevelUpPayload {
+  return (
+    isRecord(data) &&
+    Array.isArray(data.offer) &&
+    data.offer.length >= 1 &&
+    data.offer.length <= MAX_OFFER_SIZE &&
+    data.offer.every(isPerkCard)
+  );
 }
 
 export function isRunStats(data: unknown): data is RunStats {
