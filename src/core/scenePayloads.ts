@@ -18,6 +18,7 @@ export const SCENE = {
   levelUp: 'LevelUp',
   result: 'Result',
   textureDebug: 'TextureDebug',
+  collisionDebug: 'CollisionDebug',
 } as const;
 
 /** Registry key under which Boot stores the run seed (from `?seed=` or the clock). */

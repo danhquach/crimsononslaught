@@ -7,7 +7,8 @@ import { generatePlaceholderTextures } from '../render/textures';
 /**
  * First scene: builds the placeholder textures every later scene draws with,
  * fixes the run seed, then hands off to SpellSelect.
- * `?debug=textures` opens the CO-005 texture check instead.
+ * `?debug=textures` opens the CO-005 texture check instead, `?debug=collisions`
+ * the CO-032 overlap check.
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -30,8 +31,13 @@ export class BootScene extends Phaser.Scene {
     this.registry.set(TIME_SCALE_REGISTRY_KEY, timeScale);
     if (timeScale !== 1) console.info(`[run] timeScale=${timeScale}`);
 
-    if (new URLSearchParams(location.search).get('debug') === 'textures') {
+    const debug = new URLSearchParams(location.search).get('debug');
+    if (debug === 'textures') {
       this.scene.start(SCENE.textureDebug);
+      return;
+    }
+    if (debug === 'collisions') {
+      this.scene.start(SCENE.collisionDebug);
       return;
     }
 
