@@ -23,6 +23,7 @@ import type {
 } from '../core/spellStats';
 import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import type { SpellId } from '../config/spells';
+import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { XpGem } from '../entities/XpGem';
@@ -49,6 +50,8 @@ const UI_DEPTH = 10;
 
 /** Debug kill button: more than any archetype's HP, so one hit always kills. */
 const DEBUG_KILL_DAMAGE = 9999;
+/** Debug boss button: how far from the player the boss appears — beyond the 960-wide view's edge. */
+const DEBUG_BOSS_DISTANCE = 800;
 
 /**
  * The run: a 3000 x 3000 bounded arena with the player at its centre and the
@@ -68,7 +71,8 @@ const DEBUG_KILL_DAMAGE = 9999;
  * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
  * (CO-025) feeds the arena off-camera on the wave schedule. The chosen spell
  * (Epic D) is what kills enemies: Fire (CO-044), Ice (CO-045), Lightning
- * (CO-046) and Earth (CO-047).
+ * (CO-046) and Earth (CO-047). The boss (CO-050) is an enemy in the same pool;
+ * until the boss phase spawns it (CO-051), the "Boss" button does.
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
  * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
  * spell hitboxes included.
@@ -147,6 +151,7 @@ export class GameScene extends Phaser.Scene {
     const buttons = [
       addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.grantLevel()),
       addTextButton(this, width / 2, height * 0.67, 'Kill all', () => this.killAllEnemies()),
+      addTextButton(this, width / 2, height * 0.74, 'Boss', () => this.spawnBoss()),
       addTextButton(this, width * 0.4, height * 0.81, 'Win', () => this.endRun('win')),
       addTextButton(this, width * 0.6, height * 0.81, 'Lose', () => this.endRun('lose')),
     ];
@@ -250,7 +255,15 @@ export class GameScene extends Phaser.Scene {
     const { x, y, enemyType } = enemy;
     if (!enemy.takeDamage(amount)) return;
     this.run.recordKill();
-    this.gems.dropFor(enemyType, x, y);
+    // The boss's death is the win (spec §5, CO-051), not a gem drop.
+    if (!(enemy instanceof Boss)) this.gems.dropFor(enemyType, x, y);
+  }
+
+  /** Debug stand-in for the boss phase (CO-051): the boss lands off-screen to the player's right. */
+  private spawnBoss(): void {
+    const x = Phaser.Math.Clamp(this.player.x + DEBUG_BOSS_DISTANCE, 0, WORLD_WIDTH);
+    this.enemies.spawnBoss(x, this.player.y);
+    this.updateDebugText();
   }
 
   /** Debug shortcut: wipe the arena and watch it rain gems. */
@@ -263,8 +276,14 @@ export class GameScene extends Phaser.Scene {
     this.debugText.setText(
       `enemies ${this.enemies.liveCount} / ${MAX_LIVE_ENEMIES} · gems ${this.gems.liveCount} · ` +
         `xp ${this.run.xp}/${this.run.xpToNext} · lv ${this.run.level} · ` +
-        `kills ${this.run.kills} · ${this.run.phase}`,
+        `kills ${this.run.kills} · ${this.run.phase}` +
+        this.bossDebugText(),
     );
+  }
+
+  private bossDebugText(): string {
+    const boss = this.enemies.boss;
+    return boss ? ` · boss ${boss.remainingHp} ${boss.phase}` : '';
   }
 
   /**
