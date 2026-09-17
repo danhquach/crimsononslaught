@@ -42,7 +42,7 @@ export class Boss extends Enemy {
     return BOSS.contactDamage;
   }
 
-  /** Where the boss is in its cycle; the debug readout shows it. */
+  /** Where the boss is in its cycle: chasing, telegraphing or charging. */
   get phase(): BossPhase {
     return this.cycle.phase;
   }

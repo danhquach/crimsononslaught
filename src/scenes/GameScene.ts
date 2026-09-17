@@ -24,7 +24,6 @@ import type {
   LightningStats,
   PlayerStats,
 } from '../core/spellStats';
-import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import type { SpellId } from '../config/spells';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
@@ -38,7 +37,6 @@ import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { GemPool } from '../systems/GemPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
-import { addTextButton } from './ui';
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
 const WORLD_WIDTH = 3000;
@@ -48,24 +46,18 @@ const ARENA_FILL = 0x121212;
 const ARENA_LINE = 0x1f1f1f;
 const ARENA_BORDER = 0x5a1620;
 const GRID_CELL = 200;
-/** Stub buttons and labels sit above the world and ignore the camera scroll. */
-const UI_DEPTH = 10;
-
-/** Debug kill button: more than any enemy's HP, the boss included, so one hit always kills. */
-const DEBUG_KILL_DAMAGE = 9999;
 
 /**
  * The run: a 3000 x 3000 bounded arena with the player at its centre and the
- * camera following inside the same bounds.
+ * camera following inside the same bounds. Nothing but the HUD is drawn over
+ * it — the run's seed is reachable from the boot log (`[rng] seed=`).
  *
- * Still stubbed around that: Win / Lose buttons end the run with a full
- * `ResultPayload`, and the run clock is emitted on `this.events` (see
- * `core/runEvents.ts`) so the HUD is live. Collected XP levels the run on spec
- * §5's curve (CO-031) and each level drives the level-up flow (pause -> LevelUp
- * overlay -> pick -> resume, or the zero-perk fallback); "Level up" just grants
- * the XP for one. `PerkSystem` (CO-042) owns the offers and the run's stats —
- * each pick is pushed onto the live spell and the generic block onto the
- * player here.
+ * The run clock is emitted on `this.events` (see `core/runEvents.ts`) so the
+ * HUD is live. Collected XP levels the run on spec §5's curve (CO-031) and
+ * each level drives the level-up flow (pause -> LevelUp overlay -> pick ->
+ * resume, or the zero-perk fallback). `PerkSystem` (CO-042) owns the offers
+ * and the run's stats — each pick is pushed onto the live spell and the
+ * generic block onto the player here.
  *
  * The player carries HP and damage intake (CO-021) and enemies chase and damage
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
@@ -85,7 +77,6 @@ export class GameScene extends Phaser.Scene {
   private enemies!: EnemyPool;
   private spawns!: SpawnDirector;
   private gems!: GemPool;
-  private debugText!: Phaser.GameObjects.Text;
   private rng!: Rng;
   private run!: RunState;
   private perks!: PerkSystem;
@@ -146,21 +137,6 @@ export class GameScene extends Phaser.Scene {
     });
     this.spell = this.createSpell(spellId, collisions);
 
-    const { width, height } = this.scale;
-    // Below the HUD's timer and boss bar, which own the top of the screen.
-    this.addOverlayText(width / 2, 96, `Game (stub)\nspell ${spellId} · seed ${seed}`);
-    this.debugText = this.addOverlayText(width / 2, 136, '');
-    this.updateDebugText();
-    this.addOverlayText(width / 2, height - 40, 'WASD / arrows or gamepad stick / D-pad to move');
-
-    const buttons = [
-      addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.grantLevel()),
-      addTextButton(this, width / 2, height * 0.67, 'Kill all', () => this.killAllEnemies()),
-      addTextButton(this, width * 0.4, height * 0.81, 'Win', () => this.endRun('win')),
-      addTextButton(this, width * 0.6, height * 0.81, 'Lose', () => this.endRun('lose')),
-    ];
-    buttons.forEach((button) => button.setScrollFactor(0).setDepth(UI_DEPTH));
-
     const onPick = (pick: LevelUpPickPayload): void => this.applyPick(pick.perkId);
     this.events.on(LEVEL_UP_EVENT.pick, onPick);
     // Spec §4 step 4: the player reaching 0 HP is the losing end of the run.
@@ -205,7 +181,6 @@ export class GameScene extends Phaser.Scene {
     );
     this.gems.update(this.player, this.perks.playerStats.pickupRadius);
     this.spell.update(frame.deltaMs);
-    this.updateDebugText();
   }
 
   /** The run's spell, built on the pool and collision wiring above. */
@@ -252,13 +227,12 @@ export class GameScene extends Phaser.Scene {
     const gained = this.gems.collect(gem);
     if (gained === 0) return;
     this.pendingLevelUps += this.run.addXp(gained);
-    this.updateDebugText();
   }
 
   /**
-   * Every point of damage an enemy takes comes through here — spell hits, burn
-   * ticks, the debug button — so a death is tallied and drops its gems where
-   * the enemy fell (spec §5: 1, or 3 for a tank) whatever killed it.
+   * Every point of damage an enemy takes comes through here — spell hits and
+   * burn ticks alike — so a death is tallied and drops its gems where the
+   * enemy fell (spec §5: 1, or 3 for a tank) whatever killed it.
    */
   private damageEnemy(enemy: Enemy, amount: number): void {
     if (!enemy.active) return;
@@ -283,27 +257,6 @@ export class GameScene extends Phaser.Scene {
       this.rng.next() * Math.PI * 2,
     );
     this.enemies.spawnBoss(point.x, point.y);
-    this.updateDebugText();
-  }
-
-  /** Debug shortcut: wipe the arena and watch it rain gems. */
-  private killAllEnemies(): void {
-    for (const enemy of this.enemies.live) this.damageEnemy(enemy, DEBUG_KILL_DAMAGE);
-    this.updateDebugText();
-  }
-
-  private updateDebugText(): void {
-    this.debugText.setText(
-      `enemies ${this.enemies.liveCount} / ${MAX_LIVE_ENEMIES} · gems ${this.gems.liveCount} · ` +
-        `xp ${this.run.xp}/${this.run.xpToNext} · lv ${this.run.level} · ` +
-        `kills ${this.run.kills} · ${this.run.phase}` +
-        this.bossDebugText(),
-    );
-  }
-
-  private bossDebugText(): string {
-    const boss = this.enemies.boss;
-    return boss ? ` · boss ${boss.remainingHp} ${boss.phase}` : '';
   }
 
   /**
@@ -328,25 +281,6 @@ export class GameScene extends Phaser.Scene {
       1,
     );
     this.add.rectangle(cx, cy, WORLD_WIDTH, WORLD_HEIGHT).setStrokeStyle(6, ARENA_BORDER);
-  }
-
-  private addOverlayText(x: number, y: number, text: string): Phaser.GameObjects.Text {
-    return this.add
-      .text(x, y, text, {
-        fontFamily: 'monospace',
-        fontSize: '16px',
-        color: '#cccccc',
-        align: 'center',
-      })
-      .setOrigin(0.5)
-      .setScrollFactor(0)
-      .setDepth(UI_DEPTH);
-  }
-
-  /** Debug stand-in for collecting gems: enough XP to cross the current threshold. */
-  private grantLevel(): void {
-    this.pendingLevelUps += this.run.addXp(this.run.xpToNext - this.run.xp);
-    this.updateDebugText();
   }
 
   /**
