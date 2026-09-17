@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"],
+    // `import('/src/main.ts')` inside `page.evaluate` is a dev-server URL at
+    // runtime; resolve it to the source file so the browser-side code is typed.
+    "paths": { "/src/*": ["./src/*"] }
+  },
+  "include": ["e2e", "playwright.config.ts"]
+}

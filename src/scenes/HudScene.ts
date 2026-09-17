@@ -72,6 +72,11 @@ export class HudScene extends Phaser.Scene {
     super(SCENE.hud);
   }
 
+  /** What the HUD currently shows, read-only; the browser smoke suite (CO-060) asserts on it. */
+  get view(): Readonly<HudModel> {
+    return this.model;
+  }
+
   create(): void {
     this.model = INITIAL_HUD;
     const { width } = this.scale;

@@ -54,7 +54,8 @@ npm run lint       # type-check + ESLint + Prettier check
 npm run format     # Prettier (write)
 ```
 
-`test:e2e` is a placeholder until the Playwright smoke test lands (CO-060).
+`test:e2e` starts its own Vite dev server and drives Chromium; the first run
+needs the browser installed once with `npx playwright install chromium`.
 
 ## Project layout
 
@@ -101,8 +102,10 @@ them with Phaser's animation manager keyed off the same `TextureKey`.
 
 ## CI and deployment
 
-Every pull request runs `npm run lint`, `npm test`, and `npm run build` in
-GitHub Actions (`.github/workflows/ci.yml`). Pushes to `main` additionally
+Every pull request runs `npm run lint`, `npm test`, `npm run build`, and the
+Playwright smoke suite (`npm run test:e2e`) in GitHub Actions
+(`.github/workflows/ci.yml`); a failed smoke run uploads its HTML report as a
+workflow artifact. Pushes to `main` additionally
 deploy `dist/` to GitHub Pages at the URL above. The deploy job needs the
 repository's Pages source set to **GitHub Actions** (Settings → Pages); the
 lint/test/build job does not depend on it.
