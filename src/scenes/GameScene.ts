@@ -12,7 +12,9 @@ import { LEVEL_UP_EVENT, resolveLevelUp, type LevelUpPickPayload } from '../core
 import { PLAYER_EVENT } from '../core/health';
 import { PerkSystem } from '../core/perkSystem';
 import { createRng, type Rng } from '../core/rng';
+import { RUN_EVENT, type RunEventPayloads } from '../core/runEvents';
 import { RunState, clampTimeScale } from '../core/runState';
+import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
 import type {
   EarthStats,
@@ -48,10 +50,8 @@ const GRID_CELL = 200;
 /** Stub buttons and labels sit above the world and ignore the camera scroll. */
 const UI_DEPTH = 10;
 
-/** Debug kill button: more than any archetype's HP, so one hit always kills. */
+/** Debug kill button: more than any enemy's HP, the boss included, so one hit always kills. */
 const DEBUG_KILL_DAMAGE = 9999;
-/** Debug boss button: how far from the player the boss appears — beyond the 960-wide view's edge. */
-const DEBUG_BOSS_DISTANCE = 800;
 
 /**
  * The run: a 3000 x 3000 bounded arena with the player at its centre and the
@@ -72,7 +72,8 @@ const DEBUG_BOSS_DISTANCE = 800;
  * (CO-025) feeds the arena off-camera on the wave schedule. The chosen spell
  * (Epic D) is what kills enemies: Fire (CO-044), Ice (CO-045), Lightning
  * (CO-046) and Earth (CO-047). The boss (CO-050) is an enemy in the same pool;
- * until the boss phase spawns it (CO-051), the "Boss" button does.
+ * the boss phase (CO-051) spawns it off-camera at 5:00, the wave table has
+ * stopped regular spawns by then, and its death is the win (spec §4 step 4).
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
  * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
  * spell hitboxes included.
@@ -151,7 +152,6 @@ export class GameScene extends Phaser.Scene {
     const buttons = [
       addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.grantLevel()),
       addTextButton(this, width / 2, height * 0.67, 'Kill all', () => this.killAllEnemies()),
-      addTextButton(this, width / 2, height * 0.74, 'Boss', () => this.spawnBoss()),
       addTextButton(this, width * 0.4, height * 0.81, 'Win', () => this.endRun('win')),
       addTextButton(this, width * 0.6, height * 0.81, 'Lose', () => this.endRun('lose')),
     ];
@@ -162,9 +162,15 @@ export class GameScene extends Phaser.Scene {
     // Spec §4 step 4: the player reaching 0 HP is the losing end of the run.
     const onDied = (): void => this.endRun('lose');
     this.events.once(PLAYER_EVENT.died, onDied);
+    // Spec §4 step 4: the clock turning to the boss phase brings the boss in.
+    const onPhase = ({ phase }: RunEventPayloads['phase']): void => {
+      if (phase === 'boss') this.spawnBoss();
+    };
+    this.events.on(RUN_EVENT.phase, onPhase);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(LEVEL_UP_EVENT.pick, onPick);
       this.events.off(PLAYER_EVENT.died, onDied);
+      this.events.off(RUN_EVENT.phase, onPhase);
     });
 
     this.scene.launch(SCENE.hud);
@@ -256,13 +262,23 @@ export class GameScene extends Phaser.Scene {
     if (!enemy.takeDamage(amount)) return;
     this.run.recordKill();
     // The boss's death is the win (spec §5, CO-051), not a gem drop.
-    if (!(enemy instanceof Boss)) this.gems.dropFor(enemyType, x, y);
+    if (enemy instanceof Boss) this.endRun('win');
+    else this.gems.dropFor(enemyType, x, y);
   }
 
-  /** Debug stand-in for the boss phase (CO-051): the boss lands off-screen to the player's right. */
+  /**
+   * Boss phase (CO-051): the boss lands on the same off-camera ring regular
+   * spawns use, at a seeded angle, so where it walks in from is fixed per seed.
+   */
   private spawnBoss(): void {
-    const x = Phaser.Math.Clamp(this.player.x + DEBUG_BOSS_DISTANCE, 0, WORLD_WIDTH);
-    this.enemies.spawnBoss(x, this.player.y);
+    const view = this.cameras.main.worldView;
+    const point = spawnPoint(
+      { x: view.centerX, y: view.centerY },
+      { width: view.width, height: view.height },
+      { width: WORLD_WIDTH, height: WORLD_HEIGHT },
+      this.rng.next() * Math.PI * 2,
+    );
+    this.enemies.spawnBoss(point.x, point.y);
     this.updateDebugText();
   }
 
@@ -389,8 +405,12 @@ export class GameScene extends Phaser.Scene {
     if (after.maxHp !== before.maxHp) this.player.grantMaxHp(after.maxHp - before.maxHp);
   }
 
+  /**
+   * Spec §4 step 4. The first outcome stands: a frame in which the boss's last
+   * hit and the player's death both land must not start Result twice.
+   */
   private endRun(outcome: Outcome): void {
-    if (!this.payload) return;
+    if (!this.payload || this.run.phase === 'over') return;
     this.run.end();
     const payload: ResultPayload = { outcome, stats: this.run.stats(this.payload.spellId) };
     // The HUD is a parallel scene; stopping Game does not stop it.
