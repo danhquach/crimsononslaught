@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { resolveSeed } from '../core/rng';
 import { resolveTimeScale } from '../core/runState';
 import { SCENE, SEED_REGISTRY_KEY, TIME_SCALE_REGISTRY_KEY } from '../core/scenePayloads';
+import { validatePerks } from '../core/spellStats';
 import { generatePlaceholderTextures } from '../render/textures';
 
 /**
@@ -17,6 +18,10 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     generatePlaceholderTextures(this);
+
+    // Spec §7: config is checked once at boot and complains loudly, but a bad
+    // perk tree never stops the run — the nodes that are sound still work.
+    for (const problem of validatePerks()) console.error(`[config] ${problem}`);
 
     // Run seed: `?seed=<int>` reproduces a run; otherwise a fresh one per page
     // load. Logged so a bug report can quote it. SpellSelect reads it from the
