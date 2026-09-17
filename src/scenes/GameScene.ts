@@ -14,7 +14,13 @@ import { PerkSystem } from '../core/perkSystem';
 import { createRng, type Rng } from '../core/rng';
 import { RunState, clampTimeScale } from '../core/runState';
 import type { Spell } from '../core/spell';
-import type { FireStats, IceStats, LightningStats, PlayerStats } from '../core/spellStats';
+import type {
+  EarthStats,
+  FireStats,
+  IceStats,
+  LightningStats,
+  PlayerStats,
+} from '../core/spellStats';
 import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import type { SpellId } from '../config/spells';
 import { Enemy } from '../entities/Enemy';
@@ -23,6 +29,7 @@ import { XpGem } from '../entities/XpGem';
 import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { FireballSpell } from '../spells/FireballSpell';
 import { FrostNovaSpell } from '../spells/FrostNovaSpell';
+import { OrbitingBouldersSpell } from '../spells/OrbitingBouldersSpell';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { GemPool } from '../systems/GemPool';
@@ -60,9 +67,8 @@ const DEBUG_KILL_DAMAGE = 9999;
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
  * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
  * (CO-025) feeds the arena off-camera on the wave schedule. The chosen spell
- * (Epic D) is what kills enemies: Fire (CO-044), Ice (CO-045) and Lightning
- * (CO-046) are in; Earth is not built yet, so a run with it has no spell and
- * "Kill all" stands in.
+ * (Epic D) is what kills enemies: Fire (CO-044), Ice (CO-045), Lightning
+ * (CO-046) and Earth (CO-047).
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
  * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
  * spell hitboxes included.
@@ -77,8 +83,8 @@ export class GameScene extends Phaser.Scene {
   private rng!: Rng;
   private run!: RunState;
   private perks!: PerkSystem;
-  /** The run's one spell, or `null` for a spell not yet built (CO-047). */
-  private spell: Spell | null = null;
+  /** The run's one spell (Epic D), built from the payload's id in `create`. */
+  private spell!: Spell;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
   private pendingLevelUps = 0;
 
@@ -183,16 +189,12 @@ export class GameScene extends Phaser.Scene {
       this.damageEnemy(enemy, amount),
     );
     this.gems.update(this.player, this.perks.playerStats.pickupRadius);
-    this.spell?.update(frame.deltaMs);
+    this.spell.update(frame.deltaMs);
     this.updateDebugText();
   }
 
-  /**
-   * The run's spell, built on the pool and collision wiring above. Fire, Ice and
-   * Lightning exist so far; Earth returns `null` until CO-047 lands, and a run
-   * with it plays without a spell.
-   */
-  private createSpell(spellId: SpellId, collisions: CollisionSystem): Spell | null {
+  /** The run's spell, built on the pool and collision wiring above. */
+  private createSpell(spellId: SpellId, collisions: CollisionSystem): Spell {
     const damage = (enemy: Enemy, amount: number): void => this.damageEnemy(enemy, amount);
     // `PerkSystem` was built from the same id, so its block is this spell's.
     switch (spellId) {
@@ -208,8 +210,10 @@ export class GameScene extends Phaser.Scene {
         const stats = this.perks.spellStats as Readonly<LightningStats>;
         return new ChainLightningSpell(this, this.player, this.enemies, stats, damage);
       }
-      default:
-        return null;
+      case 'earth': {
+        const stats = this.perks.spellStats as Readonly<EarthStats>;
+        return new OrbitingBouldersSpell(this, this.player, collisions, stats, damage);
+      }
     }
   }
 
@@ -249,7 +253,7 @@ export class GameScene extends Phaser.Scene {
     this.gems.dropFor(enemyType, x, y);
   }
 
-  /** Debug stand-in for the spells not built yet: wipe the arena and watch it rain gems. */
+  /** Debug shortcut: wipe the arena and watch it rain gems. */
   private killAllEnemies(): void {
     for (const enemy of this.enemies.live) this.damageEnemy(enemy, DEBUG_KILL_DAMAGE);
     this.updateDebugText();
@@ -350,7 +354,7 @@ export class GameScene extends Phaser.Scene {
     // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
     this.run.recordPerk(card.name);
     // The spell reads its block per cast, so the next volley already has the perk.
-    this.spell?.setStats(this.perks.spellStats);
+    this.spell.setStats(this.perks.spellStats);
     this.syncPlayerStats(before);
   }
 
