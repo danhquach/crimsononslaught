@@ -8,11 +8,26 @@ import {
   type Vec2,
 } from '../core/enemy';
 import { NO_BURN, applyBurn, tickBurn, type BurnState } from '../core/fireball';
+import {
+  NO_FROST,
+  applyFrost,
+  frostSpeedFactor,
+  isSlowed,
+  tickFrost,
+  type FrostHit,
+  type FrostState,
+} from '../core/frostNova';
+import { PLACEHOLDERS } from '../config/colors';
+
+/** A slowed or frozen enemy is tinted the nova's blue so the slow reads on screen. */
+const FROST_TINT = PLACEHOLDERS.fx_nova.color;
 
 /**
  * A regular enemy (spec §5 "Enemies"): chases the player in a straight line at
  * its archetype's speed and damages them on contact at most once per 0.5 s.
  * A fireball hit can set it burning (CO-044); the burn ticks with the chase.
+ * A frost pulse can slow or freeze it (CO-045); the cold scales the chase speed
+ * and runs out with it.
  *
  * Pooled — never constructed per spawn. `systems/EnemyPool.ts` owns the pool and
  * calls `spawn` / `despawn`; an inactive enemy has its body disabled, so it costs
@@ -27,6 +42,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private hp = 0;
   private contactCooldownMs = 0;
   private burn: BurnState = { ...NO_BURN };
+  private frost: FrostState = { ...NO_FROST };
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y, ENEMY_ARCHETYPES.swarm.texture);
@@ -40,6 +56,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return ENEMY_ARCHETYPES[this.kind].contactDamage;
   }
 
+  /** Spec §5 Ice: moving slower than the archetype says, frozen included — what Shatter checks. */
+  get slowed(): boolean {
+    return isSlowed(this.frost);
+  }
+
   /** Take this pooled object out of the pool as `type`, alive and at (x, y). */
   spawn(type: EnemyType, x: number, y: number): void {
     const archetype = ENEMY_ARCHETYPES[type];
@@ -47,6 +68,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.hp = archetype.hp;
     this.contactCooldownMs = 0;
     this.burn = { ...NO_BURN };
+    this.frost = { ...NO_FROST };
+    this.clearTint();
     this.setTexture(archetype.texture);
     this.enableBody(true, x, y, true, true);
     // Body radius comes from the archetype (spec §5), not the placeholder art,
@@ -69,9 +92,14 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   chase(deltaMs: number, target: Readonly<Vec2>): number {
     this.contactCooldownMs = tickContactCooldown(this.contactCooldownMs, deltaMs);
-    const { x, y } = chaseVelocity(this, target, ENEMY_ARCHETYPES[this.kind].speed);
+    const speed = ENEMY_ARCHETYPES[this.kind].speed * frostSpeedFactor(this.frost);
+    const { x, y } = chaseVelocity(this, target, speed);
     this.setVelocity(x, y);
-    const burn = tickBurn(this.burn, deltaMs / 1000);
+    const deltaS = deltaMs / 1000;
+    const frost = tickFrost(this.frost, deltaS);
+    this.frost = frost.state;
+    if (frost.ended) this.clearTint();
+    const burn = tickBurn(this.burn, deltaS);
     this.burn = burn.state;
     return burn.damage;
   }
@@ -79,6 +107,12 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** Spec §5 Fire: set (or refresh) a burn of `dps` for the burn duration. */
   applyBurn(dps: number): void {
     this.burn = applyBurn(this.burn, dps);
+  }
+
+  /** Spec §5 Ice: slow (max, not additive) and maybe freeze; takes effect on the next chase step. */
+  applyFrost(hit: Readonly<FrostHit>): void {
+    this.frost = applyFrost(this.frost, hit);
+    if (this.slowed) this.setTintFill(FROST_TINT);
   }
 
   /**
