@@ -16,12 +16,13 @@ import {
 import { PLAYER_EVENT } from '../core/health';
 import { createRng, type Rng } from '../core/rng';
 import { emitRunEvent } from '../core/runEvents';
-import { ENEMY_TYPES, MAX_LIVE_ENEMIES } from '../config/enemies';
+import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { XpGem } from '../entities/XpGem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { GemPool } from '../systems/GemPool';
+import { SpawnDirector } from '../systems/SpawnDirector';
 import { addTextButton } from './ui';
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
@@ -35,10 +36,6 @@ const GRID_CELL = 200;
 /** Stub buttons and labels sit above the world and ignore the camera scroll. */
 const UI_DEPTH = 10;
 
-/** Debug spawn button: enemies per press, and the ring they appear on around the player. */
-const DEBUG_SPAWN_BATCH = 50;
-const DEBUG_SPAWN_RADIUS_MIN = 500;
-const DEBUG_SPAWN_RADIUS_MAX = 700;
 /** Debug kill button: more than any archetype's HP, so one hit always kills. */
 const DEBUG_KILL_DAMAGE = 9999;
 
@@ -89,15 +86,17 @@ const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
  * a stub perk pool until CO-031 / CO-042 trigger it from XP and the real trees.
  * The player carries HP and damage intake (CO-021) and enemies chase and damage
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
- * Deaths drop XP gems that drift in and count XP (CO-023). "Spawn 50" stands in
- * for the spawn director until CO-025 and "Kill all" for spells (Epic D), which
- * are what will kill enemies in a real run. CO-030's RunState takes over every
- * run event and CO-031 turns collected XP into levels.
+ * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
+ * (CO-025) feeds the arena off-camera on the wave schedule; "Kill all" stands
+ * in for spells (Epic D), which are what will kill enemies in a real run.
+ * CO-030's RunState takes over every run event and CO-031 turns collected XP
+ * into levels.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
   private player!: Player;
   private enemies!: EnemyPool;
+  private spawns!: SpawnDirector;
   private gems!: GemPool;
   private debugText!: Phaser.GameObjects.Text;
   private rng!: Rng;
@@ -139,6 +138,10 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true);
 
     this.enemies = new EnemyPool(this);
+    this.spawns = new SpawnDirector(this.cameras.main, this.enemies, this.rng, {
+      width: WORLD_WIDTH,
+      height: WORLD_HEIGHT,
+    });
     // Spec §5: contact damage. CO-032 moves every overlap into CollisionSystem.
     this.physics.add.overlap(this.player, this.enemies.group, (_player, enemy) => {
       if (enemy instanceof Enemy) this.onEnemyContact(enemy);
@@ -159,10 +162,7 @@ export class GameScene extends Phaser.Scene {
 
     const buttons = [
       addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.levelUp()),
-      addTextButton(this, width / 2, height * 0.67, `Spawn ${DEBUG_SPAWN_BATCH}`, () =>
-        this.spawnDebugWave(),
-      ),
-      addTextButton(this, width / 2, height * 0.74, 'Kill all', () => this.killAllEnemies()),
+      addTextButton(this, width / 2, height * 0.67, 'Kill all', () => this.killAllEnemies()),
       addTextButton(this, width * 0.4, height * 0.81, 'Win', () => this.endRun('win')),
       addTextButton(this, width * 0.6, height * 0.81, 'Lose', () => this.endRun('lose')),
     ];
@@ -184,11 +184,15 @@ export class GameScene extends Phaser.Scene {
   /** Run clock accumulates scene delta, so it freezes with the scene when Game is paused. */
   update(_time: number, delta: number): void {
     if (!this.payload) return;
+    // Spec §4 step 2: the director spends the frame's budget before anything
+    // moves, so a new enemy chases from the moment it lands.
+    this.spawns.update(this.elapsedMs / 1000, delta / 1000);
     this.player.update(delta);
     this.enemies.update(delta, this.player);
     this.gems.update(this.player);
     this.elapsedMs += delta;
     emitRunEvent(this.events, 'timer', { elapsedMs: this.elapsedMs });
+    this.updateDebugText();
   }
 
   /**
@@ -226,22 +230,6 @@ export class GameScene extends Phaser.Scene {
   private killAllEnemies(): void {
     for (const child of this.enemies.group.getChildren()) {
       if (child instanceof Enemy) this.killEnemy(child);
-    }
-    this.updateDebugText();
-  }
-
-  /**
-   * Debug stand-in for the spawn director (CO-025): a batch of mixed enemies on
-   * a ring around the player. Requests past the live cap come back `null` from
-   * the pool and are simply dropped (spec §5).
-   */
-  private spawnDebugWave(): void {
-    for (let i = 0; i < DEBUG_SPAWN_BATCH; i++) {
-      const angle = this.rng.next() * Math.PI * 2;
-      const radius = this.rng.int(DEBUG_SPAWN_RADIUS_MIN, DEBUG_SPAWN_RADIUS_MAX);
-      const x = Phaser.Math.Clamp(this.player.x + Math.cos(angle) * radius, 0, WORLD_WIDTH);
-      const y = Phaser.Math.Clamp(this.player.y + Math.sin(angle) * radius, 0, WORLD_HEIGHT);
-      this.enemies.spawn(this.rng.pick(ENEMY_TYPES), x, y);
     }
     this.updateDebugText();
   }
