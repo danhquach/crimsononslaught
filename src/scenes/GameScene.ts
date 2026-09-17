@@ -14,13 +14,14 @@ import { PerkSystem } from '../core/perkSystem';
 import { createRng, type Rng } from '../core/rng';
 import { RunState, clampTimeScale } from '../core/runState';
 import type { Spell } from '../core/spell';
-import type { FireStats, PlayerStats } from '../core/spellStats';
+import type { FireStats, IceStats, PlayerStats } from '../core/spellStats';
 import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import type { SpellId } from '../config/spells';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { XpGem } from '../entities/XpGem';
 import { FireballSpell } from '../spells/FireballSpell';
+import { FrostNovaSpell } from '../spells/FrostNovaSpell';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { GemPool } from '../systems/GemPool';
@@ -58,8 +59,9 @@ const DEBUG_KILL_DAMAGE = 9999;
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
  * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
  * (CO-025) feeds the arena off-camera on the wave schedule. The chosen spell
- * (Epic D) is what kills enemies: Fire is in (CO-044); the other three are not
- * built yet, so a run with one of them has no spell and "Kill all" stands in.
+ * (Epic D) is what kills enemies: Fire (CO-044) and Ice (CO-045) are in; the
+ * other two are not built yet, so a run with one of them has no spell and
+ * "Kill all" stands in.
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
  * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
  * spell hitboxes included.
@@ -74,7 +76,7 @@ export class GameScene extends Phaser.Scene {
   private rng!: Rng;
   private run!: RunState;
   private perks!: PerkSystem;
-  /** The run's one spell, or `null` for a spell not yet built (CO-045..047). */
+  /** The run's one spell, or `null` for a spell not yet built (CO-046, CO-047). */
   private spell: Spell | null = null;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
   private pendingLevelUps = 0;
@@ -185,17 +187,25 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The run's spell, built on the pool and collision wiring above. Only Fire
-   * exists so far; the other three return `null` until CO-045..047 land, and a
+   * The run's spell, built on the pool and collision wiring above. Fire and Ice
+   * exist so far; the other two return `null` until CO-046 / CO-047 land, and a
    * run with one of them plays without a spell.
    */
   private createSpell(spellId: SpellId, collisions: CollisionSystem): Spell | null {
-    if (spellId !== 'fire') return null;
-    // `PerkSystem` was built from the same id, so its block is Fire's.
-    const stats = this.perks.spellStats as Readonly<FireStats>;
-    return new FireballSpell(this, this.player, this.enemies, collisions, stats, (enemy, amount) =>
-      this.damageEnemy(enemy, amount),
-    );
+    const damage = (enemy: Enemy, amount: number): void => this.damageEnemy(enemy, amount);
+    // `PerkSystem` was built from the same id, so its block is this spell's.
+    switch (spellId) {
+      case 'fire': {
+        const stats = this.perks.spellStats as Readonly<FireStats>;
+        return new FireballSpell(this, this.player, this.enemies, collisions, stats, damage);
+      }
+      case 'ice': {
+        const stats = this.perks.spellStats as Readonly<IceStats>;
+        return new FrostNovaSpell(this, this.player, this.enemies, stats, damage, this.rng);
+      }
+      default:
+        return null;
+    }
   }
 
   /** `?timeScale=` is resolved once in Boot; a Game started without it runs real time. */

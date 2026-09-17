@@ -12,13 +12,7 @@ import type { Enemy } from '../entities/Enemy';
 import { Projectile } from '../entities/Projectile';
 import type { CollisionSystem, SpellHitbox } from '../systems/CollisionSystem';
 import type { EnemyPool } from '../systems/EnemyPool';
-
-/**
- * Where spell damage goes. What a hit costs the run — the kill tally, the gem
- * drop — is `GameScene`'s business, so a spell reports the damage it dealt and
- * the scene applies it.
- */
-export type DamageSink = (enemy: Enemy, amount: number) => void;
+import type { DamageSink } from './DamageSink';
 
 /**
  * Fire (spec §5 "Fire — Fireball"): every `cooldown` s a volley of
