@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { resolveSeed } from '../core/rng';
-import { SCENE, SEED_REGISTRY_KEY } from '../core/scenePayloads';
+import { resolveTimeScale } from '../core/runState';
+import { SCENE, SEED_REGISTRY_KEY, TIME_SCALE_REGISTRY_KEY } from '../core/scenePayloads';
 import { generatePlaceholderTextures } from '../render/textures';
 
 /**
@@ -22,6 +23,12 @@ export class BootScene extends Phaser.Scene {
     const seed = resolveSeed(location.search, Date.now());
     this.registry.set(SEED_REGISTRY_KEY, seed);
     console.info(`[rng] seed=${seed}`);
+
+    // `?timeScale=<n>` speeds the run clock up (CO-030); Game reads it from the
+    // registry. Logged only when it is on, so a normal run stays quiet.
+    const timeScale = resolveTimeScale(location.search);
+    this.registry.set(TIME_SCALE_REGISTRY_KEY, timeScale);
+    if (timeScale !== 1) console.info(`[run] timeScale=${timeScale}`);
 
     if (new URLSearchParams(location.search).get('debug') === 'textures') {
       this.scene.start(SCENE.textureDebug);

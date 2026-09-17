@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import {
   SCENE,
+  TIME_SCALE_REGISTRY_KEY,
   isGamePayload,
   type GamePayload,
   type LevelUpPayload,
@@ -15,7 +16,7 @@ import {
 } from '../core/levelUp';
 import { PLAYER_EVENT } from '../core/health';
 import { createRng, type Rng } from '../core/rng';
-import { emitRunEvent } from '../core/runEvents';
+import { RunState, clampTimeScale } from '../core/runState';
 import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
@@ -89,8 +90,8 @@ const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
  * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
  * (CO-025) feeds the arena off-camera on the wave schedule; "Kill all" stands
  * in for spells (Epic D), which are what will kill enemies in a real run.
- * CO-030's RunState takes over every run event and CO-031 turns collected XP
- * into levels.
+ * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
+ * events; CO-031 turns collected XP into levels.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
@@ -100,11 +101,8 @@ export class GameScene extends Phaser.Scene {
   private gems!: GemPool;
   private debugText!: Phaser.GameObjects.Text;
   private rng!: Rng;
-  private elapsedMs = 0;
-  private level = 1;
-  private xp = 0;
+  private run!: RunState;
   private readonly owned = new Map<string, number>();
-  private perks: string[] = [];
 
   constructor() {
     super(SCENE.game);
@@ -127,11 +125,13 @@ export class GameScene extends Phaser.Scene {
     }
     const { spellId, seed } = this.payload;
     this.rng = createRng(seed);
-    this.elapsedMs = 0;
-    this.level = 1;
-    this.xp = 0;
+    const timeScale = this.timeScale();
+    this.run = new RunState(this.events, timeScale);
+    // Arcade integrates velocities against real time, so the test hook has to
+    // reach the physics world too or a scaled run would speed up the clock
+    // while the arena crawled. Phaser reads its scale inversely: 0.5 = double.
+    this.physics.world.timeScale = 1 / timeScale;
     this.owned.clear();
-    this.perks = [];
 
     this.buildArena();
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
@@ -181,18 +181,29 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch(SCENE.hud);
   }
 
-  /** Run clock accumulates scene delta, so it freezes with the scene when Game is paused. */
+  /**
+   * The run clock accumulates scene delta, so it freezes with the scene when
+   * Game is paused. `RunState.tick` scales that delta (`?timeScale=`) and the
+   * whole frame is simulated over the window it returns, so a scaled run speeds
+   * up the arena and not just the timer. A finished run returns a zero-length
+   * window and nothing moves.
+   */
   update(_time: number, delta: number): void {
     if (!this.payload) return;
+    const frame = this.run.tick(delta);
+    if (frame.deltaMs === 0) return;
     // Spec §4 step 2: the director spends the frame's budget before anything
     // moves, so a new enemy chases from the moment it lands.
-    this.spawns.update(this.elapsedMs / 1000, delta / 1000);
-    this.player.update(delta);
-    this.enemies.update(delta, this.player);
+    this.spawns.update(frame.startMs / 1000, frame.deltaMs / 1000);
+    this.player.update(frame.deltaMs);
+    this.enemies.update(frame.deltaMs, this.player);
     this.gems.update(this.player);
-    this.elapsedMs += delta;
-    emitRunEvent(this.events, 'timer', { elapsedMs: this.elapsedMs });
     this.updateDebugText();
+  }
+
+  /** `?timeScale=` is resolved once in Boot; a Game started without it runs real time. */
+  private timeScale(): number {
+    return clampTimeScale(this.registry.get(TIME_SCALE_REGISTRY_KEY));
   }
 
   /**
@@ -209,8 +220,7 @@ export class GameScene extends Phaser.Scene {
   private onGemPickup(gem: XpGem): void {
     const gained = this.gems.collect(gem);
     if (gained === 0) return;
-    this.xp += gained;
-    emitRunEvent(this.events, 'xp', { xp: this.xp, xpToNext: 0, level: this.level });
+    this.run.addXp(gained);
     this.updateDebugText();
   }
 
@@ -223,6 +233,7 @@ export class GameScene extends Phaser.Scene {
     if (!enemy.active) return;
     const { x, y, enemyType } = enemy;
     if (!enemy.takeDamage(DEBUG_KILL_DAMAGE)) return;
+    this.run.recordKill();
     this.gems.dropFor(enemyType, x, y);
   }
 
@@ -236,7 +247,8 @@ export class GameScene extends Phaser.Scene {
 
   private updateDebugText(): void {
     this.debugText.setText(
-      `enemies ${this.enemies.liveCount} / ${MAX_LIVE_ENEMIES} · gems ${this.gems.liveCount} · xp ${this.xp}`,
+      `enemies ${this.enemies.liveCount} / ${MAX_LIVE_ENEMIES} · gems ${this.gems.liveCount} · ` +
+        `xp ${this.run.xp} · kills ${this.run.kills} · ${this.run.phase}`,
     );
   }
 
@@ -283,8 +295,7 @@ export class GameScene extends Phaser.Scene {
    * from the stub pool here until CO-041's `perkOffer` replaces them.
    */
   private levelUp(): void {
-    this.level += 1;
-    emitRunEvent(this.events, 'xp', { xp: this.xp, xpToNext: 0, level: this.level });
+    this.run.levelUp();
 
     const rankOf = (id: string): number => this.owned.get(id) ?? 0;
     const eligible = STUB_PERKS.filter((p) => rankOf(p.id) < p.maxRank);
@@ -308,21 +319,13 @@ export class GameScene extends Phaser.Scene {
     }
     this.owned.set(perkId, (this.owned.get(perkId) ?? 0) + 1);
     // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
-    this.perks.push(perk.name);
+    this.run.recordPerk(perk.name);
   }
 
   private endRun(outcome: Outcome): void {
     if (!this.payload) return;
-    const payload: ResultPayload = {
-      outcome,
-      stats: {
-        timeSurvivedMs: this.elapsedMs,
-        level: this.level,
-        kills: 0,
-        spellId: this.payload.spellId,
-        perks: this.perks,
-      },
-    };
+    this.run.end();
+    const payload: ResultPayload = { outcome, stats: this.run.stats(this.payload.spellId) };
     // The HUD is a parallel scene; stopping Game does not stop it.
     this.scene.stop(SCENE.hud);
     this.scene.start(SCENE.result, payload);
