@@ -31,6 +31,9 @@ export const SEED_REGISTRY_KEY = 'seed';
  */
 export const TIME_SCALE_REGISTRY_KEY = 'timeScale';
 
+/** Registry key under which Boot stores the `?invulnerable=1` test hook (default false). */
+export const INVULNERABLE_REGISTRY_KEY = 'invulnerable';
+
 /** `SpellSelect -> Game` */
 export interface GamePayload {
   spellId: SpellId;

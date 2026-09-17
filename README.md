@@ -24,7 +24,8 @@ until the asset pass.
   or utility.
 - Three enemy archetypes (swarm, fast, tank) on a time-based spawn schedule.
 - Seeded runs: `?seed=<n>` reproduces a run exactly; `?timeScale=<n>` speeds
-  it up for testing.
+  it up for testing; `?invulnerable=1` drops contact damage so an unattended
+  run reaches the boss.
 - Dev switches: `?debug=textures` shows every placeholder texture in a row;
   `?debug=collisions` runs the collision pairs on their own.
 

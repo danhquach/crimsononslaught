@@ -25,6 +25,11 @@ export class ResultScene extends Phaser.Scene {
     super(SCENE.result);
   }
 
+  /** The run this screen shows, read-only; the browser full-run test (CO-061) asserts on it. */
+  get summary(): Readonly<ResultPayload> | null {
+    return this.payload;
+  }
+
   init(data: unknown): void {
     this.payload = isResultPayload(data) ? data : null;
     // Phaser keeps the last `start(key, data)` payload in settings.data and

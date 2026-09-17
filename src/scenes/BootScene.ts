@@ -1,7 +1,12 @@
 import Phaser from 'phaser';
 import { resolveSeed } from '../core/rng';
-import { resolveTimeScale } from '../core/runState';
-import { SCENE, SEED_REGISTRY_KEY, TIME_SCALE_REGISTRY_KEY } from '../core/scenePayloads';
+import { resolveInvulnerable, resolveTimeScale } from '../core/runState';
+import {
+  INVULNERABLE_REGISTRY_KEY,
+  SCENE,
+  SEED_REGISTRY_KEY,
+  TIME_SCALE_REGISTRY_KEY,
+} from '../core/scenePayloads';
 import { validatePerks } from '../core/spellStats';
 import { generatePlaceholderTextures } from '../render/textures';
 
@@ -35,6 +40,11 @@ export class BootScene extends Phaser.Scene {
     const timeScale = resolveTimeScale(location.search);
     this.registry.set(TIME_SCALE_REGISTRY_KEY, timeScale);
     if (timeScale !== 1) console.info(`[run] timeScale=${timeScale}`);
+
+    // `?invulnerable=1` lets a hands-off browser run reach the boss (CO-061).
+    const invulnerable = resolveInvulnerable(location.search);
+    this.registry.set(INVULNERABLE_REGISTRY_KEY, invulnerable);
+    if (invulnerable) console.info('[run] invulnerable=1');
 
     const debug = new URLSearchParams(location.search).get('debug');
     if (debug === 'textures') {

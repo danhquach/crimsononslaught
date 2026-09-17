@@ -189,3 +189,13 @@ export function resolveTimeScale(search: string, fallback = 1): number {
   if (raw === null || raw.trim() === '') return fallback;
   return clampTimeScale(Number(raw), fallback);
 }
+
+/**
+ * `?invulnerable=1` makes the player ignore contact damage. A test hook like
+ * `?timeScale=`: the hands-off Playwright full run (spec §8, CO-061) needs the
+ * player to reach the boss without anyone steering. Only the exact value `1`
+ * turns it on, so a stray param never silently blesses a run.
+ */
+export function resolveInvulnerable(search: string): boolean {
+  return new URLSearchParams(search).get('invulnerable') === '1';
+}

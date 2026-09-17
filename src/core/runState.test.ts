@@ -7,6 +7,7 @@ import {
   MAX_TIME_SCALE,
   RunState,
   clampTimeScale,
+  resolveInvulnerable,
   resolveTimeScale,
 } from './runState';
 
@@ -286,5 +287,21 @@ describe('resolveTimeScale', () => {
 
   it('clamps to the maximum scale', () => {
     expect(resolveTimeScale(`?timeScale=${MAX_TIME_SCALE * 10}`)).toBe(MAX_TIME_SCALE);
+  });
+});
+
+describe('resolveInvulnerable', () => {
+  it('is off when the param is absent', () => {
+    expect(resolveInvulnerable('')).toBe(false);
+    expect(resolveInvulnerable('?seed=1&timeScale=100')).toBe(false);
+  });
+
+  it('is on only for the exact value 1', () => {
+    expect(resolveInvulnerable('?invulnerable=1')).toBe(true);
+    expect(resolveInvulnerable('?seed=1&invulnerable=1&timeScale=100')).toBe(true);
+    expect(resolveInvulnerable('?invulnerable')).toBe(false);
+    expect(resolveInvulnerable('?invulnerable=')).toBe(false);
+    expect(resolveInvulnerable('?invulnerable=true')).toBe(false);
+    expect(resolveInvulnerable('?invulnerable=0')).toBe(false);
   });
 });

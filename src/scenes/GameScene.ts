@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  INVULNERABLE_REGISTRY_KEY,
   SCENE,
   TIME_SCALE_REGISTRY_KEY,
   isGamePayload,
@@ -92,6 +93,8 @@ export class GameScene extends Phaser.Scene {
   private spell!: Spell;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
   private pendingLevelUps = 0;
+  /** `?invulnerable=1` (test hook): contact damage is dropped before it reaches the player. */
+  private invulnerable = false;
 
   constructor() {
     super(SCENE.game);
@@ -122,6 +125,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.timeScale = 1 / timeScale;
     this.perks = new PerkSystem(spellId, this.rng);
     this.pendingLevelUps = 0;
+    this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
 
     this.buildArena();
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
@@ -238,7 +242,7 @@ export class GameScene extends Phaser.Scene {
    * own invulnerability window (CO-021) gates the damage on top of that.
    */
   private onEnemyContact(enemy: Enemy): void {
-    if (!enemy.active) return;
+    if (!enemy.active || this.invulnerable) return;
     if (!enemy.tryContact()) return;
     this.player.takeDamage(enemy.contactDamage);
   }
