@@ -57,8 +57,8 @@ export class EnemyPool {
 
   /**
    * Bring the boss into the world at (x, y) (CO-050). The Boss sprite is made
-   * when none is in the group and appended to it; while one lives, a call —
-   * the debug button — puts that sprite back at full HP where asked.
+   * when none is in the group and appended to it; a call while one lives puts
+   * that sprite back at full HP where asked.
    */
   spawnBoss(x: number, y: number): Boss {
     this.releaseDeadBoss();
@@ -68,11 +68,6 @@ export class EnemyPool {
     }
     this.bossSprite.spawnBoss(x, y);
     return this.bossSprite;
-  }
-
-  /** The boss while it is alive in the world; `null` before it arrives and after it dies. */
-  get boss(): Boss | null {
-    return this.bossSprite?.active ? this.bossSprite : null;
   }
 
   /** Every enemy alive in the world right now, in pool order. */
