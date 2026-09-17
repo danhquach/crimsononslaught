@@ -21,6 +21,7 @@ import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { XpGem } from '../entities/XpGem';
+import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { GemPool } from '../systems/GemPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
@@ -92,7 +93,8 @@ const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
  * (CO-025) feeds the arena off-camera on the wave schedule; "Kill all" stands
  * in for spells (Epic D), which are what will kill enemies in a real run.
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
- * events.
+ * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
+ * spell hitboxes included.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
@@ -146,15 +148,13 @@ export class GameScene extends Phaser.Scene {
       width: WORLD_WIDTH,
       height: WORLD_HEIGHT,
     });
-    // Spec §5: contact damage. CO-032 moves every overlap into CollisionSystem.
-    this.physics.add.overlap(this.player, this.enemies.group, (_player, enemy) => {
-      if (enemy instanceof Enemy) this.onEnemyContact(enemy);
-    });
-
     this.gems = new GemPool(this);
-    // Spec §5: gems are XP on touch. CO-032 moves every overlap into CollisionSystem.
-    this.physics.add.overlap(this.player, this.gems.group, (_player, gem) => {
-      if (gem instanceof XpGem) this.onGemPickup(gem);
+    // Every overlap in the run is registered here and nowhere else (CO-032).
+    // Its colliders belong to the physics world, so nothing needs to hold the
+    // system until a spell has a group to hand `addSpellGroup` (Epic D).
+    new CollisionSystem(this, this.player, this.enemies, this.gems, {
+      onEnemyContact: (enemy) => this.onEnemyContact(enemy),
+      onGemPickup: (gem) => this.onGemPickup(gem),
     });
 
     const { width, height } = this.scale;

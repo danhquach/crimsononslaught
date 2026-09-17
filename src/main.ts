@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
+import { CollisionDebugScene } from './scenes/CollisionDebugScene';
 import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
 import { LevelUpScene } from './scenes/LevelUpScene';
@@ -37,6 +38,7 @@ const config: Phaser.Types.Core.GameConfig = {
     LevelUpScene,
     ResultScene,
     TextureDebugScene,
+    CollisionDebugScene,
   ],
 };
 
