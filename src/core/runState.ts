@@ -22,17 +22,20 @@ import { applyXpGain, xpToNext } from './xp';
 export const BOSS_START_MS = BOSS_START_TIME * 1000;
 
 /**
- * `?timeScale=` is a test hook; this ceiling keeps a typo from freezing the tab.
+ * The fastest `?timeScale=` the arena still plays correctly at; anything higher
+ * is clamped to it.
  *
- * It is a safety limit, not a usable speed: the scale multiplies one frame's
- * delta, so how much run time a single frame simulates depends on the machine.
- * Near the ceiling a slow machine's frames cover seconds of run time each, and
- * a projectile's step carries it past its target rather than into it while the
- * cast backlog is dropped at `MAX_CASTS_PER_FRAME` — the clock flies and almost
- * nothing lands (CO-091). Around 30 and below the arena stays faithful on a
- * slow runner, which is what the Playwright suites drive.
+ * The scale multiplies one frame's delta, and a frame is one decision: one
+ * steering vector per enemy, one angle for Earth's ring, one cast window. Past
+ * this a frame covers so much run time that the decisions stop tracking the
+ * arena — a projectile's step carries it past its target rather than into it
+ * and the cast backlog is dropped at `MAX_CASTS_PER_FRAME` (CO-091), and the
+ * boss's chase overshoots the player by hundreds of px a frame, so Earth's
+ * 80 px ring never touches it and the boss outlives the run (#89). At 100 the
+ * clock flew while almost nothing landed; 30 was measured faithful under CPU
+ * throttling from 1x to 32x, and it is what the Playwright suites drive.
  */
-export const MAX_TIME_SCALE = 100;
+export const MAX_TIME_SCALE = 30;
 
 /**
  * Any value to a usable run-clock multiplier. Zero, negative, non-finite and

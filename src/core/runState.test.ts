@@ -258,6 +258,13 @@ describe('clampTimeScale', () => {
     expect(clampTimeScale(MAX_TIME_SCALE * 5)).toBe(MAX_TIME_SCALE);
   });
 
+  it('caps at the fastest scale the arena still plays correctly at (#89)', () => {
+    // Pinned, not derived: above this the per-frame decisions stop tracking the
+    // arena and the boss outlives Earth's ring. The full-run browser check
+    // drives this same ceiling, so raising it here turns that check red.
+    expect(MAX_TIME_SCALE).toBe(30);
+  });
+
   it('falls back on anything else, so no caller can divide by it into Infinity', () => {
     for (const value of [0, -3, Number.NaN, Number.POSITIVE_INFINITY, '10', null, undefined]) {
       expect(clampTimeScale(value)).toBe(1);
