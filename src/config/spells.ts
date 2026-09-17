@@ -1,10 +1,11 @@
+import type { SpellStatsBySpell } from '../core/spellStats';
 import { PLACEHOLDERS } from './colors';
 
 /**
- * Spell identifiers and the card each one shows on the select screen (spec §2,
- * §5 "Spells"). Exactly one spell is chosen per run. Order here is card order,
- * so keys 1–4 map to it. Base `SpellStats` per spell land with CO-030; the
- * `stats` strings below are a display-only summary of the spec's base values.
+ * Spell identifiers, the card each one shows on the select screen (spec §2,
+ * §5 "Spells") and the base stat block a run starts with. Exactly one spell is
+ * chosen per run. Order here is card order, so keys 1–4 map to it. The `stats`
+ * strings on a card are a display-only summary of `BASE_SPELL_STATS`.
  */
 export const SPELL_IDS = ['fire', 'ice', 'lightning', 'earth'] as const;
 
@@ -68,6 +69,59 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
       ['Orbit radius', '80'],
       ['Knockback', '60'],
     ],
+  },
+};
+
+/**
+ * Spec §5 base values, one block per spell. A run copies its block at spell
+ * select (`createLoadout`) and perks change the copy; the field meanings live
+ * with the types in `core/spellStats.ts`.
+ *
+ * Four fields exist only because a perk overwrites them, so the spec's base
+ * table skips them: `aoeDamageFactor` and `chainFalloff` hold the defaults the
+ * spec states in prose (half damage in the blast, 80% per chain), and
+ * `shatterBonus` / `crushMultiplier` start at "no bonus". Fire's `range` is a
+ * tuning value — the spec names the Long Throw perk but no baseline.
+ */
+export const BASE_SPELL_STATS: Readonly<{
+  [S in SpellId]: Readonly<SpellStatsBySpell[S]>;
+}> = {
+  fire: {
+    cooldown: 1.2,
+    damage: 12,
+    aoeRadius: 40,
+    aoeDamageFactor: 0.5,
+    projectiles: 1,
+    speed: 350,
+    range: 400,
+    burn: 0,
+  },
+  ice: {
+    cooldown: 2,
+    damage: 8,
+    radius: 90,
+    slowPct: 0.3,
+    slowDuration: 1.5,
+    freezeChance: 0,
+    shatterBonus: 0,
+  },
+  lightning: {
+    cooldown: 1,
+    damage: 10,
+    chains: 2,
+    chainRange: 120,
+    strikes: 1,
+    stun: 0,
+    chainFalloff: 0.8,
+  },
+  earth: {
+    count: 2,
+    orbitRadius: 80,
+    orbitSpeed: 2,
+    damage: 10,
+    knockback: 60,
+    size: 14,
+    crushMultiplier: 1,
   },
 };
 
