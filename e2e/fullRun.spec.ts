@@ -1,37 +1,35 @@
 import { expect, test, type Page } from '@playwright/test';
-import { SPELL_IDS } from '../src/config/spells';
+import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import type { RunPhase } from '../src/core/runEvents';
-import { BOSS_START_MS } from '../src/core/runState';
+import { BOSS_START_MS, MAX_TIME_SCALE } from '../src/core/runState';
 import { SCENE, type ResultPayload } from '../src/core/scenePayloads';
 import type { HudScene } from '../src/scenes/HudScene';
 import type { ResultScene } from '../src/scenes/ResultScene';
 import { cardCenter, collectErrors, waitForScene } from './game';
 
 /**
- * Spec §8 full run (CO-061): one seeded run at an accelerated clock, played
+ * Spec §8 full run (CO-061): a seeded run at an accelerated clock, played
  * hands-off, reaches the boss phase and ends on the Result scene with no
  * console errors. Nobody steers, so `?invulnerable=1` keeps the player alive
  * through the waves, and every level-up overlay is answered with its first
  * card. Either outcome is fine; balance is CO-062's job.
  *
- * Observed at seed 1: fire wins at about 5:30 of run time in roughly 14 s of
- * wall clock.
+ * Observed at seed 1: fire wins at about 5:30 of run time, earth at about 8:00.
  */
 
 /**
- * Not `MAX_TIME_SCALE` (CO-091): the scale multiplies one frame's delta, so the
- * run window a frame simulates grows with the runner's frame time, and past
- * roughly 30 a slow machine's frames are long enough that a fireball's step
- * carries it clear across the boss instead of into it. The run clock keeps
- * flying while almost nothing lands, which is how the hosted runner reached
- * ~48:00 with the boss untouched. At 30 the arena is still faithful: measured
- * under CPU throttling from 1x to 32x, the boss dies within 7 s of reaching it
- * every time, where at 100 it survives the whole budget from 16x down.
+ * `MAX_TIME_SCALE` itself, so this check is also the guard on that ceiling
+ * (#89): the scale multiplies one frame's delta, so past the ceiling a frame
+ * covers enough run time that the per-frame decisions stop tracking the arena —
+ * a fireball's step carries it clear across the boss instead of into it, the
+ * boss's chase overshoots the player, and the run clock flies while almost
+ * nothing lands. Raising the ceiling past what the arena can simulate turns
+ * this check red rather than shipping a scale that does not play.
  */
-const TIME_SCALE = 30;
+const TIME_SCALE = MAX_TIME_SCALE;
 
 /**
- * The ticket's ceiling: the whole test, boot included, must fit in CI's 90 s.
+ * The ticket's ceiling per run: each check, boot included, must fit in CI's 90 s.
  *
  * The waves are what spends it — the boss dies seconds after it arrives, so the
  * cost is the clock's climb to 5:00. Under a 32x CPU throttle that took 50 s
@@ -51,8 +49,15 @@ const TEST_BUDGET_MS = 90_000;
  */
 const RUN_TAIL_MS = 10_000;
 
-/** Fire, by name rather than position: the timings above are fire's, whatever order the cards take. */
-const SPELL_INDEX = SPELL_IDS.indexOf('fire');
+/**
+ * Fire and earth, by name rather than position, whatever order the cards take.
+ *
+ * Fire is the reach spell and the one CO-061 was written around; earth is the
+ * strictest, the only spell that has to touch the boss to hurt it, and the one
+ * the ceiling used to be too fast for (#89). A scale both of these win at is a
+ * scale the arena simulates honestly.
+ */
+const SPELLS: readonly SpellId[] = ['fire', 'earth'];
 
 interface Snapshot {
   levelUp: boolean;
@@ -102,30 +107,32 @@ async function playToResult(page: Page, deadline: number): Promise<boolean> {
   }
 }
 
-test(`a ${SPELL_IDS[SPELL_INDEX]} run at time scale ${TIME_SCALE} reaches the boss and a Result`, async ({
-  page,
-}) => {
-  test.setTimeout(TEST_BUDGET_MS);
-  const deadline = Date.now() + TEST_BUDGET_MS - RUN_TAIL_MS;
-  const errors = collectErrors(page);
+for (const spellId of SPELLS) {
+  test(`a ${spellId} run at time scale ${TIME_SCALE} reaches the boss and a Result`, async ({
+    page,
+  }) => {
+    test.setTimeout(TEST_BUDGET_MS);
+    const deadline = Date.now() + TEST_BUDGET_MS - RUN_TAIL_MS;
+    const errors = collectErrors(page);
 
-  await page.goto(`/?seed=1&timeScale=${TIME_SCALE}&invulnerable=1`);
-  await waitForScene(page, SCENE.spellSelect);
+    await page.goto(`/?seed=1&timeScale=${TIME_SCALE}&invulnerable=1`);
+    await waitForScene(page, SCENE.spellSelect);
 
-  const { x, y } = cardCenter(SPELL_INDEX);
-  await page.mouse.click(x, y);
-  await waitForScene(page, SCENE.game);
+    const { x, y } = cardCenter(SPELL_IDS.indexOf(spellId));
+    await page.mouse.click(x, y);
+    await waitForScene(page, SCENE.game);
 
-  const sawBoss = await playToResult(page, deadline);
-  const result = await readResult(page);
+    const sawBoss = await playToResult(page, deadline);
+    const result = await readResult(page);
 
-  expect(sawBoss).toBe(true);
-  expect(result).not.toBeNull();
-  // With the hook on, only a win can end the run today; these two hold the
-  // ticket's actual terms so a narrower hook or a losable boss fight later
-  // still has to reach the boss first.
-  expect(['win', 'lose']).toContain(result?.outcome);
-  expect(result?.stats.timeSurvivedMs).toBeGreaterThanOrEqual(BOSS_START_MS);
-  expect(result?.stats.spellId).toBe(SPELL_IDS[SPELL_INDEX]);
-  expect(errors).toEqual([]);
-});
+    expect(sawBoss).toBe(true);
+    expect(result).not.toBeNull();
+    // With the hook on, only a win can end the run today; these two hold the
+    // ticket's actual terms so a narrower hook or a losable boss fight later
+    // still has to reach the boss first.
+    expect(['win', 'lose']).toContain(result?.outcome);
+    expect(result?.stats.timeSurvivedMs).toBeGreaterThanOrEqual(BOSS_START_MS);
+    expect(result?.stats.spellId).toBe(spellId);
+    expect(errors).toEqual([]);
+  });
+}

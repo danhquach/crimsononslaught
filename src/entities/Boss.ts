@@ -1,12 +1,6 @@
 import Phaser from 'phaser';
 import { BOSS } from '../config/boss';
-import {
-  bossVelocity,
-  startBossCycle,
-  stepBossCycle,
-  type BossCycle,
-  type BossPhase,
-} from '../core/boss';
+import { startBossCycle, stepBossCycle, type BossCycle, type BossPhase } from '../core/boss';
 import type { Vec2 } from '../core/enemy';
 import { emitRunEvent } from '../core/runEvents';
 import { Enemy } from './Enemy';
@@ -73,9 +67,10 @@ export class Boss extends Enemy {
   /** Advance the cycle by the frame and move as the current phase asks. */
   protected override steer(deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
     const wasTelegraphing = this.telegraphing;
-    this.cycle = stepBossCycle(this.cycle, deltaS, this, target);
+    const step = stepBossCycle(this.cycle, deltaS, this, target, speedFactor);
+    this.cycle = step.cycle;
     if (this.telegraphing !== wasTelegraphing) this.refreshTint();
-    return bossVelocity(this.cycle, this, target, speedFactor);
+    return step.velocity;
   }
 
   /** The telegraph flash outranks the status tints: the warning must always show. */

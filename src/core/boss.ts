@@ -1,10 +1,10 @@
 import { BOSS } from '../config/boss';
-import { chaseVelocity, type Vec2 } from './enemy';
+import type { Vec2 } from './enemy';
 
 /**
  * Boss rules that do not need an engine (spec §5 "Boss"): the charge cycle —
- * chase, 0.8 s telegraph, 0.6 s charge, every 4 s — and the velocity each phase
- * asks for.
+ * chase, 0.8 s telegraph, 0.6 s charge, every 4 s — and the movement each frame
+ * of it asks for.
  *
  * `entities/Boss.ts` is the Phaser side; everything decidable without Phaser
  * lives here so it is Vitest-covered.
@@ -24,6 +24,25 @@ export interface BossCycle {
    * stood on the boss at that instant — nowhere to charge.
    */
   readonly chargeDir: Vec2;
+}
+
+/** What one frame came to: the cycle after it, and the movement it asks for. */
+export interface BossStep {
+  readonly cycle: BossCycle;
+  /**
+   * Velocity to hold for the whole frame, px/s: everything the frame's phases
+   * move the boss, spread evenly over its length.
+   *
+   * A frame is one velocity, but a frame can span several phases — at a scaled
+   * clock (`?timeScale=`) one frame covers seconds of run time, several times
+   * the 0.6 s charge. Charging at 400 px/s for such a frame threw the boss
+   * thousands of px out of a 3000 px arena and left it walking back at 70 px/s
+   * for most of the fight, out of reach of Earth's 80 px ring (#89). Averaging
+   * keeps the distance each phase covers exactly what the spec says, whatever
+   * the frame length, at the cost of the telegraph's stop reading as a slow
+   * drift on a frame that also charges.
+   */
+  readonly velocity: Vec2;
 }
 
 const NO_DIRECTION: Vec2 = { x: 0, y: 0 };
@@ -49,51 +68,61 @@ export function startBossCycle(): BossCycle {
 }
 
 /**
- * Advance the cycle by one frame of `deltaS` seconds. A frame that outruns the
- * current phase carries the remainder into the next, so a long frame (a scaled
- * run) keeps the 4 s period exact. The frame that ends the telegraph locks the
- * charge toward `target` as seen from `from`; nothing later turns it. A bad
- * frame leaves the cycle alone.
+ * Advance the cycle by one frame of `deltaS` seconds and say how to move over
+ * it. A frame that outruns the current phase carries the remainder into the
+ * next, so a long frame (a scaled run) keeps the 4 s period exact and moves the
+ * boss by what each phase it crossed asks for — no more. The frame that ends
+ * the telegraph locks the charge toward `target` as seen from `from`; nothing
+ * later turns it. A bad frame leaves the cycle alone and moves nothing.
+ *
+ * Slows and stuns scale the movement through `speedFactor`, the charge
+ * included; the cycle keeps time regardless, so a frozen boss simply charges
+ * nowhere. The chase legs all aim where the target stood at the start of the
+ * frame, as a regular enemy's chase does (`chaseVelocity`).
  */
 export function stepBossCycle(
   cycle: BossCycle,
   deltaS: number,
   from: Readonly<Vec2>,
   target: Readonly<Vec2>,
-): BossCycle {
-  if (!(deltaS > 0) || !Number.isFinite(deltaS)) return cycle;
+  speedFactor = 1,
+): BossStep {
+  if (!(deltaS > 0) || !Number.isFinite(deltaS)) return { cycle, velocity: NO_DIRECTION };
   let { phase, remainingS, chargeDir } = cycle;
+  const chaseDir = unitToward(from, target);
+  let moveX = 0;
+  let moveY = 0;
   let left = deltaS;
+  const travel = (seconds: number): void => {
+    const step = phaseSpeed(phase) * seconds;
+    const direction = phase === 'charge' ? chargeDir : chaseDir;
+    moveX += direction.x * step;
+    moveY += direction.y * step;
+  };
   while (left >= remainingS) {
+    travel(remainingS);
     left -= remainingS;
     if (phase === 'telegraph') chargeDir = unitToward(from, target);
     phase = NEXT_PHASE[phase];
     remainingS = PHASE_LENGTH_S[phase];
   }
-  return { phase, remainingS: remainingS - left, chargeDir };
+  travel(left);
+  const scale = speedFactor / deltaS;
+  return {
+    cycle: { phase, remainingS: remainingS - left, chargeDir },
+    velocity: { x: moveX * scale, y: moveY * scale },
+  };
 }
 
-/**
- * The velocity the current phase asks for: a straight chase at the boss speed,
- * a dead stop for the telegraph, or the locked charge at `chargeSpeed`. Slows
- * and stuns scale it through `speedFactor` like any other enemy's movement —
- * the cycle keeps time regardless, so a frozen boss simply charges nowhere.
- */
-export function bossVelocity(
-  cycle: BossCycle,
-  from: Readonly<Vec2>,
-  target: Readonly<Vec2>,
-  speedFactor = 1,
-): Vec2 {
-  switch (cycle.phase) {
+/** How fast the boss moves in `phase`, px/s: it stands still to telegraph (spec §5). */
+function phaseSpeed(phase: BossPhase): number {
+  switch (phase) {
     case 'chase':
-      return chaseVelocity(from, target, BOSS.speed * speedFactor);
+      return BOSS.speed;
     case 'telegraph':
-      return { x: 0, y: 0 };
-    case 'charge': {
-      const speed = BOSS.chargeSpeed * speedFactor;
-      return { x: cycle.chargeDir.x * speed, y: cycle.chargeDir.y * speed };
-    }
+      return 0;
+    case 'charge':
+      return BOSS.chargeSpeed;
   }
 }
 
