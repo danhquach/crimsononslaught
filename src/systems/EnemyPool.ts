@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { MAX_LIVE_ENEMIES, type EnemyType } from '../config/enemies';
 import { canSpawn, type Vec2 } from '../core/enemy';
+import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 
 /**
@@ -12,10 +13,15 @@ import { Enemy } from '../entities/Enemy';
  * `spawn` returns `null` once the cap is reached — the request is dropped, never
  * queued (spec §5), so the spawn director (CO-025) can ask freely.
  *
+ * The boss (CO-050) joins the same group through `spawnBoss`, so every spell's
+ * targeting (`live`) and overlap wiring (`group`) reaches it with no special
+ * case. It is one of a kind, never recycled: it leaves the group when it dies.
+ *
  * `group` is the overlap target for collisions (CollisionSystem, CO-032).
  */
 export class EnemyPool {
   readonly group: Phaser.Physics.Arcade.Group;
+  private bossSprite: Boss | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.group = scene.physics.add.group({
@@ -23,7 +29,9 @@ export class EnemyPool {
       // Deliberately redundant with `canSpawn` below: this caps how many sprites
       // the pool may ever allocate, `canSpawn` caps how many may be alive. Both
       // read `MAX_LIVE_ENEMIES`, so dropping either changes the cap's meaning.
-      maxSize: MAX_LIVE_ENEMIES,
+      // The extra slot is the boss's (CO-050): `group.add` refuses a full
+      // group, and the boss must land even over a full crowd.
+      maxSize: MAX_LIVE_ENEMIES + 1,
       // Enemies are updated from `update` below with the player's position,
       // and only while Game runs, so a paused scene freezes them.
       runChildUpdate: false,
@@ -37,11 +45,34 @@ export class EnemyPool {
 
   /** Spawn one enemy, or `null` when the live cap is already reached. */
   spawn(type: EnemyType, x: number, y: number): Enemy | null {
+    // A boss killed since the last update walk is still a dead member here,
+    // and `group.get` hands out the first dead member whatever its class.
+    this.releaseDeadBoss();
     if (!canSpawn(this.liveCount)) return null;
     const enemy = this.group.get(x, y) as Enemy | null;
     if (!enemy) return null;
     enemy.spawn(type, x, y);
     return enemy;
+  }
+
+  /**
+   * Bring the boss into the world at (x, y) (CO-050). The Boss sprite is made
+   * when none is in the group and appended to it; while one lives, a call —
+   * the debug button — puts that sprite back at full HP where asked.
+   */
+  spawnBoss(x: number, y: number): Boss {
+    this.releaseDeadBoss();
+    if (!this.bossSprite) {
+      this.bossSprite = new Boss(this.group.scene);
+      this.group.add(this.bossSprite, true);
+    }
+    this.bossSprite.spawnBoss(x, y);
+    return this.bossSprite;
+  }
+
+  /** The boss while it is alive in the world; `null` before it arrives and after it dies. */
+  get boss(): Boss | null {
+    return this.bossSprite?.active ? this.bossSprite : null;
   }
 
   /** Every enemy alive in the world right now, in pool order. */
@@ -67,5 +98,18 @@ export class EnemyPool {
       const burn = child.chase(deltaMs, target);
       if (burn > 0) onDamage?.(child, burn);
     }
+    this.releaseDeadBoss();
+  }
+
+  /**
+   * A dead boss leaves the group for good — destroyed, not pooled — so
+   * `group.get` can never hand its sprite out as the next swarm. Called after
+   * the update walk (never inside it: the children array must not be edited
+   * under the loop) and before anything is taken from the group.
+   */
+  private releaseDeadBoss(): void {
+    if (!this.bossSprite || this.bossSprite.active) return;
+    this.group.remove(this.bossSprite, true, true);
+    this.bossSprite = null;
   }
 }

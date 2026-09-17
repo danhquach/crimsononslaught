@@ -19,12 +19,19 @@ import {
   type FrostState,
 } from '../core/frostNova';
 import { tickBoulderCooldown, tryBoulderHit } from '../core/orbitingBoulders';
-import { PLACEHOLDERS } from '../config/colors';
+import { PLACEHOLDERS, type TextureKey } from '../config/colors';
 
 /** A slowed or frozen enemy is tinted the nova's blue so the slow reads on screen. */
 const FROST_TINT = PLACEHOLDERS.fx_nova.color;
 /** A stunned enemy is tinted the bolt's yellow so the stun reads on screen. */
 const STUN_TINT = PLACEHOLDERS.fx_bolt.color;
+
+/** What any enemy needs to come alive: an archetype row, or the boss's own table. */
+export interface EnemyStats {
+  readonly hp: number;
+  readonly radius: number;
+  readonly texture: TextureKey;
+}
 
 /**
  * A regular enemy (spec §5 "Enemies"): chases the player in a straight line at
@@ -71,23 +78,35 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return isSlowed(this.frost);
   }
 
+  /** HP left; 0 once dead. What the boss bar (CO-051) and the debug readout show. */
+  get remainingHp(): number {
+    return this.hp;
+  }
+
   /** Take this pooled object out of the pool as `type`, alive and at (x, y). */
   spawn(type: EnemyType, x: number, y: number): void {
-    const archetype = ENEMY_ARCHETYPES[type];
     this.kind = type;
-    this.hp = archetype.hp;
+    this.arise(ENEMY_ARCHETYPES[type], x, y);
+  }
+
+  /**
+   * Come alive at (x, y) with `stats`: full HP, no effects, a fresh body. Shared
+   * by every archetype and the boss (CO-050), which brings its own stats.
+   */
+  protected arise(stats: Readonly<EnemyStats>, x: number, y: number): void {
+    this.hp = stats.hp;
     this.contactCooldownMs = 0;
     this.burn = { ...NO_BURN };
     this.frost = { ...NO_FROST };
     this.stunS = 0;
     this.boulderCooldownS = 0;
     this.clearTint();
-    this.setTexture(archetype.texture);
+    this.setTexture(stats.texture);
     this.enableBody(true, x, y, true, true);
     // Body radius comes from the archetype (spec §5), not the placeholder art,
     // so swapping in a sprite leaves the hitbox alone. Centre it on the frame.
     const body = this.body as Phaser.Physics.Arcade.Body;
-    const r = archetype.radius;
+    const r = stats.radius;
     body.setCircle(r, this.width / 2 - r, this.height / 2 - r);
   }
 
@@ -104,13 +123,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   chase(deltaMs: number, target: Readonly<Vec2>): number {
     this.contactCooldownMs = tickContactCooldown(this.contactCooldownMs, deltaMs);
-    const speed =
-      ENEMY_ARCHETYPES[this.kind].speed *
-      frostSpeedFactor(this.frost) *
-      stunSpeedFactor(this.stunS);
-    const { x, y } = chaseVelocity(this, target, speed);
-    this.setVelocity(x, y);
     const deltaS = deltaMs / 1000;
+    const speedFactor = frostSpeedFactor(this.frost) * stunSpeedFactor(this.stunS);
+    const { x, y } = this.steer(deltaS, target, speedFactor);
+    this.setVelocity(x, y);
     const frost = tickFrost(this.frost, deltaS);
     this.frost = frost.state;
     const stun = tickStun(this.stunS, deltaS);
@@ -120,6 +136,15 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     const burn = tickBurn(this.burn, deltaS);
     this.burn = burn.state;
     return burn.damage;
+  }
+
+  /**
+   * The velocity this frame asks for: a straight chase at the archetype's speed,
+   * scaled by whatever slow or stun holds the enemy. The boss (CO-050) overrides
+   * this with its charge cycle; `deltaS` is for such stateful movers.
+   */
+  protected steer(_deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
+    return chaseVelocity(this, target, ENEMY_ARCHETYPES[this.kind].speed * speedFactor);
   }
 
   /** Spec §5 Fire: set (or refresh) a burn of `dps` for the burn duration. */
@@ -162,7 +187,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** The tint says which effect holds the enemy: a stun over a slow, nothing when it moves freely. */
-  private refreshTint(): void {
+  protected refreshTint(): void {
     if (this.stunS > 0) this.setTintFill(STUN_TINT);
     else if (this.slowed) this.setTintFill(FROST_TINT);
     else this.clearTint();
