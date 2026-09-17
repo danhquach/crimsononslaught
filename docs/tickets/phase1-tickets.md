@@ -196,8 +196,13 @@ AC: Passes locally and in CI; wired into CI workflow.
 
 ### CO-061 Playwright full run to Result
 Deps: CO-060
-- Seeded run at max time scale reaches boss phase and a Result scene (either outcome) without errors.
+- Seeded run at high time scale reaches boss phase and a Result scene (either outcome) without errors.
 AC: Passes in CI under 90 s.
+- Amended by CO-091: "max time scale" was the original wording, and it is why this
+  check could not pass on a hosted runner — the scale multiplies one frame's delta,
+  so near the ceiling a slow machine's frames are long enough that projectiles step
+  past their target. The check runs at 30, the highest scale measured to stay
+  faithful under CPU throttling.
 
 ### CO-062 Balance pass and tuning doc
 Deps: CO-051
