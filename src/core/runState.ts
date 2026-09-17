@@ -2,6 +2,7 @@ import type { SpellId } from '../config/spells';
 import { BOSS_START_TIME } from '../config/waves';
 import { emitRunEvent, type RunEventEmitter, type RunPhase } from './runEvents';
 import type { RunStats } from './scenePayloads';
+import { applyXpGain, xpToNext } from './xp';
 
 /**
  * The run itself (spec §4 step 2, §5): the clock, the phase it drives, and the
@@ -84,6 +85,11 @@ export class RunState {
     return this.xpValue;
   }
 
+  /** XP still needed to leave the current level (spec §5's curve, `core/xp.ts`). */
+  get xpToNext(): number {
+    return xpToNext(this.levelValue);
+  }
+
   /** Display names of the perks taken, in pick order. A copy: the run owns the list. */
   get perks(): readonly string[] {
     return [...this.perksTaken];
@@ -123,17 +129,22 @@ export class RunState {
     emitRunEvent(this.emitter, 'kill', { kills: this.killCount });
   }
 
-  /** Collected XP (spec §5: a gem is 1 XP). CO-031 turns the total into levels. */
-  addXp(amount: number): void {
-    if (!(amount > 0)) return;
-    this.xpValue += amount;
+  /**
+   * Collected XP (spec §5: a gem is 1 XP), applied to the curve. Returns how
+   * many levels it crossed — one pickup can cross several, and the caller owes
+   * the player that many level-up offers, in order (spec §4 step 3).
+   *
+   * The whole gain is one `xp` event: every payload is absolute, so the HUD
+   * needs the settled level and progress, not the steps between.
+   */
+  addXp(amount: number): number {
+    // Nothing collected: no state change, no event.
+    if (!(amount > 0) || !Number.isFinite(amount)) return 0;
+    const gain = applyXpGain({ level: this.levelValue, xp: this.xpValue }, amount);
+    this.levelValue = gain.level;
+    this.xpValue = gain.xp;
     this.emitXp();
-  }
-
-  /** One level gained. The threshold that triggers it is CO-031's XP curve. */
-  levelUp(): void {
-    this.levelValue += 1;
-    this.emitXp();
+    return gain.levelsGained;
   }
 
   recordPerk(displayName: string): void {
@@ -156,9 +167,13 @@ export class RunState {
     emitRunEvent(this.emitter, 'phase', { phase });
   }
 
-  /** `xpToNext` stays 0 until CO-031 lands the curve; the HUD bar reads empty. */
+  /** Progress inside the current level, plus the threshold the HUD bar fills toward. */
   private emitXp(): void {
-    emitRunEvent(this.emitter, 'xp', { xp: this.xpValue, xpToNext: 0, level: this.levelValue });
+    emitRunEvent(this.emitter, 'xp', {
+      xp: this.xpValue,
+      xpToNext: this.xpToNext,
+      level: this.levelValue,
+    });
   }
 }
 

@@ -171,36 +171,45 @@ describe('RunState.recordKill', () => {
 });
 
 describe('RunState.addXp', () => {
-  it('emits the running xp total with the current level', () => {
+  it('emits progress inside the level with the level threshold', () => {
     const { emitter, run } = newRun();
-    run.addXp(1);
-    run.addXp(3);
+    expect(run.addXp(1)).toBe(0);
+    expect(run.addXp(3)).toBe(0);
     expect(run.xp).toBe(4);
+    expect(run.level).toBe(1);
     expect(emitter.of('xp')).toEqual([
-      { name: 'xp', payload: { xp: 1, xpToNext: 0, level: 1 } },
-      { name: 'xp', payload: { xp: 4, xpToNext: 0, level: 1 } },
+      { name: 'xp', payload: { xp: 1, xpToNext: 15, level: 1 } },
+      { name: 'xp', payload: { xp: 4, xpToNext: 15, level: 1 } },
     ]);
+  });
+
+  it('levels on the curve and carries the surplus over', () => {
+    const { emitter, run } = newRun();
+    run.addXp(12);
+    expect(run.addXp(10)).toBe(1);
+    expect(run.level).toBe(2);
+    expect(run.xp).toBe(7);
+    expect(run.xpToNext).toBe(20);
+    expect(emitter.of('xp').at(-1)).toEqual({
+      name: 'xp',
+      payload: { xp: 7, xpToNext: 20, level: 2 },
+    });
+  });
+
+  it('reports every level a single gain crossed, in one event (spec §5)', () => {
+    const { emitter, run } = newRun();
+    expect(run.addXp(100)).toBe(4);
+    expect(run.level).toBe(5);
+    expect(run.xp).toBe(10);
+    expect(emitter.of('xp')).toEqual([{ name: 'xp', payload: { xp: 10, xpToNext: 35, level: 5 } }]);
   });
 
   it('ignores a non-positive amount', () => {
     const { emitter, run } = newRun();
-    run.addXp(0);
-    run.addXp(-5);
+    expect(run.addXp(0)).toBe(0);
+    expect(run.addXp(-5)).toBe(0);
     expect(run.xp).toBe(0);
     expect(emitter.of('xp')).toEqual([]);
-  });
-});
-
-describe('RunState.levelUp', () => {
-  it('raises the level and republishes xp at the new level', () => {
-    const { emitter, run } = newRun();
-    run.addXp(2);
-    run.levelUp();
-    expect(run.level).toBe(2);
-    expect(emitter.of('xp').at(-1)).toEqual({
-      name: 'xp',
-      payload: { xp: 2, xpToNext: 0, level: 2 },
-    });
   });
 });
 
@@ -226,7 +235,7 @@ describe('RunState.stats', () => {
     const { run } = newRun();
     run.tick(1500);
     run.recordKill();
-    run.levelUp();
+    run.addXp(15);
     run.recordPerk('Quick Cast');
 
     const stats = run.stats('fire');

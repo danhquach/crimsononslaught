@@ -82,16 +82,17 @@ const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
  *
  * Still stubbed around that: Win / Lose buttons end the run with a full
  * `ResultPayload`, and the run clock is emitted on `this.events` (see
- * `core/runEvents.ts`) so the HUD is live. "Level up" drives the level-up flow
- * (pause -> LevelUp overlay -> pick -> resume, or the zero-perk fallback) from
- * a stub perk pool until CO-031 / CO-042 trigger it from XP and the real trees.
+ * `core/runEvents.ts`) so the HUD is live. Collected XP levels the run on spec
+ * §5's curve (CO-031) and each level drives the level-up flow (pause -> LevelUp
+ * overlay -> pick -> resume, or the zero-perk fallback) from a stub perk pool
+ * until CO-042 brings the real trees; "Level up" just grants the XP for one.
  * The player carries HP and damage intake (CO-021) and enemies chase and damage
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
  * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
  * (CO-025) feeds the arena off-camera on the wave schedule; "Kill all" stands
  * in for spells (Epic D), which are what will kill enemies in a real run.
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
- * events; CO-031 turns collected XP into levels.
+ * events.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
@@ -103,6 +104,8 @@ export class GameScene extends Phaser.Scene {
   private rng!: Rng;
   private run!: RunState;
   private readonly owned = new Map<string, number>();
+  /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
+  private pendingLevelUps = 0;
 
   constructor() {
     super(SCENE.game);
@@ -132,6 +135,7 @@ export class GameScene extends Phaser.Scene {
     // while the arena crawled. Phaser reads its scale inversely: 0.5 = double.
     this.physics.world.timeScale = 1 / timeScale;
     this.owned.clear();
+    this.pendingLevelUps = 0;
 
     this.buildArena();
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
@@ -161,7 +165,7 @@ export class GameScene extends Phaser.Scene {
     this.addOverlayText(width / 2, height - 40, 'WASD / arrows or gamepad stick / D-pad to move');
 
     const buttons = [
-      addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.levelUp()),
+      addTextButton(this, width / 2, height * 0.6, 'Level up', () => this.grantLevel()),
       addTextButton(this, width / 2, height * 0.67, 'Kill all', () => this.killAllEnemies()),
       addTextButton(this, width * 0.4, height * 0.81, 'Win', () => this.endRun('win')),
       addTextButton(this, width * 0.6, height * 0.81, 'Lose', () => this.endRun('lose')),
@@ -190,6 +194,11 @@ export class GameScene extends Phaser.Scene {
    */
   update(_time: number, delta: number): void {
     if (!this.payload) return;
+    // Spec §4 step 3: XP owed from the last pickup is paid before the run moves
+    // on. Draining here rather than at pickup is what sequences several levels
+    // from one gem: each overlay pauses Game, and the next update after it
+    // closes opens the following one.
+    if (this.drainLevelUps()) return;
     const frame = this.run.tick(delta);
     if (frame.deltaMs === 0) return;
     // Spec §4 step 2: the director spends the frame's budget before anything
@@ -220,7 +229,7 @@ export class GameScene extends Phaser.Scene {
   private onGemPickup(gem: XpGem): void {
     const gained = this.gems.collect(gem);
     if (gained === 0) return;
-    this.run.addXp(gained);
+    this.pendingLevelUps += this.run.addXp(gained);
     this.updateDebugText();
   }
 
@@ -248,7 +257,8 @@ export class GameScene extends Phaser.Scene {
   private updateDebugText(): void {
     this.debugText.setText(
       `enemies ${this.enemies.liveCount} / ${MAX_LIVE_ENEMIES} · gems ${this.gems.liveCount} · ` +
-        `xp ${this.run.xp} · kills ${this.run.kills} · ${this.run.phase}`,
+        `xp ${this.run.xp}/${this.run.xpToNext} · lv ${this.run.level} · ` +
+        `kills ${this.run.kills} · ${this.run.phase}`,
     );
   }
 
@@ -289,14 +299,32 @@ export class GameScene extends Phaser.Scene {
       .setDepth(UI_DEPTH);
   }
 
+  /** Debug stand-in for collecting gems: enough XP to cross the current threshold. */
+  private grantLevel(): void {
+    this.pendingLevelUps += this.run.addXp(this.run.xpToNext - this.run.xp);
+    this.updateDebugText();
+  }
+
+  /**
+   * Pay out the level-ups owed, in order, until one of them opens the overlay.
+   * Returns true when it did — Game is paused and this frame is over.
+   */
+  private drainLevelUps(): boolean {
+    while (this.pendingLevelUps > 0) {
+      this.pendingLevelUps -= 1;
+      if (this.openLevelUp()) return true;
+    }
+    return false;
+  }
+
   /**
    * Spec §5: pause and offer up to 3 eligible perks; with none eligible grant
    * +10 max HP silently and keep running. Eligibility and the seeded pick come
    * from the stub pool here until CO-041's `perkOffer` replaces them.
+   *
+   * Returns whether the overlay was launched (and Game paused).
    */
-  private levelUp(): void {
-    this.run.levelUp();
-
+  private openLevelUp(): boolean {
     const rankOf = (id: string): number => this.owned.get(id) ?? 0;
     const eligible = STUB_PERKS.filter((p) => rankOf(p.id) < p.maxRank);
     const offer = this.rng.shuffle(eligible).map((p) => ({ ...p, rank: rankOf(p.id) + 1 }));
@@ -304,11 +332,12 @@ export class GameScene extends Phaser.Scene {
     const resolution = resolveLevelUp(offer);
     if (resolution.kind === 'fallback') {
       this.player.grantMaxHp(resolution.maxHpBonus);
-      return;
+      return false;
     }
     const payload: LevelUpPayload = { offer: resolution.cards };
     this.scene.pause();
     this.scene.launch(SCENE.levelUp, payload);
+    return true;
   }
 
   private applyPick(perkId: string): void {
