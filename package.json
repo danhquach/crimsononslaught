@@ -11,8 +11,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:e2e": "echo \"browser smoke tests: Playwright lands with CO-060\"",
-    "lint": "tsc --noEmit && eslint . && prettier --check .",
+    "test:e2e": "playwright test",
+    "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json && eslint . && prettier --check .",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -20,6 +20,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.3",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",

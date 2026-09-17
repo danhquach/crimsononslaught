@@ -1,0 +1,79 @@
+import { expect, test, type Page } from '@playwright/test';
+import { SPELL_IDS } from '../src/config/spells';
+import { formatTimer, type HudModel } from '../src/core/hudModel';
+import { SCENE } from '../src/core/scenePayloads';
+import type { HudScene } from '../src/scenes/HudScene';
+
+/**
+ * Spec §8 browser smoke (CO-060): load the page, see SpellSelect, click each
+ * spell card, let the run go for 10 s at `?seed=1&timeScale=10`, then check the
+ * HUD timer advanced, something died, and the console stayed clean.
+ *
+ * Everything the tests read comes through `game` exported by `src/main.ts`,
+ * which the Vite dev server hands back as the very module `index.html` loaded
+ * (`tsconfig.e2e.json` maps that URL onto the source file for type-checking).
+ */
+
+function isSceneActive(page: Page, key: string): Promise<boolean> {
+  return page.evaluate(async (sceneKey) => {
+    const { game } = await import('/src/main.ts');
+    return game.scene.isActive(sceneKey);
+  }, key);
+}
+
+/**
+ * Polls through `expect.poll`, which awaits the predicate's promise;
+ * `page.waitForFunction` would take the pending promise of an async predicate
+ * as its truthy result and return at once.
+ */
+async function waitForScene(page: Page, key: string): Promise<void> {
+  await expect
+    .poll(() => isSceneActive(page, key), { message: `scene ${key} is active`, timeout: 15_000 })
+    .toBe(true);
+}
+
+/** The HUD's own view-model (`HudScene.view`), not the Game scene's internals. */
+async function readHud(page: Page): Promise<HudModel> {
+  return page.evaluate(async (hudKey) => {
+    const { game } = await import('/src/main.ts');
+    return (game.scene.getScene(hudKey) as HudScene).view;
+  }, SCENE.hud);
+}
+
+/**
+ * Centre of the i-th spell card in game pixels, mirroring the row layout in
+ * `SpellSelectScene` (four 200 px cards, 24 px apart, top edge at y = 150,
+ * centred on a 960 px wide canvas). The viewport matches the canvas, so these
+ * are page coordinates too; a drifted layout fails the "Game started" wait.
+ */
+function cardCenter(index: number): { x: number; y: number } {
+  const width = 200;
+  const gap = 24;
+  const rowWidth = SPELL_IDS.length * width + (SPELL_IDS.length - 1) * gap;
+  return { x: (960 - rowWidth) / 2 + width / 2 + index * (width + gap), y: 150 + 280 / 2 };
+}
+
+for (const [index, spellId] of SPELL_IDS.entries()) {
+  test(`boots to SpellSelect and runs ${spellId} for 10 s`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    page.on('pageerror', (error) => errors.push(error.message));
+
+    await page.goto('/?seed=1&timeScale=10');
+    await waitForScene(page, SCENE.spellSelect);
+
+    const { x, y } = cardCenter(index);
+    await page.mouse.click(x, y);
+    await waitForScene(page, SCENE.game);
+
+    // The ticket's window: 10 s of wall clock, 100 s of run time at scale 10.
+    await page.waitForTimeout(10_000);
+
+    const hud = await readHud(page);
+    expect(formatTimer(hud.elapsedMs)).not.toBe('0:00');
+    expect(hud.kills).toBeGreaterThan(0);
+    expect(errors).toEqual([]);
+  });
+}
