@@ -14,12 +14,13 @@ import { PerkSystem } from '../core/perkSystem';
 import { createRng, type Rng } from '../core/rng';
 import { RunState, clampTimeScale } from '../core/runState';
 import type { Spell } from '../core/spell';
-import type { FireStats, IceStats, PlayerStats } from '../core/spellStats';
+import type { FireStats, IceStats, LightningStats, PlayerStats } from '../core/spellStats';
 import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import type { SpellId } from '../config/spells';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { XpGem } from '../entities/XpGem';
+import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { FireballSpell } from '../spells/FireballSpell';
 import { FrostNovaSpell } from '../spells/FrostNovaSpell';
 import { CollisionSystem } from '../systems/CollisionSystem';
@@ -59,8 +60,8 @@ const DEBUG_KILL_DAMAGE = 9999;
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
  * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
  * (CO-025) feeds the arena off-camera on the wave schedule. The chosen spell
- * (Epic D) is what kills enemies: Fire (CO-044) and Ice (CO-045) are in; the
- * other two are not built yet, so a run with one of them has no spell and
+ * (Epic D) is what kills enemies: Fire (CO-044), Ice (CO-045) and Lightning
+ * (CO-046) are in; Earth is not built yet, so a run with it has no spell and
  * "Kill all" stands in.
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
  * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
@@ -76,7 +77,7 @@ export class GameScene extends Phaser.Scene {
   private rng!: Rng;
   private run!: RunState;
   private perks!: PerkSystem;
-  /** The run's one spell, or `null` for a spell not yet built (CO-046, CO-047). */
+  /** The run's one spell, or `null` for a spell not yet built (CO-047). */
   private spell: Spell | null = null;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
   private pendingLevelUps = 0;
@@ -187,9 +188,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The run's spell, built on the pool and collision wiring above. Fire and Ice
-   * exist so far; the other two return `null` until CO-046 / CO-047 land, and a
-   * run with one of them plays without a spell.
+   * The run's spell, built on the pool and collision wiring above. Fire, Ice and
+   * Lightning exist so far; Earth returns `null` until CO-047 lands, and a run
+   * with it plays without a spell.
    */
   private createSpell(spellId: SpellId, collisions: CollisionSystem): Spell | null {
     const damage = (enemy: Enemy, amount: number): void => this.damageEnemy(enemy, amount);
@@ -202,6 +203,10 @@ export class GameScene extends Phaser.Scene {
       case 'ice': {
         const stats = this.perks.spellStats as Readonly<IceStats>;
         return new FrostNovaSpell(this, this.player, this.enemies, stats, damage, this.rng);
+      }
+      case 'lightning': {
+        const stats = this.perks.spellStats as Readonly<LightningStats>;
+        return new ChainLightningSpell(this, this.player, this.enemies, stats, damage);
       }
       default:
         return null;

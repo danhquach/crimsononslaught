@@ -7,6 +7,7 @@ import {
   tryContact,
   type Vec2,
 } from '../core/enemy';
+import { applyStun, stunSpeedFactor, tickStun } from '../core/chainLightning';
 import { NO_BURN, applyBurn, tickBurn, type BurnState } from '../core/fireball';
 import {
   NO_FROST,
@@ -21,13 +22,16 @@ import { PLACEHOLDERS } from '../config/colors';
 
 /** A slowed or frozen enemy is tinted the nova's blue so the slow reads on screen. */
 const FROST_TINT = PLACEHOLDERS.fx_nova.color;
+/** A stunned enemy is tinted the bolt's yellow so the stun reads on screen. */
+const STUN_TINT = PLACEHOLDERS.fx_bolt.color;
 
 /**
  * A regular enemy (spec §5 "Enemies"): chases the player in a straight line at
  * its archetype's speed and damages them on contact at most once per 0.5 s.
  * A fireball hit can set it burning (CO-044); the burn ticks with the chase.
  * A frost pulse can slow or freeze it (CO-045); the cold scales the chase speed
- * and runs out with it.
+ * and runs out with it. A bolt can stun it (CO-046): a full stop that runs out
+ * the same way.
  *
  * Pooled — never constructed per spawn. `systems/EnemyPool.ts` owns the pool and
  * calls `spawn` / `despawn`; an inactive enemy has its body disabled, so it costs
@@ -43,6 +47,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private contactCooldownMs = 0;
   private burn: BurnState = { ...NO_BURN };
   private frost: FrostState = { ...NO_FROST };
+  /** Seconds of stun left; 0 when moving freely. */
+  private stunS = 0;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y, ENEMY_ARCHETYPES.swarm.texture);
@@ -69,6 +75,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.contactCooldownMs = 0;
     this.burn = { ...NO_BURN };
     this.frost = { ...NO_FROST };
+    this.stunS = 0;
     this.clearTint();
     this.setTexture(archetype.texture);
     this.enableBody(true, x, y, true, true);
@@ -92,13 +99,18 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   chase(deltaMs: number, target: Readonly<Vec2>): number {
     this.contactCooldownMs = tickContactCooldown(this.contactCooldownMs, deltaMs);
-    const speed = ENEMY_ARCHETYPES[this.kind].speed * frostSpeedFactor(this.frost);
+    const speed =
+      ENEMY_ARCHETYPES[this.kind].speed *
+      frostSpeedFactor(this.frost) *
+      stunSpeedFactor(this.stunS);
     const { x, y } = chaseVelocity(this, target, speed);
     this.setVelocity(x, y);
     const deltaS = deltaMs / 1000;
     const frost = tickFrost(this.frost, deltaS);
     this.frost = frost.state;
-    if (frost.ended) this.clearTint();
+    const stun = tickStun(this.stunS, deltaS);
+    this.stunS = stun.remainingS;
+    if (frost.ended || stun.ended) this.refreshTint();
     const burn = tickBurn(this.burn, deltaS);
     this.burn = burn.state;
     return burn.damage;
@@ -112,7 +124,20 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** Spec §5 Ice: slow (max, not additive) and maybe freeze; takes effect on the next chase step. */
   applyFrost(hit: Readonly<FrostHit>): void {
     this.frost = applyFrost(this.frost, hit);
-    if (this.slowed) this.setTintFill(FROST_TINT);
+    this.refreshTint();
+  }
+
+  /** Spec §5 Lightning: a full stop for `stunS` s (refreshed, never stacked); takes effect on the next chase step. */
+  applyStun(stunS: number): void {
+    this.stunS = applyStun(this.stunS, stunS);
+    this.refreshTint();
+  }
+
+  /** The tint says which effect holds the enemy: a stun over a slow, nothing when it moves freely. */
+  private refreshTint(): void {
+    if (this.stunS > 0) this.setTintFill(STUN_TINT);
+    else if (this.slowed) this.setTintFill(FROST_TINT);
+    else this.clearTint();
   }
 
   /**
