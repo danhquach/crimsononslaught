@@ -37,3 +37,16 @@ Filed 2026-09-14 to danhquach/crimsononslaught, milestone "Phase 1".
 | CO-061 | [#31](https://github.com/danhquach/crimsononslaught/issues/31) |
 | CO-062 | [#32](https://github.com/danhquach/crimsononslaught/issues/32) |
 | CO-063 | [#33](https://github.com/danhquach/crimsononslaught/issues/33) |
+
+## Epic H — Standards & tech debt
+
+Filed 2026-09-17, milestone "Phase 1". Detail and implementation order:
+`docs/tickets/standards-debt.md`.
+
+| Ticket | Issue |
+|---|---|
+| CO-090 | [#73](https://github.com/danhquach/crimsononslaught/issues/73) |
+| CO-091 | [#74](https://github.com/danhquach/crimsononslaught/issues/74) |
+| CO-092 | [#75](https://github.com/danhquach/crimsononslaught/issues/75) |
+| CO-093 | [#76](https://github.com/danhquach/crimsononslaught/issues/76) |
+| CO-094 | [#77](https://github.com/danhquach/crimsononslaught/issues/77) |
