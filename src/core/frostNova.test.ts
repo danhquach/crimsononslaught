@@ -136,19 +136,19 @@ describe('tickFrost (CO-045)', () => {
 
 describe('pulseDamage and Shatter (CO-045)', () => {
   it('deals the base damage to an unslowed enemy', () => {
-    expect(pulseDamage(base, false)).toBe(8);
+    expect(pulseDamage(base, false)).toBe(base.damage);
   });
 
   it('without Shatter a slowed enemy takes the same damage', () => {
-    expect(pulseDamage(base, true)).toBe(8);
+    expect(pulseDamage(base, true)).toBe(base.damage);
   });
 
   it('with Shatter a slowed enemy takes +50%', () => {
-    expect(pulseDamage({ ...base, shatterBonus: 0.5 }, true)).toBe(12);
+    expect(pulseDamage({ ...base, shatterBonus: 0.5 }, true)).toBe(base.damage * 1.5);
   });
 
   it('Shatter does nothing to an unslowed enemy', () => {
-    expect(pulseDamage({ ...base, shatterBonus: 0.5 }, false)).toBe(8);
+    expect(pulseDamage({ ...base, shatterBonus: 0.5 }, false)).toBe(base.damage);
   });
 
   it('Shatter compounds with +damage perks', () => {

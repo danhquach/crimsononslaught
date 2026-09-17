@@ -24,21 +24,21 @@ describe('enemy archetypes', () => {
     expect(ENEMY_ARCHETYPES.swarm).toEqual({
       hp: 10,
       speed: 90,
-      contactDamage: 5,
+      contactDamage: 3,
       radius: 10,
       texture: 'enemy_swarm',
     });
     expect(ENEMY_ARCHETYPES.fast).toEqual({
       hp: 8,
-      speed: 200,
-      contactDamage: 5,
+      speed: 170,
+      contactDamage: 3,
       radius: 8,
       texture: 'enemy_fast',
     });
     expect(ENEMY_ARCHETYPES.tank).toEqual({
       hp: 60,
       speed: 50,
-      contactDamage: 20,
+      contactDamage: 15,
       radius: 20,
       texture: 'enemy_tank',
     });

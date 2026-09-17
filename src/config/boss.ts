@@ -28,7 +28,7 @@ export interface BossConfig {
 }
 
 export const BOSS: Readonly<BossConfig> = {
-  hp: 1500,
+  hp: 1800,
   speed: 70,
   contactDamage: 30,
   radius: 40,

@@ -28,9 +28,9 @@ export interface EnemyArchetype {
 }
 
 export const ENEMY_ARCHETYPES: Readonly<Record<EnemyType, EnemyArchetype>> = {
-  swarm: { hp: 10, speed: 90, contactDamage: 5, radius: 10, texture: 'enemy_swarm' },
-  fast: { hp: 8, speed: 200, contactDamage: 5, radius: 8, texture: 'enemy_fast' },
-  tank: { hp: 60, speed: 50, contactDamage: 20, radius: 20, texture: 'enemy_tank' },
+  swarm: { hp: 10, speed: 90, contactDamage: 3, radius: 10, texture: 'enemy_swarm' },
+  fast: { hp: 8, speed: 170, contactDamage: 3, radius: 8, texture: 'enemy_fast' },
+  tank: { hp: 60, speed: 50, contactDamage: 15, radius: 20, texture: 'enemy_tank' },
 };
 
 /**

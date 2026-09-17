@@ -43,16 +43,16 @@ describe('spell cards', () => {
 describe('spell card stats match spec §5 base values', () => {
   it('fire', () => {
     expect(SPELL_CARDS.fire.stats).toEqual([
-      ['Cooldown', '1.2 s'],
+      ['Cooldown', '1.0 s'],
       ['Damage', '12'],
-      ['Blast radius', '40'],
+      ['Blast radius', '50'],
       ['Projectiles', '1'],
     ]);
   });
   it('ice', () => {
     expect(SPELL_CARDS.ice.stats).toEqual([
-      ['Cooldown', '2.0 s'],
-      ['Damage', '8'],
+      ['Cooldown', '1.4 s'],
+      ['Damage', '12'],
       ['Radius', '90'],
       ['Slow', '30% for 1.5 s'],
     ]);
@@ -60,14 +60,14 @@ describe('spell card stats match spec §5 base values', () => {
   it('lightning', () => {
     expect(SPELL_CARDS.lightning.stats).toEqual([
       ['Cooldown', '1.0 s'],
-      ['Damage', '10'],
+      ['Damage', '12'],
       ['Chains', '2'],
       ['Chain range', '120'],
     ]);
   });
   it('earth', () => {
     expect(SPELL_CARDS.earth.stats).toEqual([
-      ['Boulders', '2'],
+      ['Boulders', '3'],
       ['Damage', '10'],
       ['Orbit radius', '80'],
       ['Knockback', '60'],

@@ -22,15 +22,15 @@ function row(count: number, gap = 100): { x: number; y: number }[] {
 
 describe('hitDamage and falloff (CO-046)', () => {
   it('the first target takes full damage', () => {
-    expect(hitDamage(base, false)).toBe(10);
+    expect(hitDamage(base, false)).toBe(base.damage);
   });
 
   it('a chained hit takes 80%', () => {
-    expect(hitDamage(base, true)).toBeCloseTo(8, 9);
+    expect(hitDamage(base, true)).toBeCloseTo(base.damage * 0.8, 9);
   });
 
   it('No Falloff brings chained hits to 100%', () => {
-    expect(hitDamage({ ...base, chainFalloff: 1 }, true)).toBe(10);
+    expect(hitDamage({ ...base, chainFalloff: 1 }, true)).toBe(base.damage);
   });
 
   it('falloff compounds with +damage perks', () => {
@@ -106,9 +106,9 @@ describe('resolveCast (CO-046)', () => {
     const bolts = resolveCast(origin, [d, c, b, a], base);
     expect(bolts).toEqual([
       [
-        { target: a, damage: 10 },
-        { target: b, damage: 8 },
-        { target: c, damage: 8 },
+        { target: a, damage: base.damage },
+        { target: b, damage: base.damage * base.chainFalloff },
+        { target: c, damage: base.damage * base.chainFalloff },
       ],
     ]);
   });
@@ -121,12 +121,12 @@ describe('resolveCast (CO-046)', () => {
 
   it('the first target has no range limit', () => {
     const far = { x: 5000, y: 0 };
-    expect(resolveCast(origin, [far], base)).toEqual([[{ target: far, damage: 10 }]]);
+    expect(resolveCast(origin, [far], base)).toEqual([[{ target: far, damage: base.damage }]]);
   });
 
   it('No Falloff pays full damage down the whole arc', () => {
     const bolts = resolveCast(origin, row(3), { ...base, chainFalloff: 1 });
-    expect(bolts[0]?.map((hit) => hit.damage)).toEqual([10, 10, 10]);
+    expect(bolts[0]?.map((hit) => hit.damage)).toEqual([base.damage, base.damage, base.damage]);
   });
 
   it('with no enemy there are no bolts', () => {
@@ -153,7 +153,10 @@ describe('resolveCast (CO-046)', () => {
   it('once everything is hit a further bolt lands on the nearest enemy again, with no chain', () => {
     const [lone] = row(1) as [Vec];
     const bolts = resolveCast(origin, [lone], { ...base, strikes: 2 });
-    expect(bolts).toEqual([[{ target: lone, damage: 10 }], [{ target: lone, damage: 10 }]]);
+    expect(bolts).toEqual([
+      [{ target: lone, damage: base.damage }],
+      [{ target: lone, damage: base.damage }],
+    ]);
   });
 
   it('does not touch the input list', () => {

@@ -121,9 +121,9 @@ src/
 ### Enemies
 | Type | HP | Speed | Contact dmg | Radius | Notes |
 |---|---|---|---|---|---|
-| Swarm | 10 | 90 | 5 | 10 | many, early |
-| Fast | 8 | 200 | 5 | 8 | from 1:00 |
-| Tank | 60 | 50 | 20 | 20 | from 2:00 |
+| Swarm | 10 | 90 | 3 | 10 | many, early |
+| Fast | 8 | 170 | 3 | 8 | from 1:00 |
+| Tank | 60 | 50 | 15 | 20 | from 2:00 |
 
 - AI: move directly toward player each frame.
 - Contact damage ticks at most once per 0.5 s per enemy.
@@ -134,15 +134,15 @@ src/
 ### Spawn schedule (`waves.ts`)
 | t (s) | Types | Spawns / s |
 |---|---|---|
-| 0 | Swarm | 2 |
-| 60 | Swarm, Fast | 3 |
-| 120 | Swarm, Fast, Tank | 4 |
-| 180 | Swarm, Fast, Tank | 6 |
-| 240 | Swarm, Fast, Tank | 8 |
+| 0 | Swarm | 1.5 |
+| 60 | Swarm, Fast | 2.5 |
+| 120 | Swarm, Fast, Tank | 3.5 |
+| 180 | Swarm, Fast, Tank | 4.5 |
+| 240 | Swarm, Fast, Tank | 5 |
 | 300 | none (boss phase) | 0 |
 
 ### Boss
-- Spawns at 5:00 off-camera. HP 1500, speed 70, contact dmg 30, radius 40.
+- Spawns at 5:00 off-camera. HP 1800, speed 70, contact dmg 30, radius 40.
 - Every 4 s: 0.8 s telegraph (color flash), then charge toward player's
   position at 400 px/s for 0.6 s.
 - Remaining regular enemies keep living but no new spawns.
@@ -160,7 +160,7 @@ All spells read a `SpellStats` object; perks mutate it. Base values below.
 **Fire — Fireball.** Every `cooldown` s, fire `projectiles` projectiles at
 nearest enemies (distinct targets when possible). On hit: `damage` to
 target, then explode: `damage * 0.5` to all enemies within `aoeRadius`.
-Base: cooldown 1.2, damage 12, aoeRadius 40, projectiles 1, speed 350,
+Base: cooldown 1.0, damage 12, aoeRadius 50, projectiles 1, speed 350,
 burn 0.
 - Power: +dmg (x3 ranks), Burn (dmg/s for 2 s, x2), Big Blast (+aoe dmg to 100%).
 - Reach: +aoeRadius (x3), +range (x1).
@@ -168,7 +168,7 @@ burn 0.
 
 **Ice — Frost Nova.** Every `cooldown` s, ring pulse of `radius` around
 player: `damage` to all in radius, apply slow `slowPct` for `slowDuration`.
-Base: cooldown 2.0, damage 8, radius 90, slowPct 0.3, slowDuration 1.5,
+Base: cooldown 1.4, damage 12, radius 90, slowPct 0.3, slowDuration 1.5,
 freezeChance 0.
 - Power: +dmg (x3), Freeze chance (full stop 1 s, x2), Shatter (+50% dmg to slowed).
 - Reach: +radius (x3), +slowDuration (x1).
@@ -177,7 +177,7 @@ freezeChance 0.
 **Lightning — Chain Lightning.** Every `cooldown` s, `strikes` bolts each
 hit nearest enemy for `damage`, then chain up to `chains` times to nearest
 unhit enemy within `chainRange`, each chain `damage * 0.8`.
-Base: cooldown 1.0, damage 10, chains 2, chainRange 120, strikes 1, stun 0.
+Base: cooldown 1.0, damage 12, chains 2, chainRange 120, strikes 1, stun 0.
 - Power: +dmg (x3), Stun 0.3 s (x2), No falloff (chains do 100%).
 - Reach: +chains (x3), +chainRange (x1).
 - Utility: +1 strike (x2), -cooldown (x2).
@@ -185,7 +185,7 @@ Base: cooldown 1.0, damage 10, chains 2, chainRange 120, strikes 1, stun 0.
 **Earth — Orbiting Boulders.** `count` boulders orbit player at
 `orbitRadius`, angular speed `orbitSpeed`. On overlap: `damage` and knockback
 `knockback` px; per-enemy hit cooldown 0.4 s.
-Base: count 2, orbitRadius 80, orbitSpeed 2.0 rad/s, damage 10,
+Base: count 3, orbitRadius 80, orbitSpeed 2.5 rad/s, damage 10,
 knockback 60, size 14.
 - Power: +dmg (x3), +knockback (x2), Crush (x2 dmg to Tanks).
 - Reach: +orbitRadius (x3), +size (x1).
