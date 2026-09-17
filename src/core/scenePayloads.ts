@@ -23,6 +23,13 @@ export const SCENE = {
 /** Registry key under which Boot stores the run seed (from `?seed=` or the clock). */
 export const SEED_REGISTRY_KEY = 'seed';
 
+/**
+ * Registry key under which Boot stores the run clock multiplier (from
+ * `?timeScale=`, default 1). It is a test hook rather than part of the run, so
+ * it travels in the registry instead of the `Game` payload.
+ */
+export const TIME_SCALE_REGISTRY_KEY = 'timeScale';
+
 /** `SpellSelect -> Game` */
 export interface GamePayload {
   spellId: SpellId;
