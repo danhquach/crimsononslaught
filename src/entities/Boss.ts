@@ -8,6 +8,7 @@ import {
   type BossPhase,
 } from '../core/boss';
 import type { Vec2 } from '../core/enemy';
+import { emitRunEvent } from '../core/runEvents';
 import { Enemy } from './Enemy';
 
 /** The telegraph flash: the ring fills white for the wind-up so the charge reads before it lands. */
@@ -23,6 +24,10 @@ const TELEGRAPH_TINT = 0xffffff;
  * targeting and overlap wiring reaches it unchanged, and burns, slows and stuns
  * apply as they do to any enemy — a slow or stun scales the charge too. One of
  * a kind: never recycled as a regular enemy; the pool drops it when it dies.
+ *
+ * Its HP is published as `run:bossHp` on the scene emitter (CO-051), on spawn
+ * and after every hit, the way `Player` publishes `run:hp`; the HUD boss bar
+ * (CO-012) renders from those events alone.
  *
  * All the decisions live in `core/boss.ts`; this class only moves the sprite.
  */
@@ -51,6 +56,18 @@ export class Boss extends Enemy {
   spawnBoss(x: number, y: number): void {
     this.cycle = startBossCycle();
     this.arise(BOSS, x, y);
+    this.emitHp();
+  }
+
+  /** Every hit redraws the boss bar; the killing blow shows it empty. */
+  override takeDamage(amount: number): boolean {
+    const died = super.takeDamage(amount);
+    this.emitHp();
+    return died;
+  }
+
+  private emitHp(): void {
+    emitRunEvent(this.scene.events, 'bossHp', { hp: this.remainingHp, maxHp: BOSS.hp });
   }
 
   /** Advance the cycle by the frame and move as the current phase asks. */
