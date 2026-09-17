@@ -21,7 +21,17 @@ import { applyXpGain, xpToNext } from './xp';
 /** Spec §5: the boss phase starts at 5:00. Milliseconds, since the clock is in ms. */
 export const BOSS_START_MS = BOSS_START_TIME * 1000;
 
-/** `?timeScale=` is a test hook; this ceiling keeps a typo from freezing the tab. */
+/**
+ * `?timeScale=` is a test hook; this ceiling keeps a typo from freezing the tab.
+ *
+ * It is a safety limit, not a usable speed: the scale multiplies one frame's
+ * delta, so how much run time a single frame simulates depends on the machine.
+ * Near the ceiling a slow machine's frames cover seconds of run time each, and
+ * a projectile's step carries it past its target rather than into it while the
+ * cast backlog is dropped at `MAX_CASTS_PER_FRAME` — the clock flies and almost
+ * nothing lands (CO-091). Around 30 and below the arena stays faithful on a
+ * slow runner, which is what the Playwright suites drive.
+ */
 export const MAX_TIME_SCALE = 100;
 
 /**
