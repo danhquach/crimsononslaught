@@ -15,6 +15,10 @@ export default defineConfig({
   // A smoke test waits 10 s of real time on top of boot; give it room.
   timeout: 60_000,
   fullyParallel: false,
+  // One file at a time too: every test here is bound to wall clock (a 10 s
+  // window, a run at scale 100 doing 100 physics steps a frame), so a second
+  // worker on the same CPU slows the run under test rather than the suite.
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
