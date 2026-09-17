@@ -18,6 +18,7 @@ import {
   type FrostHit,
   type FrostState,
 } from '../core/frostNova';
+import { tickBoulderCooldown, tryBoulderHit } from '../core/orbitingBoulders';
 import { PLACEHOLDERS } from '../config/colors';
 
 /** A slowed or frozen enemy is tinted the nova's blue so the slow reads on screen. */
@@ -31,7 +32,8 @@ const STUN_TINT = PLACEHOLDERS.fx_bolt.color;
  * A fireball hit can set it burning (CO-044); the burn ticks with the chase.
  * A frost pulse can slow or freeze it (CO-045); the cold scales the chase speed
  * and runs out with it. A bolt can stun it (CO-046): a full stop that runs out
- * the same way.
+ * the same way. A boulder can hit it at most once per 0.4 s and shove it
+ * (CO-047); that window drains with the chase too.
  *
  * Pooled — never constructed per spawn. `systems/EnemyPool.ts` owns the pool and
  * calls `spawn` / `despawn`; an inactive enemy has its body disabled, so it costs
@@ -49,6 +51,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private frost: FrostState = { ...NO_FROST };
   /** Seconds of stun left; 0 when moving freely. */
   private stunS = 0;
+  /** Seconds before a boulder may hit this enemy again; 0 when it may. */
+  private boulderCooldownS = 0;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y, ENEMY_ARCHETYPES.swarm.texture);
@@ -76,6 +80,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.burn = { ...NO_BURN };
     this.frost = { ...NO_FROST };
     this.stunS = 0;
+    this.boulderCooldownS = 0;
     this.clearTint();
     this.setTexture(archetype.texture);
     this.enableBody(true, x, y, true, true);
@@ -110,6 +115,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.frost = frost.state;
     const stun = tickStun(this.stunS, deltaS);
     this.stunS = stun.remainingS;
+    this.boulderCooldownS = tickBoulderCooldown(this.boulderCooldownS, deltaS);
     if (frost.ended || stun.ended) this.refreshTint();
     const burn = tickBurn(this.burn, deltaS);
     this.burn = burn.state;
@@ -131,6 +137,28 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   applyStun(stunS: number): void {
     this.stunS = applyStun(this.stunS, stunS);
     this.refreshTint();
+  }
+
+  /**
+   * Spec §5 Earth: claim a boulder hit. `true` means it lands and this enemy's
+   * own 0.4 s window has just opened; any boulder inside it is ignored.
+   */
+  tryBoulderHit(): boolean {
+    const { remainingS, hit } = tryBoulderHit(this.boulderCooldownS);
+    this.boulderCooldownS = remainingS;
+    return hit;
+  }
+
+  /**
+   * Spec §5 Earth: shove the enemy by `push` px, kept inside the arena. The
+   * body picks the new spot up on its next step; the chase resumes from there.
+   */
+  knockBack(push: Readonly<Vec2>): void {
+    const bounds = this.scene.physics.world.bounds;
+    this.setPosition(
+      Phaser.Math.Clamp(this.x + push.x, bounds.left, bounds.right),
+      Phaser.Math.Clamp(this.y + push.y, bounds.top, bounds.bottom),
+    );
   }
 
   /** The tint says which effect holds the enemy: a stun over a slow, nothing when it moves freely. */
