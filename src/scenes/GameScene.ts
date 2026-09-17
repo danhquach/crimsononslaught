@@ -8,15 +8,12 @@ import {
   type Outcome,
   type ResultPayload,
 } from '../core/scenePayloads';
-import {
-  LEVEL_UP_EVENT,
-  resolveLevelUp,
-  type LevelUpPickPayload,
-  type PerkCard,
-} from '../core/levelUp';
+import { LEVEL_UP_EVENT, resolveLevelUp, type LevelUpPickPayload } from '../core/levelUp';
 import { PLAYER_EVENT } from '../core/health';
+import { PerkSystem } from '../core/perkSystem';
 import { createRng, type Rng } from '../core/rng';
 import { RunState, clampTimeScale } from '../core/runState';
+import type { PlayerStats } from '../core/spellStats';
 import { MAX_LIVE_ENEMIES } from '../config/enemies';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
@@ -42,42 +39,6 @@ const UI_DEPTH = 10;
 const DEBUG_KILL_DAMAGE = 9999;
 
 /**
- * Stand-in perk pool until the real trees (CO-040) and offer logic (CO-041)
- * land: six ranks in total, so a few debug level-ups exhaust it and exercise
- * the 3 / 2 / 1 / 0-card paths, including the silent +10 max HP fallback.
- */
-const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
-  {
-    id: 'stub.power.damage',
-    name: 'Sharper Edge',
-    branch: 'Power',
-    maxRank: 2,
-    description: '+20% damage per rank.',
-  },
-  {
-    id: 'stub.reach.radius',
-    name: 'Wider Reach',
-    branch: 'Reach',
-    maxRank: 1,
-    description: '+15% area of effect.',
-  },
-  {
-    id: 'stub.utility.cooldown',
-    name: 'Quick Cast',
-    branch: 'Utility',
-    maxRank: 2,
-    description: '-10% cooldown per rank.',
-  },
-  {
-    id: 'stub.generic.speed',
-    name: 'Move Speed',
-    branch: 'Generic',
-    maxRank: 1,
-    description: '+10% move speed.',
-  },
-];
-
-/**
  * The run: a 3000 x 3000 bounded arena with the player at its centre and the
  * camera following inside the same bounds.
  *
@@ -85,8 +46,11 @@ const STUB_PERKS: readonly Omit<PerkCard, 'rank'>[] = [
  * `ResultPayload`, and the run clock is emitted on `this.events` (see
  * `core/runEvents.ts`) so the HUD is live. Collected XP levels the run on spec
  * §5's curve (CO-031) and each level drives the level-up flow (pause -> LevelUp
- * overlay -> pick -> resume, or the zero-perk fallback) from a stub perk pool
- * until CO-042 brings the real trees; "Level up" just grants the XP for one.
+ * overlay -> pick -> resume, or the zero-perk fallback); "Level up" just grants
+ * the XP for one. `PerkSystem` (CO-042) owns the offers and the run's stats —
+ * the spell block waits for a spell to read it (Epic D), the generic block is
+ * pushed onto the player here.
+ *
  * The player carries HP and damage intake (CO-021) and enemies chase and damage
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
  * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
@@ -105,7 +69,7 @@ export class GameScene extends Phaser.Scene {
   private debugText!: Phaser.GameObjects.Text;
   private rng!: Rng;
   private run!: RunState;
-  private readonly owned = new Map<string, number>();
+  private perks!: PerkSystem;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
   private pendingLevelUps = 0;
 
@@ -136,7 +100,7 @@ export class GameScene extends Phaser.Scene {
     // reach the physics world too or a scaled run would speed up the clock
     // while the arena crawled. Phaser reads its scale inversely: 0.5 = double.
     this.physics.world.timeScale = 1 / timeScale;
-    this.owned.clear();
+    this.perks = new PerkSystem(spellId, this.rng);
     this.pendingLevelUps = 0;
 
     this.buildArena();
@@ -206,7 +170,7 @@ export class GameScene extends Phaser.Scene {
     this.spawns.update(frame.startMs / 1000, frame.deltaMs / 1000);
     this.player.update(frame.deltaMs);
     this.enemies.update(frame.deltaMs, this.player);
-    this.gems.update(this.player);
+    this.gems.update(this.player, this.perks.playerStats.pickupRadius);
     this.updateDebugText();
   }
 
@@ -319,17 +283,12 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Spec §5: pause and offer up to 3 eligible perks; with none eligible grant
-   * +10 max HP silently and keep running. Eligibility and the seeded pick come
-   * from the stub pool here until CO-041's `perkOffer` replaces them.
+   * +10 max HP silently and keep running.
    *
    * Returns whether the overlay was launched (and Game paused).
    */
   private openLevelUp(): boolean {
-    const rankOf = (id: string): number => this.owned.get(id) ?? 0;
-    const eligible = STUB_PERKS.filter((p) => rankOf(p.id) < p.maxRank);
-    const offer = this.rng.shuffle(eligible).map((p) => ({ ...p, rank: rankOf(p.id) + 1 }));
-
-    const resolution = resolveLevelUp(offer);
+    const resolution = resolveLevelUp(this.perks.offer());
     if (resolution.kind === 'fallback') {
       this.player.grantMaxHp(resolution.maxHpBonus);
       return false;
@@ -340,15 +299,32 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
+  /**
+   * Take the pick the overlay sent. `PerkSystem` refuses anything this run
+   * cannot take, so an out-of-date or stray pick is logged and dropped.
+   */
   private applyPick(perkId: string): void {
-    const perk = STUB_PERKS.find((p) => p.id === perkId);
-    if (!perk) {
-      console.warn(`[Game] ignoring pick of unknown perk "${perkId}"`);
+    const before = this.perks.playerStats;
+    const card = this.perks.pick(perkId);
+    if (!card) {
+      console.warn(`[Game] ignoring pick of unavailable perk "${perkId}"`);
       return;
     }
-    this.owned.set(perkId, (this.owned.get(perkId) ?? 0) + 1);
     // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
-    this.run.recordPerk(perk.name);
+    this.run.recordPerk(card.name);
+    this.syncPlayerStats(before);
+  }
+
+  /**
+   * Push the generic perks onto the player. Move speed is set outright, max HP
+   * is granted as the difference — health owns the current HP and the +10
+   * fallback bonus, so it is raised, never overwritten. The pickup radius is
+   * read straight from the stats each frame in `update`.
+   */
+  private syncPlayerStats(before: Readonly<PlayerStats>): void {
+    const after = this.perks.playerStats;
+    this.player.speed = after.moveSpeed;
+    if (after.maxHp !== before.maxHp) this.player.grantMaxHp(after.maxHp - before.maxHp);
   }
 
   private endRun(outcome: Outcome): void {

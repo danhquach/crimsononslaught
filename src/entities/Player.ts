@@ -9,6 +9,7 @@ import {
   type HealthState,
 } from '../core/health';
 import {
+  PLAYER_SPEED,
   directionVector,
   moveVelocity,
   padVector,
@@ -28,6 +29,9 @@ const BODY_RADIUS = 14;
  * normalized; an Arcade body collides with the world bounds, so the arena edge
  * stops the player rather than a clamp in `update`.
  *
+ * Move speed, max HP and pickup radius are the run's stats, not constants: the
+ * generic perks raise them, and `GameScene` pushes each change here (CO-042).
+ *
  * HP and damage intake live in `core/health.ts`: `takeDamage` applies a hit at
  * most once per 0.5 s, the sprite flickers for that window, and the killing blow
  * emits `PLAYER_EVENT.died` once. Every HP change is published as a `run:hp`
@@ -40,6 +44,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys | undefined;
   private readonly wasd: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key> | undefined;
   private health: HealthState = createHealth();
+  /** px/s before diagonal normalization; the Move Speed perk raises it (CO-042). */
+  speed = PLAYER_SPEED;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'player');
@@ -66,7 +72,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   override update(deltaMs = 0): void {
     this.setHealth(tickHealth(this.health, deltaMs));
-    const { x, y } = moveVelocity(resolveMove(this.keyboardMove(), this.padMove()));
+    const { x, y } = moveVelocity(resolveMove(this.keyboardMove(), this.padMove()), this.speed);
     this.setVelocity(x, y);
   }
 
