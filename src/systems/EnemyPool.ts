@@ -44,10 +44,28 @@ export class EnemyPool {
     return enemy;
   }
 
-  /** Step every live enemy toward `target`. */
-  update(deltaMs: number, target: Readonly<Vec2>): void {
+  /** Every enemy alive in the world right now, in pool order. */
+  get live(): Enemy[] {
+    const live: Enemy[] = [];
     for (const child of this.group.getChildren()) {
-      if (child instanceof Enemy && child.active) child.chase(deltaMs, target);
+      if (child instanceof Enemy && child.active) live.push(child);
+    }
+    return live;
+  }
+
+  /**
+   * Step every live enemy toward `target`. Burn damage owed this frame is handed
+   * to `onDamage` (CO-044) so the run applies it and its kills count.
+   */
+  update(
+    deltaMs: number,
+    target: Readonly<Vec2>,
+    onDamage?: (enemy: Enemy, amount: number) => void,
+  ): void {
+    for (const child of this.group.getChildren()) {
+      if (!(child instanceof Enemy) || !child.active) continue;
+      const burn = child.chase(deltaMs, target);
+      if (burn > 0) onDamage?.(child, burn);
     }
   }
 }
