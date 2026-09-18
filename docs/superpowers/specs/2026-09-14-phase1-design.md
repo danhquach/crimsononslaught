@@ -142,7 +142,7 @@ src/
 | 300 | none (boss phase) | 0 |
 
 ### Boss
-- Spawns at 5:00 off-camera. HP 1800, speed 70, contact dmg 30, radius 40.
+- Spawns at 5:00 off-camera. HP 1500, speed 70, contact dmg 30, radius 40.
 - Every 4 s: 0.8 s telegraph (color flash), then charge toward player's
   position at 400 px/s for 0.6 s.
 - Remaining regular enemies keep living but no new spawns.

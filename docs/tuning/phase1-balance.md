@@ -5,12 +5,13 @@ Ticket: [#32](https://github.com/danhquach/crimsononslaught/issues/32) · Spec: 
 **Targets (from the ticket).** An average player reaches the boss with 2 of the 4
 spells, and the boss is killable in about 45–90 s.
 
-**Result.** Met with the round 3 configs. Fire and Lightning each reach the boss
-in 2 of 3 seeded runs and kill it in 34–60 s; Ice and Earth are the hard pair and
-die in waves two to three. Invulnerable boss times sit at 32–46 s (Fire),
-33–66 s (Lightning), 51–53 s (Earth) and 89–99 s (Ice, a touch slow). All
-changes are config values in `src/config/*` plus the spec's §5 tables; the unit
-tests that had hard-coded those values now read them from the config.
+**Result.** Largely met with the round 4 configs. Lightning reaches the boss in
+2 of 3 seeded runs and kills it in 37–42 s; Fire reaches it in about half its
+runs (3 of 6 across rounds 3–4) and kills it in 34–41 s when it does; Ice and
+Earth are the hard pair and die in waves two to three. Invulnerable boss times
+sit at 26–61 s (Fire), 26–46 s (Lightning), 42–46 s (Earth) and 74–82 s (Ice).
+All changes are config values in `src/config/*` plus the spec's §5 tables; the
+unit tests that had hard-coded those values now read them from the config.
 
 ---
 
@@ -142,19 +143,43 @@ further); last wave 6 → 5 spawns/s (1020 total).
 | Lightning | **win 6:00** · **win 5:46** · 3:09 | 2 / 3 | 60 · 46 · — s (40 / 67 HP left) | 33 · 58 · 66 s | 9 · 10 · 10 |
 | Earth | 1:30 · 2:00 · 1:35 | 0 / 3 | — | 53 · 51 · 51 s | 20 · 20 · 20 |
 
-Both targets hold: two spells reach and kill the boss in most runs, and every
-mortal boss fight ended inside 34–60 s. Stopping here — the remaining gaps are
-small against the run-to-run noise, and a fourth round would be tuning to the
-bot rather than to a player.
+Both targets held on this sweep, but the 1800 HP boss broke the CI guard:
+`e2e/fullRun.spec.ts` plays a hands-off, stationary, invulnerable Earth run at
+time scale 30, and on the hosted runner it sat in the boss phase for 24 minutes
+of run time without a kill. Reproduced locally under a CPU throttle (see round
+4). The balance is not what a player would meet; it is a frame-length problem
+in that one guard, and the boss's HP is the value that sets its margin.
 
-## Final values (round 3) versus the merged baseline
+## Round 4 (boss back to 1500 HP)
+
+Only change: boss HP 1800 → 1500, the merged value. Re-run of the invulnerable
+sweep plus mortal Fire and Lightning (Ice and Earth die before the boss, so
+their mortal rows are round 3's).
+
+| Spell | Mortal: survived | Reached boss | Mortal TTK | Invulnerable TTK | Level at 5:00 (invuln) |
+|---|---|---|---|---|---|
+| Fire | 4:18 · 5:01 · 4:20 | 1 / 3 (died at 22 HP) | — | 61 · 26 · 33 s | 11 · 12 · 11 |
+| Ice | (round 3) | 0 / 3 | — | 82 · 75 · 74 s | 17 · 18 · 14 |
+| Lightning | **win 5:37** · **win 5:41** · 4:44 | 2 / 3 | 37 · 42 s (19 / 91 HP left) | 46 · 26 · 31 s | 9 · 11 · 11 |
+| Earth | (round 3) | 0 / 3 | — | 46 · 45 · 42 s | 20 · 20 · 20 |
+
+Fire is the marginal one: across rounds 3 and 4 it reached the boss in 3 of 6
+runs and won 2, always with under a third of its HP. Lightning is solid. The
+throttled Earth guard: at a 1.5× CPU throttle (32 fps) the boss dies in 535 s of
+run time (18 s wall) at 1500 HP; at 2× the harness drops to 5 fps and neither
+this branch nor `main` kills it, so that level is past what the guard is meant
+to cover. CI is the final word on the guard.
+
+Stopping here — the remaining gaps are inside the run-to-run noise, and another
+round would be tuning to the bot rather than to a player.
+
+## Final values (round 4) versus the merged baseline
 
 | Table | Field | Was | Now | Why |
 |---|---|---|---|---|
 | `waves.ts` | spawns/s per wave | 2 / 3 / 4 / 6 / 8 | 1.5 / 2.5 / 3.5 / 4.5 / 5 | Base kits could not match 2/s at t = 0; late waves capped the arena at 300 for a minute |
 | `enemies.ts` | Fast speed | 200 | 170 | Kiting must be possible; 170 still closes on a player who stops for gems |
 | `enemies.ts` | contact damage Swarm / Fast / Tank | 5 / 5 / 20 | 3 / 3 / 15 | Swarm/Fast touch 10 → 6 HP/s, Tank 40 → 30; 100 HP was ten seconds of Swarm contact per run |
-| `boss.ts` | HP | 1500 | 1800 | Spell buffs below would have put Fire and Lightning under 30 s |
 | `spells.ts` | Fire cooldown / blast radius | 1.2 s / 40 | 1.0 s / 50 | Fire killed ~2.5/s against 3.5–4.5 spawned and died in wave four |
 | `spells.ts` | Ice damage / cooldown | 8 / 2.0 s | 12 / 1.4 s | One pulse now kills Swarm and Fast; boss time 95 s → ~90 s |
 | `spells.ts` | Lightning damage | 10 | 12 | Chains now kill Fast; boss time 73 s → ~50 s |
@@ -162,7 +187,9 @@ bot rather than to a player.
 | `perks.ts` | Kindling (+damage per rank) | +4 | +3 | Same per-rank bonus as the other spells; keeps Fire's boss fight from dipping under 30 s |
 
 Spell card text follows the new values. Spec §5 tables were updated in place so
-"matches spec §5" in the tests stays true.
+"matches spec §5" in the tests stays true. Boss HP stays at 1500: rounds 1–3 ran
+it at 1800 to hold the boss fight above 45 s against the spell buffs, and that
+is what took the Earth full-run guard over its CI budget.
 
 ## What did not change, and why
 
@@ -171,9 +198,9 @@ Spell card text follows the new values. Spec §5 tables were updated in place so
   everyone something to take through the run.
 - **Player HP, speed, pickup radius.** Constants in `src/core`, not config
   (CO-093 moves them); changing them was out of this ticket's remit.
-- **Boss speed, cycle, charge.** Nobody died to the boss in a run that reached
-  it with more than 20 HP; the boss is a damage check, not a dodge check, at
-  this stage.
+- **Boss speed, cycle, charge, HP.** Nobody died to the boss in a run that
+  reached it with more than 20 HP; the boss is a damage check, not a dodge
+  check, at this stage. HP is pinned by the Earth full-run guard (above).
 
 ## Follow-ups (not blocking Phase 1)
 
@@ -183,13 +210,18 @@ Spell card text follows the new values. Spec §5 tables were updated in place so
   freeze on first hit, or radius 100+), Earth its ring to hold (knockback on
   every hit, larger boulders). Both are config, but each is a feel change worth
   its own ticket with a human on the keys.
-- **Fire's boss fight is on the fast side** (32–46 s) because Split Shot stacks
+- **Fire reaches the boss in only about half its runs** and arrives low. One
+  more notch (blast radius 50 → 55, or wave four 4.5 → 4/s) would likely make it
+  reliable; left for a human read on whether Fire should be the easy spell.
+- **Fire's boss fight is on the fast side** (26–41 s) because Split Shot stacks
   every projectile on a lone boss ("distinct targets when possible" collapses to
   one). If a floor matters, give the boss spell-specific resistance or make extra
-  projectiles miss when only one target exists (code, not config).
-- **Ice's boss fight is slightly slow** (89–99 s). Shatter (+50 % on slowed) does
-  most of the work; if it is a problem, Ice cooldown 1.4 → 1.2 brings it to
-  ~80 s.
+  projectiles miss when only one target exists (code, not config). Raising boss
+  HP is not the lever: see the Earth guard above.
+- **The Earth full-run guard is frame-rate bound**, not balance bound. At time
+  scale 30 on a slow runner the boss's chase overshoots a stationary player and
+  it rarely crosses the 80 px ring. Any future boss HP change has to be checked
+  against `npm run test:e2e` under a CPU throttle before it goes to CI.
 - **Human check.** CO-063's walkthrough on the deployed build should confirm the
   bot's floor: a first-time player should get past 2:00 with every spell and
   reach the boss with Fire or Lightning.
