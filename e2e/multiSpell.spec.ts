@@ -81,8 +81,10 @@ test('three actives cast in one run and the arena still draws', async ({ page })
 
   expect(arena).not.toBeNull();
   if (!arena) return;
-  // All three survived the run; nothing dropped one on the way.
-  expect(arena.spells).toEqual([PICKED, ...EXTRA]);
+  // All three survived the run; nothing dropped one on the way. A level-up may
+  // have equipped a fourth on top — companions are offerable now (#133) — so
+  // this is a superset check rather than an equality one.
+  expect(arena.spells.slice(0, 3)).toEqual([PICKED, ...EXTRA]);
   // The arena filled: an fps reading on an empty one would prove nothing.
   expect(arena.enemies).toBeGreaterThan(0);
   expect(arena.overlays).toBeLessThanOrEqual(arena.enemies);

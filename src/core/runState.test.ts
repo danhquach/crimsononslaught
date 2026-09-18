@@ -336,11 +336,18 @@ describe('resolveLoadout', () => {
     expect(resolveLoadout('?loadout=fire,%20ice')).toEqual(['fire', 'ice']);
   });
 
-  it('drops anything that is not a spell id', () => {
+  it('drops anything that is not a roster spell id', () => {
     expect(resolveLoadout('?loadout=')).toEqual([]);
     expect(resolveLoadout('?loadout=water,fire,,earth')).toEqual(['fire', 'earth']);
-    // The roster ids land with #140-#143; nothing can cast them yet.
-    expect(resolveLoadout('?loadout=fire_meteor')).toEqual([]);
+  });
+
+  it('takes a Phase 2 roster id, so a mechanic can be driven before its slot is', () => {
+    // #133's companions are the first of these; whether this build can cast one
+    // is `Spellbook.equip`'s to say, not the query string's.
+    expect(resolveLoadout('?loadout=fire_companion,fire_meteor')).toEqual([
+      'fire_companion',
+      'fire_meteor',
+    ]);
   });
 });
 

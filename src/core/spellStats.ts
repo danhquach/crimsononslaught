@@ -1,5 +1,3 @@
-import type { SpellId } from '../config/spells';
-
 /**
  * The numbers a run is made of (Phase 2 spec §9): one stat block per spell.
  *
@@ -78,12 +76,53 @@ export interface EarthStats {
   crushMultiplier: number;
 }
 
+/**
+ * One companion ally (#133, spec §9). All four share a block: the flavour —
+ * ranged or melee — is `config/companions.ts`'s, and the element's on-hit
+ * effect is whichever of the optional fields the block carries a value for.
+ */
+export interface CompanionStats {
+  /** Seconds between this companion's own attacks. */
+  attackCooldown: number;
+  /** Damage one attack deals. */
+  damage: number;
+  /** How far the companion looks for something to attack, in px. */
+  targetRange: number;
+  /** How far it may stray from the player before it walks back, in px. */
+  leashRadius: number;
+  /** How fast it walks, in px/s. */
+  chaseSpeed: number;
+  /** Ranged only: shots per attack. */
+  projectiles?: number;
+  /** Ranged only: shot speed in px/s. */
+  speed?: number;
+  /** Fire: burn damage per second applied on hit. */
+  burn?: number;
+  /** Fire: seconds that burn lasts. */
+  burnDuration?: number;
+  /** Ice: speed cut applied on hit, 0-1. */
+  slowPct?: number;
+  /** Ice: seconds a slow lasts. */
+  slowDuration?: number;
+  /** Earth: knockback distance in px. */
+  knockback?: number;
+  /** Lightning: seconds of stagger on hit. Applied once #139 lands the effect. */
+  staggerDuration?: number;
+}
+
 /** Which stat block each spell owns. */
 export interface SpellStatsBySpell {
   fire: FireStats;
   ice: IceStats;
   lightning: LightningStats;
   earth: EarthStats;
+  fire_companion: CompanionStats;
+  ice_companion: CompanionStats;
+  lightning_companion: CompanionStats;
+  earth_companion: CompanionStats;
 }
 
-export type SpellStats = SpellStatsBySpell[SpellId];
+/** Every id a `Spell` may carry: the Phase 1 four plus the Phase 2 spells that exist. */
+export type StattedSpellId = keyof SpellStatsBySpell;
+
+export type SpellStats = SpellStatsBySpell[StattedSpellId];

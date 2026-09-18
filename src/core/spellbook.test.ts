@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SLOT_UNLOCK_LEVELS, type RosterSpellId } from '../config/loadout';
+import { SLOT_UNLOCK_LEVELS } from '../config/loadout';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { buildLoadout } from './loadout';
 import { RunState } from './runState';
@@ -20,8 +20,14 @@ type StubId = 'fire' | 'ice' | 'lightning';
 
 const STUB_IDS: readonly StubId[] = ['fire', 'ice', 'lightning'];
 
-function isStubId(spellId: RosterSpellId): spellId is StubId {
+function isStubId(spellId: string): spellId is StubId {
   return (STUB_IDS as readonly string[]).includes(spellId);
+}
+
+/** The base block behind a live stub. A `Spell.id` may now be any Phase 2 id (#133). */
+function stubBase(spellId: string): SpellStatsBySpell[StubId] {
+  if (!isStubId(spellId)) throw new Error(`no stub for "${spellId}"`);
+  return BASE_SPELL_STATS[spellId];
 }
 
 /** Counts its casts and the run-time second each one landed on. */
@@ -151,7 +157,7 @@ describe('Spellbook (CO-109)', () => {
     spells.takePassive('passive_power');
 
     for (const spell of spells.spells) {
-      expect(spell.stats.damage).toBeCloseTo(BASE_SPELL_STATS[spell.id].damage * 1.1, 10);
+      expect(spell.stats.damage).toBeCloseTo(stubBase(spell.id).damage * 1.1, 10);
     }
     expect(spells.profile.damageMul).toBeCloseTo(1.1, 10);
   });
@@ -185,7 +191,7 @@ describe('Spellbook (CO-109)', () => {
     const spells = book();
     for (const id of STUB_IDS) equip(spells, id);
     for (const spell of spells.spells) {
-      expect(spell.stats).toEqual(BASE_SPELL_STATS[spell.id]);
+      expect(spell.stats).toEqual(stubBase(spell.id));
     }
   });
 

@@ -1,6 +1,5 @@
-import type { SpellId } from '../config/spells';
 import type { Vec2 } from './input';
-import type { SpellStatsBySpell } from './spellStats';
+import type { SpellStatsBySpell, StattedSpellId } from './spellStats';
 
 /**
  * What every spell is made of (spec §5 "Spells"): a stat block, a clock that
@@ -110,7 +109,7 @@ export function nearestEnemies<T extends Vec2>(
  * not a cooldown spell (Earth's boulders orbit continuously), overrides
  * `tick(deltaS)` instead of letting the scheduler drive it.
  */
-export abstract class Spell<S extends SpellId = SpellId> {
+export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
   readonly id: S;
   private currentStats: SpellStatsBySpell[S];
   private readonly scheduler = new CastScheduler();

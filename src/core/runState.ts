@@ -1,4 +1,5 @@
-import { isSpellId, type SpellId } from '../config/spells';
+import { isRosterSpellId, type RosterSpellId } from '../config/loadout';
+import type { SpellId } from '../config/spells';
 import { BOSS_START_TIME } from '../config/waves';
 import { emitRunEvent, type RunEventEmitter, type RunPhase } from './runEvents';
 import type { RunStats } from './scenePayloads';
@@ -246,20 +247,23 @@ export function resolveInvulnerable(search: string): boolean {
 }
 
 /**
- * `?loadout=fire,ice,lightning` equips those spells alongside the one picked on
- * the select screen (CO-109). A test hook like `?timeScale=`: a run cannot yet
- * be offered a second active — that is #132's level-up rework — and until then
- * this is the only way to drive several at once.
+ * `?loadout=fire,ice,fire_companion` equips those spells alongside the one
+ * picked on the select screen (CO-109). A test hook like `?timeScale=`: it puts
+ * a chosen set of actives on the board without playing up to the levels that
+ * unlock the slots, and it ignores the element a spell belongs to, so one run
+ * can exercise spells a real loadout would never carry together.
  *
- * Ids are returned in the order they were written; unknown ids are dropped, and
- * the chosen spell repeating here is harmless (`Spellbook.equip` refuses a
- * second copy of anything already equipped).
+ * Any roster id is accepted, not only the Phase 1 four (#133): an id this build
+ * has no implementation for is refused later by `Spellbook.equip`, which is
+ * where the one rule about it belongs. Ids are returned in the order they were
+ * written; unknown ids are dropped, and the chosen spell repeating here is
+ * harmless (`Spellbook.equip` refuses a second copy of anything equipped).
  */
-export function resolveLoadout(search: string): SpellId[] {
+export function resolveLoadout(search: string): RosterSpellId[] {
   const raw = new URLSearchParams(search).get('loadout');
   if (raw === null) return [];
   return raw
     .split(',')
     .map((id) => id.trim())
-    .filter(isSpellId);
+    .filter(isRosterSpellId);
 }

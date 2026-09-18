@@ -127,13 +127,18 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
 ];
 
 /**
- * The still frame each existing texture key now resolves to.
+ * The still frame each texture key with art resolves to.
  *
  * Entities ask for a `TextureKey` and anything that draws a static image keeps
  * working unchanged (spec §6): the key maps to the first idle or move frame of
  * the matching object instead of to a generated placeholder.
+ *
+ * Partial on purpose (Phase 2 §10): a spell registers its texture key and
+ * placeholder colour on the day it lands, and the sheet follows in its own art
+ * ticket. A key missing here keeps the generated placeholder — `companion` does
+ * until #146 — so the entity draws either way and nothing has to wait on art.
  */
-export const STATIC_FRAMES: Readonly<Record<TextureKey, FrameName>> = {
+export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   player: 'hero.idle.down.0',
   enemy_swarm: 'swarm.move.0',
   enemy_fast: 'fast.move.0',

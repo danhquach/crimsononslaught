@@ -49,6 +49,9 @@ export function installAtlas(scene: Phaser.Scene): string[] {
   for (const key of TEXTURE_KEYS) {
     if (scene.textures.exists(key)) continue;
     const frameName = STATIC_FRAMES[key];
+    // No sheet for this key yet (Phase 2 §10): it keeps its generated
+    // placeholder, which `generatePlaceholderTextures` makes for every key.
+    if (!frameName) continue;
     const info = FRAMES[frameName];
     const canvas = scene.textures.createCanvas(key, info.w, info.h);
     if (!canvas) continue;
