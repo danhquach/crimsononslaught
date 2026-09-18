@@ -73,15 +73,15 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
 };
 
 /**
- * Spec §5 base values, one block per spell. A run copies its block at spell
- * select (`createLoadout`) and perks change the copy; the field meanings live
- * with the types in `core/spellStats.ts`.
+ * Spec §5 base values, one block per spell. A run never casts these numbers
+ * directly: the `Spellbook` copies the block and scales it against the run's
+ * player profile (Phase 2 spec §6.2). The field meanings live with the types in
+ * `core/spellStats.ts`.
  *
- * Four fields exist only because a perk overwrites them, so the spec's base
- * table skips them: `aoeDamageFactor` and `chainFalloff` hold the defaults the
- * spec states in prose (half damage in the blast, 80% per chain), and
- * `shatterBonus` / `crushMultiplier` start at "no bonus". Fire's `range` is a
- * tuning value — the spec names the Long Throw perk but no baseline.
+ * Four fields the spec's base table skips: `aoeDamageFactor` and `chainFalloff`
+ * hold the defaults the spec states in prose (half damage in the blast, 80% per
+ * chain), and `shatterBonus` / `crushMultiplier` start at "no bonus". Fire's
+ * `range` is a tuning value the spec never gives a baseline for.
  */
 export const BASE_SPELL_STATS: Readonly<{
   [S in SpellId]: Readonly<SpellStatsBySpell[S]>;
@@ -125,13 +125,13 @@ export const BASE_SPELL_STATS: Readonly<{
   },
 };
 
-/** Spec §5 Fire: burn ticks for this long after a hit. Not perk-modified. */
+/** Spec §5 Fire: burn ticks for this long after a hit. A run's passives never scale it. */
 export const BURN_DURATION = 2;
 
-/** Spec §5 Ice: a freeze is a full stop for this long. Not perk-modified. */
+/** Spec §5 Ice: a freeze is a full stop for this long. A run's passives never scale it. */
 export const FREEZE_DURATION = 1;
 
-/** Spec §5 Earth: one boulder can hit the same enemy this often. Not perk-modified. */
+/** Spec §5 Earth: one boulder can hit the same enemy this often. A run's passives never scale it. */
 export const BOULDER_HIT_COOLDOWN = 0.4;
 
 /** Keyboard shortcut: `'1'`–`'4'` (KeyboardEvent.key) pick the card in that slot. */

@@ -67,29 +67,37 @@ describe('isResultPayload', () => {
 });
 
 describe('isLevelUpPayload', () => {
-  const perk = {
-    id: 'fire.power.dmg',
-    name: 'Hotter Flames',
-    branch: 'Power',
+  const passive = {
+    kind: 'passive',
+    id: 'passive_power',
+    name: 'Power',
     rank: 1,
     maxRank: 3,
-    description: '+20% damage.',
+    description: 'Every spell deals 10% more damage.',
+  };
+  const active = {
+    kind: 'active',
+    id: 'fire_meteor',
+    name: 'Meteor',
+    description: 'Calls a meteor down on the crowd.',
   };
 
-  it('accepts one to three valid cards', () => {
-    expect(isLevelUpPayload({ offer: [perk] })).toBe(true);
-    expect(isLevelUpPayload({ offer: [perk, perk, perk] })).toBe(true);
+  it('accepts one to three valid cards, of either kind', () => {
+    expect(isLevelUpPayload({ offer: [passive] })).toBe(true);
+    expect(isLevelUpPayload({ offer: [passive, passive, passive] })).toBe(true);
+    expect(isLevelUpPayload({ offer: [active, active] })).toBe(true);
   });
 
   it('rejects an empty offer (Game handles that path without an overlay) and more than three', () => {
     expect(isLevelUpPayload({ offer: [] })).toBe(false);
-    expect(isLevelUpPayload({ offer: [perk, perk, perk, perk] })).toBe(false);
+    expect(isLevelUpPayload({ offer: [passive, passive, passive, passive] })).toBe(false);
   });
 
   it('rejects missing payload or a malformed card', () => {
     expect(isLevelUpPayload(undefined)).toBe(false);
     expect(isLevelUpPayload({})).toBe(false);
-    expect(isLevelUpPayload({ offer: 'perk' })).toBe(false);
-    expect(isLevelUpPayload({ offer: [{ ...perk, rank: 0 }] })).toBe(false);
+    expect(isLevelUpPayload({ offer: 'passive' })).toBe(false);
+    expect(isLevelUpPayload({ offer: [{ ...passive, rank: 0 }] })).toBe(false);
+    expect(isLevelUpPayload({ offer: [{ ...active, kind: 'perk' }] })).toBe(false);
   });
 });

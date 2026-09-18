@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import {
   LEVEL_UP_EVENT,
-  perkIndexForKey,
+  offerIndexForKey,
   type LevelUpPickPayload,
-  type PerkCard,
+  type OfferCard,
 } from '../core/levelUp';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
+import { SPELL_CARDS, isSpellId } from '../config/spells';
 import { attachMenuInput, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
@@ -18,15 +19,16 @@ const CARD_STROKE = 0xdc143c;
 const BACKDROP_ALPHA = 0.65;
 
 /**
- * Level-up overlay: launched by Game over its own paused scene with 1–3 perk
- * cards (name, branch, rank x/y, description). Click a card or press its number
- * key (1–3) to pick; the pick is emitted as `LEVEL_UP_EVENT.pick` on the Game
- * scene's emitter, then Game is resumed and this scene stops. The HUD is a
+ * Level-up overlay: launched by Game over its own paused scene with 1–3 offer
+ * cards — a new spell for an open slot, or a rank of a passive (Phase 2 spec
+ * §7.1). Click a card or press its number key (1–3) to pick; the pick is
+ * emitted as `LEVEL_UP_EVENT.pick` on the Game scene's emitter, then Game is
+ * resumed and this scene stops. The HUD is a
  * separate parallel scene and stays visible throughout. A gamepad moves the
  * selection with the D-pad or left stick and picks with A.
  */
 export class LevelUpScene extends Phaser.Scene {
-  private cards: readonly PerkCard[] = [];
+  private cards: readonly OfferCard[] = [];
   private picked = false;
 
   constructor() {
@@ -62,7 +64,7 @@ export class LevelUpScene extends Phaser.Scene {
       .setOrigin(0.5);
     const keys = this.cards.length === 1 ? '1' : `1–${this.cards.length}`;
     this.add
-      .text(width / 2, 118, `Choose a perk  ·  click a card, press ${keys}, or use a gamepad`, {
+      .text(width / 2, 118, `Choose an upgrade  ·  click a card, press ${keys}, or use a gamepad`, {
         fontFamily: 'Georgia, serif',
         fontSize: '18px',
         color: '#cccccc',
@@ -79,13 +81,13 @@ export class LevelUpScene extends Phaser.Scene {
     attachMenuInput(this, items);
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      const index = perkIndexForKey(event.key, this.cards.length);
+      const index = offerIndexForKey(event.key, this.cards.length);
       const card = index === undefined ? undefined : this.cards[index];
       if (card) this.pick(card);
     });
   }
 
-  private addCard(x: number, y: number, card: PerkCard, hotkey: number): MenuItem {
+  private addCard(x: number, y: number, card: OfferCard, hotkey: number): MenuItem {
     const innerWidth = CARD_WIDTH - CARD_PADDING * 2;
     const left = -CARD_WIDTH / 2 + CARD_PADDING;
     const top = -CARD_HEIGHT / 2 + CARD_PADDING;
@@ -99,7 +101,7 @@ export class LevelUpScene extends Phaser.Scene {
       color: '#888888',
     });
     const rank = this.add
-      .text(left + innerWidth, top, `Rank ${card.rank}/${card.maxRank}`, {
+      .text(left + innerWidth, top, rankLabel(card), {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: '#aaaaaa',
@@ -111,10 +113,10 @@ export class LevelUpScene extends Phaser.Scene {
       color: '#ffffff',
       wordWrap: { width: innerWidth },
     });
-    const branch = this.add.text(left, top + 92, card.branch, {
+    const kind = this.add.text(left, top + 92, card.kind === 'active' ? 'New spell' : 'Passive', {
       fontFamily: 'monospace',
       fontSize: '13px',
-      color: '#dc143c',
+      color: accentOf(card),
     });
     const description = this.add.text(left, top + 120, card.description, {
       fontFamily: 'Georgia, serif',
@@ -124,7 +126,7 @@ export class LevelUpScene extends Phaser.Scene {
       lineSpacing: 3,
     });
 
-    this.add.container(x, y, [frame, key, rank, name, branch, description]);
+    this.add.container(x, y, [frame, key, rank, name, kind, description]);
 
     // Gamepad selection reuses the hover look, so a card reads the same however
     // it was reached.
@@ -140,11 +142,11 @@ export class LevelUpScene extends Phaser.Scene {
     return { setSelected: highlight, confirm: () => this.pick(card) };
   }
 
-  /** Idempotent: a click and a key press in the same frame pick exactly one perk. */
-  private pick(card: PerkCard): void {
+  /** Idempotent: a click and a key press in the same frame pick exactly one card. */
+  private pick(card: OfferCard): void {
     if (this.picked) return;
     this.picked = true;
-    const payload: LevelUpPickPayload = { perkId: card.id };
+    const payload: LevelUpPickPayload = { offerId: card.id };
     this.scene.get(SCENE.game).events.emit(LEVEL_UP_EVENT.pick, payload);
     this.close();
   }
@@ -153,4 +155,16 @@ export class LevelUpScene extends Phaser.Scene {
     this.scene.resume(SCENE.game);
     this.scene.stop();
   }
+}
+
+/** `Rank 2/5`, `Rank 2` for a passive that never caps, nothing for a spell. */
+function rankLabel(card: OfferCard): string {
+  if (card.rank === undefined) return '';
+  return card.maxRank === undefined ? `Rank ${card.rank}` : `Rank ${card.rank}/${card.maxRank}`;
+}
+
+/** A spell card wears its own element's colour; a passive wears the menu crimson. */
+function accentOf(card: OfferCard): string {
+  if (card.kind !== 'active' || !isSpellId(card.id)) return '#dc143c';
+  return `#${SPELL_CARDS[card.id].color.toString(16).padStart(6, '0')}`;
 }

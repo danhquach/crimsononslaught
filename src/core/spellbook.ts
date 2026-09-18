@@ -1,7 +1,7 @@
 import type { RosterSpellId } from '../config/loadout';
 import type { PassiveId, PlayerProfile } from '../config/passives';
 import type { SpellStatBlock } from '../config/spellFields';
-import { profileOf, takePassive, type Loadout } from './loadout';
+import { equip as equipInLoadout, profileOf, takePassive, type Loadout } from './loadout';
 import { resolveSpellStats } from './playerProfile';
 import type { Spell } from './spell';
 import type { SpellStats } from './spellStats';
@@ -75,6 +75,25 @@ export class Spellbook {
   }
 
   /**
+   * Equip a level-up pick: fill the lowest open slot with `spellId` and start
+   * casting it. `undefined` — and nothing changed — when the loadout refuses it
+   * (`canEquip`: another element, already equipped, no slot open at this level)
+   * or when this build cannot cast it, so a slot is never spent on a spell that
+   * would not fire.
+   *
+   * `equip` is the other door in: it casts a spell without occupying a slot,
+   * which is what the default spell and the `?loadout=` test hook need.
+   */
+  equipActive(spellId: RosterSpellId, level: number): Spell | undefined {
+    const result = equipInLoadout(this.current, spellId, level);
+    if (!result.ok) return undefined;
+    const spell = this.equip(spellId);
+    if (!spell) return undefined;
+    this.current = result.loadout;
+    return spell;
+  }
+
+  /**
    * Take one rank of a passive and push the new numbers onto every equipped
    * spell, so the next cast of all of them already has it. Throws on what
    * `takePassive` rejects — an unknown id or one already at `maxRank`.
@@ -87,7 +106,7 @@ export class Spellbook {
   /**
    * Re-resolve every equipped spell's block against the loadout as it stands.
    * Called for a passive, and by the caller for anything else that moves the
-   * numbers a spell's base block comes from (Phase 1's perks, until #132).
+   * numbers a spell's base block comes from.
    */
   refresh(): void {
     for (const spell of this.live) {
