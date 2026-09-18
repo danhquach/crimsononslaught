@@ -1,6 +1,7 @@
+import { BURN_DURATION } from '../config/spells';
 import type { Vec2 } from './input';
 import { nearestEnemies } from './spell';
-import { BURN_DURATION, type FireStats } from './spellStats';
+import type { FireStats } from './spellStats';
 
 /**
  * Fireball rules that do not need an engine (spec §5 "Fire — Fireball"): who a

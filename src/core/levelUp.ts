@@ -1,3 +1,5 @@
+import { EMPTY_OFFER_MAX_HP_BONUS } from '../config/progression';
+
 /**
  * Level-up overlay contract (spec §4 step 3, §5 "XP and level-up").
  *
@@ -21,9 +23,6 @@ export interface PerkCard {
 
 /** Spec §5: offer 3 random eligible perks; fewer if fewer exist. */
 export const MAX_OFFER_SIZE = 3;
-
-/** Spec §5: zero eligible perks -> +10 max HP, no overlay. */
-export const EMPTY_OFFER_MAX_HP_BONUS = 10;
 
 export type LevelUpResolution =
   { kind: 'overlay'; cards: readonly PerkCard[] } | { kind: 'fallback'; maxHpBonus: number };

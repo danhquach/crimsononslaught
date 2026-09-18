@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { SPELL_CARDS, SPELL_IDS, isSpellId, spellIdForKey } from './spells';
+import {
+  BOULDER_HIT_COOLDOWN,
+  BURN_DURATION,
+  FREEZE_DURATION,
+  SPELL_CARDS,
+  SPELL_IDS,
+  isSpellId,
+  spellIdForKey,
+} from './spells';
 
 describe('spell ids', () => {
   it('lists the four spells from the spec in card order', () => {
@@ -87,5 +95,19 @@ describe('spellIdForKey', () => {
     for (const key of ['0', '5', '9', 'a', 'Enter', ' ', '', '11', '-1']) {
       expect(spellIdForKey(key), JSON.stringify(key)).toBeUndefined();
     }
+  });
+});
+
+describe('spell durations match spec §5', () => {
+  it('burn ticks for 2 s — "Burn (dmg/s for 2 s, x2)"', () => {
+    expect(BURN_DURATION).toBe(2);
+  });
+
+  it('a freeze is a full stop for 1 s — "Freeze chance (full stop 1 s, x2)"', () => {
+    expect(FREEZE_DURATION).toBe(1);
+  });
+
+  it('a boulder re-hits the same enemy at most every 0.4 s — "per-enemy hit cooldown 0.4 s"', () => {
+    expect(BOULDER_HIT_COOLDOWN).toBe(0.4);
   });
 });

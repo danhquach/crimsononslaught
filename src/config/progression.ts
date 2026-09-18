@@ -13,3 +13,6 @@ export const XP_CURVE = {
   /** Extra XP each level adds to the previous level's cost. */
   perLevel: 5,
 } as const;
+
+/** Spec §5: zero eligible perks -> +10 max HP, no overlay. */
+export const EMPTY_OFFER_MAX_HP_BONUS = 10;

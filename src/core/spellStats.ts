@@ -17,15 +17,6 @@ import { BASE_SPELL_STATS, SPELL_IDS, type SpellId } from '../config/spells';
  * Pure TS, no Phaser import.
  */
 
-/** Spec §5 Fire: burn ticks for this long after a hit. Not perk-modified. */
-export const BURN_DURATION = 2;
-
-/** Spec §5 Ice: a freeze is a full stop for this long. Not perk-modified. */
-export const FREEZE_DURATION = 1;
-
-/** Spec §5 Earth: one boulder can hit the same enemy this often. Not perk-modified. */
-export const BOULDER_HIT_COOLDOWN = 0.4;
-
 export interface FireStats {
   /** Seconds between volleys. */
   cooldown: number;

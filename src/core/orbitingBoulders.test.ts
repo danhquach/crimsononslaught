@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_SPELL_STATS } from '../config/spells';
+import { BASE_SPELL_STATS, BOULDER_HIT_COOLDOWN } from '../config/spells';
 import {
   MAX_BOULDERS,
   advanceOrbit,
@@ -10,7 +10,7 @@ import {
   tickBoulderCooldown,
   tryBoulderHit,
 } from './orbitingBoulders';
-import { BOULDER_HIT_COOLDOWN, type EarthStats } from './spellStats';
+import type { EarthStats } from './spellStats';
 
 const base: EarthStats = { ...BASE_SPELL_STATS.earth };
 const TAU = Math.PI * 2;
