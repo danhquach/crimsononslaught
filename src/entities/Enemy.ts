@@ -17,7 +17,7 @@ import {
   type Vec2,
 } from '../core/enemy';
 import { applyStun, stunSpeedFactor, tickStun } from '../core/chainLightning';
-import { NO_BURN, applyBurn, tickBurn, type BurnState } from '../core/fireball';
+import { NO_BURN, applyBurn, hasBurn, tickBurn, type BurnState } from '../core/fireball';
 import {
   NO_FROST,
   applyFrost,
@@ -101,6 +101,21 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return isSlowed(this.frost);
   }
 
+  /** Spec §5 Fire: a burn is ticking on it; the overlay pool (CO-082) shows the flame. */
+  get isBurning(): boolean {
+    return hasBurn(this.burn);
+  }
+
+  /** Spec §5 Ice: in a full stop from a freeze; the overlay pool shows the block. */
+  get isFrozen(): boolean {
+    return this.frost.frozenS > 0;
+  }
+
+  /** Spec §5 Lightning: in a full stop from a bolt; the overlay pool shows the sparks. */
+  get isStunned(): boolean {
+    return this.stunS > 0;
+  }
+
   /** HP left; 0 once dead. What the boss bar (CO-051) and the debug readout show. */
   get remainingHp(): number {
     return this.hp;
@@ -151,8 +166,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.spawnMs = this.show('spawn', { x: 0, y: 0 });
   }
 
-  /** The body radius the clips are placed around: the archetype's, or the boss's own. */
-  protected get bodyRadius(): number {
+  /** The body radius the clips are placed around: the archetype's, or the boss's own. The overlays (CO-082) size the flame by it. */
+  get bodyRadius(): number {
     return ENEMY_ARCHETYPES[this.kind].radius;
   }
 

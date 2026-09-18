@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { dustFlip } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import {
   MAX_BOULDERS,
@@ -13,6 +14,7 @@ import type { EarthStats } from '../core/spellStats';
 import { Boulder } from '../entities/Boulder';
 import type { Enemy } from '../entities/Enemy';
 import type { CollisionSystem, SpellHitbox } from '../systems/CollisionSystem';
+import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
 
 /**
@@ -30,11 +32,16 @@ import type { DamageSink } from './DamageSink';
  * every frame the ring turns and each boulder is placed from the live stats,
  * which is what makes a perk take effect on the next frame — a wider orbit
  * moves the ring out, an extra boulder joins and the others re-space.
+ *
+ * FX (CO-082): each boulder rolls at a rate that follows `orbitSpeed`,
+ * `earth.impact` plays on every hit, and `earth.dust` kicks up under a shoved
+ * enemy, blowing the way it was pushed.
  */
 export class OrbitingBouldersSpell extends Spell<'earth'> {
   private readonly group: Phaser.Physics.Arcade.Group;
   private readonly caster: Readonly<Vec2>;
   private readonly damage: DamageSink;
+  private readonly fx: FxPool;
   /** Where boulder 0 is on the ring, in radians; the rest are spaced from it. */
   private angle = 0;
 
@@ -44,10 +51,12 @@ export class OrbitingBouldersSpell extends Spell<'earth'> {
     collisions: CollisionSystem,
     stats: Readonly<EarthStats>,
     damage: DamageSink,
+    fx: FxPool,
   ) {
     super('earth', stats);
     this.caster = caster;
     this.damage = damage;
+    this.fx = fx;
     this.group = scene.physics.add.group({
       classType: Boulder,
       maxSize: MAX_BOULDERS,
@@ -74,25 +83,27 @@ export class OrbitingBouldersSpell extends Spell<'earth'> {
   protected cast(): void {}
 
   /**
-   * Put `count` boulders on the ring at the live radius and size. Boulders are
-   * taken from and returned to the pool as the count changes, and every one is
-   * repositioned from the same base angle, so the spacing is even every frame.
+   * Put `count` boulders on the ring at the live radius, size and roll. Boulders
+   * are taken from and returned to the pool as the count changes, and every one
+   * is repositioned from the same base angle, so the spacing is even every frame.
    */
   private place(): void {
-    const { count, orbitRadius, size } = this.stats;
+    const { count, orbitRadius, orbitSpeed, size } = this.stats;
     const angles = boulderAngles(this.angle, count);
     const live = this.liveBoulders();
     while (live.length > angles.length) live.pop()?.despawn();
     angles.forEach((angle, i) => {
       const { x, y } = boulderPosition(this.caster, orbitRadius, angle);
-      const boulder = live[i];
+      let boulder = live[i];
       if (boulder) {
         boulder.setPosition(x, y);
         boulder.resize(size);
       } else {
         // Pool exhausted: the ring is short a boulder until the pool frees one.
-        (this.group.get(x, y) as Boulder | null)?.spawn(x, y, size);
+        boulder = (this.group.get(x, y) as Boulder | null) ?? undefined;
+        boulder?.spawn(x, y, size);
       }
+      boulder?.spin(orbitSpeed);
     });
   }
 
@@ -113,8 +124,12 @@ export class OrbitingBouldersSpell extends Spell<'earth'> {
 
     const stats = this.stats;
     const push = knockbackVector(hitbox, enemy, stats.knockback, this.caster);
+    this.fx.burst('earth.impact', enemy.x, enemy.y);
     this.damage(enemy, boulderDamage(stats, enemy.enemyType));
     // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
-    if (enemy.active) enemy.knockBack(push);
+    if (!enemy.active) return;
+    enemy.knockBack(push);
+    // The dust is drawn from its top edge, so it sits at the enemy's feet.
+    this.fx.burst('earth.dust', enemy.x, enemy.y + enemy.bodyRadius, { flipX: dustFlip(push) });
   }
 }
