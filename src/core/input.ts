@@ -5,10 +5,11 @@
  * and hand it here, so the deadzone, the keyboard-vs-pad tie-break and diagonal
  * normalization are unit-tested without an engine. The Phaser side lives in
  * `scenes/input.ts` (menus) and `entities/Player.ts` (movement).
+ *
+ * The move speed itself lives in `config/player.ts`.
  */
 
-/** Player move speed in px/s (spec §5). */
-export const PLAYER_SPEED = 180;
+import { PLAYER_SPEED } from '../config/player';
 
 /**
  * Any value to a usable move speed in px/s. Zero, negative, non-finite and

@@ -33,3 +33,6 @@ export const WAVES: readonly [Wave, ...Wave[]] = [
  * director do not hard-code 300.
  */
 export const BOSS_START_TIME = 300;
+
+/** Spec §5: spawns sit on a ring 100 px outside the camera view. */
+export const SPAWN_RING_MARGIN = 100;

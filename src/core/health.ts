@@ -7,14 +7,10 @@
  * are testable without Phaser and the entity (`entities/Player.ts`) stays a thin
  * renderer of whatever the current state says.
  *
- * Pure TS, no Phaser import.
+ * Pure TS, no Phaser import. The tunables themselves live in `config/player.ts`.
  */
 
-/** Spec §5: the player starts a run with 100 HP. */
-export const PLAYER_MAX_HP = 100;
-
-/** Spec §5: one hit grants 0.5 s of invulnerability. */
-export const INVULN_MS = 500;
+import { INVULN_MS, PLAYER_MAX_HP } from '../config/player';
 
 /** Alpha the sprite drops to on the dark half of a flicker. */
 export const FLICKER_ALPHA = 0.3;

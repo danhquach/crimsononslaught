@@ -1,4 +1,4 @@
-import { MAX_LIVE_ENEMIES } from '../config/enemies';
+import { CONTACT_DAMAGE_INTERVAL_MS, MAX_LIVE_ENEMIES } from '../config/enemies';
 import type { Vec2 } from './input';
 
 export type { Vec2 };
@@ -10,11 +10,8 @@ export type { Vec2 };
  * `entities/Enemy.ts` and `systems/EnemyPool.ts` are the Phaser side; everything
  * decidable without Phaser lives here so it is Vitest-covered.
  *
- * Pure TS, no Phaser import.
+ * Pure TS, no Phaser import. The tunables themselves live in `config/enemies.ts`.
  */
-
-/** Spec §5: one enemy damages the player at most once per 0.5 s. */
-export const CONTACT_DAMAGE_INTERVAL_MS = 500;
 
 /**
  * Velocity that moves straight at the target at `speed` px/s (spec §5: "move

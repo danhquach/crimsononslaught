@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { PLAYER_SPEED } from '../config/player';
 import {
-  PLAYER_SPEED,
   STICK_DEADZONE,
   clampMoveSpeed,
   directionVector,

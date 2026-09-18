@@ -1,4 +1,5 @@
 import type { EnemyType } from '../config/enemies';
+import { GEM_DRIFT_SPEED, PICKUP_RADIUS } from '../config/gems';
 import { chaseVelocity } from './enemy';
 import type { Vec2 } from './input';
 
@@ -12,28 +13,8 @@ export type { Vec2 };
  * `entities/XpGem.ts` and `systems/GemPool.ts` are the Phaser side; everything
  * decidable without Phaser lives here so it is Vitest-covered.
  *
- * Pure TS, no Phaser import.
+ * Pure TS, no Phaser import. The tunables themselves live in `config/gems.ts`.
  */
-
-/** Spec §5: "Pickup radius 40 px for XP gems (perk can increase)". */
-export const PICKUP_RADIUS = 40;
-
-/**
- * Drift speed in px/s once a gem is inside the pickup radius. Comfortably above
- * the player's 180 px/s, so a gem that is in range catches up rather than being
- * outrun.
- */
-export const GEM_DRIFT_SPEED = 400;
-
-/** Spec §5 "XP and level-up": "Gem = 1 XP". */
-export const GEM_XP_VALUE = 1;
-
-/**
- * Pool size, sitting well above the 300-enemy cap so a full arena wiped at once
- * still has a gem for every death. Past it a drop is dropped, never queued —
- * the same rule the enemy pool uses (spec §5).
- */
-export const MAX_LIVE_GEMS = 1000;
 
 /** Spec §5: "Death drops 1 XP gem (Tank drops 3)". */
 export function gemDropCount(type: EnemyType): number {

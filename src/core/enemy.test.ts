@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_LIVE_ENEMIES } from '../config/enemies';
-import {
-  CONTACT_DAMAGE_INTERVAL_MS,
-  canSpawn,
-  chaseVelocity,
-  damageEnemy,
-  tickContactCooldown,
-  tryContact,
-} from './enemy';
+import { CONTACT_DAMAGE_INTERVAL_MS, MAX_LIVE_ENEMIES } from '../config/enemies';
+import { canSpawn, chaseVelocity, damageEnemy, tickContactCooldown, tryContact } from './enemy';
 
 describe('chaseVelocity', () => {
   it('moves straight at the target at the given speed', () => {

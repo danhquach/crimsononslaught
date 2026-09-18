@@ -1,4 +1,5 @@
 import type { EnemyType } from '../config/enemies';
+import { SPAWN_RING_MARGIN } from '../config/waves';
 import type { Vec2 } from './input';
 import type { Rng } from './rng';
 import { activeWave, spawnBudget } from './waveSchedule';
@@ -12,11 +13,8 @@ import { activeWave, spawnBudget } from './waveSchedule';
  * carry between frames and hands each request to the pool. Everything decidable
  * without an engine lives here so it is Vitest-covered.
  *
- * Pure TS, no Phaser import.
+ * Pure TS, no Phaser import. The ring margin lives in `config/waves.ts`.
  */
-
-/** Spec §5: spawns sit on a ring 100 px outside the camera view. */
-export const SPAWN_RING_MARGIN = 100;
 
 export interface Size {
   readonly width: number;

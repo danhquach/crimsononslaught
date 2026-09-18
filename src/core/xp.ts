@@ -5,8 +5,11 @@
  * is the arithmetic between them, kept pure so the carry-over and multi-level
  * cases are unit-tested rather than inferred from a running game.
  *
- * Pure TS, no Phaser import.
+ * Pure TS, no Phaser import. The curve's parameters live in
+ * `config/progression.ts`.
  */
+
+import { XP_CURVE } from '../config/progression';
 
 /**
  * Spec §5: `xpToNext(level) = 10 + level * 5` — the XP needed to leave `level`
@@ -14,7 +17,7 @@
  * after it costs 5 more.
  */
 export function xpToNext(level: number): number {
-  return 10 + level * 5;
+  return XP_CURVE.base + level * XP_CURVE.perLevel;
 }
 
 /** Where a run sits on the curve: `xp` is progress inside `level`, not the run total. */
