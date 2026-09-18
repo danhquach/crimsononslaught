@@ -25,12 +25,24 @@ import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../cor
 import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
 import { Spellbook } from '../core/spellbook';
-import type { EarthStats, FireStats, IceStats, LightningStats } from '../core/spellStats';
+import type {
+  CompanionStats,
+  EarthStats,
+  FireStats,
+  IceStats,
+  LightningStats,
+} from '../core/spellStats';
 import { buildLoadout } from '../core/loadout';
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
 import { isPassiveId, type PlayerProfile } from '../config/passives';
 import type { SpellStatBlock } from '../config/spellFields';
-import { BASE_SPELL_STATS, SPELL_CARDS, isSpellId, type SpellId } from '../config/spells';
+import { BASE_SPELL_STATS, SPELL_CARDS, isSpellId } from '../config/spells';
+import {
+  BASE_COMPANION_STATS,
+  COMPANION_CARDS,
+  COMPANION_SPELL_IDS,
+  isCompanionSpellId,
+} from '../config/companions';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
@@ -38,6 +50,7 @@ import { XpGem } from '../entities/XpGem';
 import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { FireballSpell } from '../spells/FireballSpell';
 import { FrostNovaSpell } from '../spells/FrostNovaSpell';
+import { CompanionSpell } from '../spells/CompanionSpell';
 import { OrbitingBouldersSpell } from '../spells/OrbitingBouldersSpell';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
@@ -125,6 +138,32 @@ export class GameScene extends Phaser.Scene {
   /** Test hook (CO-109): the actives casting right now, in equip order. */
   get equippedSpellIds(): RosterSpellId[] {
     return this.spells.spells.map((spell) => spell.id);
+  }
+
+  /**
+   * Test hook (#133): each companion out right now — how far it has strayed
+   * from the player, the leash it is held on, and how many attacks it has
+   * landed. The browser suite checks the leash holds over a whole run.
+   */
+  get companionReport(): {
+    id: RosterSpellId;
+    distance: number;
+    leashRadius: number;
+    hits: number;
+  }[] {
+    return this.spells.spells
+      .filter((spell): spell is CompanionSpell => spell instanceof CompanionSpell)
+      .map((spell) => ({
+        id: spell.id,
+        distance: Phaser.Math.Distance.Between(
+          spell.at.x,
+          spell.at.y,
+          this.player.x,
+          this.player.y,
+        ),
+        leashRadius: spell.companionStats.leashRadius,
+        hits: spell.hits,
+      }));
   }
 
   init(data: unknown): void {
@@ -312,6 +351,20 @@ export class GameScene extends Phaser.Scene {
           damage,
           this.fx,
         );
+      case 'fire_companion':
+      case 'ice_companion':
+      case 'lightning_companion':
+      case 'earth_companion':
+        return new CompanionSpell(
+          this,
+          spellId,
+          this.player,
+          this.enemies,
+          this.collisions,
+          stats as Readonly<CompanionStats>,
+          damage,
+          this.fx,
+        );
       default:
         console.warn(`[Game] no implementation for spell "${spellId}" yet`);
         return undefined;
@@ -325,27 +378,43 @@ export class GameScene extends Phaser.Scene {
    * the offers until they do.
    */
   private baseStatsFor(spellId: RosterSpellId): SpellStatBlock | undefined {
-    return isSpellId(spellId) ? BASE_SPELL_STATS[spellId] : undefined;
+    if (isSpellId(spellId)) return BASE_SPELL_STATS[spellId];
+    if (isCompanionSpellId(spellId)) return BASE_COMPANION_STATS[spellId];
+    return undefined;
   }
 
   /**
-   * Every active this build can actually cast, as a level-up card reads it.
-   * Only the four Phase 1 spells have an implementation and a stat block today,
-   * and each is its element's default, so nothing is offerable until the roster
-   * tickets land — until then every level-up draws passives (spec §7.1).
+   * Every active this build can actually cast and is not already casting, as a
+   * level-up card reads it: the four Phase 1 spells — each its element's
+   * default — and the four companions (#133). The rest of the roster lands with
+   * #140-#143; until then a level-up that cannot offer a spell draws passives
+   * (spec §7.1).
+   *
+   * What is already casting is filtered out here rather than by `canEquip`,
+   * because `?loadout=` puts a spell on the board without spending a slot
+   * (CO-109): the loadout would still count it offerable and the pick would be
+   * dropped at `equipActive`, costing the level-up for nothing.
    */
   private activeCatalog(): ActiveCard[] {
-    return ROSTER_SPELL_IDS.filter(isSpellId).map((id) => ({
-      id,
-      name: SPELL_CARDS[id].name,
-      description: SPELL_CARDS[id].description,
-    }));
+    const casting = new Set<string>(this.equippedSpellIds);
+    return [
+      ...ROSTER_SPELL_IDS.filter(isSpellId).map((id) => ({
+        id,
+        name: SPELL_CARDS[id].name,
+        description: SPELL_CARDS[id].description,
+      })),
+      ...COMPANION_SPELL_IDS.map((id) => ({
+        id,
+        name: COMPANION_CARDS[id].name,
+        description: COMPANION_CARDS[id].description,
+      })),
+    ].filter((card) => !casting.has(card.id));
   }
 
   /** `?loadout=` (test hook): extra actives Boot parsed out of the query string. */
-  private extraActives(): SpellId[] {
+  private extraActives(): RosterSpellId[] {
     const extra: unknown = this.registry.get(LOADOUT_REGISTRY_KEY);
-    return Array.isArray(extra) ? extra.filter(isSpellId) : [];
+    return Array.isArray(extra) ? extra.filter(isRosterSpellId) : [];
   }
 
   /** `?timeScale=` is resolved once in Boot; a Game started without it runs real time. */

@@ -13,10 +13,14 @@ const SPEC_KEYS = [
   'fx_nova',
   'fx_bolt',
   'boulder',
+  // Phase 2 §10: every new spell registers a texture key and a placeholder
+  // colour on day one; the companions' own sheets land with #146.
+  'companion',
+  'proj_ice',
 ];
 
 describe('placeholder texture config', () => {
-  it('defines exactly the 10 texture keys from the spec', () => {
+  it('defines exactly the texture keys from the spec', () => {
     expect([...TEXTURE_KEYS].sort()).toEqual([...SPEC_KEYS].sort());
     expect(Object.keys(PLACEHOLDERS).sort()).toEqual([...SPEC_KEYS].sort());
   });

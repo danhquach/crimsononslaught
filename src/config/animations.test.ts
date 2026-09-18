@@ -112,19 +112,28 @@ describe('animation data (CO-080)', () => {
 });
 
 describe('static texture keys', () => {
-  it('still covers every key an entity can ask for', () => {
-    expect(Object.keys(STATIC_FRAMES).sort()).toEqual([...TEXTURE_KEYS].sort());
+  it('names only keys an entity can ask for', () => {
+    for (const key of Object.keys(STATIC_FRAMES)) {
+      expect(TEXTURE_KEYS, key).toContain(key);
+    }
   });
 
-  it('resolves every key to a real atlas frame', () => {
-    for (const key of TEXTURE_KEYS) {
-      expect(FRAME_NAMES, key).toContain(STATIC_FRAMES[key]);
+  it('covers every key whose art has landed', () => {
+    // The companion's sheets are #146 and the ice bolt's flight art is #145;
+    // both keep their placeholder until then.
+    const withoutArt = TEXTURE_KEYS.filter((key) => STATIC_FRAMES[key] === undefined);
+    expect(withoutArt).toEqual(['companion', 'proj_ice']);
+  });
+
+  it('resolves every mapped key to a real atlas frame', () => {
+    for (const [key, frame] of Object.entries(STATIC_FRAMES)) {
+      expect(FRAME_NAMES, key).toContain(frame);
     }
   });
 
   it('points at the first frame of an idle or move animation', () => {
-    for (const key of TEXTURE_KEYS) {
-      expect(STATIC_FRAMES[key], key).toMatch(/\.0$/);
+    for (const [key, frame] of Object.entries(STATIC_FRAMES)) {
+      expect(frame, key).toMatch(/\.0$/);
     }
   });
 
