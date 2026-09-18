@@ -9,7 +9,7 @@
 
 Object: all visuals of the Lightning spell. A bolt strikes the nearest enemy, then chains along a straight segment to the next enemy (the engine stretches and repeats the segment between two points), and a perk shows a stun effect on hit enemies.
 
-## Sheet 1 — `lightning_strike.png` — done, attached
+## Sheet 1 — `lightning_strike.png` (CELL 256, COLS 4, ROWS 2) — done, attached
 
 ## Sheet 2 — `lightning_chain.png` — to do
 

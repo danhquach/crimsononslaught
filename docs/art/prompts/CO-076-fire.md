@@ -9,7 +9,7 @@
 
 Object: all visuals of the Fire spell. The projectile flies at the nearest enemy and explodes on hit, and a burn perk shows flames on burning enemies.
 
-## Sheet 1 — `fire_projectile.png` — done, attached
+## Sheet 1 — `fire_projectile.png` (CELL 128, COLS 4, ROWS 2) — done, attached
 
 ## Sheet 2 — `fire_explosion.png` — to do
 
@@ -66,7 +66,7 @@ Delivery
   available. Report the exact pixel dimensions.
 ```
 
-## Sheet 3 — `fire_burn_overlay.png` — done, attached
+## Sheet 3 — `fire_burn_overlay.png` (CELL 128, COLS 4, ROWS 2) — done, attached
 
 ## Done when
 Every sheet marked "to do" is attached at the stated grid. Engine integration is a separate ticket that depends on this one.
