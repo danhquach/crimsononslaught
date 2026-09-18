@@ -10,6 +10,17 @@
 /** Player move speed in px/s (spec §5). */
 export const PLAYER_SPEED = 180;
 
+/**
+ * Any value to a usable move speed in px/s. Zero, negative, non-finite and
+ * non-numeric all read as the base speed, so no perk or caller can leave the
+ * player frozen in place or moving an infinite distance in one step.
+ */
+export function clampMoveSpeed(value: unknown, fallback = PLAYER_SPEED): number {
+  const n = typeof value === 'number' ? value : Number.NaN;
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return n;
+}
+
 /** Left-stick magnitude below this reads as no input at all, so a resting stick never drifts (spec §5). */
 export const STICK_DEADZONE = 0.2;
 

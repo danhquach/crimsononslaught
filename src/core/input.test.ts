@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PLAYER_SPEED,
   STICK_DEADZONE,
+  clampMoveSpeed,
   directionVector,
   menuStep,
   moveVelocity,
@@ -135,5 +136,23 @@ describe('wrapIndex', () => {
   it('moves normally inside the range', () => {
     expect(wrapIndex(1, 1, 4)).toBe(2);
     expect(wrapIndex(0, 0, 1)).toBe(0);
+  });
+});
+
+describe('clampMoveSpeed', () => {
+  it('keeps any positive finite speed, perk-raised ones included', () => {
+    expect(clampMoveSpeed(PLAYER_SPEED)).toBe(180);
+    expect(clampMoveSpeed(180 * 1.1 ** 3)).toBeCloseTo(239.58, 10);
+    expect(clampMoveSpeed(0.5)).toBe(0.5);
+  });
+
+  it('falls back on anything else, so no perk can freeze or teleport the player', () => {
+    for (const value of [0, -3, Number.NaN, Number.POSITIVE_INFINITY, '180', null, undefined]) {
+      expect(clampMoveSpeed(value)).toBe(PLAYER_SPEED);
+    }
+  });
+
+  it('takes the fallback the caller gives', () => {
+    expect(clampMoveSpeed(-1, 200)).toBe(200);
   });
 });

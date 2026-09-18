@@ -358,7 +358,7 @@ export class GameScene extends Phaser.Scene {
    */
   private syncPlayerStats(before: Readonly<PlayerStats>): void {
     const after = this.perks.playerStats;
-    this.player.speed = after.moveSpeed;
+    this.player.setMoveSpeed(after.moveSpeed);
     if (after.maxHp !== before.maxHp) this.player.grantMaxHp(after.maxHp - before.maxHp);
   }
 
