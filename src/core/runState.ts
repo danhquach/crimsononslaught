@@ -1,4 +1,4 @@
-import type { SpellId } from '../config/spells';
+import { isSpellId, type SpellId } from '../config/spells';
 import { BOSS_START_TIME } from '../config/waves';
 import { emitRunEvent, type RunEventEmitter, type RunPhase } from './runEvents';
 import type { RunStats } from './scenePayloads';
@@ -238,4 +238,23 @@ export function resolveTimeScale(search: string, fallback = 1): number {
  */
 export function resolveInvulnerable(search: string): boolean {
   return new URLSearchParams(search).get('invulnerable') === '1';
+}
+
+/**
+ * `?loadout=fire,ice,lightning` equips those spells alongside the one picked on
+ * the select screen (CO-109). A test hook like `?timeScale=`: a run cannot yet
+ * be offered a second active — that is #132's level-up rework — and until then
+ * this is the only way to drive several at once.
+ *
+ * Ids are returned in the order they were written; unknown ids are dropped, and
+ * the chosen spell repeating here is harmless (`Spellbook.equip` refuses a
+ * second copy of anything already equipped).
+ */
+export function resolveLoadout(search: string): SpellId[] {
+  const raw = new URLSearchParams(search).get('loadout');
+  if (raw === null) return [];
+  return raw
+    .split(',')
+    .map((id) => id.trim())
+    .filter(isSpellId);
 }

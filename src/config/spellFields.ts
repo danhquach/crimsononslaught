@@ -10,6 +10,10 @@
  * "+12% boulders" would round to nothing on a 3-boulder ring and to a lot on a
  * 9-boulder one. Counts change only in a spell's own block and in #147's pass.
  *
+ * The Phase 1 blocks (`config/spells.ts`) are covered too: CO-109 made this map
+ * the path every equipped spell's numbers go through, so a field missing here
+ * would be a stat no passive can ever reach.
+ *
  * Pure data, no Phaser import.
  */
 
@@ -53,6 +57,7 @@ export const STAT_CATEGORIES = {
   bleedDuration: 'duration',
   slowDuration: 'duration',
   freezeDuration: 'duration',
+  stun: 'duration',
   stunDuration: 'duration',
   staggerDuration: 'duration',
 
@@ -67,6 +72,8 @@ export const STAT_CATEGORIES = {
   stunChance: 'unscaled',
   chainFalloff: 'unscaled',
   aoeDamageFactor: 'unscaled',
+  shatterBonus: 'unscaled',
+  crushMultiplier: 'unscaled',
   knockback: 'unscaled',
   pullForce: 'unscaled',
   homingTurnRate: 'unscaled',

@@ -11,6 +11,7 @@ import {
   type SpellStatBlock,
   type SpellStatField,
 } from '../config/spellFields';
+import { BASE_SPELL_STATS } from '../config/spells';
 import { resolveProfile, resolveSpellStats, validateSpellFields } from './playerProfile';
 import { createRng } from './rng';
 
@@ -188,6 +189,13 @@ describe('validateSpellFields', () => {
   it('categorises every field exactly once', () => {
     const fields = Object.keys(STAT_CATEGORIES) as SpellStatField[];
     expect(new Set(fields).size).toBe(fields.length);
-    expect(fields.length).toBe(45);
+    expect(fields.length).toBe(48);
+  });
+
+  // CO-109 routes every equipped spell's block through the category map, so a
+  // field the shipped blocks carry but the map has not is a stat no passive can
+  // ever reach. The roster blocks join these with #140-#143.
+  it('categorises every field the shipped spells carry', () => {
+    expect(validateSpellFields(BASE_SPELL_STATS)).toEqual([]);
   });
 });

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import {
   INVULNERABLE_REGISTRY_KEY,
+  LOADOUT_REGISTRY_KEY,
   SCENE,
   TIME_SCALE_REGISTRY_KEY,
   isGamePayload,
@@ -18,6 +19,7 @@ import { RUN_EVENT, type RunEventPayloads } from '../core/runEvents';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
 import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
+import { Spellbook } from '../core/spellbook';
 import type {
   EarthStats,
   FireStats,
@@ -25,7 +27,10 @@ import type {
   LightningStats,
   PlayerStats,
 } from '../core/spellStats';
-import type { SpellId } from '../config/spells';
+import { buildLoadout } from '../core/loadout';
+import type { RosterSpellId } from '../config/loadout';
+import type { SpellStatBlock } from '../config/spellFields';
+import { BASE_SPELL_STATS, isSpellId, type SpellId } from '../config/spells';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
@@ -59,15 +64,16 @@ const GRID_CELL = 200;
  * HUD is live. Collected XP levels the run on spec §5's curve (CO-031) and
  * each level drives the level-up flow (pause -> LevelUp overlay -> pick ->
  * resume, or the zero-perk fallback). `PerkSystem` (CO-042) owns the offers
- * and the run's stats — each pick is pushed onto the live spell and the
+ * and the run's stats — each pick is pushed onto the equipped spells and the
  * generic block onto the player here.
  *
  * The player carries HP and damage intake (CO-021) and enemies chase and damage
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
  * Deaths drop XP gems that drift in and count XP (CO-023). The spawn director
- * (CO-025) feeds the arena off-camera on the wave schedule. The chosen spell
- * (Epic D) is what kills enemies: Fire (CO-044), Ice (CO-045), Lightning
- * (CO-046) and Earth (CO-047). The boss (CO-050) is an enemy in the same pool;
+ * (CO-025) feeds the arena off-camera on the wave schedule. The equipped spells
+ * (Epic D) are what kill enemies: Fire (CO-044), Ice (CO-045), Lightning
+ * (CO-046) and Earth (CO-047), each on its own cooldown in the run's
+ * `Spellbook` (CO-109). The boss (CO-050) is an enemy in the same pool;
  * the boss phase (CO-051) spawns it off-camera at 5:00, the wave table has
  * stopped regular spawns by then, and its death is the win (spec §4 step 4).
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
@@ -86,8 +92,10 @@ export class GameScene extends Phaser.Scene {
   private rng!: Rng;
   private run!: RunState;
   private perks!: PerkSystem;
-  /** The run's one spell (Epic D), built from the payload's id in `create`. */
-  private spell!: Spell;
+  /** Every active this run is casting (CO-109), each on its own cooldown. */
+  private spells!: Spellbook;
+  /** Kept so a spell equipped mid-run can be given the arena's overlaps. */
+  private collisions!: CollisionSystem;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
   private pendingLevelUps = 0;
   /** `?invulnerable=1` (test hook): contact damage is dropped before it reaches the player. */
@@ -109,6 +117,11 @@ export class GameScene extends Phaser.Scene {
   /** Test hook: enemies alive in the arena, the bound `overlayCount` must respect. */
   get liveEnemyCount(): number {
     return this.enemies.live.length;
+  }
+
+  /** Test hook (CO-109): the actives casting right now, in equip order. */
+  get equippedSpellIds(): RosterSpellId[] {
+    return this.spells.spells.map((spell) => spell.id);
   }
 
   init(data: unknown): void {
@@ -154,13 +167,21 @@ export class GameScene extends Phaser.Scene {
     this.fx = new FxPool(this);
     this.overlays = new OverlayPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
-    // Its colliders belong to the physics world, so nothing holds the system
-    // past handing the spell its group.
-    const collisions = new CollisionSystem(this, this.player, this.enemies, this.gems, {
+    // Its colliders belong to the physics world; the scene keeps the system
+    // itself only so a spell equipped mid-run can register its group too.
+    this.collisions = new CollisionSystem(this, this.player, this.enemies, this.gems, {
       onEnemyContact: (enemy) => this.onEnemyContact(enemy),
       onGemPickup: (gem) => this.onGemPickup(gem),
     });
-    this.spell = this.createSpell(spellId, collisions);
+    // The four Phase 1 spell ids are also the four element ids (spec §9.1), so
+    // the chosen spell is this run's element and its always-equipped default.
+    this.spells = new Spellbook(
+      buildLoadout(spellId),
+      (id, stats) => this.createSpell(id, stats),
+      (id) => this.baseStatsFor(id),
+    );
+    this.equipSpell(spellId);
+    for (const extra of this.extraActives()) this.equipSpell(extra);
 
     const onPick = (pick: LevelUpPickPayload): void => this.applyPick(pick.perkId);
     this.events.on(LEVEL_UP_EVENT.pick, onPick);
@@ -224,7 +245,7 @@ export class GameScene extends Phaser.Scene {
       this.damageEnemy(enemy, amount),
     );
     this.gems.update(step.deltaMs, this.player);
-    this.spell.update(step.deltaMs);
+    this.spells.update(step.deltaMs);
     this.physics.world.update(time, step.deltaMs);
     this.physics.world.postUpdate();
     // After the bodies have settled, so an overlay sits on where its host is
@@ -232,44 +253,82 @@ export class GameScene extends Phaser.Scene {
     this.overlays.update(this.enemies.live);
   }
 
-  /** The run's spell, built on the pool and collision wiring above. */
-  private createSpell(spellId: SpellId, collisions: CollisionSystem): Spell {
+  /**
+   * Equip one active mid-run (CO-109). A spell added here starts casting from
+   * this moment, on a full cooldown of its own. Which spells a run may be
+   * *offered* is the loadout's rule; #132's level-up rework is what calls this.
+   */
+  equipSpell(spellId: RosterSpellId): boolean {
+    return this.spells.equip(spellId) !== undefined;
+  }
+
+  /**
+   * One spell, built on the pools and collision wiring above. `undefined` for a
+   * Phase 2 roster id: those spells land with #140-#143, and equipping one this
+   * build cannot cast would leave a dead slot rather than fail loudly.
+   */
+  private createSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
     const damage = (enemy: Enemy, amount: number): void => this.damageEnemy(enemy, amount);
-    // `PerkSystem` was built from the same id, so its block is this spell's.
     switch (spellId) {
-      case 'fire': {
-        const stats = this.perks.spellStats as Readonly<FireStats>;
+      case 'fire':
         return new FireballSpell(
           this,
           this.player,
           this.enemies,
-          collisions,
-          stats,
+          this.collisions,
+          stats as Readonly<FireStats>,
           damage,
           this.fx,
         );
-      }
-      case 'ice': {
-        const stats = this.perks.spellStats as Readonly<IceStats>;
+      case 'ice':
         return new FrostNovaSpell(
           this,
           this.player,
           this.enemies,
-          stats,
+          stats as Readonly<IceStats>,
           damage,
           this.rng,
           this.fx,
         );
-      }
-      case 'lightning': {
-        const stats = this.perks.spellStats as Readonly<LightningStats>;
-        return new ChainLightningSpell(this, this.player, this.enemies, stats, damage, this.fx);
-      }
-      case 'earth': {
-        const stats = this.perks.spellStats as Readonly<EarthStats>;
-        return new OrbitingBouldersSpell(this, this.player, collisions, stats, damage, this.fx);
-      }
+      case 'lightning':
+        return new ChainLightningSpell(
+          this,
+          this.player,
+          this.enemies,
+          stats as Readonly<LightningStats>,
+          damage,
+          this.fx,
+        );
+      case 'earth':
+        return new OrbitingBouldersSpell(
+          this,
+          this.player,
+          this.collisions,
+          stats as Readonly<EarthStats>,
+          damage,
+          this.fx,
+        );
+      default:
+        console.warn(`[Game] no implementation for spell "${spellId}" yet`);
+        return undefined;
     }
+  }
+
+  /**
+   * The block a spell's stats are resolved from, before the loadout's passives
+   * scale it. The run's perk tree belongs to the chosen spell alone (Phase 1),
+   * so that one reads `PerkSystem`'s live block and every other active casts at
+   * base values — until #132 retires perks for passives.
+   */
+  private baseStatsFor(spellId: RosterSpellId): SpellStatBlock | undefined {
+    if (!isSpellId(spellId)) return undefined;
+    return spellId === this.payload?.spellId ? this.perks.spellStats : BASE_SPELL_STATS[spellId];
+  }
+
+  /** `?loadout=` (test hook): extra actives Boot parsed out of the query string. */
+  private extraActives(): SpellId[] {
+    const extra: unknown = this.registry.get(LOADOUT_REGISTRY_KEY);
+    return Array.isArray(extra) ? extra.filter(isSpellId) : [];
   }
 
   /** `?timeScale=` is resolved once in Boot; a Game started without it runs real time. */
@@ -391,8 +450,10 @@ export class GameScene extends Phaser.Scene {
     }
     // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
     this.run.recordPerk(card.name);
-    // The spell reads its block per cast, so the next volley already has the perk.
-    this.spell.setStats(this.perks.spellStats);
+    // Every spell reads its block per cast, so the next volley already has it:
+    // the perk reaches the spell that owns the tree, and #132's passives will
+    // reach all of them through the same call.
+    this.spells.refresh();
     this.syncPlayerStats(before);
   }
 

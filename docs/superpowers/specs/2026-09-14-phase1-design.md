@@ -159,7 +159,9 @@ src/
 ### Data flow
 1. `SpellSelectScene` -> `GameScene.init({ spellId, seed })`.
 2. `GameScene.update(dt)`: `RunState.tick` -> `SpawnDirector.update` ->
-   `Spell.update` -> entities move -> `CollisionSystem` resolves ->
+   `Spellbook.update` (every equipped spell, each on its own cooldown — CO-109;
+   Phase 1 ran a single `Spell.update` here) -> entities move ->
+   `CollisionSystem` resolves ->
    `RunState` records kills / xp -> emits events (`xp`, `hp`, `kill`,
    `timer`, `bossHp`) consumed by `HudScene`.
 3. XP threshold reached -> `GameScene.scene.pause()`, launch `LevelUpScene`

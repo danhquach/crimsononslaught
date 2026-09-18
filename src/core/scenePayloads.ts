@@ -34,6 +34,13 @@ export const TIME_SCALE_REGISTRY_KEY = 'timeScale';
 /** Registry key under which Boot stores the `?invulnerable=1` test hook (default false). */
 export const INVULNERABLE_REGISTRY_KEY = 'invulnerable';
 
+/**
+ * Registry key under which Boot stores the extra actives of the `?loadout=`
+ * test hook (default none). Like `?timeScale=` it is a hook, not part of the
+ * run, so it travels in the registry rather than the `Game` payload.
+ */
+export const LOADOUT_REGISTRY_KEY = 'loadout';
+
 /** `SpellSelect -> Game` */
 export interface GamePayload {
   spellId: SpellId;

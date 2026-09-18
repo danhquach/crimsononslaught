@@ -10,6 +10,7 @@ import {
   type RunFrame,
   clampTimeScale,
   resolveInvulnerable,
+  resolveLoadout,
   resolveTimeScale,
   simulationSteps,
 } from './runState';
@@ -313,6 +314,33 @@ describe('resolveInvulnerable', () => {
     expect(resolveInvulnerable('?invulnerable=')).toBe(false);
     expect(resolveInvulnerable('?invulnerable=true')).toBe(false);
     expect(resolveInvulnerable('?invulnerable=0')).toBe(false);
+  });
+});
+
+describe('resolveLoadout', () => {
+  it('is empty when the param is absent', () => {
+    expect(resolveLoadout('')).toEqual([]);
+    expect(resolveLoadout('?seed=1&timeScale=10')).toEqual([]);
+  });
+
+  it('reads the ids in the order they were written', () => {
+    expect(resolveLoadout('?loadout=lightning,fire')).toEqual(['lightning', 'fire']);
+    expect(resolveLoadout('?seed=1&loadout=fire,ice,lightning')).toEqual([
+      'fire',
+      'ice',
+      'lightning',
+    ]);
+  });
+
+  it('tolerates spacing around an id', () => {
+    expect(resolveLoadout('?loadout=fire,%20ice')).toEqual(['fire', 'ice']);
+  });
+
+  it('drops anything that is not a spell id', () => {
+    expect(resolveLoadout('?loadout=')).toEqual([]);
+    expect(resolveLoadout('?loadout=water,fire,,earth')).toEqual(['fire', 'earth']);
+    // The roster ids land with #140-#143; nothing can cast them yet.
+    expect(resolveLoadout('?loadout=fire_meteor')).toEqual([]);
   });
 });
 

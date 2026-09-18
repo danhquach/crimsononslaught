@@ -34,13 +34,22 @@ export const LARGE_BURN_MIN_RADIUS = ENEMY_ARCHETYPES.tank.radius;
  * A burst past this is dropped, never queued, the rule every pool follows.
  * Sized for a maxed fire build at `?timeScale=10`, where casts land ten
  * times a second and each clip is a fraction of a second.
+ *
+ * Re-measured for several actives (CO-109), headless at seed 1 over whole
+ * runs: the peak is 17-23 of these at `?timeScale=10` with one spell or with
+ * three, and the pool saturates at `?timeScale=30` either way — one maxed fire
+ * build already peaked at 63 there. All four at once (past what a run may
+ * equip) saturates it at `?timeScale=10` too. Frame rate held at 60 fps in
+ * every one of those runs, so what another active costs is dropped bursts at
+ * the edges, never frames; the number itself is #147's tuning pass to move.
  */
 export const MAX_LIVE_FX = 64;
 
 /**
  * Status overlays that may be out at once. One enemy shows at most one overlay
- * (a run has one spell, and a freeze outranks its slow), so the cap is the
- * enemy pool's own: `MAX_LIVE_ENEMIES` plus the boss's slot.
+ * whatever is on it — `statusOverlay` picks a single clip by priority, so three
+ * actives stacking a freeze, a stun and a burn still draw one — so the cap is
+ * the enemy pool's own: `MAX_LIVE_ENEMIES` plus the boss's slot.
  */
 export const MAX_LIVE_OVERLAYS = MAX_LIVE_ENEMIES + 1;
 
