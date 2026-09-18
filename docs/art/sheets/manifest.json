@@ -700,10 +700,10 @@
     {
       "key": "ice",
       "ticket": "CO-077",
-      "file": "CO-077/ice_nova.jpg",
+      "file": "CO-077/ice_nova.png",
       "cols": 6,
       "rows": 1,
-      "sheetCell": 448,
+      "sheetCell": 544,
       "rowSpecs": [
         [
           {
@@ -711,12 +711,6 @@
             "cols": [
               1,
               6
-            ],
-            "allowEdge": [
-              "top",
-              "left",
-              "right",
-              "bottom"
             ]
           }
         ]
