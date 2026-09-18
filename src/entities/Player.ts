@@ -10,6 +10,7 @@ import {
 } from '../core/health';
 import {
   PLAYER_SPEED,
+  clampMoveSpeed,
   directionVector,
   moveVelocity,
   padVector,
@@ -45,7 +46,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly wasd: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key> | undefined;
   private health: HealthState = createHealth();
   /** px/s before diagonal normalization; the Move Speed perk raises it (CO-042). */
-  speed = PLAYER_SPEED;
+  private moveSpeed = PLAYER_SPEED;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'player');
@@ -70,6 +71,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.health.maxHp;
   }
 
+  get speed(): number {
+    return this.moveSpeed;
+  }
+
   override update(deltaMs = 0): void {
     this.setHealth(tickHealth(this.health, deltaMs));
     const { x, y } = moveVelocity(resolveMove(this.keyboardMove(), this.padMove()), this.speed);
@@ -83,6 +88,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!damaged) return;
     emitRunEvent(this.scene.events, 'hp', { hp: state.hp, maxHp: state.maxHp });
     if (died) this.scene.events.emit(PLAYER_EVENT.died);
+  }
+
+  /**
+   * Perk-driven move speed (spec §5): the only write path, so a caller cannot
+   * leave the player frozen or teleporting. Anything unusable keeps the base
+   * speed rather than being stored.
+   */
+  setMoveSpeed(pxPerSecond: number): void {
+    this.moveSpeed = clampMoveSpeed(pxPerSecond);
   }
 
   /** Level-up fallback (spec §5): raise the maximum, leaving current HP alone. */
