@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RosterSpellId } from '../config/loadout';
+import { SLOT_UNLOCK_LEVELS, type RosterSpellId } from '../config/loadout';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { buildLoadout } from './loadout';
 import { RunState } from './runState';
@@ -203,5 +203,60 @@ describe('Spellbook (CO-109)', () => {
   it('throws on a passive the loadout cannot take', () => {
     const spells = book();
     expect(() => spells.takePassive('passive_power_typo' as 'passive_power')).toThrow();
+  });
+});
+
+describe('Spellbook.equipActive (CO-110)', () => {
+  const [SLOT_2_LEVEL] = SLOT_UNLOCK_LEVELS;
+  /** #140-#143 land the roster spells; until then the rig casts one under a roster id. */
+  const ROSTER_ID = 'fire_meteor';
+
+  const rosterFactory: SpellFactory = (spellId, stats) =>
+    isStubId(spellId) || spellId === ROSTER_ID
+      ? new StubSpell(spellId as StubId, stats as SpellStatsBySpell[StubId])
+      : undefined;
+
+  const rosterBase: BaseStatsFor = (spellId) =>
+    spellId === ROSTER_ID ? BASE_SPELL_STATS.fire : baseStats(spellId);
+
+  const rosterBook = (): Spellbook => book(rosterFactory, rosterBase);
+
+  it('fills the lowest open slot and starts casting the pick', () => {
+    const spells = rosterBook();
+    const spell = spells.equipActive(ROSTER_ID, SLOT_2_LEVEL);
+    expect(spell?.id).toBe(ROSTER_ID);
+    expect(spells.loadout.slots).toEqual([ROSTER_ID, null]);
+    expect(spells.spells).toHaveLength(1);
+  });
+
+  it('refuses what the loadout refuses, and leaves the run as it was', () => {
+    const spells = rosterBook();
+    // Below the unlock level there is no open slot yet.
+    expect(spells.equipActive(ROSTER_ID, SLOT_2_LEVEL - 1)).toBeUndefined();
+    // Another element's spell never reaches this run's slots.
+    expect(spells.equipActive('ice_blizzard', SLOT_2_LEVEL)).toBeUndefined();
+    // Nor does the default, which is equipped from the start.
+    expect(spells.equipActive('fire', SLOT_2_LEVEL)).toBeUndefined();
+    expect(spells.loadout.slots).toEqual([null, null]);
+    expect(spells.spells).toEqual([]);
+  });
+
+  it('leaves the slot open when the build cannot cast the pick', () => {
+    const spells = book();
+    expect(spells.equipActive(ROSTER_ID, SLOT_2_LEVEL)).toBeUndefined();
+    expect(spells.loadout.slots).toEqual([null, null]);
+    expect(spells.spells).toEqual([]);
+  });
+
+  it('casts a mid-run pick on its own full cooldown, alongside the default', () => {
+    const spells = rosterBook();
+    const fire = equip(spells, 'fire');
+    runFor(spells, 3);
+    const extra = spells.equipActive(ROSTER_ID, SLOT_2_LEVEL) as StubSpell;
+    runFor(spells, 3);
+
+    expect(fire.casts).toBe(6);
+    // The new spell started from zero charge, three seconds in.
+    expect(extra.casts).toBe(3);
   });
 });

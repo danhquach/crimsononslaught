@@ -278,7 +278,12 @@ On each level-up, in order:
 
 1. **Any active slot open?** (unlocked, empty) → offer up to 3 of the element's
    unequipped active spells. The element has 4 non-default actives, so this is
-   3 cards for the first slot and exactly 3 for the second.
+   3 cards for the first slot and exactly 3 for the second. Only spells the
+   build can actually cast are offered — until the roster tickets
+   ([#140](https://github.com/danhquach/crimsononslaught/issues/140)-[#143](https://github.com/danhquach/crimsononslaught/issues/143))
+   land there are none, and an open slot falls through to state 2 rather than to
+   state 3: the slot waits for a later level and the run still gets the upgrade
+   it earned.
 2. **Otherwise** → offer 3 passives drawn from those with `rank < maxRank`, via
    `rng.shuffle(pool).slice(0, 3)`. Uncapped passives are always eligible.
 3. **Nothing eligible** → no overlay; grant `EMPTY_OFFER_MAX_HP_BONUS` (+10 max
@@ -308,7 +313,10 @@ fallback, so the run's level and the run's power never diverge.
 `config/perks.ts`, `core/perkOffer.ts` and `core/perkSystem.ts` are deleted,
 along with `applyPerk` and `validatePerks` in `core/spellStats.ts` and the
 `LoadoutStats` type. What replaces them: `config/passives.ts`,
-`core/passiveOffer.ts`, `core/playerProfile.ts` and `core/loadout.ts`.
+`core/levelUpOffer.ts`, `core/playerProfile.ts` and `core/loadout.ts`. (§7's
+state machine draws both kinds of card, so the one module is
+`core/levelUpOffer.ts` rather than the `core/passiveOffer.ts` + `spellOffer`
+pair this section first named.)
 
 Where each node goes:
 
@@ -606,10 +614,10 @@ Unit (Vitest, `src/core/**`, no Phaser import):
   identical profile, clamps hold at the caps in §4.3.
 - `loadout`: slots unlock at 3 and 7; a filled slot cannot be reassigned;
   passives are uncapped; the element lock rejects a spell from another element.
-- `passiveOffer`: three cards while nothing is capped, fewer near the end of a
-  capped config, no duplicates in one offer, determinism under a seed.
-- `spellOffer`: offers only unequipped actives of the run's element; exactly 3
-  for each of the two slots.
+- `levelUpOffer`: three cards while nothing is capped, fewer near the end of a
+  capped config, no duplicates in one offer, determinism under a seed; offers
+  only unequipped actives of the run's element, exactly 3 for each of the two
+  slots.
 - `levelUp`: actives while a slot is open, passives once none is, the +10 max HP
   fallback at zero eligible.
 - `effectiveStats`: each category multiplier reaches exactly the fields §6.1

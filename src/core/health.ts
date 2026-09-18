@@ -62,6 +62,20 @@ export function takeDamage(state: Readonly<HealthState>, amount: number): Damage
   };
 }
 
+/**
+ * Heal one frame's worth of regeneration (Phase 2 spec §6.2: it ticks here,
+ * capped at `maxHp`). A dead player never regenerates back out of it.
+ */
+export function regenHealth(
+  state: Readonly<HealthState>,
+  hpPerSecond: number,
+  deltaMs: number,
+): HealthState {
+  const healing = hpPerSecond > 0 && deltaMs > 0 && !isDead(state) && state.hp < state.maxHp;
+  if (!healing) return state as HealthState;
+  return { ...state, hp: Math.min(state.maxHp, state.hp + (hpPerSecond * deltaMs) / 1000) };
+}
+
 /** Drain the invulnerability window by one frame's delta. */
 export function tickHealth(state: Readonly<HealthState>, deltaMs: number): HealthState {
   if (state.invulnMs === 0) return state as HealthState;
@@ -76,9 +90,14 @@ export function flickerAlpha(state: Readonly<HealthState>): number {
   return half % 2 === 0 ? FLICKER_ALPHA : 1;
 }
 
-/** Level-up fallback (spec §5): +10 max HP, no heal. */
-export function grantMaxHp(state: Readonly<HealthState>, bonus: number): HealthState {
-  return { ...state, maxHp: state.maxHp + bonus };
+/**
+ * Raise the maximum by `bonus`. The level-up fallback (Phase 1 spec §5) grants
+ * +10 with no heal; Vitality heals for what it adds, so taking it mid-fight is
+ * worth something (Phase 2 spec §5) — `heal` says which.
+ */
+export function grantMaxHp(state: Readonly<HealthState>, bonus: number, heal = false): HealthState {
+  const maxHp = state.maxHp + bonus;
+  return { ...state, maxHp, hp: heal ? Math.min(state.hp + bonus, maxHp) : state.hp };
 }
 
 /** Emitter event names for the player -> Game direction, namespaced like `run:*`. */

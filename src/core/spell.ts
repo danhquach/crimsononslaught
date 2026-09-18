@@ -1,11 +1,6 @@
 import type { SpellId } from '../config/spells';
 import type { Vec2 } from './input';
-import {
-  BASE_PLAYER_STATS,
-  applyPerk,
-  type LoadoutStats,
-  type SpellStatsBySpell,
-} from './spellStats';
+import type { SpellStatsBySpell } from './spellStats';
 
 /**
  * What every spell is made of (spec §5 "Spells"): a stat block, a clock that
@@ -13,7 +8,7 @@ import {
  *
  * The four spells (CO-044..047) differ only in what a cast *does*, so that is
  * the one thing `Spell` leaves abstract. Everything around it — counting down
- * the cooldown across scaled frames, surviving a perk that shortens that
+ * the cooldown across scaled frames, surviving a passive that shortens that
  * cooldown mid-run, picking the nearest targets — lives here once and is
  * unit-tested against a stub instead of four times against Phaser.
  *
@@ -33,7 +28,7 @@ export const MAX_CASTS_PER_FRAME = 4;
  * The cooldown clock, in seconds of run time.
  *
  * `due` is handed the current cooldown every frame rather than at construction,
- * because a Utility perk shortens it mid-run and the next cast has to feel it.
+ * because Haste shortens it mid-run and the next cast has to feel it.
  * Time left over after a cast carries into the following frame, so a cast lands
  * every `cooldown` s of run time whatever the frame length — the property the
  * `?timeScale=` smoke runs depend on (spec §8).
@@ -122,12 +117,12 @@ export abstract class Spell<S extends SpellId = SpellId> {
 
   constructor(id: S, stats: SpellStatsBySpell[S]) {
     this.id = id;
-    // Copied so the caller's block — `PerkSystem`'s loadout — and the spell's
-    // can never be changed through each other.
+    // Copied so the caller's block — the `Spellbook`'s resolved stats — and the
+    // spell's can never be changed through each other.
     this.currentStats = { ...stats };
   }
 
-  /** The live block. Read it per cast: a perk can change it between two casts. */
+  /** The live block. Read it per cast: a passive can change it between two casts. */
   get stats(): Readonly<SpellStatsBySpell[S]> {
     return this.currentStats;
   }
@@ -147,24 +142,7 @@ export abstract class Spell<S extends SpellId = SpellId> {
     this.tick(deltaMs / 1000);
   }
 
-  /**
-   * Apply one rank of a perk to this spell's own block (spec §5).
-   *
-   * Generic perks (move speed, max HP, pickup radius) belong to the player, so
-   * they pass through here without changing a spell stat — `PerkSystem` owns
-   * the player block and routes those. Everything the reducer rejects still
-   * throws: an unknown id, another spell's perk, a rank out of range.
-   */
-  applyPerk(perkId: string, rank: number): void {
-    const loadout: LoadoutStats<S> = {
-      spellId: this.id,
-      spell: this.currentStats,
-      player: { ...BASE_PLAYER_STATS },
-    };
-    this.currentStats = applyPerk(loadout, perkId, rank).spell;
-  }
-
-  /** Overwrite the block wholesale, as `PerkSystem`'s loadout already holds it. */
+  /** Overwrite the block wholesale, as the `Spellbook` resolved it. */
   setStats(stats: SpellStatsBySpell[S]): void {
     this.currentStats = { ...stats };
   }
@@ -179,7 +157,7 @@ export abstract class Spell<S extends SpellId = SpellId> {
   }
 
   /**
-   * Seconds between casts. Read fresh every frame so a Utility perk shortens
+   * Seconds between casts. Read fresh every frame so a passive shortens
    * the wait the player is already in. `Infinity` for a spell with no cooldown.
    */
   protected get cooldown(): number {

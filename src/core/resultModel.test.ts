@@ -11,7 +11,7 @@ const stats: RunStats = {
   level: 8,
   kills: 1234,
   spellId: 'fire',
-  perks: ['Sharper Edge', 'Quick Cast', 'Sharper Edge'],
+  perks: ['Power', 'Meteor', 'Power'],
 };
 
 describe('RESULT_HEADLINES', () => {
@@ -38,7 +38,7 @@ describe('summarizePerks', () => {
   });
 
   it('keeps pick order and collapses repeats into ×n', () => {
-    expect(summarizePerks(stats.perks)).toBe('Sharper Edge ×2, Quick Cast');
+    expect(summarizePerks(stats.perks)).toBe('Power ×2, Meteor');
     expect(summarizePerks(['a', 'a', 'a'])).toBe('a ×3');
   });
 });
@@ -50,7 +50,7 @@ describe('resultRows', () => {
       ['Level', '8'],
       ['Kills', '1,234'],
       ['Spell', 'Fireball'],
-      ['Perks taken', 'Sharper Edge ×2, Quick Cast'],
+      ['Upgrades taken', 'Power ×2, Meteor'],
     ]);
   });
 
@@ -67,7 +67,7 @@ describe('resultRows', () => {
       ['Level', '1'],
       ['Kills', '0'],
       ['Spell', 'Orbiting Boulders'],
-      ['Perks taken', 'none'],
+      ['Upgrades taken', 'none'],
     ]);
   });
 

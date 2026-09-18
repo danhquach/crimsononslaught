@@ -237,3 +237,8 @@ export const PASSIVES: readonly Passive[] = PASSIVE_LIST;
 export function passiveById(id: string): Passive | undefined {
   return PASSIVES.find((passive) => passive.id === id);
 }
+
+/** Narrows a card id or an event payload to a passive this build knows. */
+export function isPassiveId(value: unknown): value is PassiveId {
+  return typeof value === 'string' && PASSIVES.some((passive) => passive.id === value);
+}

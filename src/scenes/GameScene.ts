@@ -11,26 +11,26 @@ import {
   type ResultPayload,
 } from '../core/scenePayloads';
 import { BOSS_EVENT } from '../core/boss';
-import { LEVEL_UP_EVENT, resolveLevelUp, type LevelUpPickPayload } from '../core/levelUp';
+import {
+  LEVEL_UP_EVENT,
+  resolveLevelUp,
+  type LevelUpPickPayload,
+  type OfferCard,
+} from '../core/levelUp';
+import { levelUpOffer, type ActiveCard } from '../core/levelUpOffer';
 import { PLAYER_EVENT } from '../core/health';
-import { PerkSystem } from '../core/perkSystem';
 import { createRng, type Rng } from '../core/rng';
 import { RUN_EVENT, type RunEventPayloads } from '../core/runEvents';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
 import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
 import { Spellbook } from '../core/spellbook';
-import type {
-  EarthStats,
-  FireStats,
-  IceStats,
-  LightningStats,
-  PlayerStats,
-} from '../core/spellStats';
+import type { EarthStats, FireStats, IceStats, LightningStats } from '../core/spellStats';
 import { buildLoadout } from '../core/loadout';
-import type { RosterSpellId } from '../config/loadout';
+import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
+import { isPassiveId, type PlayerProfile } from '../config/passives';
 import type { SpellStatBlock } from '../config/spellFields';
-import { BASE_SPELL_STATS, isSpellId, type SpellId } from '../config/spells';
+import { BASE_SPELL_STATS, SPELL_CARDS, isSpellId, type SpellId } from '../config/spells';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
@@ -63,9 +63,11 @@ const GRID_CELL = 200;
  * The run clock is emitted on `this.events` (see `core/runEvents.ts`) so the
  * HUD is live. Collected XP levels the run on spec §5's curve (CO-031) and
  * each level drives the level-up flow (pause -> LevelUp overlay -> pick ->
- * resume, or the zero-perk fallback). `PerkSystem` (CO-042) owns the offers
- * and the run's stats — each pick is pushed onto the equipped spells and the
- * generic block onto the player here.
+ * resume, or the empty-offer fallback). `levelUpOffer` (CO-110) draws the
+ * cards from the run's loadout: an active while a slot is open, a passive once
+ * both are filled. A picked active is equipped into the `Spellbook`; a picked
+ * passive lands on the loadout, from where it reaches every equipped spell and
+ * the player's own stats here.
  *
  * The player carries HP and damage intake (CO-021) and enemies chase and damage
  * them on contact (CO-022); HP 0 ends the run as a loss (spec §4 step 4).
@@ -91,13 +93,14 @@ export class GameScene extends Phaser.Scene {
   private overlays!: OverlayPool;
   private rng!: Rng;
   private run!: RunState;
-  private perks!: PerkSystem;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
   /** Kept so a spell equipped mid-run can be given the arena's overlaps. */
   private collisions!: CollisionSystem;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
   private pendingLevelUps = 0;
+  /** The cards the open overlay is showing; a pick is only honoured against these. */
+  private offer: readonly OfferCard[] = [];
   /** `?invulnerable=1` (test hook): contact damage is dropped before it reaches the player. */
   private invulnerable = false;
 
@@ -150,8 +153,8 @@ export class GameScene extends Phaser.Scene {
     // and step zero or two times for one of ours.
     this.physics.disableUpdate();
     this.physics.world.fixedStep = false;
-    this.perks = new PerkSystem(spellId, this.rng);
     this.pendingLevelUps = 0;
+    this.offer = [];
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
 
     this.buildArena();
@@ -183,7 +186,7 @@ export class GameScene extends Phaser.Scene {
     this.equipSpell(spellId);
     for (const extra of this.extraActives()) this.equipSpell(extra);
 
-    const onPick = (pick: LevelUpPickPayload): void => this.applyPick(pick.perkId);
+    const onPick = (pick: LevelUpPickPayload): void => this.applyPick(pick.offerId);
     this.events.on(LEVEL_UP_EVENT.pick, onPick);
     // Spec §4 step 4: the player reaching 0 HP is the losing end of the run.
     const onDied = (): void => this.endRun('lose');
@@ -254,9 +257,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Equip one active mid-run (CO-109). A spell added here starts casting from
-   * this moment, on a full cooldown of its own. Which spells a run may be
-   * *offered* is the loadout's rule; #132's level-up rework is what calls this.
+   * Cast one more active from this moment on, on a full cooldown of its own
+   * (CO-109), without spending a slot: the run's default spell at the start,
+   * and the `?loadout=` test hook's extras. A level-up pick goes through
+   * `Spellbook.equipActive`, which fills a slot first.
    */
   equipSpell(spellId: RosterSpellId): boolean {
     return this.spells.equip(spellId) !== undefined;
@@ -316,13 +320,26 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * The block a spell's stats are resolved from, before the loadout's passives
-   * scale it. The run's perk tree belongs to the chosen spell alone (Phase 1),
-   * so that one reads `PerkSystem`'s live block and every other active casts at
-   * base values — until #132 retires perks for passives.
+   * scale it (spec §6.2). `undefined` for a roster spell this build cannot
+   * cast yet — those land with #140-#143, and `activeCatalog` keeps them out of
+   * the offers until they do.
    */
   private baseStatsFor(spellId: RosterSpellId): SpellStatBlock | undefined {
-    if (!isSpellId(spellId)) return undefined;
-    return spellId === this.payload?.spellId ? this.perks.spellStats : BASE_SPELL_STATS[spellId];
+    return isSpellId(spellId) ? BASE_SPELL_STATS[spellId] : undefined;
+  }
+
+  /**
+   * Every active this build can actually cast, as a level-up card reads it.
+   * Only the four Phase 1 spells have an implementation and a stat block today,
+   * and each is its element's default, so nothing is offerable until the roster
+   * tickets land — until then every level-up draws passives (spec §7.1).
+   */
+  private activeCatalog(): ActiveCard[] {
+    return ROSTER_SPELL_IDS.filter(isSpellId).map((id) => ({
+      id,
+      name: SPELL_CARDS[id].name,
+      description: SPELL_CARDS[id].description,
+    }));
   }
 
   /** `?loadout=` (test hook): extra actives Boot parsed out of the query string. */
@@ -350,7 +367,10 @@ export class GameScene extends Phaser.Scene {
   private onGemPickup(gem: XpGem): void {
     const gained = this.gems.collect(gem, this.player);
     if (gained === 0) return;
-    this.pendingLevelUps += this.run.addXp(gained);
+    // Avarice multiplies what a gem is worth as it is collected (spec §6.2), so
+    // the gem keeps its face value everywhere else. The XP curve carries the
+    // fraction: rounding a 1 XP gem would throw every Avarice rank away.
+    this.pendingLevelUps += this.run.addXp(gained * this.spells.profile.xpGain);
   }
 
   /**
@@ -410,6 +430,12 @@ export class GameScene extends Phaser.Scene {
   /**
    * Pay out the level-ups owed, in order, until one of them opens the overlay.
    * Returns true when it did — Game is paused and this frame is over.
+   *
+   * One pickup can owe several: `RunState` settles the level once and reports
+   * how many were crossed, so every overlay in the batch is offered at the
+   * level the run has reached. A burst that crosses a slot's unlock level
+   * therefore pays out that slot on the batch's first card rather than holding
+   * it back for a level the run is already past.
    */
   private drainLevelUps(): boolean {
     while (this.pendingLevelUps > 0) {
@@ -420,17 +446,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Spec §5: pause and offer up to 3 eligible perks; with none eligible grant
-   * +10 max HP silently and keep running.
+   * Spec §7.1: pause and offer up to 3 cards — actives while a slot is open,
+   * passives once both are filled; with nothing eligible grant +10 max HP
+   * silently and keep running.
    *
    * Returns whether the overlay was launched (and Game paused).
    */
   private openLevelUp(): boolean {
-    const resolution = resolveLevelUp(this.perks.offer());
+    const offer = levelUpOffer(this.rng, {
+      loadout: this.spells.loadout,
+      level: this.run.level,
+      actives: this.activeCatalog(),
+    });
+    const resolution = resolveLevelUp(offer);
     if (resolution.kind === 'fallback') {
       this.player.grantMaxHp(resolution.maxHpBonus);
       return false;
     }
+    this.offer = resolution.cards;
     const payload: LevelUpPayload = { offer: resolution.cards };
     this.scene.pause();
     this.scene.launch(SCENE.levelUp, payload);
@@ -438,35 +471,59 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Take the pick the overlay sent. `PerkSystem` refuses anything this run
-   * cannot take, so an out-of-date or stray pick is logged and dropped.
+   * Take the pick the overlay sent. Only a card from the offer that is still
+   * open counts, so a stray or out-of-date pick is logged and dropped rather
+   * than granting something this run was never shown.
    */
-  private applyPick(perkId: string): void {
-    const before = this.perks.playerStats;
-    const card = this.perks.pick(perkId);
+  private applyPick(offerId: string): void {
+    const card = this.offer.find((c) => c.id === offerId);
+    this.offer = [];
     if (!card) {
-      console.warn(`[Game] ignoring pick of unavailable perk "${perkId}"`);
+      console.warn(`[Game] ignoring pick of unoffered card "${offerId}"`);
       return;
     }
+    const taken = card.kind === 'active' ? this.equipActive(card.id) : this.takePassive(card.id);
+    if (!taken) return;
     // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
     this.run.recordPerk(card.name);
-    // Every spell reads its block per cast, so the next volley already has it:
-    // the perk reaches the spell that owns the tree, and #132's passives will
-    // reach all of them through the same call.
-    this.spells.refresh();
-    this.syncPlayerStats(before);
+  }
+
+  /** A picked active fills the lowest open slot and starts casting (spec §3.1). */
+  private equipActive(spellId: string): boolean {
+    if (!isRosterSpellId(spellId)) return false;
+    if (this.spells.equipActive(spellId, this.run.level) === undefined) {
+      console.warn(`[Game] could not equip "${spellId}"`);
+      return false;
+    }
+    return true;
   }
 
   /**
-   * Push the generic perks onto the player. Move speed and pickup radius are
-   * set outright; max HP is granted as the difference — health owns the current
-   * HP and the +10 fallback bonus, so it is raised, never overwritten.
+   * A picked passive lands on the loadout, which re-resolves every equipped
+   * spell's block (spec §4.2, §6.2); what the profile changes on the player
+   * itself is pushed across here.
    */
-  private syncPlayerStats(before: Readonly<PlayerStats>): void {
-    const after = this.perks.playerStats;
+  private takePassive(passiveId: string): boolean {
+    if (!isPassiveId(passiveId)) return false;
+    const before = this.spells.profile;
+    this.spells.takePassive(passiveId);
+    this.syncPlayerStats(before);
+    return true;
+  }
+
+  /**
+   * Push the profile's player-side fields onto the player. Move speed and
+   * pickup radius are set outright; max HP is granted as the difference —
+   * health owns the current HP and the +10 fallback bonus, so it is raised,
+   * never overwritten — and it heals for what it added, which is what makes a
+   * Vitality taken mid-fight worth something (spec §5).
+   */
+  private syncPlayerStats(before: Readonly<PlayerProfile>): void {
+    const after = this.spells.profile;
     this.player.setMoveSpeed(after.moveSpeed);
     this.player.setPickupRadius(after.pickupRadius);
-    if (after.maxHp !== before.maxHp) this.player.grantMaxHp(after.maxHp - before.maxHp);
+    this.player.setHpRegen(after.hpRegen);
+    if (after.maxHp !== before.maxHp) this.player.grantMaxHp(after.maxHp - before.maxHp, true);
   }
 
   /**

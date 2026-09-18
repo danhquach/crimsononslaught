@@ -8,6 +8,7 @@ import {
   flickerAlpha,
   grantMaxHp,
   isInvulnerable,
+  regenHealth,
   takeDamage,
   tickHealth,
   type HealthState,
@@ -56,10 +57,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys | undefined;
   private readonly wasd: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key> | undefined;
   private health: HealthState = createHealth();
-  /** px/s before diagonal normalization; the Move Speed perk raises it (CO-042). */
+  /** px/s before diagonal normalization; the Swift passive raises it (CO-110). */
   private moveSpeed = PLAYER_SPEED;
-  /** px the player attracts XP gems from; the Pickup Radius perk widens it (CO-042). */
+  /** px the player attracts XP gems from; the Magnet passive widens it (CO-110). */
   private gemPickupRadius = PICKUP_RADIUS;
+  /** HP per second healed continuously; the Regeneration passive raises it (CO-110). */
+  private hpRegenPerSecond = 0;
   private facing: Facing = DEFAULT_FACING;
   /** Run-clock ms of death clip still to play; the death event fires when it runs out. */
   private deathMs = 0;
@@ -104,6 +107,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return;
     }
     this.setHealth(tickHealth(this.health, deltaMs));
+    this.regenerate(deltaMs);
     const move = resolveMove(this.keyboardMove(), this.padMove());
     const { x, y } = moveVelocity(move, this.speed);
     this.setVelocity(x, y);
@@ -121,7 +125,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Perk-driven move speed (spec §5): the only write path, so a caller cannot
+   * Passive-driven move speed (spec §4.1): the only write path, so a caller cannot
    * leave the player frozen or teleporting. Anything unusable keeps the base
    * speed rather than being stored.
    */
@@ -130,17 +134,37 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Perk-driven pickup radius (spec §5): the third generic perk, set outright
-   * like the move speed. The gem pool reads it off the player it is already
-   * given, so nothing else has to carry the number.
+   * Passive-driven pickup radius (spec §4.1), set outright like the move speed.
+   * The gem pool reads it off the player it is already given, so nothing else
+   * has to carry the number.
    */
   setPickupRadius(px: number): void {
     this.gemPickupRadius = px;
   }
 
-  /** Level-up fallback (spec §5): raise the maximum, leaving current HP alone. */
-  grantMaxHp(bonus: number): void {
-    this.setHealth(grantMaxHp(this.health, bonus));
+  /** Passive-driven regeneration in HP per second (spec §4.1); 0 is none. */
+  setHpRegen(hpPerSecond: number): void {
+    this.hpRegenPerSecond = Math.max(0, hpPerSecond);
+  }
+
+  /**
+   * Raise the maximum. The level-up fallback leaves current HP alone; a
+   * Vitality rank heals for what it adds (Phase 2 spec §5).
+   */
+  grantMaxHp(bonus: number, heal = false): void {
+    this.setHealth(grantMaxHp(this.health, bonus, heal));
+    emitRunEvent(this.scene.events, 'hp', { hp: this.health.hp, maxHp: this.health.maxHp });
+  }
+
+  /**
+   * One step of Regeneration. Healing is continuous but the HUD is told only
+   * when the HP it would draw changes, so a scaled run does not emit an event
+   * per simulation step for a fraction of a point.
+   */
+  private regenerate(deltaMs: number): void {
+    const before = Math.ceil(this.health.hp);
+    this.setHealth(regenHealth(this.health, this.hpRegenPerSecond, deltaMs));
+    if (Math.ceil(this.health.hp) === before) return;
     emitRunEvent(this.scene.events, 'hp', { hp: this.health.hp, maxHp: this.health.maxHp });
   }
 

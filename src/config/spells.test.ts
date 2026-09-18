@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BASE_SPELL_STATS,
   BOULDER_HIT_COOLDOWN,
   BURN_DURATION,
   FREEZE_DURATION,
@@ -109,5 +110,51 @@ describe('spell durations match spec §5', () => {
 
   it('a boulder re-hits the same enemy at most every 0.4 s — "per-enemy hit cooldown 0.4 s"', () => {
     expect(BOULDER_HIT_COOLDOWN).toBe(0.4);
+  });
+});
+
+describe('base stat blocks', () => {
+  it('matches the spec §5 base table', () => {
+    expect(BASE_SPELL_STATS.fire).toEqual({
+      cooldown: 1,
+      damage: 12,
+      aoeRadius: 50,
+      aoeDamageFactor: 0.5,
+      projectiles: 1,
+      speed: 350,
+      range: 400,
+      burn: 0,
+    });
+    expect(BASE_SPELL_STATS.ice).toEqual({
+      cooldown: 1.4,
+      damage: 12,
+      radius: 90,
+      slowPct: 0.3,
+      slowDuration: 1.5,
+      freezeChance: 0,
+      shatterBonus: 0,
+    });
+    expect(BASE_SPELL_STATS.lightning).toEqual({
+      cooldown: 1,
+      damage: 12,
+      chains: 2,
+      chainRange: 120,
+      strikes: 1,
+      stun: 0,
+      chainFalloff: 0.8,
+    });
+    expect(BASE_SPELL_STATS.earth).toEqual({
+      count: 3,
+      orbitRadius: 80,
+      orbitSpeed: 2.5,
+      damage: 10,
+      knockback: 60,
+      size: 14,
+      crushMultiplier: 1,
+    });
+  });
+
+  it('defines a block for every spell id', () => {
+    expect(Object.keys(BASE_SPELL_STATS).sort()).toEqual([...SPELL_IDS].sort());
   });
 });

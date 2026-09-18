@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { perkById } from '../config/perks';
+import { BASE_SPELL_STATS } from '../config/spells';
 import { RunState } from './runState';
 import { CastScheduler, MAX_CASTS_PER_FRAME, Spell, nearestEnemies } from './spell';
-import { createLoadout, type FireStats } from './spellStats';
+import type { FireStats } from './spellStats';
+
+/** A fresh copy of Fire's base block, as the `Spellbook` hands one out. */
+const fireStats = (): FireStats => ({ ...BASE_SPELL_STATS.fire });
 
 /** The stub spell CO-043's acceptance criterion asks for: it only counts casts. */
 class StubSpell extends Spell<'fire'> {
@@ -11,7 +14,7 @@ class StubSpell extends Spell<'fire'> {
   readonly castTimes: number[] = [];
   private elapsed = 0;
 
-  constructor(stats: FireStats = createLoadout('fire').spell) {
+  constructor(stats: FireStats = fireStats()) {
     super('fire', stats);
   }
 
@@ -186,58 +189,31 @@ describe('Spell', () => {
     expect(spell.timeToNextCast).toBeCloseTo(cooldown - 0.6, 10);
   });
 
-  it('copies the stats it is handed, so the loadout cannot be changed through it', () => {
-    const loadout = createLoadout('fire');
-    const spell = new StubSpell(loadout.spell);
-    const bonus = perkById('fire_power_damage')?.effect.amount ?? 0;
-    spell.applyPerk('fire_power_damage', 1);
-    expect(spell.stats.damage).toBe(loadout.spell.damage + bonus);
-    expect(loadout.spell.damage).toBe(createLoadout('fire').spell.damage);
+  it('copies the stats it is handed, so the block it came from cannot change it', () => {
+    const stats = fireStats();
+    const spell = new StubSpell(stats);
+    stats.damage = 99;
+    expect(spell.stats.damage).toBe(BASE_SPELL_STATS.fire.damage);
   });
 
-  it('applies a spell perk to its own block', () => {
+  it('takes a whole block from the spellbook, and copies that one too', () => {
     const spell = new StubSpell();
-    const { aoeRadius } = spell.stats;
-    spell.applyPerk('fire_reach_blast', 1);
-    spell.applyPerk('fire_reach_blast', 2);
-    expect(spell.stats.aoeRadius).toBe(aoeRadius + 24);
+    const stats = fireStats();
+    stats.damage = 99;
+    spell.setStats(stats);
+    expect(spell.stats.damage).toBe(99);
+    stats.damage = 1;
+    expect(spell.stats.damage).toBe(99);
   });
 
-  it('takes a generic perk without changing a spell stat', () => {
-    const spell = new StubSpell();
-    const before = { ...spell.stats };
-    spell.applyPerk('generic_move_speed', 1);
-    expect(spell.stats).toEqual(before);
-  });
-
-  it('rejects a perk this spell cannot have', () => {
-    const spell = new StubSpell();
-    expect(() => spell.applyPerk('ice_power_damage', 1)).toThrow(/belongs to ice/);
-    expect(() => spell.applyPerk('nope', 1)).toThrow(/unknown perk/);
-    expect(() => spell.applyPerk('fire_power_damage', 4)).toThrow(RangeError);
-  });
-
-  it('shortens the wait the player is already in when a cooldown perk lands', () => {
+  it('shortens the wait the player is already in when Haste lands', () => {
     const spell = new StubSpell();
     const { cooldown } = spell.stats;
-    // 80% into the cooldown, two Utility ranks (0.85² ≈ 72%) cut it below the charge held.
+    // 80% into the cooldown; three Haste ranks (0.92³ ≈ 78%) cut it below the charge held.
     spell.update(cooldown * 800);
     expect(spell.casts).toBe(0);
-    spell.applyPerk('fire_utility_cooldown', 1);
-    spell.applyPerk('fire_utility_cooldown', 2);
-    const cut = perkById('fire_utility_cooldown')?.effect.amount ?? 1;
-    expect(spell.stats.cooldown).toBeCloseTo(cooldown * cut ** 2, 10);
+    spell.setStats({ ...spell.stats, cooldown: cooldown * 0.92 ** 3 });
     spell.update(0);
     expect(spell.casts).toBe(1);
-  });
-
-  it('takes a whole block from the perk system', () => {
-    const spell = new StubSpell();
-    const loadout = createLoadout('fire');
-    loadout.spell.damage = 99;
-    spell.setStats(loadout.spell);
-    expect(spell.stats.damage).toBe(99);
-    loadout.spell.damage = 1;
-    expect(spell.stats.damage).toBe(99);
   });
 });

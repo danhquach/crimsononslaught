@@ -1,5 +1,5 @@
 import { isSpellId, type SpellId } from '../config/spells';
-import { MAX_OFFER_SIZE, isPerkCard, type PerkCard } from './levelUp';
+import { MAX_OFFER_SIZE, isOfferCard, type OfferCard } from './levelUp';
 
 /**
  * Typed payloads carried across scene transitions (spec §7: transitions always
@@ -47,9 +47,9 @@ export interface GamePayload {
   seed: number;
 }
 
-/** `Game -> LevelUp` (launched over the paused Game). Never empty: Game handles the zero-perk path itself. */
+/** `Game -> LevelUp` (launched over the paused Game). Never empty: Game handles the empty-offer path itself. */
 export interface LevelUpPayload {
-  offer: readonly PerkCard[];
+  offer: readonly OfferCard[];
 }
 
 export type Outcome = 'win' | 'lose';
@@ -86,7 +86,7 @@ export function isLevelUpPayload(data: unknown): data is LevelUpPayload {
     Array.isArray(data.offer) &&
     data.offer.length >= 1 &&
     data.offer.length <= MAX_OFFER_SIZE &&
-    data.offer.every(isPerkCard)
+    data.offer.every(isOfferCard)
   );
 }
 

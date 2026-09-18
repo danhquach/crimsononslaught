@@ -35,7 +35,7 @@ function formatCount(value: number): string {
 }
 
 /**
- * Perks in pick order, repeats collapsed into `name ×n` (a perk picked at
+ * Upgrades in pick order, repeats collapsed into `name ×n` (a passive taken at
  * several ranks appears once). Empty list reads `none`.
  */
 export function summarizePerks(perks: readonly string[]): string {
@@ -51,6 +51,6 @@ export function resultRows(stats: RunStats): StatRow[] {
     ['Level', formatCount(stats.level)],
     ['Kills', formatCount(stats.kills)],
     ['Spell', SPELL_CARDS[stats.spellId].name],
-    ['Perks taken', summarizePerks(stats.perks)],
+    ['Upgrades taken', summarizePerks(stats.perks)],
   ];
 }

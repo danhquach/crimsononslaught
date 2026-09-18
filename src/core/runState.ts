@@ -130,7 +130,11 @@ export class RunState {
     return xpToNext(this.levelValue);
   }
 
-  /** Display names of the perks taken, in pick order. A copy: the run owns the list. */
+  /**
+   * Display names of the upgrades taken, in pick order — a passive's name each
+   * time a rank of it is picked, and a spell's when it is equipped. A copy: the
+   * run owns the list.
+   */
   get perks(): readonly string[] {
     return [...this.perksTaken];
   }
@@ -187,6 +191,7 @@ export class RunState {
     return gain.levelsGained;
   }
 
+  /** One level-up pick, by display name (a passive rank or a newly equipped spell). */
   recordPerk(displayName: string): void {
     this.perksTaken.push(displayName);
   }

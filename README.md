@@ -20,8 +20,9 @@ until the asset pass.
 - Pick one of four spells before the run: **Fire** (fireball, area burst),
   **Ice** (frost nova, slow), **Lightning** (chain bolt), **Earth** (orbiting
   boulders).
-- Level up to draw three random perks from that spell's tree: power, reach,
-  or utility.
+- Level up to draw three cards: a second and third spell for the run's two
+  active slots while they are open, then global passives — damage, cooldown,
+  area, crit, survivability — for the rest of the run.
 - Three enemy archetypes (swarm, fast, tank) on a time-based spawn schedule.
 - Seeded runs: `?seed=<n>` reproduces a run exactly; `?timeScale=<n>` speeds
   it up for testing; `?invulnerable=1` drops contact damage so an unattended
@@ -61,8 +62,8 @@ needs the browser installed once with `npx playwright install chromium`.
 ## Project layout
 
 ```
-src/config/   tunable data: spells, perks, enemies, waves, boss, progression, player, gems, animations, FX
-src/core/     pure game logic, no engine imports, unit-tested: run state, perks, spawn director, spell math
+src/config/   tunable data: spells, loadout, passives, enemies, waves, boss, progression, player, gems, animations, FX
+src/core/     pure game logic, no engine imports, unit-tested: run state, loadout, level-up offers, spawn director, spell math
 src/scenes/   Boot, SpellSelect, Game, HUD, LevelUp, Result, two dev-only debug scenes
 src/entities/ Player, Enemy, Boss, XpGem, Projectile, Boulder
 src/spells/   one Phaser-side class per spell over its `src/core/` math, plus the damage sink

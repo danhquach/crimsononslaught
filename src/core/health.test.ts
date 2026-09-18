@@ -6,6 +6,7 @@ import {
   createHealth,
   flickerAlpha,
   grantMaxHp,
+  regenHealth,
   takeDamage,
   tickHealth,
 } from './health';
@@ -115,9 +116,43 @@ describe('flickerAlpha', () => {
   });
 });
 
+describe('regenHealth', () => {
+  it('heals the frame’s share of the rate', () => {
+    const hurt = takeDamage(createHealth(), 30).state;
+    expect(regenHealth(hurt, 0.5, 1000).hp).toBeCloseTo(70.5, 10);
+    expect(regenHealth(hurt, 0.5, 100).hp).toBeCloseTo(70.05, 10);
+  });
+
+  it('never heals past the maximum, and does nothing at rate 0 or full HP', () => {
+    const nearlyFull = takeDamage(createHealth(), 0.2).state;
+    expect(regenHealth(nearlyFull, 10, 1000).hp).toBe(nearlyFull.maxHp);
+    const hurt = takeDamage(createHealth(), 30).state;
+    expect(regenHealth(hurt, 0, 1000)).toEqual(hurt);
+    expect(regenHealth(createHealth(), 5, 1000)).toEqual(createHealth());
+  });
+
+  it('never heals a dead player back out of death', () => {
+    const dead = takeDamage(createHealth(), 999).state;
+    expect(regenHealth(dead, 5, 1000)).toEqual(dead);
+  });
+});
+
 describe('grantMaxHp', () => {
-  it('raises the maximum without healing', () => {
+  it('raises the maximum without healing — the level-up fallback', () => {
     const hurt = takeDamage(createHealth(), 30).state;
     expect(grantMaxHp(hurt, 10)).toEqual({ hp: 70, maxHp: 110, invulnMs: INVULN_MS });
+  });
+
+  it('heals for what it adds when asked — a Vitality rank (spec §5)', () => {
+    const hurt = takeDamage(createHealth(), 30).state;
+    expect(grantMaxHp(hurt, 20, true)).toEqual({ hp: 90, maxHp: 120, invulnMs: INVULN_MS });
+  });
+
+  it('never heals past the new maximum', () => {
+    expect(grantMaxHp(createHealth(), 20, true)).toEqual({
+      hp: 120,
+      maxHp: 120,
+      invulnMs: 0,
+    });
   });
 });
