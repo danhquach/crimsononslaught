@@ -36,7 +36,9 @@ import { FrostNovaSpell } from '../spells/FrostNovaSpell';
 import { OrbitingBouldersSpell } from '../spells/OrbitingBouldersSpell';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
+import { FxPool } from '../systems/FxPool';
 import { GemPool } from '../systems/GemPool';
+import { OverlayPool } from '../systems/OverlayPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
@@ -78,6 +80,9 @@ export class GameScene extends Phaser.Scene {
   private enemies!: EnemyPool;
   private spawns!: SpawnDirector;
   private gems!: GemPool;
+  /** Spell effects (CO-082): one-shot bursts, and the status overlays that follow enemies. */
+  private fx!: FxPool;
+  private overlays!: OverlayPool;
   private rng!: Rng;
   private run!: RunState;
   private perks!: PerkSystem;
@@ -90,6 +95,20 @@ export class GameScene extends Phaser.Scene {
 
   constructor() {
     super(SCENE.game);
+  }
+
+  /**
+   * Test hook (CO-082): status overlays out right now. The browser suite reads
+   * it to check nothing is left on a dead enemy; it can never exceed the live
+   * enemy count.
+   */
+  get overlayCount(): number {
+    return this.overlays.count;
+  }
+
+  /** Test hook: enemies alive in the arena, the bound `overlayCount` must respect. */
+  get liveEnemyCount(): number {
+    return this.enemies.live.length;
   }
 
   init(data: unknown): void {
@@ -132,6 +151,8 @@ export class GameScene extends Phaser.Scene {
       height: WORLD_HEIGHT,
     });
     this.gems = new GemPool(this);
+    this.fx = new FxPool(this);
+    this.overlays = new OverlayPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
     // Its colliders belong to the physics world, so nothing holds the system
     // past handing the spell its group.
@@ -206,6 +227,9 @@ export class GameScene extends Phaser.Scene {
     this.spell.update(step.deltaMs);
     this.physics.world.update(time, step.deltaMs);
     this.physics.world.postUpdate();
+    // After the bodies have settled, so an overlay sits on where its host is
+    // drawn this frame; one not in the live set — status over, host dead — is freed.
+    this.overlays.update(this.enemies.live);
   }
 
   /** The run's spell, built on the pool and collision wiring above. */
@@ -215,19 +239,35 @@ export class GameScene extends Phaser.Scene {
     switch (spellId) {
       case 'fire': {
         const stats = this.perks.spellStats as Readonly<FireStats>;
-        return new FireballSpell(this, this.player, this.enemies, collisions, stats, damage);
+        return new FireballSpell(
+          this,
+          this.player,
+          this.enemies,
+          collisions,
+          stats,
+          damage,
+          this.fx,
+        );
       }
       case 'ice': {
         const stats = this.perks.spellStats as Readonly<IceStats>;
-        return new FrostNovaSpell(this, this.player, this.enemies, stats, damage, this.rng);
+        return new FrostNovaSpell(
+          this,
+          this.player,
+          this.enemies,
+          stats,
+          damage,
+          this.rng,
+          this.fx,
+        );
       }
       case 'lightning': {
         const stats = this.perks.spellStats as Readonly<LightningStats>;
-        return new ChainLightningSpell(this, this.player, this.enemies, stats, damage);
+        return new ChainLightningSpell(this, this.player, this.enemies, stats, damage, this.fx);
       }
       case 'earth': {
         const stats = this.perks.spellStats as Readonly<EarthStats>;
-        return new OrbitingBouldersSpell(this, this.player, collisions, stats, damage);
+        return new OrbitingBouldersSpell(this, this.player, collisions, stats, damage, this.fx);
       }
     }
   }

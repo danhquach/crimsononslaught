@@ -99,7 +99,7 @@ export class Boss extends Enemy {
     return step.velocity;
   }
 
-  protected override get bodyRadius(): number {
+  override get bodyRadius(): number {
     return BOSS.radius;
   }
 

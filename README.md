@@ -98,6 +98,20 @@ it. Spawn holds, hurt flashes and death clips run on the run clock, so a paused
 run holds them and a missing atlas (one `[atlas]` warning) shortens them to
 nothing.
 
+The spells play their effects the same way (CO-082). One-shot bursts — the
+fireball's cast flash and explosion, the nova pulse, the strike and impact of
+a bolt, the boulder's impact and knockback dust — come from
+`src/systems/FxPool.ts`, a pool of plain sprites that free themselves when
+the clip ends. Status overlays — the flame on a burning enemy, the frost on a
+slowed one, the block on a frozen one, the sparks on a stunned one — come from
+`src/systems/OverlayPool.ts`, one per afflicted enemy, positioned from its
+host every frame and freed when the status ends or the host dies; the pool is
+capped at the enemy cap, and `GameScene.overlayCount` exposes the count to
+the browser suite. A chain jump is a tiled `lightning.chain` strip stretched
+between two enemies for one pass of the clip, cycled on the run clock. Which
+overlay a status calls for, how big an effect is drawn for the live stats and
+how a strip lies are `src/core/fx.ts`; the tunables are `src/config/fx.ts`.
+
 ### Regenerating the atlas
 
 ```

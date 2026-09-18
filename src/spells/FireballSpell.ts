@@ -5,6 +5,7 @@ import {
   splashTargets,
   volleyTargets,
 } from '../core/fireball';
+import { explosionScale } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { Spell } from '../core/spell';
 import type { FireStats } from '../core/spellStats';
@@ -12,6 +13,7 @@ import type { Enemy } from '../entities/Enemy';
 import { Projectile } from '../entities/Projectile';
 import type { CollisionSystem, SpellHitbox } from '../systems/CollisionSystem';
 import type { EnemyPool } from '../systems/EnemyPool';
+import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
 
 /**
@@ -25,12 +27,17 @@ import type { DamageSink } from './DamageSink';
  * `core/fireball.ts`; this class owns the projectile pool, registers it with
  * `CollisionSystem` (the one place overlaps are wired, CO-032) and turns an
  * overlap into damage.
+ *
+ * FX (CO-082): `fire.spawn` flashes at the caster as a volley leaves and
+ * `fire.explode` plays at the hit point, scaled to the live `aoeRadius`. The
+ * flame on a burning enemy is the overlay pool's, driven from its status.
  */
 export class FireballSpell extends Spell<'fire'> {
   private readonly group: Phaser.Physics.Arcade.Group;
   private readonly caster: Readonly<Vec2>;
   private readonly enemies: EnemyPool;
   private readonly damage: DamageSink;
+  private readonly fx: FxPool;
 
   constructor(
     scene: Phaser.Scene,
@@ -39,11 +46,13 @@ export class FireballSpell extends Spell<'fire'> {
     collisions: CollisionSystem,
     stats: Readonly<FireStats>,
     damage: DamageSink,
+    fx: FxPool,
   ) {
     super('fire', stats);
     this.caster = caster;
     this.enemies = enemies;
     this.damage = damage;
+    this.fx = fx;
     this.group = scene.physics.add.group({
       classType: Projectile,
       maxSize: MAX_LIVE_PROJECTILES,
@@ -70,12 +79,16 @@ export class FireballSpell extends Spell<'fire'> {
   protected cast(): void {
     const { projectiles, range, speed } = this.stats;
     const { x, y } = this.caster;
+    let fired = 0;
     for (const target of volleyTargets(this.caster, this.enemies.live, projectiles, range)) {
       const shot = this.group.get(x, y) as Projectile | null;
       // Pool exhausted: the rest of the volley is dropped, never queued.
-      if (!shot) return;
+      if (!shot) break;
       shot.fire(x, y, target, speed, range);
+      fired += 1;
     }
+    // One flash per volley, not per shot: three fireballs leave one hand.
+    if (fired > 0) this.fx.burst('fire.spawn', x, y);
   }
 
   private onHit(enemy: Enemy, hitbox: SpellHitbox): void {
@@ -89,6 +102,7 @@ export class FireballSpell extends Spell<'fire'> {
     // hit lands, so a killing blow still explodes at the spot the enemy held.
     const splash = splashTargets(enemy, this.enemies.live, aoeRadius, enemy);
     const blast = explosionDamage(this.stats);
+    this.fx.burst('fire.explode', enemy.x, enemy.y, { scale: explosionScale(aoeRadius) });
 
     enemy.applyBurn(burn);
     this.damage(enemy, damage);

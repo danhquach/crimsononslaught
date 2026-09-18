@@ -53,3 +53,18 @@ export function clearClip(sprite: Phaser.Physics.Arcade.Sprite): void {
   sprite.setFlipX(false);
   sprite.setRotation(0);
 }
+
+/**
+ * Play one-shot or looping effect `name` on a plain (non-Arcade) sprite
+ * (CO-082): origin moved onto the frame's anchor so the effect lands on the
+ * sprite's position whatever the frame was trimmed to. Returns false, touching
+ * nothing, when the atlas did not supply the clip.
+ */
+export function showEffect(sprite: Phaser.GameObjects.Sprite, name: string): boolean {
+  const first = FIRST_FRAME.get(name);
+  if (!first || !sprite.scene.anims.exists(name)) return false;
+  const origin = frameOrigin(FRAMES[first]);
+  sprite.setOrigin(origin.x, origin.y);
+  sprite.play(name);
+  return true;
+}
