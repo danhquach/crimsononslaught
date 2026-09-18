@@ -62,7 +62,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['**/*.{js,ts}'],
+    files: ['**/*.{js,mjs,ts}'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     rules: noMathRandom,
   },

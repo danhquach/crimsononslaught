@@ -8,11 +8,12 @@ import {
   TIME_SCALE_REGISTRY_KEY,
 } from '../core/scenePayloads';
 import { validatePerks } from '../core/spellStats';
+import { installAtlas, queueAtlas } from '../render/atlas';
 import { generatePlaceholderTextures } from '../render/textures';
 
 /**
- * First scene: builds the placeholder textures every later scene draws with,
- * fixes the run seed, then hands off to SpellSelect.
+ * First scene: loads the sprite atlas, fills any gap with a placeholder
+ * texture, fixes the run seed, then hands off to SpellSelect.
  * `?debug=textures` opens the CO-005 texture check instead, `?debug=collisions`
  * the CO-032 overlap check.
  */
@@ -21,7 +22,15 @@ export class BootScene extends Phaser.Scene {
     super(SCENE.boot);
   }
 
+  preload(): void {
+    queueAtlas(this);
+  }
+
   create(): void {
+    // Art first, placeholders second: `generatePlaceholderTextures` leaves any
+    // key the atlas already provides alone, so a key only falls back to a
+    // generated shape when the atlas has nothing for it (spec §6, CO-080).
+    installAtlas(this);
     generatePlaceholderTextures(this);
 
     // Spec §7: config is checked once at boot and complains loudly, but a bad

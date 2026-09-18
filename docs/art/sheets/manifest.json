@@ -1,0 +1,862 @@
+{
+  "$comment": [
+    "Source of truth mapping every sheet's grid cells to named animation frames.",
+    "scripts/cut-sheets.mjs reads only this file; it never hardcodes a sheet.",
+    "",
+    "cols/rows   the grid the sheet was authored on. The cutter divides the image",
+    "            by cols x rows and never looks for the drawn grid lines, because",
+    "            the art agent returned every sheet at a slightly different pixel",
+    "            size than the prompt asked for (hero is 1264x848, not 1152x768).",
+    "sheetCell   the authored cell size in px. nativeCell is sheetCell / 4, and",
+    "            that is the size each cut frame is downscaled to.",
+    "rowSpecs    one entry per grid row, top to bottom. Each row lists the",
+    "            animation segments it holds; `cols` is an inclusive 1-based",
+    "            column range. Columns not covered by any segment are declared",
+    "            blank and the cutter fails if it finds art there. When the same",
+    "            anim+facing appears on a later row its frames continue numbering",
+    "            (the boss death runs across two rows).",
+    "allowEdge   sides on which this row's art is deliberately cut off by the",
+    "            sheet border, relaxing the 'bbox touches the cell edge' check on",
+    "            those sides only. Two rows need it and both are intentional: the",
+    "            fast enemy's spawn flame and the bolt falling in from off-screen."
+  ],
+  "sheets": [
+    {
+      "key": "hero",
+      "ticket": "CO-070",
+      "file": "CO-070/hero_locomotion.jpg",
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 192,
+      "rowSpecs": [
+        [
+          {
+            "anim": "idle",
+            "facing": "down",
+            "cols": [
+              1,
+              2
+            ]
+          },
+          {
+            "anim": "walk",
+            "facing": "down",
+            "cols": [
+              3,
+              6
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "idle",
+            "facing": "up",
+            "cols": [
+              1,
+              2
+            ]
+          },
+          {
+            "anim": "walk",
+            "facing": "up",
+            "cols": [
+              3,
+              6
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "idle",
+            "facing": "left",
+            "cols": [
+              1,
+              2
+            ]
+          },
+          {
+            "anim": "walk",
+            "facing": "left",
+            "cols": [
+              3,
+              6
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "idle",
+            "facing": "right",
+            "cols": [
+              1,
+              2
+            ]
+          },
+          {
+            "anim": "walk",
+            "facing": "right",
+            "cols": [
+              3,
+              6
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "hero",
+      "ticket": "CO-070",
+      "file": "CO-070/hero_states.jpg",
+      "cols": 6,
+      "rows": 2,
+      "sheetCell": 192,
+      "rowSpecs": [
+        [
+          {
+            "anim": "hurt",
+            "facing": "down",
+            "cols": [
+              1,
+              1
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "up",
+            "cols": [
+              2,
+              2
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "left",
+            "cols": [
+              3,
+              3
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "right",
+            "cols": [
+              4,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "death",
+            "cols": [
+              1,
+              6
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "swarm",
+      "ticket": "CO-071",
+      "file": "CO-071/enemy_swarm.jpg",
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 128,
+      "rowSpecs": [
+        [
+          {
+            "anim": "move",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "hurt",
+            "cols": [
+              1,
+              1
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "death",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "spawn",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fast",
+      "ticket": "CO-072",
+      "file": "CO-072/enemy_fast.jpg",
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 128,
+      "rowSpecs": [
+        [
+          {
+            "anim": "move",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "hurt",
+            "cols": [
+              1,
+              1
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "death",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "spawn",
+            "cols": [
+              1,
+              4
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "tank",
+      "ticket": "CO-073",
+      "file": "CO-073/enemy_tank_walk.jpg",
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 192,
+      "rowSpecs": [
+        [
+          {
+            "anim": "walk",
+            "facing": "down",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "walk",
+            "facing": "up",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "walk",
+            "facing": "left",
+            "cols": [
+              1,
+              4
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "walk",
+            "facing": "right",
+            "cols": [
+              1,
+              4
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "tank",
+      "ticket": "CO-073",
+      "file": "CO-073/enemy_tank_states.jpg",
+      "cols": 6,
+      "rows": 3,
+      "sheetCell": 192,
+      "rowSpecs": [
+        [
+          {
+            "anim": "hurt",
+            "facing": "down",
+            "cols": [
+              1,
+              1
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "up",
+            "cols": [
+              2,
+              2
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "left",
+            "cols": [
+              3,
+              3
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "right",
+            "cols": [
+              4,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "death",
+            "cols": [
+              1,
+              6
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "spawn",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-074",
+      "file": "CO-074/boss_walk.jpg",
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 384,
+      "rowSpecs": [
+        [
+          {
+            "anim": "walk",
+            "facing": "down",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "walk",
+            "facing": "up",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "walk",
+            "facing": "left",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "walk",
+            "facing": "right",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-074",
+      "file": "CO-074/boss_charge.jpg",
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 384,
+      "rowSpecs": [
+        [
+          {
+            "anim": "telegraph",
+            "facing": "down",
+            "cols": [
+              1,
+              2
+            ]
+          },
+          {
+            "anim": "charge",
+            "facing": "down",
+            "cols": [
+              3,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "telegraph",
+            "facing": "up",
+            "cols": [
+              1,
+              2
+            ]
+          },
+          {
+            "anim": "charge",
+            "facing": "up",
+            "cols": [
+              3,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "telegraph",
+            "facing": "left",
+            "cols": [
+              1,
+              2
+            ]
+          },
+          {
+            "anim": "charge",
+            "facing": "left",
+            "cols": [
+              3,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "telegraph",
+            "facing": "right",
+            "cols": [
+              1,
+              2
+            ]
+          },
+          {
+            "anim": "charge",
+            "facing": "right",
+            "cols": [
+              3,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-074",
+      "file": "CO-074/boss_states.jpg",
+      "cols": 4,
+      "rows": 3,
+      "sheetCell": 384,
+      "rowSpecs": [
+        [
+          {
+            "anim": "hurt",
+            "facing": "down",
+            "cols": [
+              1,
+              1
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "up",
+            "cols": [
+              2,
+              2
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "left",
+            "cols": [
+              3,
+              3
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          },
+          {
+            "anim": "hurt",
+            "facing": "right",
+            "cols": [
+              4,
+              4
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "death",
+            "cols": [
+              1,
+              4
+            ],
+            "allowEdge": [
+              "top"
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "death",
+            "cols": [
+              1,
+              4
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "gem",
+      "ticket": "CO-075",
+      "file": "CO-075/gem.jpg",
+      "cols": 6,
+      "rows": 3,
+      "sheetCell": 96,
+      "rowSpecs": [
+        [
+          {
+            "anim": "idle",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "drift",
+            "cols": [
+              1,
+              2
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "pickup",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-076",
+      "file": "CO-076/fire_projectile.jpg",
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 128,
+      "rowSpecs": [
+        [
+          {
+            "anim": "fly",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "spawn",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-076",
+      "file": "CO-076/fire_explosion.png",
+      "cols": 6,
+      "rows": 1,
+      "sheetCell": 384,
+      "rowSpecs": [
+        [
+          {
+            "anim": "explode",
+            "cols": [
+              1,
+              6
+            ],
+            "allowEdge": [
+              "left",
+              "right"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-076",
+      "file": "CO-076/fire_burn_overlay.jpg",
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 128,
+      "rowSpecs": [
+        [
+          {
+            "anim": "burn",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "burnBig",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-077",
+      "file": "CO-077/ice_nova.jpg",
+      "cols": 6,
+      "rows": 1,
+      "sheetCell": 448,
+      "rowSpecs": [
+        [
+          {
+            "anim": "nova",
+            "cols": [
+              1,
+              6
+            ],
+            "allowEdge": [
+              "top",
+              "left",
+              "right",
+              "bottom"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-077",
+      "file": "CO-077/ice_status.jpg",
+      "cols": 6,
+      "rows": 3,
+      "sheetCell": 160,
+      "rowSpecs": [
+        [
+          {
+            "anim": "slow",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "freeze",
+            "cols": [
+              1,
+              3
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "shatter",
+            "cols": [
+              1,
+              5
+            ],
+            "allowEdge": [
+              "bottom"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "lightning",
+      "ticket": "CO-078",
+      "file": "CO-078/lightning_strike.jpg",
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [
+          {
+            "anim": "strike",
+            "cols": [
+              1,
+              4
+            ],
+            "allowEdge": [
+              "top"
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "impact",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "lightning",
+      "ticket": "CO-078",
+      "file": "CO-078/lightning_chain.png",
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [
+          {
+            "anim": "chain",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "stun",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-079",
+      "file": "CO-079/earth_boulder.jpg",
+      "cols": 6,
+      "rows": 3,
+      "sheetCell": 128,
+      "rowSpecs": [
+        [
+          {
+            "anim": "spin",
+            "cols": [
+              1,
+              6
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "impact",
+            "cols": [
+              1,
+              5
+            ]
+          }
+        ],
+        [
+          {
+            "anim": "dust",
+            "cols": [
+              1,
+              5
+            ]
+          }
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,265 @@
+#!/usr/bin/env node
+/**
+ * Cut the authored sprite sheets into a Phaser atlas (CO-080). `npm run art:cut`.
+ *
+ *   in   docs/art/sheets/manifest.json + the 18 sheets it names (not shipped)
+ *   out  public/assets/atlas/props.png   the packed atlas
+ *        public/assets/atlas/props.json  Phaser JSON-hash frame data
+ *        src/config/frames.ts            generated, checked in
+ *
+ * The manifest is the only place that knows what any sheet contains; nothing
+ * about a particular sheet is hardcoded here. The cut itself is in
+ * `lib/spriteCut.mjs`, which is unit-tested on synthetic buffers.
+ *
+ * Run is idempotent: same inputs produce byte-identical outputs.
+ */
+
+import { createRequire } from 'node:module';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  blit,
+  clearOutside,
+  cornerKey,
+  crop,
+  downscaleNearest,
+  edgesTouched,
+  expandRow,
+  gridSplit,
+  insetRect,
+  keyCell,
+  opaqueBounds,
+  packFrames,
+  quantize,
+  trimBorderLines,
+  unionBounds,
+} from './lib/spriteCut.mjs';
+import { encodeIndexedPng } from './lib/indexedPng.mjs';
+
+const require = createRequire(import.meta.url);
+const { PNG } = require('pngjs');
+const jpeg = require('jpeg-js');
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SHEET_DIR = join(ROOT, 'docs/art/sheets');
+const ATLAS_DIR = join(ROOT, 'public/assets/atlas');
+const FRAMES_TS = join(ROOT, 'src/config/frames.ts');
+
+/** How far in from a cell corner the background key is sampled, past any line. */
+const KEY_INSET = 0.06;
+/** Colour distance at which a pixel is fully background / fully foreground. */
+const TOL_KEYED = 60;
+const TOL_SOLID = 130;
+/** Art is downscaled by this factor: the sheets are drawn at 4x native size. */
+const SCALE = 4;
+
+const failures = [];
+function fail(message) {
+  failures.push(message);
+}
+
+function loadImage(file) {
+  const bytes = readFileSync(file);
+  if (extname(file).toLowerCase() === '.png') {
+    const png = PNG.sync.read(bytes);
+    return { width: png.width, height: png.height, data: png.data };
+  }
+  const raw = jpeg.decode(bytes, { useTArray: true, formatAsRGBA: true });
+  return { width: raw.width, height: raw.height, data: raw.data };
+}
+
+/**
+ * Cut one sheet. Returns the frames it produced, each already downscaled to
+ * native size, plus the anchor that keeps its row steady.
+ */
+function cutSheet(sheet) {
+  const img = loadImage(join(SHEET_DIR, sheet.file));
+  const cells = gridSplit(img.width, img.height, sheet.cols, sheet.rows);
+  const nativeCell = sheet.sheetCell / SCALE;
+  const cut = [];
+  // Frame numbering continues across rows, so the boss death can span two.
+  let counters = {};
+
+  sheet.rowSpecs.forEach((rowSpec, row) => {
+    const { frames, blanks, counters: next } = expandRow(sheet.key, rowSpec, sheet.cols, counters);
+    counters = next;
+
+    // The cell is keyed whole and the grid-line band is then cleared, so every
+    // frame's bounds are in cell coordinates and stay comparable between cells
+    // and between rows — which is what lets an animation spanning two rows
+    // share one crop. The key is sampled per cell, not per sheet, because
+    // hero_states is a different mauve on each row, and sampled inset so a
+    // ruled line cannot poison it.
+    const cellOf = (col) => {
+      const cell = cells[row * sheet.cols + col];
+      const key = cornerKey(img, insetRect(cell, KEY_INSET));
+      const kept = trimBorderLines(img, cell, key, TOL_KEYED, TOL_SOLID);
+      const local = { x: kept.x - cell.x, y: kept.y - cell.y, w: kept.w, h: kept.h };
+      const keyed = clearOutside(keyCell(img, cell, key, TOL_KEYED, TOL_SOLID), local);
+      return { cell, keyed, local };
+    };
+    const where = (col) => `${sheet.file} row ${row + 1} col ${col + 1}`;
+
+    // Declared-blank columns must really be blank.
+    for (const col of blanks) {
+      const { keyed, local } = cellOf(col);
+      const bounds = opaqueBounds(keyed);
+      if (bounds && bounds.w * bounds.h > local.w * local.h * 0.001) {
+        fail(`${where(col)}: declared blank but holds art (${bounds.w}x${bounds.h} px)`);
+      }
+    }
+
+    for (const f of frames) {
+      const { cell, keyed, local } = cellOf(f.col);
+      const bounds = opaqueBounds(keyed);
+      if (!bounds) {
+        fail(`${where(f.col)}: declared frame ${f.name} but the cell is empty`);
+        continue;
+      }
+      const touched = edgesTouched(bounds, local).filter((s) => !f.allowEdge.includes(s));
+      if (touched.length > 0) {
+        fail(`${where(f.col)}: ${f.name} runs off the ${touched.join(' and ')} cell edge`);
+      }
+      cut.push({ ...f, cell, keyed, bounds });
+    }
+  });
+
+  // One crop per animation, not per row: every frame of an animation must come
+  // out the same size and keep the cell's centre in the same place, or it jumps
+  // as it plays. Taking the union of the whole animation's bounds does both,
+  // and leaving each frame where it sits inside that box preserves the feet
+  // line the sheets were drawn around.
+  const out = [];
+  for (const anim of new Set(cut.map((c) => c.anim))) {
+    const group = cut.filter((c) => c.anim === anim);
+    const box = unionBounds(group.map((c) => c.bounds));
+    const cell = group[0].cell;
+    const scale = cell.h / nativeCell;
+    const width = Math.max(1, Math.round(box.w / scale));
+    const height = Math.max(1, Math.round(box.h / scale));
+
+    for (const c of group) {
+      out.push({
+        name: c.name,
+        anim: c.anim,
+        index: c.index,
+        image: downscaleNearest(crop(c.keyed, box), width, height),
+        width,
+        height,
+        // Where the cell's centre sits inside the frame, in native px, so the
+        // game can place a sprite without it drifting between frames.
+        anchorX: Math.round((cell.w / 2 - box.x) / scale),
+        anchorY: Math.round((cell.h / 2 - box.y) / scale),
+      });
+    }
+  }
+
+  return out;
+}
+
+function main() {
+  const manifest = JSON.parse(readFileSync(join(SHEET_DIR, 'manifest.json'), 'utf8'));
+
+  const frames = [];
+  const seen = new Set();
+  for (const sheet of manifest.sheets) {
+    for (const frame of cutSheet(sheet)) {
+      if (seen.has(frame.name)) fail(`${sheet.file}: duplicate frame name ${frame.name}`);
+      seen.add(frame.name);
+      frames.push(frame);
+    }
+  }
+
+  if (failures.length > 0) {
+    console.error(`art:cut failed with ${failures.length} problem(s):`);
+    for (const f of failures) console.error(`  - ${f}`);
+    process.exit(1);
+  }
+
+  const { placements, width, height } = packFrames(frames);
+  if (width > 2048 || height > 2048) {
+    console.error(`art:cut failed: atlas is ${width}x${height}, over the 2048x2048 limit`);
+    process.exit(1);
+  }
+
+  const atlas = { width, height, data: new Uint8ClampedArray(width * height * 4) };
+  for (const p of placements) blit(atlas, p.image, p.x, p.y);
+  const { palette, indices } = quantize(atlas, 256);
+
+  // Frame data in name order, so the JSON is stable whatever the packer did.
+  const byName = [...placements].sort((a, b) => (a.name < b.name ? -1 : 1));
+  const json = {
+    frames: Object.fromEntries(
+      byName.map((p) => [
+        p.name,
+        {
+          frame: { x: p.x, y: p.y, w: p.width, h: p.height },
+          rotated: false,
+          trimmed: false,
+          spriteSourceSize: { x: 0, y: 0, w: p.width, h: p.height },
+          sourceSize: { w: p.width, h: p.height },
+        },
+      ]),
+    ),
+    meta: {
+      app: 'scripts/cut-sheets.mjs',
+      format: 'RGBA8888',
+      size: { w: width, h: height },
+      scale: '1',
+    },
+  };
+
+  mkdirSync(ATLAS_DIR, { recursive: true });
+  writeFileSync(join(ATLAS_DIR, 'props.png'), encodeIndexedPng(width, height, palette, indices));
+  writeFileSync(join(ATLAS_DIR, 'props.json'), `${JSON.stringify(json, null, 2)}\n`);
+  writeFileSync(FRAMES_TS, renderFramesTs(byName));
+
+  const bytes = readFileSync(join(ATLAS_DIR, 'props.png')).length;
+  console.log(
+    `art:cut wrote ${byName.length} frames, atlas ${width}x${height}, ${(bytes / 1024).toFixed(1)} KB`,
+  );
+  if (bytes > 400 * 1024) {
+    console.error(
+      `art:cut failed: atlas is ${(bytes / 1024).toFixed(1)} KB, over the 400 KB budget`,
+    );
+    process.exit(1);
+  }
+}
+
+function renderFramesTs(placements) {
+  const lines = placements.map(
+    (p) =>
+      `  '${p.name}': { w: ${p.width}, h: ${p.height}, anchorX: ${p.anchorX}, anchorY: ${p.anchorY} },`,
+  );
+  return `// GENERATED by scripts/cut-sheets.mjs (npm run art:cut). Do not edit by hand.
+//
+// Every frame in public/assets/atlas/props.png, with its native size and the
+// anchor point the sheet was drawn around. Checked in so src/config stays a
+// pure-data layer that unit tests can read without touching the atlas.
+
+export interface FrameInfo {
+  /** Native frame size in game px. */
+  w: number;
+  h: number;
+  /** The cell's centre point, in px from the frame's top-left corner. */
+  anchorX: number;
+  anchorY: number;
+}
+
+export const ATLAS_KEY = 'props';
+export const ATLAS_TEXTURE = 'assets/atlas/props.png';
+export const ATLAS_DATA = 'assets/atlas/props.json';
+
+export const FRAMES = {
+${lines.join('\n')}
+} as const satisfies Record<string, FrameInfo>;
+
+export type FrameName = keyof typeof FRAMES;
+
+export const FRAME_NAMES = Object.keys(FRAMES) as FrameName[];
+`;
+}
+
+main();
