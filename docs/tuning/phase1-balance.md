@@ -143,18 +143,23 @@ further); last wave 6 → 5 spawns/s (1020 total).
 | Lightning | **win 6:00** · **win 5:46** · 3:09 | 2 / 3 | 60 · 46 · — s (40 / 67 HP left) | 33 · 58 · 66 s | 9 · 10 · 10 |
 | Earth | 1:30 · 2:00 · 1:35 | 0 / 3 | — | 53 · 51 · 51 s | 20 · 20 · 20 |
 
-Both targets held on this sweep, but the 1800 HP boss broke the CI guard:
-`e2e/fullRun.spec.ts` plays a hands-off, stationary, invulnerable Earth run at
-time scale 30, and on the hosted runner it sat in the boss phase for 24 minutes
-of run time without a kill. Reproduced locally under a CPU throttle (see round
-4). The balance is not what a player would meet; it is a frame-length problem
-in that one guard, and the boss's HP is the value that sets its margin.
+Both targets held on this sweep. The PR's CI run then failed on
+`e2e/fullRun.spec.ts`'s Earth check (a hands-off, stationary, invulnerable run
+at time scale 30 that must kill the boss inside 90 s), which sat in the boss
+phase for 24 minutes of run time. That check turns out to fail on `main` too:
+every CI run since it was added (#88 → #93, including the merge of #93 itself)
+shows the Earth run red and the Fire run green, with Fire taking 19–30 s on the
+runner against 14 s locally. It is a frame-length problem in that guard, not a
+balance problem, and not one this ticket introduced.
 
 ## Round 4 (boss back to 1500 HP)
 
-Only change: boss HP 1800 → 1500, the merged value. Re-run of the invulnerable
-sweep plus mortal Fire and Lightning (Ice and Earth die before the boss, so
-their mortal rows are round 3's).
+Only change: boss HP 1800 → 1500. Made while the CI failure still looked like a
+boss-HP margin problem; kept because 1500 is the spec value, it puts Ice's boss
+fight inside the window (74–82 s, was 89–99 s), and Fire and Lightning were
+already under 45 s at 1800. Re-run of the invulnerable sweep plus mortal Fire
+and Lightning (Ice and Earth die before the boss, so their mortal rows are
+round 3's).
 
 | Spell | Mortal: survived | Reached boss | Mortal TTK | Invulnerable TTK | Level at 5:00 (invuln) |
 |---|---|---|---|---|---|
@@ -164,11 +169,13 @@ their mortal rows are round 3's).
 | Earth | (round 3) | 0 / 3 | — | 46 · 45 · 42 s | 20 · 20 · 20 |
 
 Fire is the marginal one: across rounds 3 and 4 it reached the boss in 3 of 6
-runs and won 2, always with under a third of its HP. Lightning is solid. The
-throttled Earth guard: at a 1.5× CPU throttle (32 fps) the boss dies in 535 s of
-run time (18 s wall) at 1500 HP; at 2× the harness drops to 5 fps and neither
-this branch nor `main` kills it, so that level is past what the guard is meant
-to cover. CI is the final word on the guard.
+runs and won 2, always with under a third of its HP. Lightning is solid.
+
+The Earth guard under a local CPU throttle, this branch against `main`'s
+configs: at 1.5× (32–47 fps) both kill the boss; at 2× the harness drops to
+5 fps and neither does (the boss's chase overshoots the stationary player and
+it averages 400–600 px from the 80 px ring). The runner sits between those two
+and fails both; the guard's own PR (#93) was merged with that check red.
 
 Stopping here — the remaining gaps are inside the run-to-run noise, and another
 round would be tuning to the bot rather than to a player.
@@ -187,9 +194,10 @@ round would be tuning to the bot rather than to a player.
 | `perks.ts` | Kindling (+damage per rank) | +4 | +3 | Same per-rank bonus as the other spells; keeps Fire's boss fight from dipping under 30 s |
 
 Spell card text follows the new values. Spec §5 tables were updated in place so
-"matches spec §5" in the tests stays true. Boss HP stays at 1500: rounds 1–3 ran
-it at 1800 to hold the boss fight above 45 s against the spell buffs, and that
-is what took the Earth full-run guard over its CI budget.
+"matches spec §5" in the tests stays true. Boss HP stays at the spec's 1500:
+rounds 1–3 ran it at 1800 to hold the boss fight above 45 s against the spell
+buffs, which helped Fire but pushed Ice to 89–99 s; at 1500 Ice is in the window
+and Fire and Lightning are fast either way.
 
 ## What did not change, and why
 
@@ -200,7 +208,7 @@ is what took the Earth full-run guard over its CI budget.
   (CO-093 moves them); changing them was out of this ticket's remit.
 - **Boss speed, cycle, charge, HP.** Nobody died to the boss in a run that
   reached it with more than 20 HP; the boss is a damage check, not a dodge
-  check, at this stage. HP is pinned by the Earth full-run guard (above).
+  check, at this stage.
 
 ## Follow-ups (not blocking Phase 1)
 
@@ -217,11 +225,13 @@ is what took the Earth full-run guard over its CI budget.
   every projectile on a lone boss ("distinct targets when possible" collapses to
   one). If a floor matters, give the boss spell-specific resistance or make extra
   projectiles miss when only one target exists (code, not config). Raising boss
-  HP is not the lever: see the Earth guard above.
-- **The Earth full-run guard is frame-rate bound**, not balance bound. At time
-  scale 30 on a slow runner the boss's chase overshoots a stationary player and
-  it rarely crosses the 80 px ring. Any future boss HP change has to be checked
-  against `npm run test:e2e` under a CPU throttle before it goes to CI.
+  HP to 1800 moved it to 32–46 s but cost Ice its window.
+- **The Earth full-run guard fails on CI regardless of balance** (red on `main`
+  since #93). At time scale 30 on the hosted runner the boss's chase overshoots
+  a stationary player and rarely crosses the 80 px ring. That is a CO-091-class
+  fix in `e2e/fullRun.spec.ts` (a lower scale for the Earth run, or a check
+  that the boss was reached and damaged rather than killed), worth its own
+  ticket; it is test code, outside this ticket's "config only".
 - **Human check.** CO-063's walkthrough on the deployed build should confirm the
   bot's floor: a first-time player should get past 2:00 with every spell and
   reach the boss with Fire or Lightning.
