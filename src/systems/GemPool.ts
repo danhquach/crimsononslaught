@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { EnemyType } from '../config/enemies';
-import { GEM_XP_VALUE, MAX_LIVE_GEMS, gemDropCount, type Vec2 } from '../core/gems';
+import { GEM_XP_VALUE, MAX_LIVE_GEMS } from '../config/gems';
+import { gemDropCount, type Vec2 } from '../core/gems';
 import { XpGem } from '../entities/XpGem';
 
 /**

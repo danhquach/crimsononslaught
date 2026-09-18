@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ENEMY_TYPES } from '../config/enemies';
-import { GEM_DRIFT_SPEED, PICKUP_RADIUS, gemDrift, gemDropCount, withinPickupRadius } from './gems';
+import { GEM_DRIFT_SPEED, PICKUP_RADIUS } from '../config/gems';
+import { gemDrift, gemDropCount, withinPickupRadius } from './gems';
 
 describe('gemDropCount', () => {
   it('drops 1 gem per death and 3 for a tank (spec §5)', () => {

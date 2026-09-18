@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { INVULN_MS, PLAYER_MAX_HP } from '../config/player';
 import {
   FLICKER_ALPHA,
   FLICKER_PERIOD_MS,
-  INVULN_MS,
-  PLAYER_MAX_HP,
   createHealth,
   flickerAlpha,
   grantMaxHp,

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { PICKUP_RADIUS } from '../core/gems';
+import { PICKUP_RADIUS } from '../config/gems';
+import { PLAYER_SPEED } from '../config/player';
 import {
   PLAYER_EVENT,
   createHealth,
@@ -10,7 +11,6 @@ import {
   type HealthState,
 } from '../core/health';
 import {
-  PLAYER_SPEED,
   clampMoveSpeed,
   directionVector,
   moveVelocity,

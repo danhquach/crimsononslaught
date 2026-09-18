@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { TEXTURE_KEYS } from './colors';
-import { ENEMY_ARCHETYPES, ENEMY_TYPES, MAX_LIVE_ENEMIES, isEnemyType } from './enemies';
+import {
+  CONTACT_DAMAGE_INTERVAL_MS,
+  ENEMY_ARCHETYPES,
+  ENEMY_TYPES,
+  MAX_LIVE_ENEMIES,
+  isEnemyType,
+} from './enemies';
 
 describe('enemy types', () => {
   it('lists the three regular enemies from the spec', () => {
@@ -68,5 +74,11 @@ describe('enemy archetypes', () => {
 describe('live enemy cap', () => {
   it('is the spec §5 hard cap of 300', () => {
     expect(MAX_LIVE_ENEMIES).toBe(300);
+  });
+});
+
+describe('contact damage interval', () => {
+  it('is the spec §5 cadence of once per 0.5 s per enemy', () => {
+    expect(CONTACT_DAMAGE_INTERVAL_MS).toBe(500);
   });
 });

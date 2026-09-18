@@ -1,8 +1,7 @@
+import { PICKUP_RADIUS } from '../config/gems';
 import { PERKS, perkById, type PerkNode } from '../config/perks';
+import { PLAYER_MAX_HP, PLAYER_SPEED } from '../config/player';
 import { BASE_SPELL_STATS, SPELL_IDS, type SpellId } from '../config/spells';
-import { PICKUP_RADIUS } from './gems';
-import { PLAYER_MAX_HP } from './health';
-import { PLAYER_SPEED } from './input';
 
 /**
  * The numbers a run is made of (spec §5 "Spells", "Generic perks") and the one

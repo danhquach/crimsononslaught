@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ENEMY_TYPES, isEnemyType } from './enemies';
-import { BOSS_START_TIME, WAVES } from './waves';
+import { BOSS_START_TIME, SPAWN_RING_MARGIN, WAVES } from './waves';
 
 describe('wave table', () => {
   it('matches the spec §5 spawn schedule', () => {
@@ -48,5 +48,11 @@ describe('wave table', () => {
     expect(WAVES.filter((wave) => wave.startTime === BOSS_START_TIME)).toEqual([
       { startTime: BOSS_START_TIME, types: [], spawnsPerSecond: 0 },
     ]);
+  });
+});
+
+describe('spawn ring margin', () => {
+  it('is the spec §5 ring 100 px outside the camera view', () => {
+    expect(SPAWN_RING_MARGIN).toBe(100);
   });
 });

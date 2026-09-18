@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS_START_TIME, WAVES } from '../config/waves';
+import { BOSS_START_TIME, SPAWN_RING_MARGIN, WAVES } from '../config/waves';
 import { createRng } from './rng';
 import {
-  SPAWN_RING_MARGIN,
   planSpawns,
   spawnPoint,
   spawnRingRadius,
