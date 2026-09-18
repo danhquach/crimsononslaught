@@ -42,3 +42,6 @@ export const MAX_LIVE_ENEMIES = 300;
 
 /** Spec §5: one enemy damages the player at most once per 0.5 s. */
 export const CONTACT_DAMAGE_INTERVAL_MS = 500;
+
+/** How long an enemy shows its hurt frame after a hit (CO-081). */
+export const ENEMY_HURT_MS = 100;

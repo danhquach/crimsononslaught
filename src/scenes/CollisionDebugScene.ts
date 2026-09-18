@@ -65,7 +65,7 @@ export class CollisionDebugScene extends Phaser.Scene {
       onEnemyContact: (enemy) => this.count('enemy-player', enemy.active),
       // Collecting the gem is what proves the pickup path, not just the touch:
       // a gem that stays put would keep re-firing the same overlap.
-      onGemPickup: (gem) => this.count('gem-player', this.gems.collect(gem) > 0),
+      onGemPickup: (gem) => this.count('gem-player', this.gems.collect(gem, this.player) > 0),
     });
     collisions.addSpellGroup(this.spells, (enemy, hitbox) => this.onSpellHit(enemy, hitbox));
 
@@ -95,7 +95,7 @@ export class CollisionDebugScene extends Phaser.Scene {
     if (this.gems.liveCount === 0) {
       this.gems.spawn(this.player.x + GEM_DROP_OFFSET, this.player.y + GEM_DROP_OFFSET);
     }
-    this.gems.update(this.player);
+    this.gems.update(delta, this.player);
     this.fireSpell(delta);
     this.cullSpells();
   }

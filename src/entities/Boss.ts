@@ -1,11 +1,22 @@
 import Phaser from 'phaser';
 import { BOSS } from '../config/boss';
-import { startBossCycle, stepBossCycle, type BossCycle, type BossPhase } from '../core/boss';
+import { bossAnimation, type Clip, type EnemyPhase } from '../core/animation';
+import {
+  BOSS_EVENT,
+  startBossCycle,
+  stepBossCycle,
+  type BossCycle,
+  type BossPhase,
+} from '../core/boss';
 import type { Vec2 } from '../core/enemy';
 import { emitRunEvent } from '../core/runEvents';
 import { Enemy } from './Enemy';
 
-/** The telegraph flash: the ring fills white for the wind-up so the charge reads before it lands. */
+/**
+ * The telegraph flash for the placeholder ring: it fills white for the wind-up
+ * so the charge reads before it lands. With the atlas the telegraph clip is
+ * the warning (CO-081) and the tint stays off.
+ */
 const TELEGRAPH_TINT = 0xffffff;
 
 /**
@@ -23,10 +34,18 @@ const TELEGRAPH_TINT = 0xffffff;
  * and after every hit, the way `Player` publishes `run:hp`; the HUD boss bar
  * (CO-012) renders from those events alone.
  *
+ * Its clips follow the cycle (CO-081): `walk`, `telegraph` and `charge` per
+ * facing, `hurt` between them, and `death` played out before `BOSS_EVENT.died`
+ * tells the run it has won — `Enemy` keeps the sprite for the clip's length.
+ * It faces its last velocity: the player while it chases, so the telegraph
+ * that follows the stop faces them too, and the locked line while it charges.
+ *
  * All the decisions live in `core/boss.ts`; this class only moves the sprite.
  */
 export class Boss extends Enemy {
   private cycle: BossCycle = startBossCycle();
+  /** Whether the atlas is drawing the telegraph, so the tint fallback can stand down. */
+  private animated = false;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y);
@@ -60,6 +79,13 @@ export class Boss extends Enemy {
     return died;
   }
 
+  /** The end of the death clip is the win (spec §4 step 4), not the killing blow. */
+  override despawn(): void {
+    const finished = this.isDying;
+    super.despawn();
+    if (finished) this.scene.events.emit(BOSS_EVENT.died);
+  }
+
   private emitHp(): void {
     emitRunEvent(this.scene.events, 'bossHp', { hp: this.remainingHp, maxHp: BOSS.hp });
   }
@@ -73,9 +99,36 @@ export class Boss extends Enemy {
     return step.velocity;
   }
 
+  protected override get bodyRadius(): number {
+    return BOSS.radius;
+  }
+
+  /** The boss sheet has no spawn: it walks in, and nothing holds it on arrival. */
+  protected override show(phase: EnemyPhase, velocity: Readonly<Vec2>): number {
+    // One clip stands for the whole sheet: `installAtlas` registers every
+    // animation or none, so the telegraph clip is there whenever the walk is.
+    this.animated = this.scene.anims.exists(`boss.walk.${this.facingDir}`);
+    if (phase === 'spawn') {
+      super.show('move', velocity);
+      return 0;
+    }
+    return super.show(phase, velocity);
+  }
+
+  /** `Enemy`'s phases map onto the boss sheet through the cycle: moving is whatever the cycle is doing. */
+  protected override clip(phase: EnemyPhase): Clip {
+    const name = bossAnimation({
+      phase: this.cycle.phase,
+      facing: this.facingDir,
+      hurt: phase === 'hurt',
+      dead: phase === 'death',
+    });
+    return { name, flipX: false };
+  }
+
   /** The telegraph flash outranks the status tints: the warning must always show. */
   protected override refreshTint(): void {
-    if (this.telegraphing) this.setTintFill(TELEGRAPH_TINT);
+    if (this.telegraphing && !this.animated) this.setTintFill(TELEGRAPH_TINT);
     else super.refreshTint();
   }
 }

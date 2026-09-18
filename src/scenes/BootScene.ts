@@ -8,7 +8,7 @@ import {
   TIME_SCALE_REGISTRY_KEY,
 } from '../core/scenePayloads';
 import { validatePerks } from '../core/spellStats';
-import { installAtlas, queueAtlas } from '../render/atlas';
+import { installAtlas, queueAtlas, warnIfAtlasMissing } from '../render/atlas';
 import { generatePlaceholderTextures } from '../render/textures';
 
 /**
@@ -30,6 +30,7 @@ export class BootScene extends Phaser.Scene {
     // Art first, placeholders second: `generatePlaceholderTextures` leaves any
     // key the atlas already provides alone, so a key only falls back to a
     // generated shape when the atlas has nothing for it (spec §6, CO-080).
+    warnIfAtlasMissing(this);
     installAtlas(this);
     generatePlaceholderTextures(this);
 

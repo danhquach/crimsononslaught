@@ -89,6 +89,15 @@ keep requesting the same keys.
 Open `http://localhost:5173/?debug=textures` to page through every animation
 in the atlas, labelled with its frame count and native size.
 
+The hero, enemies, boss and gems play the atlas clips for what they are doing
+(CO-081). Which clip — facing from the movement vector, hurt over walk, death
+over everything — is decided in `src/core/animation.ts`, pure and unit-tested;
+`src/render/animate.ts` plays it and re-centres the Arcade body on the frame's
+anchor, so a frame of any size leaves the hitbox where the config's radius put
+it. Spawn holds, hurt flashes and death clips run on the run clock, so a paused
+run holds them and a missing atlas (one `[atlas]` warning) shortens them to
+nothing.
+
 ### Regenerating the atlas
 
 ```

@@ -14,6 +14,20 @@ export function queueAtlas(scene: Phaser.Scene): void {
 }
 
 /**
+ * A missing or broken atlas is one console warning, not a crash (CO-081).
+ * Checked after `preload` rather than on the loader's error event: a file that
+ * downloads but will not parse (a dev server answering a 404 with its page)
+ * fails in processing and never raises that event, but either way the key
+ * never reaches the texture manager, `installAtlas` finds nothing to install,
+ * and every entity boots on its placeholder shape. Phaser logs its own errors
+ * for the failed files on top of this.
+ */
+export function warnIfAtlasMissing(scene: Phaser.Scene): void {
+  if (scene.textures.exists(ATLAS_KEY)) return;
+  console.warn(`[atlas] ${ATLAS_TEXTURE} did not load; using placeholder shapes`);
+}
+
+/**
  * Register every animation and point the existing texture keys at the art.
  *
  * Entities still ask for a `TextureKey` and still get a still image, so nothing
