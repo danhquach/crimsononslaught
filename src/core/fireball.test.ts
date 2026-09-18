@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_SPELL_STATS } from '../config/spells';
+import { BASE_SPELL_STATS, BURN_DURATION } from '../config/spells';
 import {
   MAX_LIVE_PROJECTILES,
   NO_BURN,
@@ -10,7 +10,7 @@ import {
   tickBurn,
   volleyTargets,
 } from './fireball';
-import { BURN_DURATION, type FireStats } from './spellStats';
+import type { FireStats } from './spellStats';
 
 const base: FireStats = { ...BASE_SPELL_STATS.fire };
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { EMPTY_OFFER_MAX_HP_BONUS } from '../config/progression';
 import {
-  EMPTY_OFFER_MAX_HP_BONUS,
   LEVEL_UP_EVENT,
   MAX_OFFER_SIZE,
   isPerkCard,

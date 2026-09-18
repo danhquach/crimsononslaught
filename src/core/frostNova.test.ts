@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_SPELL_STATS } from '../config/spells';
+import { BASE_SPELL_STATS, FREEZE_DURATION } from '../config/spells';
 import {
   NO_FROST,
   applyFrost,
@@ -11,7 +11,7 @@ import {
   tickFrost,
 } from './frostNova';
 import { createRng } from './rng';
-import { FREEZE_DURATION, type IceStats } from './spellStats';
+import type { IceStats } from './spellStats';
 
 const base: IceStats = { ...BASE_SPELL_STATS.ice };
 

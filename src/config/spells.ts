@@ -125,6 +125,15 @@ export const BASE_SPELL_STATS: Readonly<{
   },
 };
 
+/** Spec §5 Fire: burn ticks for this long after a hit. Not perk-modified. */
+export const BURN_DURATION = 2;
+
+/** Spec §5 Ice: a freeze is a full stop for this long. Not perk-modified. */
+export const FREEZE_DURATION = 1;
+
+/** Spec §5 Earth: one boulder can hit the same enemy this often. Not perk-modified. */
+export const BOULDER_HIT_COOLDOWN = 0.4;
+
 /** Keyboard shortcut: `'1'`–`'4'` (KeyboardEvent.key) pick the card in that slot. */
 export function spellIdForKey(key: string): SpellId | undefined {
   if (!/^[1-4]$/.test(key)) return undefined;

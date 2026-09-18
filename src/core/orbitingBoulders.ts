@@ -1,6 +1,7 @@
 import type { EnemyType } from '../config/enemies';
+import { BOULDER_HIT_COOLDOWN } from '../config/spells';
 import type { Vec2 } from './input';
-import { BOULDER_HIT_COOLDOWN, type EarthStats } from './spellStats';
+import type { EarthStats } from './spellStats';
 
 /**
  * Orbiting Boulders rules that do not need an engine (spec §5 "Earth — Orbiting

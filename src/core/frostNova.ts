@@ -1,6 +1,7 @@
+import { FREEZE_DURATION } from '../config/spells';
 import type { Vec2 } from './input';
 import type { Rng } from './rng';
-import { FREEZE_DURATION, type IceStats } from './spellStats';
+import type { IceStats } from './spellStats';
 
 /**
  * Frost Nova rules that do not need an engine (spec §5 "Ice — Frost Nova"):

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { XP_CURVE } from './progression';
+import { EMPTY_OFFER_MAX_HP_BONUS, XP_CURVE } from './progression';
 
 describe('xp curve', () => {
   it('matches spec §5 `xpToNext(level) = 10 + level * 5`', () => {
@@ -8,5 +8,11 @@ describe('xp curve', () => {
 
   it('keeps the curve rising', () => {
     expect(XP_CURVE.perLevel).toBeGreaterThan(0);
+  });
+});
+
+describe('empty perk offer fallback', () => {
+  it('matches spec §5 "If 0, grant +10 max HP silently and resume"', () => {
+    expect(EMPTY_OFFER_MAX_HP_BONUS).toBe(10);
   });
 });
