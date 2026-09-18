@@ -149,7 +149,8 @@ lint/test/build job does not depend on it.
 
 ## Documentation
 
-- Design spec: [`docs/superpowers/specs/2026-09-14-phase1-design.md`](docs/superpowers/specs/2026-09-14-phase1-design.md)
+- Design spec (Phase 1): [`docs/superpowers/specs/2026-09-14-phase1-design.md`](docs/superpowers/specs/2026-09-14-phase1-design.md)
+- Design spec (Phase 2 — loadout, passives, spell roster): [`docs/superpowers/specs/2026-09-18-phase2-spells.md`](docs/superpowers/specs/2026-09-18-phase2-spells.md)
 - Ticket list: [`docs/tickets/phase1-tickets.md`](docs/tickets/phase1-tickets.md)
 - Contributor workflow rules: [`CLAUDE.md`](CLAUDE.md)
 

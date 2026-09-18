@@ -32,6 +32,6 @@ Before pushing any branch, audit `main..HEAD` plus the PR description against th
 
 # Project docs
 
-- Spec: `docs/superpowers/specs/2026-09-14-phase1-design.md`
+- Spec: `docs/superpowers/specs/2026-09-14-phase1-design.md` (Phase 1, partly superseded); `docs/superpowers/specs/2026-09-18-phase2-spells.md` (Phase 2 loadout, passives and spell roster)
 - Tickets: GitHub issues on this repo (`gh issue view <n>`), milestone "Phase 1". Source list: `docs/tickets/phase1-tickets.md`; ID map: `docs/tickets/phase1-issue-map.md`.
 - Stack: Vite + TypeScript + Phaser 3. Unit tests Vitest (`src/core/**`, no Phaser imports). Browser smoke Playwright. RNG only via `src/core/rng.ts` (no `Math.random`).
