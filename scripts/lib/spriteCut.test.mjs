@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  centreBounds,
   clearOutside,
   cornerKey,
   crop,
@@ -253,6 +254,54 @@ describe('unionBounds', () => {
   });
 });
 
+describe('centreBounds', () => {
+  const centre = { x: 50, y: 50 };
+
+  it('mirrors the box about the centre and adds the margin on every side', () => {
+    // 10 left of centre, 20 right: the far side wins and both sides get it.
+    expect(centreBounds({ x: 40, y: 30, w: 30, h: 30 }, centre, 4)).toEqual({
+      x: 26,
+      y: 26,
+      w: 48,
+      h: 48,
+    });
+  });
+
+  it('leaves the margin clear even when the art already straddles the centre evenly', () => {
+    const box = centreBounds({ x: 40, y: 40, w: 20, h: 20 }, centre, 1);
+    expect(box).toEqual({ x: 39, y: 39, w: 22, h: 22 });
+  });
+
+  it('gives a box the centre sits exactly halfway across, so the anchor is the frame centre', () => {
+    for (const art of [
+      { x: 10, y: 44, w: 5, h: 3 },
+      { x: 61, y: 12, w: 40, h: 90 },
+      { x: 49, y: 49, w: 1, h: 1 },
+    ]) {
+      const box = centreBounds(art, centre, 2);
+      expect(centre.x - box.x).toBe(box.x + box.w - centre.x);
+      expect(centre.y - box.y).toBe(box.y + box.h - centre.y);
+    }
+  });
+
+  it('comes out on whole pixels even when the centre and margin do not', () => {
+    // A 101 px cell downscaled by 4.04: both the centre and the margin land
+    // between pixels, and a fractional box would read as transparent in `crop`.
+    const box = centreBounds({ x: 30, y: 30, w: 21, h: 21 }, { x: 50.5, y: 50.5 }, 4.04);
+    for (const v of [box.x, box.y, box.w, box.h]) expect(Number.isInteger(v)).toBe(true);
+    expect(box.w).toBe(box.h);
+  });
+
+  it('never cuts into the art it was given', () => {
+    const art = { x: 12, y: 80, w: 9, h: 30 };
+    const box = centreBounds(art, centre, 3);
+    expect(box.x).toBeLessThanOrEqual(art.x - 3);
+    expect(box.y).toBeLessThanOrEqual(art.y - 3);
+    expect(box.x + box.w).toBeGreaterThanOrEqual(art.x + art.w + 3);
+    expect(box.y + box.h).toBeGreaterThanOrEqual(art.y + art.h + 3);
+  });
+});
+
 describe('downscaleNearest', () => {
   it('picks the source pixel at each block centre, keeping edges hard', () => {
     // 4x4 of four solid 2x2 quadrants, down to 2x2.
@@ -423,6 +472,13 @@ describe('expandRow', () => {
       6,
     );
     expect(frames.every((f) => f.allowEdge.includes('bottom'))).toBe(true);
+  });
+
+  it('carries centred onto every frame of the segment, and defaults it off', () => {
+    const on = expandRow('ice', [{ anim: 'nova', cols: [1, 2], centred: true }], 6);
+    expect(on.frames.every((f) => f.centred)).toBe(true);
+    const off = expandRow('ice', [{ anim: 'slow', cols: [1, 2] }], 6);
+    expect(off.frames.every((f) => f.centred === false)).toBe(true);
   });
 
   it('rejects a segment outside the grid or one that overlaps another', () => {

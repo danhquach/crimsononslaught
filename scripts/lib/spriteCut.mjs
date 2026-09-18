@@ -302,6 +302,33 @@ export function unionBounds(boundsList) {
 }
 
 /**
+ * Grow a crop box until it is symmetric about `centre` and clear of the art by
+ * `margin` on every side.
+ *
+ * Only radial art wants this. `unionBounds` deliberately leaves a box where the
+ * art sits, which is what keeps a feet-anchored walk cycle from jittering, but
+ * it is also tight: on every animation some frame is flush against a box edge,
+ * and for a ring that pulses out from the caster that reads as a flat-shaved
+ * edge rather than a circle (CO-097). Mirroring the box about the cell centre
+ * the ring was drawn around, and then holding it off the edges, frames the ring
+ * the way it was authored — the same box for every frame, so nothing jitters.
+ *
+ * The result can reach past the cell; `crop` fills that with transparent, which
+ * is the point: the margin is clear space, never invented art.
+ */
+export function centreBounds(box, centre, margin) {
+  // Whole pixels out: `centre` is half a cell and `margin` a fraction of one,
+  // and neither divides evenly on every sheet (`gridSplit` rounds each cell
+  // boundary). A fractional rectangle would reach `crop` as a fractional index,
+  // which a typed array reads as undefined and stores as a transparent 0.
+  const cx = Math.round(centre.x);
+  const cy = Math.round(centre.y);
+  const hx = Math.ceil(Math.max(cx - box.x, box.x + box.w - cx) + margin);
+  const hy = Math.ceil(Math.max(cy - box.y, box.y + box.h - cy) + margin);
+  return { x: cx - hx, y: cy - hy, w: hx * 2, h: hy * 2 };
+}
+
+/**
  * Copy a sub-rectangle out of an image, filling anything outside it with
  * transparent pixels.
  *
@@ -445,6 +472,7 @@ export function expandRow(sheetKey, rowSpecs, cols, startIndex = {}) {
         index,
         name: `${sheetKey}.${anim}.${index}`,
         allowEdge: seg.allowEdge ?? [],
+        centred: seg.centred ?? false,
       });
     }
   }

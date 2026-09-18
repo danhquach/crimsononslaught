@@ -18,7 +18,14 @@
     "allowEdge   sides on which this row's art is deliberately cut off by the",
     "            sheet border, relaxing the 'bbox touches the cell edge' check on",
     "            those sides only. Two rows need it and both are intentional: the",
-    "            fast enemy's spawn flame and the bolt falling in from off-screen."
+    "            fast enemy's spawn flame and the bolt falling in from off-screen.",
+    "centred     true for art drawn radiating from the cell centre. The crop box",
+    "            is mirrored about that centre and held one native px off the",
+    "            art, so the effect comes out whole and centred on its anchor",
+    "            rather than flush against a box it exactly fills. Off by",
+    "            default: the box is left where the art sits, which is what",
+    "            keeps a feet-anchored walk cycle steady, and frames the game",
+    "            measures (the boulder, the chain strip) read their own size."
   ],
   "sheets": [
     {
@@ -711,7 +718,8 @@
             "cols": [
               1,
               6
-            ]
+            ],
+            "centred": true
           }
         ]
       ]
