@@ -19,6 +19,7 @@ Legend: **Deps** = must be merged first. **AC** = acceptance criteria (in the is
 | CO-092 | [#75](https://github.com/danhquach/crimsononslaught/issues/75) | P2 | Phase 1 | CO-091 | `Player` owns its pickup radius instead of `GameScene` passing it through |
 | CO-093 | [#76](https://github.com/danhquach/crimsononslaught/issues/76) | P2 | Phase 1 | CO-092 | Move numeric tunables out of `src/core` into typed config modules |
 | CO-094 | [#77](https://github.com/danhquach/crimsononslaught/issues/77) | P3 | Phase 1 | CO-093 | Reconcile the spec §4 and README file trees with the actual layout |
+| CO-095 | [#108](https://github.com/danhquach/crimsononslaught/issues/108) | P3 | Phase 1 | CO-093 | Move the remaining spell and reward tunables out of `src/core` into config |
 
 Priority scale: **P1** blocks work that is about to start · **P2** must land before a
 named Phase 1 ticket · **P3** cleanup, no downstream ticket depends on it.
@@ -41,6 +42,7 @@ These interleave with the remaining Phase 1 feature tickets. Read top to bottom.
 | 8 | CO-062 | Balance pass — now genuinely config-only. |
 | 9 | **CO-094** (P3) | Last. CO-090…093 each change the tree; documenting before they land means writing it twice. Must precede CO-063 so the acceptance walkthrough follows a true tree, and precede Phase 2 / CO-080 so the art tickets reference real paths. |
 | 10 | CO-063 | Phase 1 acceptance checklist (existing ticket, unchanged). |
+| — | **CO-095** (P3) | Unsequenced. Filed after CO-093 merged; CO-062 is already complete, so nothing downstream waits on it. |
 
 Critical path unchanged apart from the insertions:
 `090 -> 044…047 -> 091 -> 092 -> 050 -> 051 -> 093 -> 060 -> 061 -> 062 -> 094 -> 063`
@@ -49,8 +51,9 @@ Critical path unchanged apart from the insertions:
 
 ## What prompted each ticket
 
-Findings from the review, in the order they were found. All five are deviations from
-a rule the repo already states in writing — none is a new convention.
+Findings from the review, in the order they were found. All are deviations from
+a rule the repo already states in writing — none is a new convention. CO-095 was
+added later, from the code review of CO-093 rather than the original sweep.
 
 1. **CO-091** — `Player.speed` is a public mutable field written from outside
    (`GameScene`). Every other entity stat is read-through: `Enemy` reads
@@ -68,6 +71,10 @@ a rule the repo already states in writing — none is a new convention.
 5. **CO-090** — "no Phaser imports in `src/core/**`" is stated in four documents and
    enforced by none. ESLint bans only `Math.random`. The tree complies today with
    nothing keeping it that way.
+6. **CO-095** — CO-093 moved the constants in its own table but left `BURN_DURATION`,
+   `FREEZE_DURATION`, `BOULDER_HIT_COOLDOWN` and `EMPTY_OFFER_MAX_HP_BONUS` in
+   `src/core/`, two of them stated verbatim in the spec §5 spell table. Found by the
+   code review of CO-093, not the original sweep.
 
 ## Not findings
 
