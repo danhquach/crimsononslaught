@@ -5,7 +5,7 @@ import { BOSS_START_MS, MAX_TIME_SCALE } from '../src/core/runState';
 import { SCENE, type ResultPayload } from '../src/core/scenePayloads';
 import type { HudScene } from '../src/scenes/HudScene';
 import type { ResultScene } from '../src/scenes/ResultScene';
-import { cardCenter, collectErrors, waitForScene } from './game';
+import { cardCenter, collectErrors, forceFrameLength, waitForScene } from './game';
 
 /**
  * Spec §8 full run (CO-061): a seeded run at an accelerated clock, played
@@ -19,14 +19,22 @@ import { cardCenter, collectErrors, waitForScene } from './game';
 
 /**
  * `MAX_TIME_SCALE` itself, so this check is also the guard on that ceiling
- * (#89): the scale multiplies one frame's delta, so past the ceiling a frame
- * covers enough run time that the per-frame decisions stop tracking the arena —
- * a fireball's step carries it clear across the boss instead of into it, the
- * boss's chase overshoots the player, and the run clock flies while almost
- * nothing lands. Raising the ceiling past what the arena can simulate turns
- * this check red rather than shipping a scale that does not play.
+ * (#89): a frame at the ceiling owes the arena the most simulation steps it
+ * ever has to fit, and a machine that cannot fit them renders fewer, longer
+ * frames — the run slows down, and past what the 90 s budget absorbs this check
+ * goes red rather than the ceiling shipping.
  */
 const TIME_SCALE = MAX_TIME_SCALE;
+
+/**
+ * The frame length the run is driven at: about what the CI runner renders,
+ * pinned so the check sees it on every machine (#94). At this length and
+ * `TIME_SCALE` a frame covers 3 s of run time; simulated as one decision that
+ * skips the boss past Earth's ring for the whole run, which is what CI did while
+ * a 60 fps desktop passed. Stepping the frame (`simulationSteps`) is the fix,
+ * and this is what proves it holds.
+ */
+const FRAME_MS = 100;
 
 /**
  * The ticket's ceiling per run: each check, boot included, must fit in CI's 90 s.
@@ -117,6 +125,7 @@ for (const spellId of SPELLS) {
 
     await page.goto(`/?seed=1&timeScale=${TIME_SCALE}&invulnerable=1`);
     await waitForScene(page, SCENE.spellSelect);
+    await forceFrameLength(page, FRAME_MS);
 
     const { x, y } = cardCenter(SPELL_IDS.indexOf(spellId));
     await page.mouse.click(x, y);

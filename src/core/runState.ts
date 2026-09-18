@@ -22,26 +22,23 @@ import { applyXpGain, xpToNext } from './xp';
 export const BOSS_START_MS = BOSS_START_TIME * 1000;
 
 /**
- * The fastest `?timeScale=` the arena still plays correctly at; anything higher
- * is clamped to it.
+ * The fastest `?timeScale=` a run may be driven at; anything higher is clamped
+ * to it.
  *
- * The scale multiplies one frame's delta, and a frame is one decision: one
- * steering vector per enemy, one angle for Earth's ring, one cast window. Past
- * this a frame covers so much run time that the decisions stop tracking the
- * arena — a projectile's step carries it past its target rather than into it
- * and the cast backlog is dropped at `MAX_CASTS_PER_FRAME` (CO-091), and the
- * boss's chase overshoots the player by hundreds of px a frame, so Earth's
- * 80 px ring never touches it and the boss outlives the run (#89). At 100 the
- * clock flew while almost nothing landed; 30 was measured faithful under CPU
- * throttling from 1x to 32x, and it is what the Playwright suites drive.
+ * The arena is simulated in steps of about `SIM_STEP_MS` whatever the scale
+ * (`simulationSteps`), so a scaled run is a real one fast-forwarded and plays
+ * the same. What the scale costs is CPU: every frame owes `scale` times as
+ * many steps as a real-time one, and a machine that cannot run them within the
+ * frame renders fewer frames, each owing more. 30 is what the Playwright full
+ * run drives, and on the slowest runner it has to fit the boss fight into the
+ * check's 90 s.
  */
 export const MAX_TIME_SCALE = 30;
 
 /**
  * Any value to a usable run-clock multiplier. Zero, negative, non-finite and
- * non-numeric all read as real time: the scale divides into Arcade's step
- * budget in `GameScene`, where an `Infinity` would stop the physics world
- * silently rather than throw.
+ * non-numeric all read as real time, so no caller can hand the run a clock
+ * that never advances or a frame that never ends.
  */
 export function clampTimeScale(value: unknown, fallback = 1): number {
   const n = typeof value === 'number' ? value : Number.NaN;
@@ -55,6 +52,36 @@ export interface RunFrame {
   startMs: number;
   /** Scaled length of the frame in ms; 0 once the run is over. */
   deltaMs: number;
+}
+
+/** One 60 fps frame of run time: what a single simulation step covers, give or take. */
+export const SIM_STEP_MS = 1000 / 60;
+
+/**
+ * Cut a frame into the steps the arena is simulated in: equal, contiguous
+ * windows of about `SIM_STEP_MS` each, as many as the frame needs.
+ *
+ * A step is one decision — one steering vector per enemy, one angle for
+ * Earth's ring, one physics integration — and one that covers seconds of run
+ * time stops tracking the arena: the boss's chase overshoots the player by
+ * hundreds of px and Earth's 80 px ring never touches it (#89), and the slower
+ * the machine renders, the longer each frame's decision gets (#94: CI at ~10
+ * fps and scale 30 decided once per 3 s of run time and never killed the boss).
+ * Stepping the frame keeps every decision as fine as a real-time frame's, so a
+ * scaled run plays the same as a real one, only faster.
+ *
+ * The count is rounded rather than ceiled so a real-time frame's jitter (17 ms,
+ * 24 ms) stays one step, as it always was; the longest step is thus one and a
+ * half `SIM_STEP_MS`. A zero-length frame is no steps.
+ */
+export function simulationSteps(frame: RunFrame): RunFrame[] {
+  if (!(frame.deltaMs > 0)) return [];
+  const count = Math.max(1, Math.round(frame.deltaMs / SIM_STEP_MS));
+  const deltaMs = frame.deltaMs / count;
+  return Array.from({ length: count }, (_, i) => ({
+    startMs: frame.startMs + i * deltaMs,
+    deltaMs,
+  }));
 }
 
 export class RunState {
