@@ -196,7 +196,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies.update(step.deltaMs, this.player, (enemy, amount) =>
       this.damageEnemy(enemy, amount),
     );
-    this.gems.update(this.player, this.perks.playerStats.pickupRadius);
+    this.gems.update(this.player);
     this.spell.update(step.deltaMs);
     this.physics.world.update(time, step.deltaMs);
     this.physics.world.postUpdate();
@@ -351,14 +351,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Push the generic perks onto the player. Move speed is set outright, max HP
-   * is granted as the difference — health owns the current HP and the +10
-   * fallback bonus, so it is raised, never overwritten. The pickup radius is
-   * read straight from the stats each frame in `update`.
+   * Push the generic perks onto the player. Move speed and pickup radius are
+   * set outright; max HP is granted as the difference — health owns the current
+   * HP and the +10 fallback bonus, so it is raised, never overwritten.
    */
   private syncPlayerStats(before: Readonly<PlayerStats>): void {
     const after = this.perks.playerStats;
     this.player.setMoveSpeed(after.moveSpeed);
+    this.player.setPickupRadius(after.pickupRadius);
     if (after.maxHp !== before.maxHp) this.player.grantMaxHp(after.maxHp - before.maxHp);
   }
 

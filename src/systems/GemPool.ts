@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { EnemyType } from '../config/enemies';
-import { GEM_XP_VALUE, MAX_LIVE_GEMS, PICKUP_RADIUS, gemDropCount, type Vec2 } from '../core/gems';
+import { GEM_XP_VALUE, MAX_LIVE_GEMS, gemDropCount, type Vec2 } from '../core/gems';
 import { XpGem } from '../entities/XpGem';
 
 /**
@@ -9,6 +9,11 @@ import { XpGem } from '../entities/XpGem';
  * over the death spot still takes all three.
  */
 const DROP_SPREAD = 12;
+
+/** What the pool needs of the player: where they are, and how far they attract gems. */
+export interface PickupTarget extends Vec2 {
+  readonly pickupRadius: number;
+}
 
 /**
  * The XP gem object pool (spec §5), mirroring `EnemyPool`: one Arcade group of
@@ -60,10 +65,14 @@ export class GemPool {
     return gem;
   }
 
-  /** Pull every in-range gem toward `target`; the rest lie still. */
-  update(target: Readonly<Vec2>, radius: number = PICKUP_RADIUS): void {
+  /**
+   * Pull every in-range gem toward `target`; the rest lie still. The radius is
+   * the target's own (`Player.pickupRadius`, CO-092), so the caller does not
+   * carry a player stat through the pool.
+   */
+  update(target: PickupTarget): void {
     for (const child of this.group.getChildren()) {
-      if (child instanceof XpGem && child.active) child.drift(target, radius);
+      if (child instanceof XpGem && child.active) child.drift(target, target.pickupRadius);
     }
   }
 

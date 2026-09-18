@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { PICKUP_RADIUS } from '../core/gems';
 import {
   PLAYER_EVENT,
   createHealth,
@@ -47,6 +48,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private health: HealthState = createHealth();
   /** px/s before diagonal normalization; the Move Speed perk raises it (CO-042). */
   private moveSpeed = PLAYER_SPEED;
+  /** px the player attracts XP gems from; the Pickup Radius perk widens it (CO-042). */
+  private gemPickupRadius = PICKUP_RADIUS;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'player');
@@ -75,6 +78,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.moveSpeed;
   }
 
+  /** How far this player pulls XP gems in from; `GemPool` is the only reader. */
+  get pickupRadius(): number {
+    return this.gemPickupRadius;
+  }
+
   override update(deltaMs = 0): void {
     this.setHealth(tickHealth(this.health, deltaMs));
     const { x, y } = moveVelocity(resolveMove(this.keyboardMove(), this.padMove()), this.speed);
@@ -97,6 +105,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
    */
   setMoveSpeed(pxPerSecond: number): void {
     this.moveSpeed = clampMoveSpeed(pxPerSecond);
+  }
+
+  /**
+   * Perk-driven pickup radius (spec §5): the third generic perk, set outright
+   * like the move speed. The gem pool reads it off the player it is already
+   * given, so nothing else has to carry the number.
+   */
+  setPickupRadius(px: number): void {
+    this.gemPickupRadius = px;
   }
 
   /** Level-up fallback (spec §5): raise the maximum, leaving current HP alone. */
