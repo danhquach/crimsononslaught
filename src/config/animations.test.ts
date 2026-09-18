@@ -152,6 +152,18 @@ describe('generated frame data', () => {
     }
   });
 
+  it('puts the anchor at the dead centre of a frame cut from a centred row (CO-097)', () => {
+    // `docs/art/sheets/manifest.json` declares the nova row `centred`, which
+    // means its crop box is mirrored about the cell centre: the anchor is then
+    // the frame's own centre, so the ring is framed symmetrically and keeps
+    // clear of the frame edge whatever Reach scales it to.
+    for (const name of FRAME_NAMES.filter((f) => f.startsWith('ice.nova.'))) {
+      const f = FRAMES[name];
+      expect(f.anchorX * 2, `${name} width`).toBe(f.w);
+      expect(f.anchorY * 2, `${name} height`).toBe(f.h);
+    }
+  });
+
   it('keeps the anchor fixed across an animation', () => {
     for (const anim of ANIMATIONS) {
       const anchors = new Set(anim.frames.map((f) => `${FRAMES[f].anchorX},${FRAMES[f].anchorY}`));

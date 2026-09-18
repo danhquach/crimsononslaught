@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   blit,
+  centreBounds,
   clearOutside,
   cornerKey,
   crop,
@@ -54,6 +55,8 @@ const TOL_KEYED = 60;
 const TOL_SOLID = 130;
 /** Art is downscaled by this factor: the sheets are drawn at 4x native size. */
 const SCALE = 4;
+/** Clear space a `centred` animation keeps between its art and its frame edge, in native px. */
+const FRAME_MARGIN = 1;
 
 const failures = [];
 function fail(message) {
@@ -134,11 +137,33 @@ function cutSheet(sheet) {
   const out = [];
   for (const anim of new Set(cut.map((c) => c.anim))) {
     const group = cut.filter((c) => c.anim === anim);
-    const box = unionBounds(group.map((c) => c.bounds));
     const cell = group[0].cell;
     const scale = cell.h / nativeCell;
-    const width = Math.max(1, Math.round(box.w / scale));
-    const height = Math.max(1, Math.round(box.h / scale));
+    const centred = group[0].centred;
+    if (group.some((c) => c.centred !== centred)) {
+      fail(`${sheet.file}: ${anim} is declared centred on some rows and not on others`);
+    }
+    // A `centred` row (the nova) mirrors that tight box about the cell centre
+    // and holds it off the art, so radial FX come out whole and centred on
+    // their anchor instead of shaved flat against a box they just fill
+    // (CO-097). Every other row keeps the box where its art sits.
+    const tight = unionBounds(group.map((c) => c.bounds));
+    const box = centred
+      ? centreBounds(tight, { x: cell.w / 2, y: cell.h / 2 }, FRAME_MARGIN * scale)
+      : tight;
+    const anchorX = Math.round((cell.w / 2 - box.x) / scale);
+    const anchorY = Math.round((cell.h / 2 - box.y) / scale);
+    // A centred frame is sized from its own anchor rather than by rounding the
+    // box again: the two roundings disagree for half of all half-extents (a
+    // 417 px box is a 104 px anchor in a 105 px frame), and the frame would
+    // then have no centre column for the anchor to sit in. Half a pixel comes
+    // off the box instead, out of the margin, which is what the margin is for.
+    const width = centred ? anchorX * 2 : Math.max(1, Math.round(box.w / scale));
+    const height = centred ? anchorY * 2 : Math.max(1, Math.round(box.h / scale));
+    if (width < 1 || height < 1) {
+      fail(`${sheet.file}: ${anim} cuts to an empty ${width}x${height} frame`);
+      continue;
+    }
 
     for (const c of group) {
       out.push({
@@ -150,8 +175,8 @@ function cutSheet(sheet) {
         height,
         // Where the cell's centre sits inside the frame, in native px, so the
         // game can place a sprite without it drifting between frames.
-        anchorX: Math.round((cell.w / 2 - box.x) / scale),
-        anchorY: Math.round((cell.h / 2 - box.y) / scale),
+        anchorX,
+        anchorY,
       });
     }
   }
