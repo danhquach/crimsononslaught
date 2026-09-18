@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json && eslint . && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "art:cut": "node scripts/cut-sheets.mjs"
   },
   "dependencies": {
     "phaser": "~3.88.2"
@@ -25,6 +26,8 @@
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0",
     "prettier": "^3.9.6",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.70.0",

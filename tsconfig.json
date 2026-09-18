@@ -19,7 +19,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+
+    /* The sheet manifest (docs/art/sheets) is imported by a config test so the
+       generated atlas and the hand-written animation list cannot drift. */
+    "resolveJsonModule": true
   },
   "include": ["src"]
 }

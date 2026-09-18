@@ -4,9 +4,11 @@ import { PLACEHOLDERS, TEXTURE_KEYS, type Placeholder, type TextureKey } from '.
 /**
  * Generate one texture per `TextureKey` from `config/colors.ts`.
  *
- * Idempotent: a key that already exists in the texture manager (e.g. loaded
- * from a sprite atlas in `BootScene.preload`) is left untouched, so real art
- * can replace placeholders key by key.
+ * Idempotent: a key that already exists in the texture manager is left
+ * untouched. `render/atlas.ts` runs first and claims every key the sprite
+ * atlas supplies, so this only fills the gaps — which is what lets art replace
+ * placeholders key by key, and what keeps the game running if the atlas fails
+ * to load (see README "Rendering and the art pipeline").
  *
  * @returns the keys that were generated in this call.
  */

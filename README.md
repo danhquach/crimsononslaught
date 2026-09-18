@@ -26,8 +26,8 @@ until the asset pass.
 - Seeded runs: `?seed=<n>` reproduces a run exactly; `?timeScale=<n>` speeds
   it up for testing; `?invulnerable=1` drops contact damage so an unattended
   run reaches the boss.
-- Dev switches: `?debug=textures` shows every placeholder texture in a row;
-  `?debug=collisions` runs the collision pairs on their own.
+- Dev switches: `?debug=textures` plays every atlas animation in a labelled
+  grid; `?debug=collisions` runs the collision pairs on their own.
 
 ## Controls
 
@@ -67,39 +67,52 @@ src/scenes/   Boot, SpellSelect, Game, HUD, LevelUp, Result
 src/entities/ Player, Enemy, Boss, XpGem, Projectile
 src/spells/   one class per spell behind a shared interface
 src/systems/  spawn director, perks, collisions, run state
-src/render/   texture-key layer (placeholder shapes now, sprite atlas later)
-docs/         design spec, ticket list, tuning notes
+src/render/   texture-key layer: sprite atlas, placeholder shapes as fallback
+scripts/      art pipeline (`npm run art:cut`)
+docs/         design spec, ticket list, tuning notes, art sheets + manifest
 ```
 
-## Rendering and swapping in real art
+## Rendering and the art pipeline
 
 Nothing in the game references an image file. Every visual asks for a
 **texture key** (`player`, `enemy_swarm`, `enemy_fast`, `enemy_tank`, `boss`,
 `gem`, `proj_fire`, `fx_nova`, `fx_bolt`, `boulder`), typed as `TextureKey`
-in `src/config/colors.ts`. At boot, `src/render/textures.ts` generates a
-flat-colored shape for each key with Phaser Graphics. Open
-`http://localhost:5173/?debug=textures` to see all ten.
+in `src/config/colors.ts`.
 
-To replace the placeholders with a sprite atlas:
+At boot, `src/render/atlas.ts` loads the sprite atlas and points each texture
+key at a still frame from it; `src/render/textures.ts` then generates a
+flat-colored placeholder shape for any key the atlas did not supply. So the
+art can be migrated a key at a time, and the game still runs if the atlas
+fails to load. No entity, spell, or scene code knows the difference — they
+keep requesting the same keys.
 
-1. Put the atlas under `public/` (e.g. `public/art/atlas.png` + `atlas.json`).
-2. In `BootScene.preload()`, load it:
-   `this.load.atlas('art', 'art/atlas.png', 'art/atlas.json')`.
-3. Name the atlas frames after the keys, then in `BootScene.create()`, before
-   `generatePlaceholderTextures(this)`, copy each frame into a standalone
-   texture of the same name:
-   ```ts
-   for (const key of TEXTURE_KEYS) {
-     const frame = this.textures.getFrame('art', key);
-     this.textures.createCanvas(key, frame.width, frame.height)?.drawFrame('art', key).refresh();
-   }
-   ```
-4. `generatePlaceholderTextures` skips any key that already exists, so keys
-   can be migrated one at a time; the rest keep their generated shapes.
+Open `http://localhost:5173/?debug=textures` to page through every animation
+in the atlas, labelled with its frame count and native size.
 
-No entity, spell, or scene code changes — they keep requesting the same keys.
-If a texture needs animation later, add the frames to the atlas and drive
-them with Phaser's animation manager keyed off the same `TextureKey`.
+### Regenerating the atlas
+
+```
+npm run art:cut
+```
+
+Reads the 18 authored sheets under `docs/art/sheets/` (source of truth, not
+shipped) and writes `public/assets/atlas/props.png` + `props.json` and the
+generated `src/config/frames.ts`. The run is deterministic: the same sheets
+always produce byte-identical output, so a re-run with nothing changed leaves
+a clean working tree.
+
+`docs/art/sheets/manifest.json` is the single place that maps grid cells to
+animation frames — which sheet, how many columns and rows, and what each row
+holds. The script never hardcodes a sheet, so new art only needs a manifest
+entry. It fails loudly, naming sheet/row/column, when a cell declared blank
+holds art, a declared frame is empty, or art runs off a cell edge without the
+row declaring `allowEdge`.
+
+The cut itself lives in `scripts/lib/spriteCut.mjs` as pure functions over
+RGBA buffers, unit-tested on synthetic pixel buffers in `spriteCut.test.mjs`.
+`src/config/animations.ts` holds the animation list as pure data, cross-checked
+against both the manifest and the generated atlas by `animations.test.ts`, so
+the three cannot drift apart.
 
 ## CI and deployment
 
