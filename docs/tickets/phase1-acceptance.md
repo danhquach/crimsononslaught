@@ -17,8 +17,9 @@ that commit's build and not an older deploy.
 
 **Walkthrough date:** 2026-09-17. **Result: every acceptance criterion below is
 met. No bugs filed.** Two ACs could not be exercised end to end on the deployed
-page; both are listed under [Gaps](#gaps-in-this-walkthrough) with what was
-checked instead.
+page; both were listed under [Gaps](#gaps-in-this-walkthrough) with what was
+checked instead. One of the two, the bolt line of CO-046, has since been
+photographed and closed ([#99](https://github.com/danhquach/crimsononslaught/issues/99)).
 
 ---
 
@@ -148,10 +149,15 @@ The run-time hooks the checks lean on are the ones the spec already documents:
       ice run cleared its way to the boss phase and took the boss to about 15%
       of its HP, so the ring is dealing its damage on the deployed build.
 - [x] **CO-046** — Lightning: chain target selection and falloff; a visible chain.
-      **suite**: `src/core/chainLightning.test.ts` (29). **page**: a lightning
-      run killed 56 by 0:45 with no projectile ever crossing the screen — the
-      chain is what is killing; the bolt line itself is shorter-lived than the
-      frame sampling (see [Gaps](#gaps-in-this-walkthrough)).
+      **suite**: `src/core/chainLightning.test.ts` (29), and `e2e/lightningArc.spec.ts`,
+      which reads the frame buffer every frame instead of sampling it. **page**: a
+      lightning run killed 56 by 0:45 with no projectile ever crossing the screen —
+      the chain is what is killing. **pixels** (#99): at real speed the bolt was on
+      56 of 480 frames over 8 s, about one frame in nine and every cast on the 1 s
+      cooldown, up to 1,601 px of line in a frame. In a crowd it draws the chain:
+      ![a chained bolt at 2:06](evidence/co-046-chain-bolt.png) — one bolt leaves the
+      player up and to the right and bends at the enemy it struck to jump to the next,
+      a second runs down-right across two more. Captured at `?seed=1&timeScale=5`.
 - [x] **CO-047** — Earth: knockback vector and Crush; boulders evenly spaced and
       re-spaced by the count perk. **suite**: `src/core/orbitingBoulders.test.ts`
       (21). **page**: three boulders orbit the player 120° apart from the first
@@ -194,9 +200,9 @@ The run-time hooks the checks lean on are the ones the spec already documents:
 
 ## Gaps in this walkthrough
 
-Neither is a defect in the build; both are limits of what the deployed page can
-be made to show from a script, and both are recorded here rather than ticked
-quietly.
+Neither was a defect in the build; both were limits of what the deployed page
+can be made to show from a script, and both are recorded here rather than
+ticked quietly. Gap 2 is now closed.
 
 1. **Gamepad input (part of CO-020).** No controller was attached to the machine
    doing the walkthrough, so the stick, the deadzone, the D-pad and hot-plugging
@@ -204,12 +210,13 @@ quietly.
    (20 cases) over the same pure input helper the scenes read, and both menus
    print the gamepad prompt. Worth one hands-on pass with a pad before Phase 2
    leans on it.
-2. **The chain's bolt line (the manual half of CO-046).** The bolt is drawn for
-   a fraction of a second and fell between frames at 220 ms sampling, so the
-   "visible chain across 3 enemies" was not photographed. The chain's effect is
-   evidenced above by kill rate and by `src/core/chainLightning.test.ts` (29
-   cases). The other three spells' effects were all seen on the page: the
-   fireball in flight, the frost ring, and the boulders in orbit.
+2. ~~**The chain's bolt line (the manual half of CO-046).**~~ **Closed**
+   ([#99](https://github.com/danhquach/crimsononslaught/issues/99)): the bolt
+   fell between frames at 220 ms sampling, not off the screen. Read frame by
+   frame rather than sampled, it is drawn on about one frame in nine at real
+   speed and bends across the enemies it chains to — the counts and the
+   photograph are under CO-046 above, and `e2e/lightningArc.spec.ts` keeps it
+   honest. Nothing in the build changed.
 
 ## Reproducing this walkthrough
 
