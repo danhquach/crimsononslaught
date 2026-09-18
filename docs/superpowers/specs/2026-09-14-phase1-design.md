@@ -1,7 +1,13 @@
 # Crimson Onslaught — Phase 1 Design
 
 Date: 2026-09-14
-Status: Approved
+Status: Approved — the record of what Phase 1 shipped.
+
+> **Partly superseded.** The loadout, the perk trees and the level-up offer are
+> replaced by `docs/superpowers/specs/2026-09-18-phase2-spells.md` (CO-107).
+> Where the two disagree, the Phase 2 spec wins; the sections below are marked
+> where that applies. Everything else here — player, enemies, spawn schedule,
+> boss, XP curve, rendering, error handling — still stands.
 
 ## 1. Goal
 
@@ -19,8 +25,11 @@ browser smoke).
 ### In
 - 1 character, 1 arena (bounded plane, camera follows player).
 - 4 spells: Fire, Ice, Lightning, Earth. Exactly one chosen per run.
+  *(Phase 2: a default spell plus two active slots, 5 spells per element —
+  phase-2 spec §3, §9.)*
 - Per-spell perk tree (3 branches, 2–3 ranked nodes each) + 3 generic perks, offered as
   3 random eligible cards on level-up.
+  *(Phase 2: the trees are retired for global passives — phase-2 spec §5, §8.)*
 - 3 enemy types (Swarm, Tank, Fast) + 1 boss.
 - Time-based spawn director, 5:00 run timer, boss at 5:00.
 - HUD: timer, XP bar/level, HP bar, kill count, boss HP bar.
@@ -33,6 +42,10 @@ browser smoke).
 Gold / meta shop, additional characters, spell evolutions, chests, sound and
 music, real art, mobile / touch controls (gamepad IS in scope), saves, multiple arenas, ranged or
 elite enemies, settings menu.
+
+The loadout overhaul — multiple active spells, passives, and the full roster per
+element — is Phase 2 and is specified in
+`docs/superpowers/specs/2026-09-18-phase2-spells.md`. Spell evolutions stay out.
 
 ## 3. Stack
 
@@ -152,6 +165,9 @@ src/
 3. XP threshold reached -> `GameScene.scene.pause()`, launch `LevelUpScene`
    with `PerkSystem.offer()`. Pick -> `PerkSystem.apply(id)` ->
    `Spell.stats` mutated -> resume.
+   *(Phase 2 replaces this step: the offer is active spells while a slot is
+   open and passives once none is, and a pick updates the loadout's player
+   profile instead of mutating a spell's block — phase-2 spec §6, §7.)*
 4. `RunState.phase` becomes `boss` at 5:00: `SpawnDirector` stops, boss
    spawned. Boss death -> `Result(win)`. Player HP 0 -> `Result(lose)`.
 
@@ -194,12 +210,19 @@ src/
 - Boss death -> win.
 
 ### XP and level-up
+*(The offer rules below are superseded by phase-2 spec §7; the curve is not.)*
+
 - `xpToNext(level) = 10 + level * 5`. Gem = 1 XP.
 - On level-up: pause, offer 3 random eligible perks. If fewer than 3 are
   eligible, offer what exists. If 0, grant +10 max HP silently and resume.
 - Eligible = prerequisites owned AND current rank < maxRank.
 
 ### Spells (one per run, auto-cast)
+*(Superseded by phase-2 spec §9: five spells per element, three equipped at
+once, and passives in place of the per-spell trees. The base blocks below are
+what Phase 2's Fire Bolt, Frost Nova Bomb, Chain Lightning and Earth Shield
+start from.)*
+
 All spells read a `SpellStats` object; perks mutate it. Base values below.
 
 **Fire — Fireball.** Every `cooldown` s, fire `projectiles` projectiles at
@@ -237,7 +260,8 @@ knockback 60, size 14.
 - Utility: +1 boulder (x2), +orbitSpeed (x2).
 
 **Generic perks (all spells):** Move speed +10% (x3), Max HP +20 (x3),
-Pickup radius +25% (x2).
+Pickup radius +25% (x2). *(Phase 2 turns these three into passives — phase-2
+spec §5.)*
 
 Tiers: nodes within a branch are listed in tier order; node N+1 requires node N owned at rank >= 1. Each spell has 7 nodes (18–20 total ranks); with generics, a run can level ~25 times before perks run dry.
 
