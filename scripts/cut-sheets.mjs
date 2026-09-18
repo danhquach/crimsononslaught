@@ -151,18 +151,18 @@ function cutSheet(sheet) {
     const box = centred
       ? centreBounds(tight, { x: cell.w / 2, y: cell.h / 2 }, FRAME_MARGIN * scale)
       : tight;
-    const width = Math.max(1, Math.round(box.w / scale));
-    const height = Math.max(1, Math.round(box.h / scale));
     const anchorX = Math.round((cell.w / 2 - box.x) / scale);
     const anchorY = Math.round((cell.h / 2 - box.y) / scale);
-    // What `centred` promises, checked rather than assumed: the rounding to
-    // native px above can only land the anchor dead centre when the box divides
-    // evenly, and a sheet whose cell size does not is the one that would slip
-    // through silently.
-    if (centred && (anchorX * 2 !== width || anchorY * 2 !== height)) {
-      fail(
-        `${sheet.file}: ${anim} is declared centred but its anchor ${anchorX},${anchorY} is not the centre of a ${width}x${height} frame`,
-      );
+    // A centred frame is sized from its own anchor rather than by rounding the
+    // box again: the two roundings disagree for half of all half-extents (a
+    // 417 px box is a 104 px anchor in a 105 px frame), and the frame would
+    // then have no centre column for the anchor to sit in. Half a pixel comes
+    // off the box instead, out of the margin, which is what the margin is for.
+    const width = centred ? anchorX * 2 : Math.max(1, Math.round(box.w / scale));
+    const height = centred ? anchorY * 2 : Math.max(1, Math.round(box.h / scale));
+    if (width < 1 || height < 1) {
+      fail(`${sheet.file}: ${anim} cuts to an empty ${width}x${height} frame`);
+      continue;
     }
 
     for (const c of group) {
