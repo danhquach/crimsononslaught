@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { resolveSeed } from '../core/rng';
-import { resolveInvulnerable, resolveTimeScale } from '../core/runState';
+import { resolveInvulnerable, resolveLoadout, resolveTimeScale } from '../core/runState';
 import {
   INVULNERABLE_REGISTRY_KEY,
+  LOADOUT_REGISTRY_KEY,
   SCENE,
   SEED_REGISTRY_KEY,
   TIME_SCALE_REGISTRY_KEY,
@@ -55,6 +56,12 @@ export class BootScene extends Phaser.Scene {
     const invulnerable = resolveInvulnerable(location.search);
     this.registry.set(INVULNERABLE_REGISTRY_KEY, invulnerable);
     if (invulnerable) console.info('[run] invulnerable=1');
+
+    // `?loadout=fire,ice` casts several actives in one run (CO-109), until the
+    // level-up rework (#132) can offer them.
+    const loadout = resolveLoadout(location.search);
+    this.registry.set(LOADOUT_REGISTRY_KEY, loadout);
+    if (loadout.length > 0) console.info(`[run] loadout=${loadout.join(',')}`);
 
     const debug = new URLSearchParams(location.search).get('debug');
     if (debug === 'textures') {
