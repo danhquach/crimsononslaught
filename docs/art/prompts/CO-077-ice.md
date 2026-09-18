@@ -77,14 +77,15 @@ Cells are 160 px square, 6 across and 3 down, so the image is 960 x 480 px.
 Row 1 is a four-frame slow effect in the first four cells: a subtle loop of
 small frost crystals and thin frost mist hovering over an invisible base
 about 80 px wide, about 60 px tall. The last two cells stay blank magenta.
-Row 2 has two frames in the first two cells: a translucent jagged block of
-ice about 100 px tall and 90 px wide seen from the three-quarter camera,
-hollow enough that a creature inside would show through; then the same
-block with hairline cracks. The other four cells stay blank magenta.
-Row 3 is a four-frame shatter in the first four cells: crack lines flash
-white across the block; the block splits into six to eight shards; the
-shards fly outward; the shards fade to almost nothing. The last two cells
-stay blank magenta.
+Row 2 has three frames in the first three cells: a translucent jagged block
+of ice about 100 px tall and 90 px wide seen from the three-quarter camera,
+hollow enough that a creature inside would show through; the same block with
+its inner highlights dimmed so the ice shimmers; then the same block with
+hairline cracks. The other three cells stay blank magenta.
+Row 3 is a five-frame shatter in the first five cells: crack lines flash
+white across the block; the block splits down the middle into two halves;
+the halves break into six to eight shards; the shards fly outward; the
+shards fade to almost nothing. The last cell stays blank magenta.
 
 Style, identical for every sheet in this project
 - Chunky pixel art with crisp hard pixel edges. No blur, no anti-aliasing,

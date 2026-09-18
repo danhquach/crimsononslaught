@@ -21,12 +21,12 @@ CELL = 128 px. COLS = 6. ROWS = 3. Image 768 x 384 px.
 Row 1 = SPIN, 6 frames (the boulder rotates clockwise 60 degrees per frame
 so frame 6 loops back to frame 1; cracks and moss travel around it; center
 stays fixed).
-Row 2 = HIT IMPACT, 4 frames (brown-grey dust puff and 4-6 small rock
-chips bursting from a point: flash, puff, chips spread, fade). Frame 4
-mostly transparent. Cols 5-6 EMPTY.
-Row 3 = KNOCKBACK DUST, 4 frames (a short horizontal skid of dust moving
-LEFT to RIGHT, drawn under a pushed enemy: two puffs, trail, thinning,
-gone). Cols 5-6 EMPTY.
+Row 2 = HIT IMPACT, 5 frames (brown-grey dust puff and 4-6 small rock
+chips bursting from a point: boulder intact, flash, puff, chips spread,
+fade). Frame 5 mostly transparent. Col 6 EMPTY.
+Row 3 = KNOCKBACK DUST, 5 frames (a short horizontal skid of dust moving
+LEFT to RIGHT, drawn under a pushed enemy: two puffs, puffs grow, trail,
+thinning, almost gone). Col 6 EMPTY.
 
 STYLE (same for every sheet in this project)
 - Chunky pixel art, crisp hard-edged pixels, no anti-aliasing blur, no
