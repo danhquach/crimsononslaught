@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS_START_TIME } from '../config/waves';
+import { BOSS_START_TIME, WAVES } from '../config/waves';
 import { createRng } from './rng';
 import {
   SPAWN_RING_MARGIN,
@@ -50,8 +50,8 @@ describe('spawnPoint', () => {
 });
 
 describe('planSpawns', () => {
-  it('spends the wave budget: 10 s of wave one at 2/s is 20 spawns', () => {
-    expect(runFrames(1, 1 / 60, 600)).toHaveLength(20);
+  it('spends the wave budget: 10 s of wave one is ten times its rate', () => {
+    expect(runFrames(1, 1 / 60, 600)).toHaveLength(10 * WAVES[0].spawnsPerSecond);
   });
 
   it('is identical across two runs of the same seed (CO-025 AC)', () => {
@@ -100,7 +100,7 @@ describe('planSpawns', () => {
       center: CENTER,
       world: WORLD,
     });
-    expect(plan.spawns).toHaveLength(20);
+    expect(plan.spawns).toHaveLength(10 * WAVES[0].spawnsPerSecond);
     for (const { type } of plan.spawns) expect(type).toBe('swarm');
   });
 
@@ -159,7 +159,8 @@ describe('planSpawns', () => {
       center: CENTER,
       world: WORLD,
     });
-    expect(plan.spawns).toHaveLength(0);
-    expect(plan.carry).toBeCloseTo(0.5);
+    const owed = 0.25 * WAVES[0].spawnsPerSecond;
+    expect(plan.spawns).toHaveLength(Math.floor(owed));
+    expect(plan.carry).toBeCloseTo(owed - Math.floor(owed));
   });
 });

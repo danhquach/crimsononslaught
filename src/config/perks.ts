@@ -61,12 +61,12 @@ const FIRE_PERKS: readonly SpellPerk<'fire'>[] = [
   {
     id: 'fire_power_damage',
     name: 'Kindling',
-    description: '+4 fireball damage',
+    description: '+3 fireball damage',
     spell: 'fire',
     branch: 'power',
     tier: 1,
     maxRank: 3,
-    effect: { field: 'damage', op: 'add', amount: 4 },
+    effect: { field: 'damage', op: 'add', amount: 3 },
   },
   {
     id: 'fire_power_burn',

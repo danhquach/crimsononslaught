@@ -31,9 +31,9 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     color: PLACEHOLDERS.proj_fire.color,
     description: 'Hurls fireballs at the nearest enemy; each explodes on hit.',
     stats: [
-      ['Cooldown', '1.2 s'],
+      ['Cooldown', '1.0 s'],
       ['Damage', '12'],
-      ['Blast radius', '40'],
+      ['Blast radius', '50'],
       ['Projectiles', '1'],
     ],
   },
@@ -42,8 +42,8 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     color: PLACEHOLDERS.fx_nova.color,
     description: 'Pulses a freezing ring that damages and slows everything nearby.',
     stats: [
-      ['Cooldown', '2.0 s'],
-      ['Damage', '8'],
+      ['Cooldown', '1.4 s'],
+      ['Damage', '12'],
       ['Radius', '90'],
       ['Slow', '30% for 1.5 s'],
     ],
@@ -54,7 +54,7 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     description: 'Bolts strike the nearest enemy and chain to others close by.',
     stats: [
       ['Cooldown', '1.0 s'],
-      ['Damage', '10'],
+      ['Damage', '12'],
       ['Chains', '2'],
       ['Chain range', '120'],
     ],
@@ -64,7 +64,7 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     color: PLACEHOLDERS.boulder.color,
     description: 'Boulders circle you, crushing and knocking back whatever they touch.',
     stats: [
-      ['Boulders', '2'],
+      ['Boulders', '3'],
       ['Damage', '10'],
       ['Orbit radius', '80'],
       ['Knockback', '60'],
@@ -87,9 +87,9 @@ export const BASE_SPELL_STATS: Readonly<{
   [S in SpellId]: Readonly<SpellStatsBySpell[S]>;
 }> = {
   fire: {
-    cooldown: 1.2,
+    cooldown: 1,
     damage: 12,
-    aoeRadius: 40,
+    aoeRadius: 50,
     aoeDamageFactor: 0.5,
     projectiles: 1,
     speed: 350,
@@ -97,8 +97,8 @@ export const BASE_SPELL_STATS: Readonly<{
     burn: 0,
   },
   ice: {
-    cooldown: 2,
-    damage: 8,
+    cooldown: 1.4,
+    damage: 12,
     radius: 90,
     slowPct: 0.3,
     slowDuration: 1.5,
@@ -107,7 +107,7 @@ export const BASE_SPELL_STATS: Readonly<{
   },
   lightning: {
     cooldown: 1,
-    damage: 10,
+    damage: 12,
     chains: 2,
     chainRange: 120,
     strikes: 1,
@@ -115,9 +115,9 @@ export const BASE_SPELL_STATS: Readonly<{
     chainFalloff: 0.8,
   },
   earth: {
-    count: 2,
+    count: 3,
     orbitRadius: 80,
-    orbitSpeed: 2,
+    orbitSpeed: 2.5,
     damage: 10,
     knockback: 60,
     size: 14,

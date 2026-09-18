@@ -19,11 +19,11 @@ export interface Wave {
 
 /** Non-empty by construction: `activeWave` always has a wave to fall back on. */
 export const WAVES: readonly [Wave, ...Wave[]] = [
-  { startTime: 0, types: ['swarm'], spawnsPerSecond: 2 },
-  { startTime: 60, types: ['swarm', 'fast'], spawnsPerSecond: 3 },
-  { startTime: 120, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 4 },
-  { startTime: 180, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 6 },
-  { startTime: 240, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 8 },
+  { startTime: 0, types: ['swarm'], spawnsPerSecond: 1.5 },
+  { startTime: 60, types: ['swarm', 'fast'], spawnsPerSecond: 2.5 },
+  { startTime: 120, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 3.5 },
+  { startTime: 180, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 4.5 },
+  { startTime: 240, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 5 },
   { startTime: 300, types: [], spawnsPerSecond: 0 },
 ];
 

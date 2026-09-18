@@ -62,7 +62,7 @@ describe('PerkSystem', () => {
       branch: 'Power',
       rank: 2,
       maxRank: 3,
-      description: '+4 fireball damage',
+      description: '+3 fireball damage',
     });
   });
 
@@ -70,7 +70,7 @@ describe('PerkSystem', () => {
   it('applies a spell perk to the spell block', () => {
     const perks = system();
     expect(perks.pick('fire_power_damage')?.rank).toBe(1);
-    expect(perks.spellStats.damage).toBe(BASE_SPELL_STATS.fire.damage + 4);
+    expect(perks.spellStats.damage).toBe(BASE_SPELL_STATS.fire.damage + 3);
     expect(perks.rankOf('fire_power_damage')).toBe(1);
   });
 
@@ -96,8 +96,8 @@ describe('PerkSystem', () => {
     perks.pick('fire_power_damage');
     const before = perks.spellStats;
     perks.pick('fire_power_damage');
-    expect(before.damage).toBe(BASE_SPELL_STATS.fire.damage + 4);
-    expect(perks.spellStats.damage).toBe(BASE_SPELL_STATS.fire.damage + 8);
+    expect(before.damage).toBe(BASE_SPELL_STATS.fire.damage + 3);
+    expect(perks.spellStats.damage).toBe(BASE_SPELL_STATS.fire.damage + 6);
   });
 
   it('unlocks the tier above a pick and stops offering a maxed node', () => {
@@ -133,6 +133,6 @@ describe('PerkSystem', () => {
     const perks = system();
     exhaust(perks);
     expect(perks.offer()).toEqual([]);
-    expect(perks.spellStats.damage).toBe(BASE_SPELL_STATS.fire.damage + 12);
+    expect(perks.spellStats.damage).toBe(BASE_SPELL_STATS.fire.damage + 9);
   });
 });

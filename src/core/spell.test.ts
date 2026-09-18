@@ -153,8 +153,9 @@ describe('Spell', () => {
 
     runFor(spell, 12, 1);
 
-    // 12 s of run time at a 1.2 s cooldown: 10 casts, one per cooldown boundary.
-    expect(spell.casts).toBe(10);
+    // 12 s of run time: one cast per cooldown boundary. The epsilon keeps a
+    // cooldown that does not divide 12 exactly in binary from flooring one low.
+    expect(spell.casts).toBe(Math.floor(12 / cooldown + 1e-9));
     expectCastsOnCooldown(spell, cooldown, 1);
   });
 
@@ -165,7 +166,7 @@ describe('Spell', () => {
     // A tenth of the wall time covers the same 12 s of run time.
     runFor(spell, 1.2, 10);
 
-    expect(spell.casts).toBe(10);
+    expect(spell.casts).toBe(Math.floor(12 / cooldown + 1e-9));
     expectCastsOnCooldown(spell, cooldown, 10);
   });
 
@@ -179,24 +180,27 @@ describe('Spell', () => {
 
   it('reports the wait until the next cast', () => {
     const spell = new StubSpell();
-    expect(spell.timeToNextCast).toBeCloseTo(1.2, 10);
+    const { cooldown } = spell.stats;
+    expect(spell.timeToNextCast).toBeCloseTo(cooldown, 10);
     spell.update(600);
-    expect(spell.timeToNextCast).toBeCloseTo(0.6, 10);
+    expect(spell.timeToNextCast).toBeCloseTo(cooldown - 0.6, 10);
   });
 
   it('copies the stats it is handed, so the loadout cannot be changed through it', () => {
     const loadout = createLoadout('fire');
     const spell = new StubSpell(loadout.spell);
+    const bonus = perkById('fire_power_damage')?.effect.amount ?? 0;
     spell.applyPerk('fire_power_damage', 1);
-    expect(spell.stats.damage).toBe(loadout.spell.damage + 4);
-    expect(loadout.spell.damage).toBe(12);
+    expect(spell.stats.damage).toBe(loadout.spell.damage + bonus);
+    expect(loadout.spell.damage).toBe(createLoadout('fire').spell.damage);
   });
 
   it('applies a spell perk to its own block', () => {
     const spell = new StubSpell();
+    const { aoeRadius } = spell.stats;
     spell.applyPerk('fire_reach_blast', 1);
     spell.applyPerk('fire_reach_blast', 2);
-    expect(spell.stats.aoeRadius).toBe(40 + 24);
+    expect(spell.stats.aoeRadius).toBe(aoeRadius + 24);
   });
 
   it('takes a generic perk without changing a spell stat', () => {
@@ -215,13 +219,14 @@ describe('Spell', () => {
 
   it('shortens the wait the player is already in when a cooldown perk lands', () => {
     const spell = new StubSpell();
-    // 1 s into a 1.2 s cooldown, two Utility ranks cut it below the charge held.
-    spell.update(1000);
+    const { cooldown } = spell.stats;
+    // 80% into the cooldown, two Utility ranks (0.85² ≈ 72%) cut it below the charge held.
+    spell.update(cooldown * 800);
     expect(spell.casts).toBe(0);
     spell.applyPerk('fire_utility_cooldown', 1);
     spell.applyPerk('fire_utility_cooldown', 2);
     const cut = perkById('fire_utility_cooldown')?.effect.amount ?? 1;
-    expect(spell.stats.cooldown).toBeCloseTo(1.2 * cut ** 2, 10);
+    expect(spell.stats.cooldown).toBeCloseTo(cooldown * cut ** 2, 10);
     spell.update(0);
     expect(spell.casts).toBe(1);
   });

@@ -28,9 +28,9 @@ function changedFields(before: object, after: object): string[] {
 describe('base stats', () => {
   it('matches the spec §5 base table', () => {
     expect(BASE_SPELL_STATS.fire).toEqual({
-      cooldown: 1.2,
+      cooldown: 1,
       damage: 12,
-      aoeRadius: 40,
+      aoeRadius: 50,
       aoeDamageFactor: 0.5,
       projectiles: 1,
       speed: 350,
@@ -38,8 +38,8 @@ describe('base stats', () => {
       burn: 0,
     });
     expect(BASE_SPELL_STATS.ice).toEqual({
-      cooldown: 2,
-      damage: 8,
+      cooldown: 1.4,
+      damage: 12,
       radius: 90,
       slowPct: 0.3,
       slowDuration: 1.5,
@@ -48,7 +48,7 @@ describe('base stats', () => {
     });
     expect(BASE_SPELL_STATS.lightning).toEqual({
       cooldown: 1,
-      damage: 10,
+      damage: 12,
       chains: 2,
       chainRange: 120,
       strikes: 1,
@@ -56,9 +56,9 @@ describe('base stats', () => {
       chainFalloff: 0.8,
     });
     expect(BASE_SPELL_STATS.earth).toEqual({
-      count: 2,
+      count: 3,
       orbitRadius: 80,
-      orbitSpeed: 2,
+      orbitSpeed: 2.5,
       damage: 10,
       knockback: 60,
       size: 14,
@@ -113,20 +113,20 @@ describe('applyPerk', () => {
   it('leaves the loadout it was given alone', () => {
     const before = createLoadout('ice');
     const after = applyPerk(before, 'ice_power_damage', 1);
-    expect(before.spell.damage).toBe(8);
-    expect(after.spell.damage).toBe(11);
+    expect(before.spell.damage).toBe(BASE_SPELL_STATS.ice.damage);
+    expect(after.spell.damage).toBe(BASE_SPELL_STATS.ice.damage + 3);
     expect(after.spellId).toBe('ice');
     expect(after.player).not.toBe(before.player);
   });
 
   it('adds, multiplies and sets per the effect', () => {
     let fire: LoadoutStats<'fire'> = createLoadout('fire');
-    // add: 3 ranks of +4 damage on a base of 12.
+    // add: 3 ranks of +3 damage on a base of 12.
     for (let rank = 1; rank <= 3; rank += 1) fire = applyPerk(fire, 'fire_power_damage', rank);
-    expect(fire.spell.damage).toBe(24);
-    // mul: two -15% ranks compound on a 1.2 s cooldown.
+    expect(fire.spell.damage).toBe(21);
+    // mul: two -15% ranks compound on a 1.0 s cooldown.
     for (let rank = 1; rank <= 2; rank += 1) fire = applyPerk(fire, 'fire_utility_cooldown', rank);
-    expect(fire.spell.cooldown).toBeCloseTo(1.2 * 0.85 * 0.85, 10);
+    expect(fire.spell.cooldown).toBeCloseTo(1 * 0.85 * 0.85, 10);
     // set: Big Blast takes the explosion to full damage.
     fire = applyPerk(fire, 'fire_power_big_blast', 1);
     expect(fire.spell.aoeDamageFactor).toBe(1);
