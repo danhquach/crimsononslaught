@@ -38,7 +38,12 @@ export class EnemyPool {
     });
   }
 
-  /** Enemies currently alive in the world; pooled-but-dead ones do not count. */
+  /**
+   * Enemies holding a pool slot right now; pooled-but-dead ones do not count.
+   * One playing its death clip (CO-081) still does: its sprite is not free,
+   * and the cap below must see every slot `group.get` cannot hand out, or the
+   * group fills past `MAX_LIVE_ENEMIES` and `spawnBoss` has no room to land.
+   */
   get liveCount(): number {
     return this.group.countActive(true);
   }
@@ -70,11 +75,15 @@ export class EnemyPool {
     return this.bossSprite;
   }
 
-  /** Every enemy alive in the world right now, in pool order. */
+  /**
+   * Every enemy alive in the world right now, in pool order. One playing its
+   * death clip (CO-081) is still `active` — so `group.get` cannot reuse it —
+   * but no longer here: nothing targets or counts a dead enemy.
+   */
   get live(): Enemy[] {
     const live: Enemy[] = [];
     for (const child of this.group.getChildren()) {
-      if (child instanceof Enemy && child.active) live.push(child);
+      if (child instanceof Enemy && child.active && !child.isDying) live.push(child);
     }
     return live;
   }

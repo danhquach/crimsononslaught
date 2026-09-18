@@ -24,6 +24,12 @@ const config: Phaser.Types.Core.GameConfig = {
   physics: {
     default: 'arcade',
   },
+  // The atlas is pixel art at native size (CO-081): sample it nearest-neighbour
+  // and draw on whole pixels, or every sprite renders soft and shimmers.
+  render: {
+    pixelArt: true,
+    roundPixels: true,
+  },
   // Phaser's Gamepad plugin is off by default; the player and the menus both
   // read a pad through `scenes/input.ts` (spec §5).
   input: {

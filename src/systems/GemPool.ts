@@ -69,22 +69,24 @@ export class GemPool {
   /**
    * Pull every in-range gem toward `target`; the rest lie still. The radius is
    * the target's own (`Player.pickupRadius`, CO-092), so the caller does not
-   * carry a player stat through the pool.
+   * carry a player stat through the pool. `deltaMs` times the pickup bursts.
    */
-  update(target: PickupTarget): void {
+  update(deltaMs: number, target: PickupTarget): void {
     for (const child of this.group.getChildren()) {
-      if (child instanceof XpGem && child.active) child.drift(target, target.pickupRadius);
+      if (child instanceof XpGem && child.active) {
+        child.drift(deltaMs, target, target.pickupRadius);
+      }
     }
   }
 
   /**
    * Take a gem the player has touched. Returns the XP it is worth, or 0 for a
    * gem that was already collected this frame, so a double overlap cannot pay
-   * twice.
+   * twice. The gem bursts where the player stood before it leaves the pool.
    */
-  collect(gem: XpGem): number {
-    if (!gem.active) return 0;
-    gem.despawn();
+  collect(gem: XpGem, at: Readonly<Vec2>): number {
+    if (!gem.active || gem.isCollected) return 0;
+    gem.collect(at);
     return GEM_XP_VALUE;
   }
 }

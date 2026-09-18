@@ -46,7 +46,10 @@ function spec(
 const LOOP = -1;
 const ONCE = 0;
 
-const FACINGS = ['down', 'up', 'left', 'right'] as const;
+export const FACINGS = ['down', 'up', 'left', 'right'] as const;
+
+/** The four directions a character sheet is drawn in. */
+export type Facing = (typeof FACINGS)[number];
 
 /** The same animation in all four facings, which every character sheet has. */
 function facings(

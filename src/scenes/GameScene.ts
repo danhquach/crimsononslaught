@@ -9,6 +9,7 @@ import {
   type Outcome,
   type ResultPayload,
 } from '../core/scenePayloads';
+import { BOSS_EVENT } from '../core/boss';
 import { LEVEL_UP_EVENT, resolveLevelUp, type LevelUpPickPayload } from '../core/levelUp';
 import { PLAYER_EVENT } from '../core/health';
 import { PerkSystem } from '../core/perkSystem';
@@ -145,6 +146,10 @@ export class GameScene extends Phaser.Scene {
     // Spec §4 step 4: the player reaching 0 HP is the losing end of the run.
     const onDied = (): void => this.endRun('lose');
     this.events.once(PLAYER_EVENT.died, onDied);
+    // Spec §4 step 4: the boss's death is the win — once its death clip has
+    // played (CO-081); the killing blow itself is tallied in `damageEnemy`.
+    const onBossDied = (): void => this.endRun('win');
+    this.events.once(BOSS_EVENT.died, onBossDied);
     // Spec §4 step 4: the clock turning to the boss phase brings the boss in.
     const onPhase = ({ phase }: RunEventPayloads['phase']): void => {
       if (phase === 'boss') this.spawnBoss();
@@ -153,6 +158,7 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(LEVEL_UP_EVENT.pick, onPick);
       this.events.off(PLAYER_EVENT.died, onDied);
+      this.events.off(BOSS_EVENT.died, onBossDied);
       this.events.off(RUN_EVENT.phase, onPhase);
     });
 
@@ -196,7 +202,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies.update(step.deltaMs, this.player, (enemy, amount) =>
       this.damageEnemy(enemy, amount),
     );
-    this.gems.update(this.player);
+    this.gems.update(step.deltaMs, this.player);
     this.spell.update(step.deltaMs);
     this.physics.world.update(time, step.deltaMs);
     this.physics.world.postUpdate();
@@ -243,7 +249,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Spec §5: a gem is XP on touch; the drop itself is handled where the enemy dies. */
   private onGemPickup(gem: XpGem): void {
-    const gained = this.gems.collect(gem);
+    const gained = this.gems.collect(gem, this.player);
     if (gained === 0) return;
     this.pendingLevelUps += this.run.addXp(gained);
   }
@@ -258,9 +264,9 @@ export class GameScene extends Phaser.Scene {
     const { x, y, enemyType } = enemy;
     if (!enemy.takeDamage(amount)) return;
     this.run.recordKill();
-    // The boss's death is the win (spec §5, CO-051), not a gem drop.
-    if (enemy instanceof Boss) this.endRun('win');
-    else this.gems.dropFor(enemyType, x, y);
+    // The boss's death is the win (spec §5, CO-051), not a gem drop; it lands
+    // as `BOSS_EVENT.died` once the boss has finished dying.
+    if (!(enemy instanceof Boss)) this.gems.dropFor(enemyType, x, y);
   }
 
   /**

@@ -1,5 +1,14 @@
 import Phaser from 'phaser';
-import { ENEMY_ARCHETYPES, type EnemyType } from '../config/enemies';
+import { ENEMY_ARCHETYPES, ENEMY_HURT_MS, type EnemyType } from '../config/enemies';
+import {
+  DEFAULT_FACING,
+  enemyAnimation,
+  facingFromVector,
+  headingRotation,
+  type Clip,
+  type EnemyPhase,
+  type Facing,
+} from '../core/animation';
 import {
   chaseVelocity,
   damageEnemy,
@@ -20,6 +29,7 @@ import {
 } from '../core/frostNova';
 import { tickBoulderCooldown, tryBoulderHit } from '../core/orbitingBoulders';
 import { PLACEHOLDERS, type TextureKey } from '../config/colors';
+import { clearClip, clipDurationMs, showClip } from '../render/animate';
 
 /** A slowed or frozen enemy is tinted the nova's blue so the slow reads on screen. */
 const FROST_TINT = PLACEHOLDERS.fx_nova.color;
@@ -47,6 +57,13 @@ export interface EnemyStats {
  * nothing until reused. The type is set on every spawn, so one pooled object can
  * come back as any archetype.
  *
+ * It shows the atlas clip for what it is doing (CO-081, `core/animation.ts`):
+ * `spawn` holds it still on arrival, `hurt` flashes for 0.1 s after a hit, and
+ * `death` plays on the pooled sprite — body off, still `active` so the pool
+ * cannot hand it out — before it is released. Those windows run on the run
+ * clock, so a paused Game holds them. With no atlas each has no length and the
+ * placeholder behaves as before.
+ *
  * All the decisions live in `core/enemy.ts`; this class only moves the sprite.
  */
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
@@ -60,6 +77,12 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private stunS = 0;
   /** Seconds before a boulder may hit this enemy again; 0 when it may. */
   private boulderCooldownS = 0;
+  private facing: Facing = DEFAULT_FACING;
+  /** Run-clock ms left of the arrival hold, the hurt flash and the death clip. */
+  private spawnMs = 0;
+  private hurtMs = 0;
+  private deathMs = 0;
+  private dying = false;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y, ENEMY_ARCHETYPES.swarm.texture);
@@ -83,6 +106,16 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return this.hp;
   }
 
+  /** Killed, and playing its death clip: not a target, not a threat, not yet back in the pool. */
+  get isDying(): boolean {
+    return this.dying;
+  }
+
+  /** Which way it last moved; the tank's and the boss's clips are drawn per facing. */
+  protected get facingDir(): Facing {
+    return this.facing;
+  }
+
   /** Take this pooled object out of the pool as `type`, alive and at (x, y). */
   spawn(type: EnemyType, x: number, y: number): void {
     this.kind = type;
@@ -100,14 +133,48 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.frost = { ...NO_FROST };
     this.stunS = 0;
     this.boulderCooldownS = 0;
+    this.facing = DEFAULT_FACING;
+    this.hurtMs = 0;
+    this.deathMs = 0;
+    this.dying = false;
     this.clearTint();
+    clearClip(this);
     this.setTexture(stats.texture);
+    this.setOrigin(0.5, 0.5);
     this.enableBody(true, x, y, true, true);
     // Body radius comes from the archetype (spec §5), not the placeholder art,
-    // so swapping in a sprite leaves the hitbox alone. Centre it on the frame.
+    // so swapping in a sprite leaves the hitbox alone. Centre it on the frame;
+    // `showClip` re-centres it on the atlas frame's anchor when a clip shows.
     const body = this.body as Phaser.Physics.Arcade.Body;
     const r = stats.radius;
     body.setCircle(r, this.width / 2 - r, this.height / 2 - r);
+    this.spawnMs = this.show('spawn', { x: 0, y: 0 });
+  }
+
+  /** The body radius the clips are placed around: the archetype's, or the boss's own. */
+  protected get bodyRadius(): number {
+    return ENEMY_ARCHETYPES[this.kind].radius;
+  }
+
+  /**
+   * The clip for `phase`, given this step's velocity. Returns its run-clock
+   * length, for the phases that hold the enemy until they end.
+   */
+  protected show(phase: EnemyPhase, velocity: Readonly<Vec2>): number {
+    const clip = this.clip(phase, velocity);
+    showClip(this, clip.name, this.bodyRadius, clip.flipX);
+    return clipDurationMs(this.scene, clip.name);
+  }
+
+  /** Which clip this enemy shows for `phase`; the boss (CO-050) picks from its own sheet. */
+  protected clip(phase: EnemyPhase, velocity: Readonly<Vec2>): Clip {
+    return enemyAnimation({ kind: this.kind, phase, facing: this.facing, velocityX: velocity.x });
+  }
+
+  /** The phase this step shows: the hurt flash over movement, the arrival hold over both. */
+  private clipPhase(): EnemyPhase {
+    if (this.spawnMs > 0) return 'spawn';
+    return this.hurtMs > 0 ? 'hurt' : 'move';
   }
 
   /** Return to the pool: inactive, invisible, body disabled. */
@@ -122,11 +189,27 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    * run's damage path — a burn kill drops gems like any other.
    */
   chase(deltaMs: number, target: Readonly<Vec2>): number {
+    if (this.dying) {
+      this.deathMs -= deltaMs;
+      if (this.deathMs <= 0) this.despawn();
+      return 0;
+    }
+    if (this.spawnMs > 0) {
+      // Arriving: the clip plays out where it landed before the chase starts.
+      this.spawnMs -= deltaMs;
+      this.setVelocity(0, 0);
+      if (this.spawnMs > 0) return 0;
+    }
+    this.hurtMs = Math.max(0, this.hurtMs - deltaMs);
     this.contactCooldownMs = tickContactCooldown(this.contactCooldownMs, deltaMs);
     const deltaS = deltaMs / 1000;
     const speedFactor = frostSpeedFactor(this.frost) * stunSpeedFactor(this.stunS);
     const { x, y } = this.steer(deltaS, target, speedFactor);
     this.setVelocity(x, y);
+    this.facing = facingFromVector({ x, y }, this.facing);
+    // The fast enemy's sheet is drawn facing up; it turns to its heading.
+    if (this.kind === 'fast') this.setRotation(headingRotation({ x, y }, this.rotation));
+    this.show(this.clipPhase(), { x, y });
     const frost = tickFrost(this.frost, deltaS);
     this.frost = frost.state;
     const stun = tickStun(this.stunS, deltaS);
@@ -203,11 +286,27 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return hit;
   }
 
-  /** `true` on the blow that kills, so a death is handled exactly once. */
+  /**
+   * `true` on the blow that kills, so a death is handled exactly once. The
+   * killing blow takes the body out of the world at once; the sprite stays to
+   * play its death clip and `chase` releases it when that ends.
+   */
   takeDamage(amount: number): boolean {
+    if (this.dying) return false;
     const result = damageEnemy(this.hp, amount);
+    const landed = result.hp < this.hp;
     this.hp = result.hp;
-    if (result.died) this.despawn();
-    return result.died;
+    if (!result.died) {
+      if (landed) this.hurtMs = ENEMY_HURT_MS;
+      return false;
+    }
+    this.dying = true;
+    this.hurtMs = 0;
+    this.setVelocity(0, 0);
+    this.disableBody(false, false);
+    this.clearTint();
+    this.deathMs = this.show('death', { x: 0, y: 0 });
+    if (this.deathMs <= 0) this.despawn();
+    return true;
   }
 }

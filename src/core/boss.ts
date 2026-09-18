@@ -14,6 +14,15 @@ import type { Vec2 } from './enemy';
 
 export type BossPhase = 'chase' | 'telegraph' | 'charge';
 
+/**
+ * Emitter event names for the boss -> Game direction, namespaced like `run:*`.
+ * `died` fires once the death animation has played out, not on the killing
+ * blow (CO-081): the win waits for it.
+ */
+export const BOSS_EVENT = {
+  died: 'boss:died',
+} as const;
+
 export interface BossCycle {
   readonly phase: BossPhase;
   /** Seconds left in `phase`. */
