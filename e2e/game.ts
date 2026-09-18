@@ -50,6 +50,22 @@ export function cardCenter(index: number): { x: number; y: number } {
   return { x: (960 - rowWidth) / 2 + width / 2 + index * (width + gap), y: 150 + 280 / 2 };
 }
 
+/**
+ * Pin the game loop to one frame every `frameMs` of wall clock, the way a slow
+ * runner renders (#94: CI draws about 10 fps). Phaser's loop is a
+ * `requestAnimationFrame` driver with a setTimeout mode; this restarts it in
+ * that mode at the given interval, so every frame's delta — and with it the run
+ * time a frame covers at `?timeScale=` — is what the runner would see.
+ */
+export async function forceFrameLength(page: Page, frameMs: number): Promise<void> {
+  await page.evaluate(async (ms) => {
+    const { game } = await import('/src/main.ts');
+    const loop = game.loop;
+    loop.raf.stop();
+    loop.raf.start((time: number) => loop.step(time), true, ms);
+  }, frameMs);
+}
+
 /** `console.error` and uncaught page errors, collected from now on. */
 export function collectErrors(page: Page): string[] {
   const errors: string[] = [];

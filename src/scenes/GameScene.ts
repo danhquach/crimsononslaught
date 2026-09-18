@@ -14,7 +14,7 @@ import { PLAYER_EVENT } from '../core/health';
 import { PerkSystem } from '../core/perkSystem';
 import { createRng, type Rng } from '../core/rng';
 import { RUN_EVENT, type RunEventPayloads } from '../core/runEvents';
-import { RunState, clampTimeScale } from '../core/runState';
+import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
 import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
 import type {
@@ -108,12 +108,15 @@ export class GameScene extends Phaser.Scene {
     }
     const { spellId, seed } = this.payload;
     this.rng = createRng(seed);
-    const timeScale = this.timeScale();
-    this.run = new RunState(this.events, timeScale);
-    // Arcade integrates velocities against real time, so the test hook has to
-    // reach the physics world too or a scaled run would speed up the clock
-    // while the arena crawled. Phaser reads its scale inversely: 0.5 = double.
-    this.physics.world.timeScale = 1 / timeScale;
+    this.run = new RunState(this.events, this.timeScale());
+    // The arena is stepped from `update`, not by Arcade's own clock: every
+    // simulation step runs the game logic and then one physics step of the same
+    // length (`simulate`), so a scaled run is the same steps, more of them a
+    // frame. `disableUpdate` is Phaser's hook for driving `World.update`
+    // yourself; without `fixedStep` off it would keep its own 60 Hz accumulator
+    // and step zero or two times for one of ours.
+    this.physics.disableUpdate();
+    this.physics.world.fixedStep = false;
     this.perks = new PerkSystem(spellId, this.rng);
     this.pendingLevelUps = 0;
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
@@ -159,28 +162,44 @@ export class GameScene extends Phaser.Scene {
   /**
    * The run clock accumulates scene delta, so it freezes with the scene when
    * Game is paused. `RunState.tick` scales that delta (`?timeScale=`) and the
-   * whole frame is simulated over the window it returns, so a scaled run speeds
-   * up the arena and not just the timer. A finished run returns a zero-length
-   * window and nothing moves.
+   * frame is simulated over the window it returns, in steps of about a 60 fps
+   * frame each (`simulationSteps`), so a scaled run — or a slow machine's long
+   * frame — speeds up the arena without coarsening it (#94). A finished run
+   * returns a zero-length window and nothing moves.
    */
-  update(_time: number, delta: number): void {
+  update(time: number, delta: number): void {
     if (!this.payload) return;
     // Spec §4 step 3: XP owed from the last pickup is paid before the run moves
     // on. Draining here rather than at pickup is what sequences several levels
     // from one gem: each overlay pauses Game, and the next update after it
     // closes opens the following one.
     if (this.drainLevelUps()) return;
-    const frame = this.run.tick(delta);
-    if (frame.deltaMs === 0) return;
-    // Spec §4 step 2: the director spends the frame's budget before anything
+    for (const step of simulationSteps(this.run.tick(delta))) {
+      // The step that ends the run (spec §4 step 4) is the frame's last: Result
+      // is queued, and nothing after it should move or land a second outcome.
+      if (this.run.phase === 'over') break;
+      this.simulate(time, step);
+    }
+  }
+
+  /**
+   * One simulation step: the logic decides, Arcade integrates the velocities it
+   * set and fires the overlaps, and the sprites are moved to where their bodies
+   * ended up so the next step decides from there — Phaser otherwise syncs them
+   * once a frame, in `postUpdate`, which is what made a long frame one decision.
+   */
+  private simulate(time: number, step: RunFrame): void {
+    // Spec §4 step 2: the director spends the step's budget before anything
     // moves, so a new enemy chases from the moment it lands.
-    this.spawns.update(frame.startMs / 1000, frame.deltaMs / 1000);
-    this.player.update(frame.deltaMs);
-    this.enemies.update(frame.deltaMs, this.player, (enemy, amount) =>
+    this.spawns.update(step.startMs / 1000, step.deltaMs / 1000);
+    this.player.update(step.deltaMs);
+    this.enemies.update(step.deltaMs, this.player, (enemy, amount) =>
       this.damageEnemy(enemy, amount),
     );
     this.gems.update(this.player, this.perks.playerStats.pickupRadius);
-    this.spell.update(frame.deltaMs);
+    this.spell.update(step.deltaMs);
+    this.physics.world.update(time, step.deltaMs);
+    this.physics.world.postUpdate();
   }
 
   /** The run's spell, built on the pool and collision wiring above. */

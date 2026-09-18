@@ -6,9 +6,12 @@ import {
   BOSS_START_MS,
   MAX_TIME_SCALE,
   RunState,
+  SIM_STEP_MS,
+  type RunFrame,
   clampTimeScale,
   resolveInvulnerable,
   resolveTimeScale,
+  simulationSteps,
 } from './runState';
 
 /** Records every run event in order; only `emit` is exercised by RunState. */
@@ -310,5 +313,49 @@ describe('resolveInvulnerable', () => {
     expect(resolveInvulnerable('?invulnerable=')).toBe(false);
     expect(resolveInvulnerable('?invulnerable=true')).toBe(false);
     expect(resolveInvulnerable('?invulnerable=0')).toBe(false);
+  });
+});
+
+describe('simulationSteps', () => {
+  const contiguous = (steps: RunFrame[], frame: RunFrame) => {
+    let cursor = frame.startMs;
+    for (const step of steps) {
+      expect(step.startMs).toBeCloseTo(cursor, 9);
+      cursor += step.deltaMs;
+    }
+    expect(cursor).toBeCloseTo(frame.startMs + frame.deltaMs, 9);
+  };
+
+  it('is empty for the zero-length frame of a finished run', () => {
+    expect(simulationSteps({ startMs: 1234, deltaMs: 0 })).toEqual([]);
+  });
+
+  it('leaves a real-time frame whole, jitter included', () => {
+    for (const deltaMs of [16, 1000 / 60, 17, 24]) {
+      expect(simulationSteps({ startMs: 100, deltaMs }), String(deltaMs)).toEqual([
+        { startMs: 100, deltaMs },
+      ]);
+    }
+  });
+
+  it('cuts a scaled frame into equal, contiguous steps of about a 60 fps frame (#94)', () => {
+    // A 60 fps frame at the maximum scale: what the Playwright full run drives.
+    const frame = { startMs: 5000, deltaMs: (1000 / 60) * MAX_TIME_SCALE };
+    const steps = simulationSteps(frame);
+    expect(steps).toHaveLength(MAX_TIME_SCALE);
+    for (const step of steps) expect(step.deltaMs).toBeCloseTo(SIM_STEP_MS, 9);
+    contiguous(steps, frame);
+  });
+
+  it('bounds every step whatever the frame length', () => {
+    for (let deltaMs = 1; deltaMs <= 6000; deltaMs += 7) {
+      const frame = { startMs: 0, deltaMs };
+      const steps = simulationSteps(frame);
+      expect(steps.length, String(deltaMs)).toBeGreaterThan(0);
+      for (const step of steps) {
+        expect(step.deltaMs, String(deltaMs)).toBeLessThanOrEqual(SIM_STEP_MS * 1.5 + 1e-9);
+      }
+      contiguous(steps, frame);
+    }
   });
 });
