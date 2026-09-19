@@ -511,10 +511,10 @@
     {
       "key": "boss",
       "ticket": "CO-074",
-      "file": "CO-074/boss_states.jpg",
+      "file": "CO-074/boss_states.png",
       "cols": 4,
       "rows": 3,
-      "sheetCell": 384,
+      "sheetCell": 432,
       "rowSpecs": [
         [
           {
@@ -523,9 +523,6 @@
             "cols": [
               1,
               1
-            ],
-            "allowEdge": [
-              "bottom"
             ]
           },
           {
@@ -534,9 +531,6 @@
             "cols": [
               2,
               2
-            ],
-            "allowEdge": [
-              "bottom"
             ]
           },
           {
@@ -545,9 +539,6 @@
             "cols": [
               3,
               3
-            ],
-            "allowEdge": [
-              "bottom"
             ]
           },
           {
@@ -556,9 +547,6 @@
             "cols": [
               4,
               4
-            ],
-            "allowEdge": [
-              "bottom"
             ]
           }
         ],
@@ -568,9 +556,6 @@
             "cols": [
               1,
               4
-            ],
-            "allowEdge": [
-              "top"
             ]
           }
         ],
@@ -667,10 +652,6 @@
             "cols": [
               1,
               6
-            ],
-            "allowEdge": [
-              "left",
-              "right"
             ]
           }
         ]
