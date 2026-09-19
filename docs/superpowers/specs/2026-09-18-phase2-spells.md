@@ -435,6 +435,15 @@ type-specific damage.
 Fire Bolt is today's Fire block with `burn` removed — burn is Fire Column's
 identity now, and a 0-valued field with nothing to raise it is dead weight.
 
+Fire Dragon's homing (#137) turns the shot's heading toward its target by at
+most `homingTurnRate` per second, so a dragon fired away from its mark arcs
+round rather than snapping onto it. When the target dies in flight the dragon
+**retargets to the nearest live enemy within `targetRange` of the dragon
+itself**, not of the player; with nothing in range it flies straight on its last
+heading. It expires after `duration` seconds of run clock — a curving flight
+covers more ground than the line to its target, so a distance range would
+expire it late or never on a target it circles.
+
 ### 9.3 Ice
 
 | Spell | id | Behaviour | Needs |
