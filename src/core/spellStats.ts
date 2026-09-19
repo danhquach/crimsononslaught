@@ -110,6 +110,50 @@ export interface CompanionStats {
   staggerDuration?: number;
 }
 
+/**
+ * Ice Shield (#134, spec §9.3): an absorbing layer on the player that refills
+ * on its own and shatters into the enemies around it.
+ */
+export interface IceShieldStats {
+  /** The pool a full shield holds, in points of damage absorbed. */
+  shieldHp: number;
+  /** Seconds unhit before the pool refills, and how long a full refill takes. */
+  rechargeDelay: number;
+  /** Damage the shatter deals to everything inside `breakRadius`. */
+  breakDamage: number;
+  /** How far the shatter reaches, in px from the player. */
+  breakRadius: number;
+  /** Speed cut the shatter applies, 0-1. */
+  slowPct: number;
+  /** Seconds that slow lasts. */
+  slowDuration: number;
+}
+
+/**
+ * Earth Shield (#134, spec §9.5): Phase 1's orbiting ring plus a shared pool —
+ * the stones absorb the player's damage, break at 0 and return after a delay.
+ */
+export interface EarthShieldStats {
+  /** Stones in the ring. */
+  count: number;
+  /** Orbit radius in px. */
+  orbitRadius: number;
+  /** Orbit angular speed in rad/s. */
+  orbitSpeed: number;
+  /** Stone body radius in px. */
+  size: number;
+  /** Damage one stone deals to an enemy it rolls over. */
+  damage: number;
+  /** Knockback distance in px. */
+  knockback: number;
+  /** Seconds between two hits on the same enemy. */
+  hitCooldown: number;
+  /** The pool the whole ring shares, in points of damage absorbed. */
+  shieldHp: number;
+  /** Seconds the ring stays down after it breaks, and how long a refill takes. */
+  rechargeDelay: number;
+}
+
 /** Which stat block each spell owns. */
 export interface SpellStatsBySpell {
   fire: FireStats;
@@ -120,6 +164,8 @@ export interface SpellStatsBySpell {
   ice_companion: CompanionStats;
   lightning_companion: CompanionStats;
   earth_companion: CompanionStats;
+  ice_shield: IceShieldStats;
+  earth_shield: EarthShieldStats;
 }
 
 /** Every id a `Spell` may carry: the Phase 1 four plus the Phase 2 spells that exist. */

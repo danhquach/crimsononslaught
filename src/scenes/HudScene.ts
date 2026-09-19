@@ -6,6 +6,7 @@ import {
   bossBarVisible,
   formatTimer,
   fraction,
+  shieldBarVisible,
   type HudModel,
 } from '../core/hudModel';
 import { onRunEvents, type RunEvent } from '../core/runEvents';
@@ -15,6 +16,7 @@ const MARGIN = 16;
 const BAR_WIDTH = 240;
 const BAR_BG = 0x222222;
 const HP_COLOR = 0xdc143c;
+const SHIELD_COLOR = PLACEHOLDERS.shield_ice.color;
 const XP_COLOR = PLACEHOLDERS.gem.color;
 const BOSS_COLOR = PLACEHOLDERS.boss.color;
 const LABEL_STYLE = { fontFamily: 'monospace', fontSize: '14px', color: '#eeeeee' } as const;
@@ -54,7 +56,11 @@ class Bar {
 }
 
 /**
- * HUD overlay: timer, HP bar, XP bar + level, kill count, boss HP bar.
+ * HUD overlay: timer, HP bar, shield bar, XP bar + level, kill count, boss HP bar.
+ *
+ * The shield bar (#134) sits under HP and is drawn only while the run has a
+ * shield equipped, so a run without one reads exactly as it did before. The
+ * full slot / cooldown / passive layout is #144's.
  *
  * Runs as a parallel scene launched by Game, so it keeps rendering while Game
  * is paused (level-up overlay). It is driven purely by `RunEvent`s on the Game
@@ -65,6 +71,7 @@ export class HudScene extends Phaser.Scene {
   private timerText!: Phaser.GameObjects.Text;
   private killsText!: Phaser.GameObjects.Text;
   private hpBar!: Bar;
+  private shieldBar!: Bar;
   private xpBar!: Bar;
   private bossBar!: Bar;
 
@@ -82,7 +89,8 @@ export class HudScene extends Phaser.Scene {
     const { width } = this.scale;
 
     this.hpBar = new Bar(this, MARGIN, MARGIN, BAR_WIDTH, 18, HP_COLOR);
-    this.xpBar = new Bar(this, MARGIN, MARGIN + 24, BAR_WIDTH, 10, XP_COLOR);
+    this.shieldBar = new Bar(this, MARGIN, MARGIN + 22, BAR_WIDTH, 8, SHIELD_COLOR);
+    this.xpBar = new Bar(this, MARGIN, MARGIN + 34, BAR_WIDTH, 10, XP_COLOR);
     this.timerText = this.add
       .text(width / 2, MARGIN - 4, '', { ...LABEL_STYLE, fontSize: '28px' })
       .setOrigin(0.5, 0);
@@ -108,6 +116,8 @@ export class HudScene extends Phaser.Scene {
     const m = this.model;
     this.timerText.setText(formatTimer(m.elapsedMs));
     this.hpBar.set(fraction(m.hp, m.maxHp), `HP ${Math.ceil(m.hp)} / ${m.maxHp}`);
+    this.shieldBar.setVisible(shieldBarVisible(m));
+    this.shieldBar.set(fraction(m.shield, m.shieldMax), `Shield ${Math.ceil(m.shield)}`);
     this.xpBar.set(fraction(m.xp, m.xpToNext), `Lv ${m.level}`);
     this.killsText.setText(`Kills ${m.kills}`);
     this.bossBar.setVisible(bossBarVisible(m));

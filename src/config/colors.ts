@@ -20,6 +20,7 @@ export const TEXTURE_KEYS = [
   'boulder',
   'companion',
   'proj_ice',
+  'shield_ice',
 ] as const;
 
 export type TextureKey = (typeof TEXTURE_KEYS)[number];
@@ -53,4 +54,7 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // today, so the second element to shoot needs a look of its own or its bolts
   // read as fireballs; the sheet itself is #145.
   proj_ice: { shape: 'diamond', color: 0x80d8ff, width: 12, height: 12 },
+  // #134: the Ice Shield's layer, drawn around the player. A ring rather
+  // than a disc so the hero is still visible through it; its own art is #145.
+  shield_ice: { shape: 'ring', color: 0xb3e5fc, width: 44, height: 44, thickness: 3 },
 };

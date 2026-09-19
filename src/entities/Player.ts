@@ -91,6 +91,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.health.maxHp;
   }
 
+  /**
+   * Whether the 0.5 s window from the last hit is still running. `GameScene`
+   * reads it to drop a contact before it reaches the run's defences (#134): a
+   * hit the player is immune to must not be paid for out of a shield's pool.
+   */
+  get immune(): boolean {
+    return isInvulnerable(this.health);
+  }
+
   get speed(): number {
     return this.moveSpeed;
   }

@@ -157,6 +157,9 @@ describe('Spellbook (CO-109)', () => {
     spells.takePassive('passive_power');
 
     for (const spell of spells.spells) {
+      // Narrowed to the stub: `Spell.stats` is the union of every block in the
+      // roster and not all of them carry `damage` (#134's Ice Shield does not).
+      if (!(spell instanceof StubSpell)) throw new Error(`unexpected spell "${spell.id}"`);
       expect(spell.stats.damage).toBeCloseTo(stubBase(spell.id).damage * 1.1, 10);
     }
     expect(spells.profile.damageMul).toBeCloseTo(1.1, 10);
