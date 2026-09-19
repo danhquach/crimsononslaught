@@ -53,8 +53,34 @@ export const MAX_LIVE_FX = 64;
  */
 export const MAX_LIVE_OVERLAYS = MAX_LIVE_ENEMIES + 1;
 
+/**
+ * Persistent ground areas (#135) that may be on the ground at once, across
+ * every spell casting them. One area spell holds at most two — its 6-8 s patch
+ * against a 12-14 s cooldown, halved at most by a stacked Haste — and only the
+ * `?loadout=` hook can equip both, so the cap is several times what a real run
+ * reaches and exists to bound the pool rather than to shape play. Past it a
+ * cast places nothing, the rule every pool follows.
+ */
+export const MAX_LIVE_AREAS = 16;
+
+/**
+ * A ground area is drawn at `radius / AREA_SCALE_RADIUS`, so the ring covers
+ * exactly the patch that ticks: scale 1 at the 100 px half-width of the
+ * `fx_area` placeholder (`config/colors.ts`, held to it by `fx.test.ts`).
+ */
+export const AREA_SCALE_RADIUS = 100;
+
 /** Effects sit above enemies so a hit reads even in a crowd. */
 export const FX_DEPTH = 5;
+
+/**
+ * Ground areas are on the ground: below the enemies standing in them and the
+ * effects that play over them, above the arena floor (`ARENA_DEPTH`).
+ */
+export const AREA_DEPTH = -1;
+
+/** The arena floor, under everything the run puts on it. */
+export const ARENA_DEPTH = -2;
 
 /** The chain segment clip; a stretched segment plays through it once per jump. */
 export const CHAIN_CLIP = 'lightning.chain';

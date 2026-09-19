@@ -18,6 +18,7 @@ const SPEC_KEYS = [
   'companion',
   'proj_ice',
   'shield_ice',
+  'fx_area',
 ];
 
 describe('placeholder texture config', () => {

@@ -1,4 +1,5 @@
 import {
+  AREA_SCALE_RADIUS,
   CHAIN_FRAME_COUNT,
   CHAIN_FRAME_RATE,
   EXPLOSION_SCALE_RADIUS,
@@ -25,6 +26,11 @@ export function explosionScale(aoeRadius: number): number {
 /** Spec §5 Ice: the pulse is drawn at `radius / 90`, so a Reach perk grows the ring on screen. */
 export function novaScale(radius: number): number {
   return radius / NOVA_SCALE_RADIUS;
+}
+
+/** #135: a ground area is drawn at `radius / 100`, so the ring is the patch that ticks. */
+export function areaScale(radius: number): number {
+  return Math.max(0, radius) / AREA_SCALE_RADIUS;
 }
 
 /**
