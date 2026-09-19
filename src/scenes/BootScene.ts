@@ -4,11 +4,16 @@ import { resolveInvulnerable, resolveLoadout, resolveTimeScale } from '../core/r
 import {
   INVULNERABLE_REGISTRY_KEY,
   LOADOUT_REGISTRY_KEY,
+  SAVE_REGISTRY_KEY,
+  SAVE_RESET_REGISTRY_KEY,
   SCENE,
   SEED_REGISTRY_KEY,
   TIME_SCALE_REGISTRY_KEY,
 } from '../core/scenePayloads';
 import { validateLoadoutConfig } from '../core/loadout';
+import { parseSave, serializeSave } from '../core/save';
+import { validateMeta } from '../core/upgrades';
+import { loadSaveJson, storeSaveJson } from '../storage/localSave';
 import { installAtlas, queueAtlas, warnIfAtlasMissing } from '../render/atlas';
 import { generatePlaceholderTextures } from '../render/textures';
 
@@ -38,6 +43,18 @@ export class BootScene extends Phaser.Scene {
     // Spec §7: config is checked once at boot and complains loudly, but a bad
     // roster or passive list never stops the run — everything sound still works.
     for (const problem of validateLoadoutConfig()) console.error(`[config] ${problem}`);
+    for (const problem of validateMeta()) console.error(`[config] ${problem}`);
+
+    // Saved progress (CO-101): parsed once here, then lives in the registry.
+    // A save this build cannot read is reset and overwritten rather than left
+    // to fail the same way on every boot; the player is told on SpellSelect.
+    const parsed = parseSave(loadSaveJson());
+    if (parsed.status === 'reset') {
+      console.warn(`[save] stored save was unreadable (${parsed.reason}); starting fresh`);
+      storeSaveJson(serializeSave(parsed.save));
+    }
+    this.registry.set(SAVE_REGISTRY_KEY, parsed.save);
+    this.registry.set(SAVE_RESET_REGISTRY_KEY, parsed.status === 'reset');
 
     // Run seed: `?seed=<int>` reproduces a run; otherwise a fresh one per page
     // load. Logged so a bug report can quote it. SpellSelect reads it from the

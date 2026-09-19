@@ -1,6 +1,7 @@
+import { CURRENCY_NAME } from '../config/meta';
 import { SPELL_CARDS } from '../config/spells';
 import { formatTimer } from './hudModel';
-import type { Outcome, RunStats } from './scenePayloads';
+import type { Outcome, ResultPayload, RunStats } from './scenePayloads';
 
 /**
  * View-model behind the result screen (CO-014): the outcome headline and the
@@ -52,5 +53,16 @@ export function resultRows(stats: RunStats): StatRow[] {
     ['Kills', formatCount(stats.kills)],
     ['Spell', SPELL_CARDS[stats.spellId].name],
     ['Upgrades taken', summarizePerks(stats.perks)],
+  ];
+}
+
+/**
+ * What the run paid and where the balance stands (CO-101), under the stat rows.
+ * `earned` is shown with a leading `+` so it reads as a payout, not a total.
+ */
+export function rewardRows(payload: Pick<ResultPayload, 'earned' | 'balance'>): StatRow[] {
+  return [
+    [`${CURRENCY_NAME} earned`, `+${formatCount(payload.earned)}`],
+    [`${CURRENCY_NAME} total`, formatCount(payload.balance)],
   ];
 }

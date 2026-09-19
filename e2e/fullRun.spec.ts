@@ -2,9 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import type { RunPhase } from '../src/core/runEvents';
 import { BOSS_START_MS, MAX_TIME_SCALE } from '../src/core/runState';
+import { currencyFor, type Save } from '../src/core/save';
 import { SCENE, type ResultPayload } from '../src/core/scenePayloads';
 import type { HudScene } from '../src/scenes/HudScene';
 import type { ResultScene } from '../src/scenes/ResultScene';
+import type { UpgradesScene } from '../src/scenes/UpgradesScene';
 import { cardCenter, collectErrors, forceFrameLength, waitForScene } from './game';
 
 /**
@@ -95,6 +97,14 @@ function readResult(page: Page): Promise<Readonly<ResultPayload> | null> {
   }, SCENE.result);
 }
 
+/** The save after a reload, read from the registry through the Upgrades scene (CO-101). */
+function readSave(page: Page): Promise<Save> {
+  return page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    return (game.scene.getScene(key) as UpgradesScene).save;
+  }, SCENE.upgrades);
+}
+
 /**
  * Drives the run to Result: every level-up overlay is answered with its first
  * card (`1`), so the run never sits paused. A press that lands before the
@@ -143,5 +153,19 @@ for (const spellId of SPELLS) {
     expect(result?.stats.timeSurvivedMs).toBeGreaterThanOrEqual(BOSS_START_MS);
     expect(result?.stats.spellId).toBe(spellId);
     expect(errors).toEqual([]);
+    if (!result) return;
+
+    // CO-101: the run paid out and was recorded; the record outlives the page.
+    expect(result.earned).toBe(currencyFor(result.stats, result.outcome));
+    expect(result.earned).toBeGreaterThan(0);
+    expect(result.balance).toBe(result.earned);
+    await page.reload();
+    await waitForScene(page, SCENE.spellSelect);
+    const save = await readSave(page);
+    expect(save.profile.runs).toBe(1);
+    expect(save.profile.wins).toBe(result.outcome === 'win' ? 1 : 0);
+    expect(save.profile.totalKills).toBe(result.stats.kills);
+    expect(save.profile.spellCounts).toEqual({ [spellId]: 1 });
+    expect(save.currency).toBe(result.earned);
   });
 }

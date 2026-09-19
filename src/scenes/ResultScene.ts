@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { RESULT_HEADLINES, isConfirmKey, resultRows } from '../core/resultModel';
+import { RESULT_HEADLINES, isConfirmKey, resultRows, rewardRows } from '../core/resultModel';
 import { SCENE, isResultPayload, type ResultPayload } from '../core/scenePayloads';
 import { attachMenuInput } from './input';
 import { addTextButton, textButtonItem } from './ui';
@@ -12,7 +12,7 @@ const BUTTON_MARGIN = 40;
 
 /**
  * Result screen: Victory / Defeat headline and the run's stats (time survived,
- * level, kills, spell, perks taken) from `ResultPayload`. "Play again" returns
+ * level, kills, spell, perks taken) and its payout from `ResultPayload`. "Play again" returns
  * to SpellSelect on click or Enter; both paths are idempotent within a frame.
  * A gamepad confirms with A. Started without a valid payload it falls back to
  * SpellSelect (spec §7).
@@ -45,7 +45,7 @@ export class ResultScene extends Phaser.Scene {
       this.scene.start(SCENE.spellSelect);
       return;
     }
-    const { outcome, stats } = this.payload;
+    const { outcome, stats, earned, balance } = this.payload;
     const { width, height } = this.scale;
     const headline = RESULT_HEADLINES[outcome];
 
@@ -67,8 +67,8 @@ export class ResultScene extends Phaser.Scene {
     // Two columns around the centre: labels right-aligned, values left-aligned.
     // Rows stack from a fixed top; the button sits below the last row so a
     // wrapped perk list (many picks) pushes it down instead of overlapping it.
-    const rows = resultRows(stats);
-    let y = height * 0.42;
+    const rows = [...resultRows(stats), ...rewardRows({ earned, balance })];
+    let y = height * 0.38;
     rows.forEach(([label, value]) => {
       this.add
         .text(width / 2 - COLUMN_GAP / 2, y, label, {

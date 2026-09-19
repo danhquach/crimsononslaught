@@ -8,7 +8,8 @@ import {
   type ElementId,
   type RosterSpellId,
 } from '../config/loadout';
-import { passiveById, type PassiveId, type PlayerProfile } from '../config/passives';
+import { UPGRADES } from '../config/meta';
+import { PASSIVES, passiveById, type PassiveId, type PlayerProfile } from '../config/passives';
 import { resolveProfile, validatePassives } from './playerProfile';
 
 /**
@@ -38,6 +39,11 @@ export interface Loadout {
   readonly slots: ActiveSlots;
   /** Passive id -> ranks owned. Uncapped in count; a passive may cap its own rank. */
   readonly passives: ReadonlyMap<PassiveId, number>;
+  /**
+   * Permanent upgrade id -> ranks bought before the run (CO-101). Fixed for the
+   * run's whole length; resolved with the passives in `profileOf`.
+   */
+  readonly upgrades: ReadonlyMap<string, number>;
 }
 
 /** Why an equip was refused (spec §3.1, §3.2). */
@@ -48,13 +54,20 @@ export type EquipResult =
   | { readonly ok: true; readonly loadout: Loadout }
   | { readonly ok: false; readonly reason: EquipRejection };
 
-/** A run's starting loadout: the element's default spell, both slots empty. */
-export function buildLoadout(element: ElementId): Loadout {
+/**
+ * A run's starting loadout: the element's default spell, both slots empty, and
+ * whatever permanent upgrades the save carries (none by default).
+ */
+export function buildLoadout(
+  element: ElementId,
+  upgrades: ReadonlyMap<string, number> = new Map(),
+): Loadout {
   return {
     element,
     defaultSpell: DEFAULT_SPELL_BY_ELEMENT[element],
     slots: [null, null],
     passives: new Map(),
+    upgrades,
   };
 }
 
@@ -155,9 +168,17 @@ export interface LoadoutConfig {
   unlockLevels?: readonly number[];
 }
 
-/** The player profile this loadout's passives resolve to (spec §4.2). */
+/**
+ * The player profile this loadout resolves to (spec §4.2): the permanent
+ * upgrades and the run's passives in one pass, so an upgrade's `mul` and a
+ * passive's `mul` on the same field multiply like two passives would. Ids never
+ * collide — upgrades are `upgrade_*`, passives `passive_*`.
+ */
 export function profileOf(loadout: Loadout): PlayerProfile {
-  return resolveProfile(loadout.passives);
+  return resolveProfile(new Map([...loadout.upgrades, ...loadout.passives]), [
+    ...UPGRADES,
+    ...PASSIVES,
+  ]);
 }
 
 /**

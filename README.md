@@ -62,13 +62,14 @@ needs the browser installed once with `npx playwright install chromium`.
 ## Project layout
 
 ```
-src/config/   tunable data: spells, loadout, passives, enemies, waves, boss, progression, player, gems, animations, FX
-src/core/     pure game logic, no engine imports, unit-tested: run state, loadout, level-up offers, spawn director, spell math
-src/scenes/   Boot, SpellSelect, Game, HUD, LevelUp, Result, two dev-only debug scenes
+src/config/   tunable data: spells, loadout, passives, meta (upgrades, milestones, currency), enemies, waves, boss, progression, player, gems, animations, FX
+src/core/     pure game logic, no engine imports, unit-tested: run state, loadout, level-up offers, spawn director, spell math, save schema and upgrade shop
+src/scenes/   Boot, SpellSelect, Upgrades, Game, HUD, LevelUp, Result, two dev-only debug scenes
 src/entities/ Player, Enemy, Boss, XpGem, Projectile, Boulder
 src/spells/   one Phaser-side class per spell over its `src/core/` math, plus the damage sink
 src/systems/  Phaser-side wrappers: spawn director, collisions, enemy / gem / FX / overlay pools
 src/render/   texture-key layer: sprite atlas, animation playback, placeholder shapes as fallback
+src/storage/  the one `localStorage` adapter; core never imports it
 scripts/      art pipeline (`npm run art:cut`)
 docs/         design spec, ticket list, tuning notes, art sheets + manifest
 ```
