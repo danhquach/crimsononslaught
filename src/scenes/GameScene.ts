@@ -28,6 +28,7 @@ import { Spellbook } from '../core/spellbook';
 import type {
   CompanionStats,
   EarthShieldStats,
+  GroundAreaStats,
   EarthStats,
   FireStats,
   IceShieldStats,
@@ -37,6 +38,8 @@ import type {
 import { buildLoadout } from '../core/loadout';
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
 import { isPassiveId, type PlayerProfile } from '../config/passives';
+import { AREA_CARDS, AREA_SPELL_IDS, BASE_AREA_STATS, isAreaSpellId } from '../config/areas';
+import { ARENA_DEPTH } from '../config/fx';
 import type { SpellStatBlock } from '../config/spellFields';
 import { BASE_SPELL_STATS, SPELL_CARDS, isSpellId } from '../config/spells';
 import {
@@ -60,10 +63,12 @@ import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { FireballSpell } from '../spells/FireballSpell';
 import { FrostNovaSpell } from '../spells/FrostNovaSpell';
 import { CompanionSpell } from '../spells/CompanionSpell';
+import { GroundAreaSpell } from '../spells/GroundAreaSpell';
 import { EarthShieldSpell } from '../spells/EarthShieldSpell';
 import { IceShieldSpell } from '../spells/IceShieldSpell';
 import { OrbitingBouldersSpell } from '../spells/OrbitingBouldersSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
+import { AreaPool } from '../systems/AreaPool';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { FxPool } from '../systems/FxPool';
@@ -120,6 +125,8 @@ export class GameScene extends Phaser.Scene {
   /** Spell effects (CO-082): one-shot bursts, and the status overlays that follow enemies. */
   private fx!: FxPool;
   private overlays!: OverlayPool;
+  /** Persistent ground areas (#135): every patch on the ground, whichever spell placed it. */
+  private areas!: AreaPool;
   private rng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
@@ -195,6 +202,27 @@ export class GameScene extends Phaser.Scene {
     }));
   }
 
+  /**
+   * Test hook (#135): the ground areas live right now — how much of their
+   * lifetime is left and how far each reaches — plus what the spells casting
+   * them have placed and paid out. The browser suite watches a patch appear,
+   * tick a crowd and expire.
+   */
+  get areaReport(): {
+    live: { radius: number; remainingS: number }[];
+    placed: number;
+    hits: number;
+  } {
+    const spells = this.spells.spells.filter(
+      (spell): spell is GroundAreaSpell => spell instanceof GroundAreaSpell,
+    );
+    return {
+      live: this.areas.areas.map((area) => ({ radius: area.radius, remainingS: area.remainingS })),
+      placed: spells.reduce((total, spell) => total + spell.placed, 0),
+      hits: spells.reduce((total, spell) => total + spell.hits, 0),
+    };
+  }
+
   init(data: unknown): void {
     this.payload = isGamePayload(data) ? data : null;
     // Phaser keeps the last `start(key, data)` payload in settings.data and
@@ -237,6 +265,7 @@ export class GameScene extends Phaser.Scene {
     this.gems = new GemPool(this);
     this.fx = new FxPool(this);
     this.overlays = new OverlayPool(this);
+    this.areas = new AreaPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
     // Its colliders belong to the physics world; the scene keeps the system
     // itself only so a spell equipped mid-run can register its group too.
@@ -343,6 +372,10 @@ export class GameScene extends Phaser.Scene {
     );
     this.gems.update(step.deltaMs, this.player);
     this.spells.update(step.deltaMs);
+    // After the casts, so a patch placed this step starts its lifetime here
+    // rather than a step late, and before the physics step, so the enemies a
+    // tick slowed move at the speed it just set.
+    this.areas.update(step.deltaMs);
     this.physics.world.update(time, step.deltaMs);
     this.physics.world.postUpdate();
     // After the bodies have settled, so an overlay sits on where its host is
@@ -429,6 +462,17 @@ export class GameScene extends Phaser.Scene {
           damage,
           this.fx,
         );
+      case 'ice_blizzard':
+      case 'earth_quake':
+        return new GroundAreaSpell(
+          spellId,
+          this.player,
+          this.enemies,
+          stats as Readonly<GroundAreaStats>,
+          damage,
+          this.areas,
+          this.rng,
+        );
       case 'earth_shield':
         return new EarthShieldSpell(
           this,
@@ -454,6 +498,7 @@ export class GameScene extends Phaser.Scene {
     if (isSpellId(spellId)) return BASE_SPELL_STATS[spellId];
     if (isCompanionSpellId(spellId)) return BASE_COMPANION_STATS[spellId];
     if (isShieldSpellId(spellId)) return BASE_SHIELD_STATS[spellId];
+    if (isAreaSpellId(spellId)) return BASE_AREA_STATS[spellId];
     return undefined;
   }
 
@@ -486,6 +531,11 @@ export class GameScene extends Phaser.Scene {
         id,
         name: SHIELD_CARDS[id].name,
         description: SHIELD_CARDS[id].description,
+      })),
+      ...AREA_SPELL_IDS.map((id) => ({
+        id,
+        name: AREA_CARDS[id].name,
+        description: AREA_CARDS[id].description,
       })),
     ].filter((card) => !casting.has(card.id));
   }
@@ -589,19 +639,15 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     const cx = WORLD_WIDTH / 2;
     const cy = WORLD_HEIGHT / 2;
-    this.add.grid(
-      cx,
-      cy,
-      WORLD_WIDTH,
-      WORLD_HEIGHT,
-      GRID_CELL,
-      GRID_CELL,
-      ARENA_FILL,
-      1,
-      ARENA_LINE,
-      1,
-    );
-    this.add.rectangle(cx, cy, WORLD_WIDTH, WORLD_HEIGHT).setStrokeStyle(6, ARENA_BORDER);
+    // Under everything the run puts on the floor, so a ground area (#135) lies
+    // on the arena rather than beneath it.
+    this.add
+      .grid(cx, cy, WORLD_WIDTH, WORLD_HEIGHT, GRID_CELL, GRID_CELL, ARENA_FILL, 1, ARENA_LINE, 1)
+      .setDepth(ARENA_DEPTH);
+    this.add
+      .rectangle(cx, cy, WORLD_WIDTH, WORLD_HEIGHT)
+      .setStrokeStyle(6, ARENA_BORDER)
+      .setDepth(ARENA_DEPTH);
   }
 
   /**

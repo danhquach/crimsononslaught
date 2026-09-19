@@ -473,6 +473,17 @@ damage before `damageReduction` applies. Blizzard's area is placed on the
 densest cluster within `targetRange`, chosen through the seeded RNG when two
 clusters tie.
 
+Ground areas — Blizzard here, Earthquake in §9.5, Tornado in §9.4 — share one
+rule for standing in more than one at a time (#135): **they do not merge.** Each
+patch keeps its own clock and ticks against its own members, so an enemy inside
+two of them takes both lots of damage, while the slows they apply resolve to the
+strongest rather than summing, which is what `applyFrost` already does for every
+other source of slow. A patch's first tick lands one `tickRate` after it is
+placed and its last on the frame its `duration` runs out, so a patch is worth
+`duration / tickRate` ticks however the frames fell; an enemy that walks in is
+caught by the next tick and never by the one before it, and one that walks out
+is not hit again.
+
 Phase 1's balance pass recorded Ice dying in waves two to three. The element's
 answer here is Frost Nova Bomb's freeze chance plus Blizzard's 50% area slow —
 gating Fast rather than out-damaging it — which is the kit-side fix that pass
@@ -557,6 +568,10 @@ stagger refreshes the timer.
 | `slowDuration` | — | — | — | 1.0 | — |
 | `bleed` | 4 | — | — | — | — |
 | `bleedDuration` | 3.0 | — | — | — | — |
+
+Earthquake's `duration` and the slow its prose promises are not in the table
+above; `config/areas.ts` carries both as tuning values (8 s, 30% for 1 s) for
+#147's pass to confirm.
 
 Earth Shield is Phase 1's Orbiting Boulders block plus a shared HP pool: the
 ring absorbs `shieldHp` of player damage, breaks at 0, and returns after

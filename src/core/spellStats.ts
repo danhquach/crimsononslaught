@@ -154,6 +154,30 @@ export interface EarthShieldStats {
   rechargeDelay: number;
 }
 
+/**
+ * A persistent ground area (#135, spec §9): Blizzard and Earthquake both place
+ * a patch that lives for `duration` and applies `tickDamage` plus its slow
+ * every `tickRate` to whatever is standing in it.
+ */
+export interface GroundAreaStats {
+  /** Seconds between casts. */
+  cooldown: number;
+  /** Damage one tick deals to every enemy inside. */
+  tickDamage: number;
+  /** Seconds between two ticks. */
+  tickRate: number;
+  /** How far the patch reaches from its centre, in px. */
+  radius: number;
+  /** Seconds the patch stays on the ground. */
+  duration: number;
+  /** How far from the player a patch may be placed, in px. */
+  targetRange: number;
+  /** Speed cut a tick applies, 0-1. */
+  slowPct: number;
+  /** Seconds that slow lasts. */
+  slowDuration: number;
+}
+
 /** Which stat block each spell owns. */
 export interface SpellStatsBySpell {
   fire: FireStats;
@@ -166,6 +190,8 @@ export interface SpellStatsBySpell {
   earth_companion: CompanionStats;
   ice_shield: IceShieldStats;
   earth_shield: EarthShieldStats;
+  ice_blizzard: GroundAreaStats;
+  earth_quake: GroundAreaStats;
 }
 
 /** Every id a `Spell` may carry: the Phase 1 four plus the Phase 2 spells that exist. */

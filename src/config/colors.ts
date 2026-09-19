@@ -21,6 +21,7 @@ export const TEXTURE_KEYS = [
   'companion',
   'proj_ice',
   'shield_ice',
+  'fx_area',
 ] as const;
 
 export type TextureKey = (typeof TEXTURE_KEYS)[number];
@@ -57,4 +58,9 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // #134: the Ice Shield's layer, drawn around the player. A ring rather
   // than a disc so the hero is still visible through it; its own art is #145.
   shield_ice: { shape: 'ring', color: 0xb3e5fc, width: 44, height: 44, thickness: 3 },
+  // #135: a persistent ground area, drawn at `areaScale` of this size so the
+  // ring outlines exactly the patch that ticks. One placeholder for Blizzard
+  // and Earthquake alike — the same call the companions' shared disc makes —
+  // until their own art lands (#145). A ring, so the crowd inside stays visible.
+  fx_area: { shape: 'ring', color: 0x90a4ae, width: 200, height: 200, thickness: 3 },
 };

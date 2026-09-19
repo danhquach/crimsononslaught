@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ANIMATIONS } from '../config/animations';
 import { ENEMY_ARCHETYPES } from '../config/enemies';
 import { BASE_SPELL_STATS } from '../config/spells';
+import { BASE_AREA_STATS } from '../config/areas';
 import {
   CHAIN_CYCLE_MS,
+  areaScale,
   chainFrame,
   chainSegmentPose,
   dustFlip,
@@ -34,6 +36,13 @@ describe('effect scales (CO-082)', () => {
   it('draws the nova at radius / 90', () => {
     expect(novaScale(BASE_SPELL_STATS.ice.radius)).toBe(1);
     expect(novaScale(180)).toBe(2);
+  });
+
+  it('draws a ground area at radius / 100, so the ring is the patch', () => {
+    expect(areaScale(100)).toBe(1);
+    expect(areaScale(BASE_AREA_STATS.ice_blizzard.radius)).toBeCloseTo(1.8);
+    // A block with no radius draws nothing rather than a mirrored ring.
+    expect(areaScale(-50)).toBe(0);
   });
 
   it('spins at the authored rate at the base orbit speed and in proportion above it', () => {
