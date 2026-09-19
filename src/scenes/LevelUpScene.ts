@@ -7,6 +7,7 @@ import {
 } from '../core/levelUp';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
 import { SPELL_CARDS, isSpellId } from '../config/spells';
+import { audioOf } from '../render/audio';
 import { attachMenuInput, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
@@ -135,7 +136,10 @@ export class LevelUpScene extends Phaser.Scene {
     };
 
     frame.setInteractive({ useHandCursor: true });
-    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => highlight(true));
+    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
+      highlight(true);
+      audioOf(this).play('ui.move');
+    });
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => highlight(false));
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.pick(card));
 
@@ -146,6 +150,7 @@ export class LevelUpScene extends Phaser.Scene {
   private pick(card: OfferCard): void {
     if (this.picked) return;
     this.picked = true;
+    audioOf(this).play('ui.confirm');
     const payload: LevelUpPickPayload = { offerId: card.id };
     this.scene.get(SCENE.game).events.emit(LEVEL_UP_EVENT.pick, payload);
     this.close();

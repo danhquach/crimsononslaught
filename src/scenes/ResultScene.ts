@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { RESULT_HEADLINES, isConfirmKey, resultRows, rewardRows } from '../core/resultModel';
 import { SCENE, isResultPayload, type ResultPayload } from '../core/scenePayloads';
+import { audioOf } from '../render/audio';
 import { attachMenuInput } from './input';
 import { addTextButton, textButtonItem } from './ui';
 
@@ -106,6 +107,7 @@ export class ResultScene extends Phaser.Scene {
   private playAgain(): void {
     if (this.restarted) return;
     this.restarted = true;
+    audioOf(this).play('ui.confirm');
     this.scene.start(SCENE.spellSelect);
   }
 }

@@ -17,11 +17,17 @@ export type BossPhase = 'chase' | 'telegraph' | 'charge';
 /**
  * Emitter event names for the boss -> Game direction, namespaced like `run:*`.
  * `died` fires once the death animation has played out, not on the killing
- * blow (CO-081): the win waits for it.
+ * blow (CO-081): the win waits for it. `phase` fires with `{ phase }` each
+ * time the charge cycle moves on (CO-102: the telegraph and charge cues).
  */
 export const BOSS_EVENT = {
   died: 'boss:died',
+  phase: 'boss:phase',
 } as const;
+
+export interface BossPhasePayload {
+  readonly phase: BossPhase;
+}
 
 export interface BossCycle {
   readonly phase: BossPhase;

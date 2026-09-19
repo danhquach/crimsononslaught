@@ -7,6 +7,7 @@ import {
   stepBossCycle,
   type BossCycle,
   type BossPhase,
+  type BossPhasePayload,
 } from '../core/boss';
 import type { Vec2 } from '../core/enemy';
 import { emitRunEvent } from '../core/runEvents';
@@ -93,9 +94,14 @@ export class Boss extends Enemy {
   /** Advance the cycle by the frame and move as the current phase asks. */
   protected override steer(deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
     const wasTelegraphing = this.telegraphing;
+    const before = this.cycle.phase;
     const step = stepBossCycle(this.cycle, deltaS, this, target, speedFactor);
     this.cycle = step.cycle;
     if (this.telegraphing !== wasTelegraphing) this.refreshTint();
+    if (this.cycle.phase !== before) {
+      const payload: BossPhasePayload = { phase: this.cycle.phase };
+      this.scene.events.emit(BOSS_EVENT.phase, payload);
+    }
     return step.velocity;
   }
 

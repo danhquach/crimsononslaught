@@ -9,6 +9,7 @@ import {
   type GamePayload,
 } from '../core/scenePayloads';
 import { emptySave, isSave } from '../core/save';
+import { audioOf } from '../render/audio';
 import { attachMenuInput, type MenuItem } from './input';
 import { addTextButton, textButtonItem } from './ui';
 
@@ -158,7 +159,10 @@ export class SpellSelectScene extends Phaser.Scene {
     };
 
     frame.setInteractive({ useHandCursor: true });
-    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => highlight(true));
+    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
+      highlight(true);
+      audioOf(this).play('ui.move');
+    });
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => highlight(false));
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.startGame(spellId));
 
@@ -169,6 +173,7 @@ export class SpellSelectScene extends Phaser.Scene {
   private startGame(spellId: SpellId): void {
     if (this.started) return;
     this.started = true;
+    audioOf(this).play('ui.confirm');
     const payload: GamePayload = { spellId, seed: this.seed };
     this.scene.start(SCENE.game, payload);
   }
@@ -176,6 +181,7 @@ export class SpellSelectScene extends Phaser.Scene {
   private openUpgrades(): void {
     if (this.started) return;
     this.started = true;
+    audioOf(this).play('ui.confirm');
     this.scene.start(SCENE.upgrades);
   }
 }
