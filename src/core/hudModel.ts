@@ -16,6 +16,9 @@ export interface HudModel {
   phase: RunPhase;
   bossHp: number;
   bossMaxHp: number;
+  /** #134: the absorption pool the run's shields hold, and what they hold at full. */
+  shield: number;
+  shieldMax: number;
 }
 
 /**
@@ -33,6 +36,8 @@ export const INITIAL_HUD: Readonly<HudModel> = {
   phase: 'waves',
   bossHp: 0,
   bossMaxHp: 0,
+  shield: 0,
+  shieldMax: 0,
 };
 
 /** Returns a new model with the event applied; the input is never mutated. */
@@ -51,7 +56,14 @@ export function applyRunEvent(model: Readonly<HudModel>, event: RunEvent): HudMo
       return { ...model, phase: event.payload.phase };
     case 'bossHp':
       return { ...model, bossHp: event.payload.hp, bossMaxHp: event.payload.maxHp };
+    case 'shield':
+      return { ...model, shield: event.payload.pool, shieldMax: event.payload.max };
   }
+}
+
+/** The shield bar exists only while the run has a shield equipped (#134). */
+export function shieldBarVisible(model: Readonly<HudModel>): boolean {
+  return model.shieldMax > 0;
 }
 
 /** The boss bar exists only during the boss phase (ticket CO-012). */

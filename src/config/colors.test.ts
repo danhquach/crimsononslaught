@@ -17,6 +17,7 @@ const SPEC_KEYS = [
   // colour on day one; the companions' own sheets land with #146.
   'companion',
   'proj_ice',
+  'shield_ice',
 ];
 
 describe('placeholder texture config', () => {

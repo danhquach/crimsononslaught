@@ -34,6 +34,7 @@ describe('onRunEvents', () => {
     emitRunEvent(emitter, 'kill', { kills: 6 });
     emitRunEvent(emitter, 'phase', { phase: 'over' });
     emitRunEvent(emitter, 'bossHp', { hp: 7, maxHp: 8 });
+    emitRunEvent(emitter, 'shield', { pool: 9, max: 10 });
     emitter.emit('shutdown', { not: 'ours' });
 
     expect(received).toEqual([
@@ -43,6 +44,7 @@ describe('onRunEvents', () => {
       { name: 'kill', payload: { kills: 6 } },
       { name: 'phase', payload: { phase: 'over' } },
       { name: 'bossHp', payload: { hp: 7, maxHp: 8 } },
+      { name: 'shield', payload: { pool: 9, max: 10 } },
     ]);
   });
 
@@ -75,8 +77,8 @@ describe('emitRunEvent', () => {
 });
 
 describe('RUN_EVENT', () => {
-  it('covers the six events RunState emits (spec §4, CO-030)', () => {
-    expect(RUN_EVENT_NAMES).toEqual(['timer', 'hp', 'xp', 'kill', 'phase', 'bossHp']);
+  it('covers every channel the run publishes (spec §4, CO-030; shield #134)', () => {
+    expect(RUN_EVENT_NAMES).toEqual(['timer', 'hp', 'xp', 'kill', 'phase', 'bossHp', 'shield']);
     expect(Object.keys(RUN_EVENT).sort()).toEqual([...RUN_EVENT_NAMES].sort());
   });
 

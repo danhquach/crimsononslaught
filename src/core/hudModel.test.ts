@@ -5,6 +5,7 @@ import {
   bossBarVisible,
   formatTimer,
   fraction,
+  shieldBarVisible,
   type HudModel,
 } from './hudModel';
 
@@ -56,6 +57,8 @@ describe('applyRunEvent', () => {
       phase: 'waves',
       bossHp: 0,
       bossMaxHp: 0,
+      shield: 0,
+      shieldMax: 0,
     });
   });
 
@@ -96,6 +99,12 @@ describe('applyRunEvent', () => {
     expect(m.bossMaxHp).toBe(400);
   });
 
+  it('shield sets the pool and what a full one holds (#134)', () => {
+    const m = applyRunEvent(INITIAL_HUD, { name: 'shield', payload: { pool: 24, max: 60 } });
+    expect(m.shield).toBe(24);
+    expect(m.shieldMax).toBe(60);
+  });
+
   it('leaves unrelated fields untouched and never mutates its input', () => {
     const before: HudModel = { ...INITIAL_HUD, kills: 7, level: 2 };
     const frozen = Object.freeze({ ...before });
@@ -103,6 +112,18 @@ describe('applyRunEvent', () => {
     expect(after).toEqual({ ...before, elapsedMs: 1000 });
     expect(frozen).toEqual(before);
     expect(after).not.toBe(frozen);
+  });
+});
+
+describe('shieldBarVisible', () => {
+  it('is hidden until a shield is equipped and shown once one is (#134)', () => {
+    expect(shieldBarVisible(INITIAL_HUD)).toBe(false);
+    const equipped = applyRunEvent(INITIAL_HUD, { name: 'shield', payload: { pool: 60, max: 60 } });
+    expect(shieldBarVisible(equipped)).toBe(true);
+    // A broken shield is still equipped, so the empty bar stays on screen.
+    const broken = applyRunEvent(equipped, { name: 'shield', payload: { pool: 0, max: 60 } });
+    expect(shieldBarVisible(broken)).toBe(true);
+    expect(fraction(broken.shield, broken.shieldMax)).toBe(0);
   });
 });
 

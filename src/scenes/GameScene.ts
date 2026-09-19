@@ -20,15 +20,17 @@ import {
 import { levelUpOffer, type ActiveCard } from '../core/levelUpOffer';
 import { PLAYER_EVENT } from '../core/health';
 import { createRng, type Rng } from '../core/rng';
-import { RUN_EVENT, type RunEventPayloads } from '../core/runEvents';
+import { RUN_EVENT, emitRunEvent, type RunEventPayloads } from '../core/runEvents';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
 import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
 import { Spellbook } from '../core/spellbook';
 import type {
   CompanionStats,
+  EarthShieldStats,
   EarthStats,
   FireStats,
+  IceShieldStats,
   IceStats,
   LightningStats,
 } from '../core/spellStats';
@@ -43,6 +45,13 @@ import {
   COMPANION_SPELL_IDS,
   isCompanionSpellId,
 } from '../config/companions';
+import {
+  BASE_SHIELD_STATS,
+  SHIELD_CARDS,
+  SHIELD_SPELL_IDS,
+  isShieldSpellId,
+  type ShieldSpellId,
+} from '../config/shields';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
@@ -51,7 +60,10 @@ import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { FireballSpell } from '../spells/FireballSpell';
 import { FrostNovaSpell } from '../spells/FrostNovaSpell';
 import { CompanionSpell } from '../spells/CompanionSpell';
+import { EarthShieldSpell } from '../spells/EarthShieldSpell';
+import { IceShieldSpell } from '../spells/IceShieldSpell';
 import { OrbitingBouldersSpell } from '../spells/OrbitingBouldersSpell';
+import { ShieldSpell } from '../spells/ShieldSpell';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { FxPool } from '../systems/FxPool';
@@ -94,6 +106,10 @@ const GRID_CELL = 200;
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
  * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
  * spell hitboxes included.
+ *
+ * Damage aimed at the player goes through one path — `onEnemyContact` — so the
+ * run's defences sit in exactly one place: a shield (#134) absorbs what it can
+ * before `Player.takeDamage` sees the rest.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
@@ -164,6 +180,19 @@ export class GameScene extends Phaser.Scene {
         leashRadius: spell.companionStats.leashRadius,
         hits: spell.hits,
       }));
+  }
+
+  /**
+   * Test hook (#134): each shield equipped right now and what its pool holds.
+   * The browser suite watches a real run drain one, break it and see it back.
+   */
+  get shieldReport(): { id: RosterSpellId; pool: number; max: number; up: boolean }[] {
+    return this.shieldSpells().map((spell) => ({
+      id: spell.id,
+      pool: spell.pool,
+      max: spell.maxPool,
+      up: spell.up,
+    }));
   }
 
   init(data: unknown): void {
@@ -270,6 +299,32 @@ export class GameScene extends Phaser.Scene {
       if (this.run.phase === 'over') break;
       this.simulate(time, step);
     }
+    // Once a frame, like the run clock, and always: the payload is absolute, so
+    // a HUD that subscribed late (it is launched from `create`) is right after
+    // the first one rather than only after the first hit.
+    this.publishShield();
+  }
+
+  /**
+   * Spec §10: the HUD shows a shield pool when one is equipped. The run's
+   * shields are summed, so a `?loadout=` run carrying both reads as the damage
+   * it can still soak; `max` 0 is a run with no shield and hides the bar.
+   */
+  private publishShield(): void {
+    let pool = 0;
+    let max = 0;
+    for (const shield of this.shieldSpells()) {
+      pool += shield.pool;
+      max += shield.maxPool;
+    }
+    emitRunEvent(this.events, 'shield', { pool, max });
+  }
+
+  /** The shields casting right now, in equip order. */
+  private shieldSpells(): ShieldSpell<ShieldSpellId>[] {
+    return this.spells.spells.filter(
+      (spell): spell is ShieldSpell<ShieldSpellId> => spell instanceof ShieldSpell,
+    );
   }
 
   /**
@@ -365,6 +420,24 @@ export class GameScene extends Phaser.Scene {
           damage,
           this.fx,
         );
+      case 'ice_shield':
+        return new IceShieldSpell(
+          this,
+          this.player,
+          this.enemies,
+          stats as Readonly<IceShieldStats>,
+          damage,
+          this.fx,
+        );
+      case 'earth_shield':
+        return new EarthShieldSpell(
+          this,
+          this.player,
+          this.collisions,
+          stats as Readonly<EarthShieldStats>,
+          damage,
+          this.fx,
+        );
       default:
         console.warn(`[Game] no implementation for spell "${spellId}" yet`);
         return undefined;
@@ -380,6 +453,7 @@ export class GameScene extends Phaser.Scene {
   private baseStatsFor(spellId: RosterSpellId): SpellStatBlock | undefined {
     if (isSpellId(spellId)) return BASE_SPELL_STATS[spellId];
     if (isCompanionSpellId(spellId)) return BASE_COMPANION_STATS[spellId];
+    if (isShieldSpellId(spellId)) return BASE_SHIELD_STATS[spellId];
     return undefined;
   }
 
@@ -408,6 +482,11 @@ export class GameScene extends Phaser.Scene {
         name: COMPANION_CARDS[id].name,
         description: COMPANION_CARDS[id].description,
       })),
+      ...SHIELD_SPELL_IDS.map((id) => ({
+        id,
+        name: SHIELD_CARDS[id].name,
+        description: SHIELD_CARDS[id].description,
+      })),
     ].filter((card) => !casting.has(card.id));
   }
 
@@ -429,7 +508,36 @@ export class GameScene extends Phaser.Scene {
   private onEnemyContact(enemy: Enemy): void {
     if (!enemy.active || this.invulnerable) return;
     if (!enemy.tryContact()) return;
-    this.player.takeDamage(enemy.contactDamage);
+    // A hit the player is still immune to costs nothing: `core/health.ts` would
+    // swallow it, so a shield must not pay for it out of its pool either.
+    //
+    // Not a defensive check — the window it guards is reachable. The hit that
+    // opens the 0.5 s window is one the shields could not fully absorb, so they
+    // are empty as it lands; but a shield whose recharge delay was almost up
+    // refills inside that window, and the next contact would then shatter a
+    // shield holding a point or two and re-arm its whole delay, for a hit the
+    // player never felt.
+    if (this.player.immune) return;
+    const throughShields = this.absorbOnShields(enemy.contactDamage);
+    if (throughShields > 0) this.player.takeDamage(throughShields);
+  }
+
+  /**
+   * Put a hit through the run's shields and return what is left for the
+   * player's HP (#134, spec §9.3: a shield absorbs before `damageReduction`,
+   * which applies in `core/health.ts` and lands with #139).
+   *
+   * Each shield takes what it can in equip order, so a run carrying two of them
+   * — only the `?loadout=` hook can, an element owns one — spends the first
+   * before the second rather than splitting the hit between them.
+   */
+  private absorbOnShields(amount: number): number {
+    let left = amount;
+    for (const shield of this.shieldSpells()) {
+      if (left <= 0) break;
+      left = shield.absorbDamage(left);
+    }
+    return left;
   }
 
   /** Spec §5: a gem is XP on touch; the drop itself is handled where the enemy dies. */

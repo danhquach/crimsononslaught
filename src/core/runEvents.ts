@@ -20,6 +20,7 @@ export const RUN_EVENT = {
   kill: 'run:kill',
   phase: 'run:phase',
   bossHp: 'run:bossHp',
+  shield: 'run:shield',
 } as const;
 
 export type RunEventName = keyof typeof RUN_EVENT;
@@ -35,6 +36,11 @@ export interface RunEventPayloads {
   kill: { kills: number };
   phase: { phase: RunPhase };
   bossHp: { hp: number; maxHp: number };
+  /**
+   * The absorption pool the run's shields hold right now (#134). `max` 0 is
+   * a run with no shield equipped, which is what the HUD hides the bar on.
+   */
+  shield: { pool: number; max: number };
 }
 
 /** Discriminated union of every event, for reducers that handle them uniformly. */
