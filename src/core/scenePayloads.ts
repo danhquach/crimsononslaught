@@ -17,6 +17,7 @@ export const SCENE = {
   hud: 'Hud',
   levelUp: 'LevelUp',
   result: 'Result',
+  upgrades: 'Upgrades',
   textureDebug: 'TextureDebug',
   collisionDebug: 'CollisionDebug',
 } as const;
@@ -40,6 +41,16 @@ export const INVULNERABLE_REGISTRY_KEY = 'invulnerable';
  * run, so it travels in the registry rather than the `Game` payload.
  */
 export const LOADOUT_REGISTRY_KEY = 'loadout';
+
+/**
+ * Registry key under which Boot stores the parsed `Save` (CO-101). Game reads
+ * the upgrades from it at `create`; Result writes the finished run back; the
+ * Upgrades screen spends from it. Always a valid `Save`, never raw JSON.
+ */
+export const SAVE_REGISTRY_KEY = 'save';
+
+/** Registry flag Boot sets when the stored save was unreadable and reset, so SpellSelect can say so once. */
+export const SAVE_RESET_REGISTRY_KEY = 'saveReset';
 
 /** `SpellSelect -> Game` */
 export interface GamePayload {
@@ -68,6 +79,10 @@ export interface RunStats {
 export interface ResultPayload {
   outcome: Outcome;
   stats: RunStats;
+  /** Currency this run paid out (CO-101), already added to the save. */
+  earned: number;
+  /** The save's balance after `earned` was added. */
+  balance: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -104,6 +119,10 @@ export function isRunStats(data: unknown): data is RunStats {
 
 export function isResultPayload(data: unknown): data is ResultPayload {
   return (
-    isRecord(data) && (data.outcome === 'win' || data.outcome === 'lose') && isRunStats(data.stats)
+    isRecord(data) &&
+    (data.outcome === 'win' || data.outcome === 'lose') &&
+    isRunStats(data.stats) &&
+    isFiniteNumber(data.earned) &&
+    isFiniteNumber(data.balance)
   );
 }

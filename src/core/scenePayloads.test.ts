@@ -8,7 +8,12 @@ import {
 } from './scenePayloads';
 
 const stats = { timeSurvivedMs: 12_345, level: 3, kills: 42, spellId: 'fire', perks: ['a', 'b'] };
-const result: ResultPayload = { outcome: 'win', stats: { ...stats, spellId: 'fire' } };
+const result: ResultPayload = {
+  outcome: 'win',
+  stats: { ...stats, spellId: 'fire' },
+  earned: 210,
+  balance: 560,
+};
 
 describe('isGamePayload', () => {
   it('accepts every spell id with an integer seed', () => {
@@ -63,6 +68,12 @@ describe('isResultPayload', () => {
     expect(isResultPayload({ outcome: 'draw', stats })).toBe(false);
     expect(isResultPayload({ outcome: 'win' })).toBe(false);
     expect(isResultPayload({ outcome: 'win', stats: {} })).toBe(false);
+  });
+
+  it('rejects a payload without the run reward', () => {
+    expect(isResultPayload({ outcome: 'win', stats })).toBe(false);
+    expect(isResultPayload({ ...result, earned: NaN })).toBe(false);
+    expect(isResultPayload({ ...result, balance: undefined })).toBe(false);
   });
 });
 

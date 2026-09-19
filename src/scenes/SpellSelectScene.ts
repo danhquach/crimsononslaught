@@ -1,7 +1,16 @@
 import Phaser from 'phaser';
 import { SPELL_CARDS, SPELL_IDS, spellIdForKey, type SpellId } from '../config/spells';
-import { SCENE, SEED_REGISTRY_KEY, type GamePayload } from '../core/scenePayloads';
+import { CURRENCY_NAME } from '../config/meta';
+import {
+  SAVE_REGISTRY_KEY,
+  SAVE_RESET_REGISTRY_KEY,
+  SCENE,
+  SEED_REGISTRY_KEY,
+  type GamePayload,
+} from '../core/scenePayloads';
+import { emptySave, isSave } from '../core/save';
 import { attachMenuInput, type MenuItem } from './input';
+import { addTextButton, textButtonItem } from './ui';
 
 const CARD_WIDTH = 200;
 const CARD_HEIGHT = 280;
@@ -14,6 +23,10 @@ const CARD_FILL_HOVER = 0x2a2a2a;
  * Spell select: one card per spell (name, color, one-line description, base
  * stats). Click a card, press its number key (1–4), or move the gamepad
  * selection and confirm with A, to start Game with a full `GamePayload`.
+ *
+ * Also the door to the permanent upgrades (CO-101): the balance and an
+ * "Upgrades" button (or `U`) sit under the cards, and a save Boot had to reset
+ * is announced here, once.
  */
 export class SpellSelectScene extends Phaser.Scene {
   private started = false;
@@ -49,12 +62,41 @@ export class SpellSelectScene extends Phaser.Scene {
     const items = SPELL_IDS.map((spellId, i) =>
       this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, spellId, i + 1),
     );
-    attachMenuInput(this, items);
+    const upgradesButton = addTextButton(
+      this,
+      width - 110,
+      height - 32,
+      'Upgrades  (U)',
+      () => this.openUpgrades(),
+      { fontSize: '20px', padding: { x: 12, y: 6 } },
+    );
+    attachMenuInput(this, [...items, textButtonItem(upgradesButton, () => this.openUpgrades())]);
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       const spellId = spellIdForKey(event.key);
       if (spellId) this.startGame(spellId);
+      else if (event.key === 'u' || event.key === 'U') this.openUpgrades();
     });
+
+    const stored: unknown = this.registry.get(SAVE_REGISTRY_KEY);
+    const save = isSave(stored) ? stored : emptySave();
+    this.add.text(24, height - 44, `${CURRENCY_NAME}: ${save.currency.toLocaleString('en-US')}`, {
+      fontFamily: 'Georgia, serif',
+      fontSize: '20px',
+      color: '#ffa040',
+    });
+
+    // Said once: Boot leaves the flag up until this screen has shown it.
+    if (this.registry.get(SAVE_RESET_REGISTRY_KEY) === true) {
+      this.registry.set(SAVE_RESET_REGISTRY_KEY, false);
+      this.add
+        .text(width / 2, height - 60, 'Saved progress could not be read and was reset.', {
+          fontFamily: 'Georgia, serif',
+          fontSize: '16px',
+          color: '#ff6666',
+        })
+        .setOrigin(0.5);
+    }
 
     this.add
       .text(width / 2, height - 24, `seed ${this.seed}`, {
@@ -129,5 +171,11 @@ export class SpellSelectScene extends Phaser.Scene {
     this.started = true;
     const payload: GamePayload = { spellId, seed: this.seed };
     this.scene.start(SCENE.game, payload);
+  }
+
+  private openUpgrades(): void {
+    if (this.started) return;
+    this.started = true;
+    this.scene.start(SCENE.upgrades);
   }
 }

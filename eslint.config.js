@@ -28,7 +28,7 @@ const noMathRandom = {
 const ENGINE_MESSAGE =
   'src/core and src/config must not import the engine. Keep Phaser in scenes/entities/systems/render (spec §4 Layering).';
 const LAYER_MESSAGE =
-  'src/core and src/config must not import engine layers. Dependencies point inward: scenes/entities/systems/render may import core, never the reverse (spec §4 Layering).';
+  'src/core and src/config must not import engine layers. Dependencies point inward: scenes/entities/systems/render/storage may import core, never the reverse (spec §4 Layering).';
 
 const noEngineInCore = {
   'no-restricted-imports': [
@@ -38,7 +38,13 @@ const noEngineInCore = {
       patterns: [
         { group: ['phaser/*'], message: ENGINE_MESSAGE },
         {
-          group: ['**/scenes/**', '**/entities/**', '**/systems/**', '**/render/**'],
+          group: [
+            '**/scenes/**',
+            '**/entities/**',
+            '**/systems/**',
+            '**/render/**',
+            '**/storage/**',
+          ],
           message: LAYER_MESSAGE,
         },
       ],
@@ -51,7 +57,8 @@ const noEngineInCore = {
       message: ENGINE_MESSAGE,
     },
     {
-      selector: 'ImportExpression > Literal[value=/\\/(scenes|entities|systems|render)\\//]',
+      selector:
+        'ImportExpression > Literal[value=/\\/(scenes|entities|systems|render|storage)\\//]',
       message: LAYER_MESSAGE,
     },
   ],

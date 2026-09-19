@@ -7,6 +7,7 @@ import { LevelUpScene } from './scenes/LevelUpScene';
 import { ResultScene } from './scenes/ResultScene';
 import { SpellSelectScene } from './scenes/SpellSelectScene';
 import { TextureDebugScene } from './scenes/TextureDebugScene';
+import { UpgradesScene } from './scenes/UpgradesScene';
 
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;
@@ -36,9 +37,11 @@ const config: Phaser.Types.Core.GameConfig = {
     gamepad: true,
   },
   // Flow: Boot -> SpellSelect -> Game (+ Hud overlay, LevelUp overlay on level-up) -> Result -> SpellSelect.
+  // SpellSelect <-> Upgrades is the meta loop (CO-101).
   scene: [
     BootScene,
     SpellSelectScene,
+    UpgradesScene,
     GameScene,
     HudScene,
     LevelUpScene,

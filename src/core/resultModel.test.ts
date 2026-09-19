@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { RESULT_HEADLINES, isConfirmKey, resultRows, summarizePerks } from './resultModel';
+import {
+  RESULT_HEADLINES,
+  isConfirmKey,
+  resultRows,
+  rewardRows,
+  summarizePerks,
+} from './resultModel';
 import type { RunStats } from './scenePayloads';
 
 /** Value of the row with `label`, or undefined when the row is missing. */
@@ -76,5 +82,21 @@ describe('resultRows', () => {
     expect(rowValue(odd, 'Level')).toBe('3');
     expect(rowValue(odd, 'Kills')).toBe('0');
     expect(rowValue({ ...stats, kills: NaN }, 'Kills')).toBe('0');
+  });
+});
+
+describe('rewardRows', () => {
+  it('shows the payout with a plus sign and the new balance', () => {
+    expect(rewardRows({ earned: 1234, balance: 56789 })).toEqual([
+      ['Embers earned', '+1,234'],
+      ['Embers total', '56,789'],
+    ]);
+  });
+
+  it('reads 0 for a run that paid nothing', () => {
+    expect(rewardRows({ earned: 0, balance: 0 })).toEqual([
+      ['Embers earned', '+0'],
+      ['Embers total', '0'],
+    ]);
   });
 });

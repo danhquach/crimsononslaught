@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   INVULNERABLE_REGISTRY_KEY,
   LOADOUT_REGISTRY_KEY,
+  SAVE_REGISTRY_KEY,
   SCENE,
   TIME_SCALE_REGISTRY_KEY,
   isGamePayload,
@@ -37,8 +38,11 @@ import type {
   MeteorStats,
 } from '../core/spellStats';
 import { buildLoadout } from '../core/loadout';
+import { currencyFor, emptySave, isSave, recordRun, serializeSave, type Save } from '../core/save';
+import { upgradeRanks } from '../core/upgrades';
+import { storeSaveJson } from '../storage/localSave';
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
-import { isPassiveId, type PlayerProfile } from '../config/passives';
+import { BASE_PLAYER_PROFILE, isPassiveId, type PlayerProfile } from '../config/passives';
 import { AREA_CARDS, AREA_SPELL_IDS, BASE_AREA_STATS, isAreaSpellId } from '../config/areas';
 import {
   BASE_STRIKE_STATS,
@@ -310,11 +314,15 @@ export class GameScene extends Phaser.Scene {
     });
     // The four Phase 1 spell ids are also the four element ids (spec §9.1), so
     // the chosen spell is this run's element and its always-equipped default.
+    // The save's permanent upgrades go into the loadout before the first cast
+    // (CO-101): they resolve with the passives and touch no RNG, so a seed
+    // replays the same run for the same save.
     this.spells = new Spellbook(
-      buildLoadout(spellId),
+      buildLoadout(spellId, upgradeRanks(this.save())),
       (id, stats) => this.createSpell(id, stats),
       (id) => this.baseStatsFor(id),
     );
+    this.syncPlayerStats(BASE_PLAYER_PROFILE);
     this.equipSpell(spellId);
     for (const extra of this.extraActives()) this.equipSpell(extra);
 
@@ -595,6 +603,12 @@ export class GameScene extends Phaser.Scene {
     ].filter((card) => !casting.has(card.id));
   }
 
+  /** The save Boot parsed into the registry; an empty one if something else got there first. */
+  private save(): Save {
+    const stored: unknown = this.registry.get(SAVE_REGISTRY_KEY);
+    return isSave(stored) ? stored : emptySave();
+  }
+
   /** `?loadout=` (test hook): extra actives Boot parsed out of the query string. */
   private extraActives(): RosterSpellId[] {
     const extra: unknown = this.registry.get(LOADOUT_REGISTRY_KEY);
@@ -812,7 +826,15 @@ export class GameScene extends Phaser.Scene {
   private endRun(outcome: Outcome): void {
     if (!this.payload || this.run.phase === 'over') return;
     this.run.end();
-    const payload: ResultPayload = { outcome, stats: this.run.stats(this.payload.spellId) };
+    const stats = this.run.stats(this.payload.spellId);
+    // The one write per run (CO-101): fold the stats and the payout into the
+    // save, hand the new save to the registry and to storage, and tell Result
+    // what it paid. A failed store is logged, never thrown: the run has ended.
+    const earned = currencyFor(stats, outcome);
+    const save = recordRun(this.save(), stats, outcome, earned);
+    this.registry.set(SAVE_REGISTRY_KEY, save);
+    if (!storeSaveJson(serializeSave(save))) console.warn('[save] could not store progress');
+    const payload: ResultPayload = { outcome, stats, earned, balance: save.currency };
     // The HUD is a parallel scene; stopping Game does not stop it.
     this.scene.stop(SCENE.hud);
     this.scene.start(SCENE.result, payload);
