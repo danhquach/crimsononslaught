@@ -67,6 +67,34 @@ describe('takeDamage', () => {
     expect(again.state.hp).toBe(0);
   });
 
+  // #139: `damageReduction` shrinks the hit before it reaches HP.
+  it('takes the reduced amount and opens the window on it', () => {
+    const { state, damaged } = takeDamage(createHealth(100), 20, 0.25);
+    expect(state.hp).toBe(85);
+    expect(damaged).toBe(true);
+    expect(state.invulnMs).toBe(INVULN_MS);
+  });
+
+  it('reports death when the reduced hit exactly zeroes HP', () => {
+    const { state, damaged, died } = takeDamage(createHealth(15), 20, 0.25);
+    expect(state.hp).toBe(0);
+    expect(damaged).toBe(true);
+    expect(died).toBe(true);
+  });
+
+  it('leaves the player standing when reduction pulls the hit under their HP', () => {
+    const { state, died } = takeDamage(createHealth(16), 20, 0.25);
+    expect(state.hp).toBe(1);
+    expect(died).toBe(false);
+  });
+
+  it('swallows a hit that reduction takes to nothing, without opening the window', () => {
+    const { state, damaged } = takeDamage(createHealth(100), 20, 1);
+    expect(damaged).toBe(false);
+    expect(state.hp).toBe(100);
+    expect(state.invulnMs).toBe(0);
+  });
+
   it('ignores non-positive damage', () => {
     const start = createHealth();
     for (const amount of [0, -5, Number.NaN]) {

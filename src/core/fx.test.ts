@@ -26,6 +26,8 @@ const idle: EnemyStatus = {
   slowed: false,
   frozen: false,
   stunned: false,
+  staggered: false,
+  bleeding: false,
   radius: ENEMY_ARCHETYPES.swarm.radius,
 };
 
@@ -94,6 +96,9 @@ describe('statusOverlay', () => {
       { slowed: true },
       { frozen: true, slowed: true },
       { stunned: true },
+      { staggered: true },
+      { bleeding: true },
+      { bleeding: true, radius: ENEMY_ARCHETYPES.tank.radius },
     ];
     for (const status of cases) {
       const clip = statusOverlay({ ...idle, ...status });
@@ -117,6 +122,20 @@ describe('statusOverlay', () => {
     expect(statusOverlay({ ...idle, slowed: true })).toBe('ice.slow');
     expect(statusOverlay({ ...idle, slowed: true, frozen: true })).toBe('ice.freeze');
     expect(statusOverlay({ ...idle, slowed: true, stunned: true })).toBe('lightning.stun');
+  });
+
+  // #139: the new statuses rank under their nearest kin and borrow its clip until #145.
+  it('ranks a stagger as a stop — over a slow and a bleed — and a bleed under everything', () => {
+    expect(statusOverlay({ ...idle, staggered: true })).toBe('lightning.stun');
+    expect(statusOverlay({ ...idle, staggered: true, slowed: true })).toBe('lightning.stun');
+    expect(statusOverlay({ ...idle, staggered: true, bleeding: true })).toBe('lightning.stun');
+    expect(statusOverlay({ ...idle, staggered: true, frozen: true })).toBe('ice.freeze');
+    expect(statusOverlay({ ...idle, bleeding: true })).toBe('fire.burn');
+    expect(statusOverlay({ ...idle, bleeding: true, radius: ENEMY_ARCHETYPES.tank.radius })).toBe(
+      'fire.burnBig',
+    );
+    expect(statusOverlay({ ...idle, bleeding: true, slowed: true })).toBe('ice.slow');
+    expect(statusOverlay({ ...idle, bleeding: true, burning: true })).toBe('fire.burn');
   });
 });
 

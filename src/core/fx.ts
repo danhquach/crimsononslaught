@@ -64,20 +64,30 @@ export interface EnemyStatus {
   readonly slowed: boolean;
   readonly frozen: boolean;
   readonly stunned: boolean;
+  /** In a stagger (#139): the short stop, ranked under the stun it can share the enemy with. */
+  readonly staggered: boolean;
+  /** Bleeding (#139): a damage-over-time, ranked under a burn. */
+  readonly bleeding: boolean;
   /** Body radius: the tank and the boss burn with the big flame. */
   readonly radius: number;
 }
 
 /**
- * The one overlay an enemy shows, or null for none. A run has one spell, so
- * at most one family applies; within Ice the freeze block covers the slow.
- * The order below only matters if that ever changes: the harder stop wins.
+ * The one overlay an enemy shows, or null for none. A loadout carries up to
+ * three spells (Phase 2), so several statuses can hold one enemy at once; the
+ * harder stop wins, a stop beats a slow, and a slow beats a damage-over-time.
+ * Within Ice the freeze block covers the slow; a stun outranks a stagger
+ * because the enemy is stopped for longer.
+ *
+ * Stagger and bleed borrow the stun and burn clips until #145 lands
+ * `lightning.stagger` and `earth.bleed`.
  */
 export function statusOverlay(status: Readonly<EnemyStatus>): string | null {
   if (status.frozen) return 'ice.freeze';
   if (status.stunned) return 'lightning.stun';
+  if (status.staggered) return 'lightning.stun';
   if (status.slowed) return 'ice.slow';
-  if (status.burning) {
+  if (status.burning || status.bleeding) {
     return status.radius >= LARGE_BURN_MIN_RADIUS ? 'fire.burnBig' : 'fire.burn';
   }
   return null;

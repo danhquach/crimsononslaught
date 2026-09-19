@@ -49,6 +49,8 @@ export class OverlayPool {
         slowed: enemy.slowed,
         frozen: enemy.isFrozen,
         stunned: enemy.isStunned,
+        staggered: enemy.isStaggered,
+        bleeding: enemy.isBleeding,
         radius: enemy.bodyRadius,
       });
       if (clip && this.group.scene.anims.exists(clip)) wanted.set(enemy, clip);

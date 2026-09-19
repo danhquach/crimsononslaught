@@ -106,7 +106,7 @@ export interface CompanionStats {
   slowDuration?: number;
   /** Earth: knockback distance in px. */
   knockback?: number;
-  /** Lightning: seconds of stagger on hit. Applied once #139 lands the effect. */
+  /** Lightning: seconds of stagger on hit (#139). */
   staggerDuration?: number;
 }
 

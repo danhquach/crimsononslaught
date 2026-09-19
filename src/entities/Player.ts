@@ -63,6 +63,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private gemPickupRadius = PICKUP_RADIUS;
   /** HP per second healed continuously; the Regeneration passive raises it (CO-110). */
   private hpRegenPerSecond = 0;
+  /** Fraction of each hit removed before HP; the Ward passive raises it (#139, spec §4.1). */
+  private damageReduction = 0;
   private facing: Facing = DEFAULT_FACING;
   /** Run-clock ms of death clip still to play; the death event fires when it runs out. */
   private deathMs = 0;
@@ -124,9 +126,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.show({ moving: x !== 0 || y !== 0 });
   }
 
-  /** Spec §5: a hit costs HP and grants 0.5 s of invulnerability; hits inside it are ignored. */
+  /** Spec §5: a hit costs HP, less the profile's damage reduction (#139), and grants 0.5 s of invulnerability; hits inside it are ignored. */
   takeDamage(amount: number): void {
-    const { state, damaged, died } = takeDamage(this.health, amount);
+    const { state, damaged, died } = takeDamage(this.health, amount, this.damageReduction);
     this.setHealth(state);
     if (!damaged) return;
     emitRunEvent(this.scene.events, 'hp', { hp: state.hp, maxHp: state.maxHp });
@@ -154,6 +156,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** Passive-driven regeneration in HP per second (spec §4.1); 0 is none. */
   setHpRegen(hpPerSecond: number): void {
     this.hpRegenPerSecond = Math.max(0, hpPerSecond);
+  }
+
+  /** Passive-driven damage reduction, 0–1 (spec §4.1); `core/status.ts` clamps what it is handed. */
+  setDamageReduction(fraction: number): void {
+    this.damageReduction = fraction;
   }
 
   /**

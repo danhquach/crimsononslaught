@@ -11,6 +11,7 @@
  */
 
 import { INVULN_MS, PLAYER_MAX_HP } from '../config/player';
+import { reduceDamage } from './status';
 
 /** Alpha the sprite drops to on the dark half of a flicker. */
 export const FLICKER_ALPHA = 0.3;
@@ -46,15 +47,23 @@ export function isInvulnerable(state: Readonly<HealthState>): boolean {
 }
 
 /**
- * Apply `amount` damage. Hits during the invulnerability window are ignored
- * outright — they neither damage nor refresh the window — so a swarm standing
- * on the player still only lands one hit per 0.5 s.
+ * Apply `amount` damage, less the player's `reduction` (Phase 2 spec §6.2:
+ * `damageReduction` lands here, after the shields and before the
+ * invulnerability window, so it shrinks the number the player sees rather than
+ * how often they are hit). Hits during the window are ignored outright — they
+ * neither damage nor refresh the window — so a swarm standing on the player
+ * still only lands one hit per 0.5 s.
  */
-export function takeDamage(state: Readonly<HealthState>, amount: number): DamageResult {
-  const blocked = !(amount > 0) || isInvulnerable(state) || isDead(state);
+export function takeDamage(
+  state: Readonly<HealthState>,
+  amount: number,
+  reduction = 0,
+): DamageResult {
+  const taken = reduceDamage(amount, reduction);
+  const blocked = !(taken > 0) || isInvulnerable(state) || isDead(state);
   if (blocked) return { state: { ...state }, damaged: false, died: false };
 
-  const hp = Math.max(0, state.hp - amount);
+  const hp = Math.max(0, state.hp - taken);
   return {
     state: { ...state, hp, invulnMs: INVULN_MS },
     damaged: true,

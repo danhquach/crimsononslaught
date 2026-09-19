@@ -89,8 +89,9 @@ export class EnemyPool {
   }
 
   /**
-   * Step every live enemy toward `target`. Burn damage owed this frame is handed
-   * to `onDamage` (CO-044) so the run applies it and its kills count.
+   * Step every live enemy toward `target`. Damage-over-time owed this frame —
+   * burn (CO-044) and bleed (#139) — is handed to `onDamage` so the run applies
+   * it and its kills count.
    */
   update(
     deltaMs: number,
@@ -99,8 +100,8 @@ export class EnemyPool {
   ): void {
     for (const child of this.group.getChildren()) {
       if (!(child instanceof Enemy) || !child.active) continue;
-      const burn = child.chase(deltaMs, target);
-      if (burn > 0) onDamage?.(child, burn);
+      const dot = child.chase(deltaMs, target);
+      if (dot > 0) onDamage?.(child, dot);
     }
     this.releaseDeadBoss();
   }

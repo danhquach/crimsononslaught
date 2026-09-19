@@ -56,7 +56,7 @@ export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
    * Put one hit on the player through this shield and return what is left for
    * their HP. Called from `GameScene`'s one player-intake path, before
    * `Player.takeDamage` (spec §6.2: a shield absorbs before `damageReduction`,
-   * which lands with #139).
+   * which `core/health.ts` applies to what passes through — #139).
    */
   absorbDamage(amount: number): number {
     const result = absorb(this.state, amount, this.rule);
