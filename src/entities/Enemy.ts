@@ -28,6 +28,7 @@ import {
   type FrostState,
 } from '../core/frostNova';
 import { tickBoulderCooldown, tryBoulderHit } from '../core/orbitingBoulders';
+import { NO_FORCE, confineVelocity, heldForce, sumVelocities } from '../core/vortex';
 import { PLACEHOLDERS, type TextureKey } from '../config/colors';
 import { clearClip, clipDurationMs, showClip } from '../render/animate';
 
@@ -77,6 +78,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private stunS = 0;
   /** Seconds before a boulder may hit this enemy again; 0 when it may. */
   private boulderCooldownS = 0;
+  /** Velocity the spells have asked for since the last chase step (#136); spent and cleared by it. */
+  private force: Readonly<Vec2> = NO_FORCE;
   private facing: Facing = DEFAULT_FACING;
   /** Run-clock ms left of the arrival hold, the hurt flash and the death clip. */
   private spawnMs = 0;
@@ -148,6 +151,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.frost = { ...NO_FROST };
     this.stunS = 0;
     this.boulderCooldownS = 0;
+    this.force = NO_FORCE;
     this.facing = DEFAULT_FACING;
     this.hurtMs = 0;
     this.deathMs = 0;
@@ -205,12 +209,15 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   chase(deltaMs: number, target: Readonly<Vec2>): number {
     if (this.dying) {
+      this.force = NO_FORCE;
       this.deathMs -= deltaMs;
       if (this.deathMs <= 0) this.despawn();
       return 0;
     }
     if (this.spawnMs > 0) {
       // Arriving: the clip plays out where it landed before the chase starts.
+      // What a vortex asked meanwhile is dropped, not saved up into one lurch.
+      this.force = NO_FORCE;
       this.spawnMs -= deltaMs;
       this.setVelocity(0, 0);
       if (this.spawnMs > 0) return 0;
@@ -219,7 +226,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.contactCooldownMs = tickContactCooldown(this.contactCooldownMs, deltaMs);
     const deltaS = deltaMs / 1000;
     const speedFactor = frostSpeedFactor(this.frost) * stunSpeedFactor(this.stunS);
-    const { x, y } = this.steer(deltaS, target, speedFactor);
+    const { x, y } = this.move(this.steer(deltaS, target, speedFactor), speedFactor, deltaS);
     this.setVelocity(x, y);
     this.facing = facingFromVector({ x, y }, this.facing);
     // The fast enemy's sheet is drawn facing up; it turns to its heading.
@@ -243,6 +250,33 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   protected steer(_deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
     return chaseVelocity(this, target, ENEMY_ARCHETYPES[this.kind].speed * speedFactor);
+  }
+
+  /**
+   * The velocity the body gets: the steering plus whatever the spells asked for
+   * through `addForce` since the last step (#136), spent here. With a force in
+   * play the step is kept inside the arena, the way `knockBack` clamps; a plain
+   * chase is left alone, since the spawn ring sits outside the bounds.
+   */
+  private move(steering: Readonly<Vec2>, speedFactor: number, deltaS: number): Vec2 {
+    if (this.force.x === 0 && this.force.y === 0) return { x: steering.x, y: steering.y };
+    const force = heldForce(this.force, speedFactor);
+    this.force = NO_FORCE;
+    return confineVelocity(
+      this,
+      sumVelocities(steering, force),
+      deltaS,
+      this.scene.physics.world.bounds,
+    );
+  }
+
+  /**
+   * #136: ask for `velocity` on top of the chase this step. A vortex calls it
+   * for every enemy it holds, every frame; several calls add up, and the next
+   * `chase` spends the total and forgets it, so a pull that stops stops.
+   */
+  addForce(velocity: Readonly<Vec2>): void {
+    this.force = sumVelocities(this.force, velocity);
   }
 
   /** Spec §5 Fire: set (or refresh) a burn of `dps` for the burn duration. */
