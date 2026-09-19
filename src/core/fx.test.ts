@@ -3,6 +3,7 @@ import { ANIMATIONS } from '../config/animations';
 import { ENEMY_ARCHETYPES } from '../config/enemies';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { BASE_AREA_STATS } from '../config/areas';
+import { BASE_METEOR_STATS } from '../config/strikes';
 import {
   CHAIN_CYCLE_MS,
   areaScale,
@@ -14,6 +15,7 @@ import {
   novaScale,
   spinTimeScale,
   statusOverlay,
+  telegraphScale,
   type EnemyStatus,
 } from './fx';
 
@@ -43,6 +45,12 @@ describe('effect scales (CO-082)', () => {
     expect(areaScale(BASE_AREA_STATS.ice_blizzard.radius)).toBeCloseTo(1.8);
     // A block with no radius draws nothing rather than a mirrored ring.
     expect(areaScale(-50)).toBe(0);
+  });
+
+  it('draws a telegraph at radius / 100, so the ring is the blast to come', () => {
+    expect(telegraphScale(100)).toBe(1);
+    expect(telegraphScale(BASE_METEOR_STATS.aoeRadius)).toBeCloseTo(1.1);
+    expect(telegraphScale(-50)).toBe(0);
   });
 
   it('spins at the authored rate at the base orbit speed and in proportion above it', () => {

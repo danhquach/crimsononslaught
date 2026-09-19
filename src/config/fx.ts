@@ -70,6 +70,22 @@ export const MAX_LIVE_AREAS = 16;
  */
 export const AREA_SCALE_RADIUS = 100;
 
+/**
+ * Sky-strike telegraphs (#138) that may be counting down at once, across every
+ * spell casting them. One Meteor holds at most one — a 1 s fall against a 4 s
+ * cooldown, halved at most by a stacked Haste — so the cap is far above what a
+ * run reaches and exists to bound the pool rather than to shape play. Past it
+ * a cast lands nothing, the rule every pool follows.
+ */
+export const MAX_LIVE_TELEGRAPHS = 8;
+
+/**
+ * A telegraph is drawn at `radius / TELEGRAPH_SCALE_RADIUS`, so the ring covers
+ * exactly the blast to come: scale 1 at the 100 px half-width of the
+ * `fx_telegraph` placeholder (`config/colors.ts`, held to it by `fx.test.ts`).
+ */
+export const TELEGRAPH_SCALE_RADIUS = 100;
+
 /** Effects sit above enemies so a hit reads even in a crowd. */
 export const FX_DEPTH = 5;
 

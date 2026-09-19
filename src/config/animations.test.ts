@@ -120,10 +120,10 @@ describe('static texture keys', () => {
 
   it('covers every key whose art has landed', () => {
     // The companion's sheets are #146, and the ice bolt's flight art, the ice
-    // shield's layer and the ground-area ring are #145; all keep their
-    // placeholder until then.
+    // shield's layer, the ground-area ring and the strike telegraph are #145;
+    // all keep their placeholder until then.
     const withoutArt = TEXTURE_KEYS.filter((key) => STATIC_FRAMES[key] === undefined);
-    expect(withoutArt).toEqual(['companion', 'proj_ice', 'shield_ice', 'fx_area']);
+    expect(withoutArt).toEqual(['companion', 'proj_ice', 'shield_ice', 'fx_area', 'fx_telegraph']);
   });
 
   it('resolves every mapped key to a real atlas frame', () => {

@@ -14,8 +14,10 @@ import {
   MAX_LIVE_AREAS,
   MAX_LIVE_FX,
   MAX_LIVE_OVERLAYS,
+  MAX_LIVE_TELEGRAPHS,
   NOVA_SCALE_RADIUS,
   SPIN_BASE_ORBIT_SPEED,
+  TELEGRAPH_SCALE_RADIUS,
 } from './fx';
 import { PLACEHOLDERS } from './colors';
 import { BASE_SPELL_STATS } from './spells';
@@ -52,6 +54,14 @@ describe('fx config (CO-082)', () => {
     // that wide or the ring would not outline the patch that ticks.
     expect(PLACEHOLDERS.fx_area.width).toBe(AREA_SCALE_RADIUS * 2);
     expect(PLACEHOLDERS.fx_area.height).toBe(PLACEHOLDERS.fx_area.width);
+  });
+
+  it('caps telegraphs above what a run can hold and scales them against their ring', () => {
+    // One strike spell, one 1 s fall against a 4 s cooldown (#138): the cap is
+    // several times the reachable peak.
+    expect(MAX_LIVE_TELEGRAPHS).toBeGreaterThanOrEqual(8);
+    expect(PLACEHOLDERS.fx_telegraph.width).toBe(TELEGRAPH_SCALE_RADIUS * 2);
+    expect(PLACEHOLDERS.fx_telegraph.height).toBe(PLACEHOLDERS.fx_telegraph.width);
   });
 
   it('lays a ground area on the arena floor and under the crowd', () => {

@@ -34,11 +34,18 @@ import type {
   IceShieldStats,
   IceStats,
   LightningStats,
+  MeteorStats,
 } from '../core/spellStats';
 import { buildLoadout } from '../core/loadout';
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
 import { isPassiveId, type PlayerProfile } from '../config/passives';
 import { AREA_CARDS, AREA_SPELL_IDS, BASE_AREA_STATS, isAreaSpellId } from '../config/areas';
+import {
+  BASE_STRIKE_STATS,
+  STRIKE_CARDS,
+  STRIKE_SPELL_IDS,
+  isStrikeSpellId,
+} from '../config/strikes';
 import { ARENA_DEPTH } from '../config/fx';
 import type { SpellStatBlock } from '../config/spellFields';
 import { BASE_SPELL_STATS, SPELL_CARDS, isSpellId } from '../config/spells';
@@ -64,11 +71,13 @@ import { FireballSpell } from '../spells/FireballSpell';
 import { FrostNovaSpell } from '../spells/FrostNovaSpell';
 import { CompanionSpell } from '../spells/CompanionSpell';
 import { GroundAreaSpell } from '../spells/GroundAreaSpell';
+import { MeteorSpell } from '../spells/MeteorSpell';
 import { EarthShieldSpell } from '../spells/EarthShieldSpell';
 import { IceShieldSpell } from '../spells/IceShieldSpell';
 import { OrbitingBouldersSpell } from '../spells/OrbitingBouldersSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
 import { AreaPool } from '../systems/AreaPool';
+import { TelegraphPool } from '../systems/TelegraphPool';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { FxPool } from '../systems/FxPool';
@@ -127,6 +136,8 @@ export class GameScene extends Phaser.Scene {
   private overlays!: OverlayPool;
   /** Persistent ground areas (#135): every patch on the ground, whichever spell placed it. */
   private areas!: AreaPool;
+  /** Sky strikes in the air (#138): every telegraph counting down, whichever spell cast it. */
+  private telegraphs!: TelegraphPool;
   private rng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
@@ -223,6 +234,29 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
+  /**
+   * Test hook (#138): the strikes in the air right now — how long each has left
+   * to fall and how far it will reach — plus what the spells casting them have
+   * committed, landed and hit. The browser suite watches a telegraph appear,
+   * hold, and land on the crowd.
+   */
+  get strikeReport(): {
+    live: { radius: number; remainingS: number }[];
+    committed: number;
+    landed: number;
+    hits: number;
+  } {
+    const spells = this.spells.spells.filter(
+      (spell): spell is MeteorSpell => spell instanceof MeteorSpell,
+    );
+    return {
+      live: this.telegraphs.telegraphs.map((t) => ({ radius: t.radius, remainingS: t.remainingS })),
+      committed: spells.reduce((total, spell) => total + spell.committed, 0),
+      landed: spells.reduce((total, spell) => total + spell.landed, 0),
+      hits: spells.reduce((total, spell) => total + spell.hits, 0),
+    };
+  }
+
   init(data: unknown): void {
     this.payload = isGamePayload(data) ? data : null;
     // Phaser keeps the last `start(key, data)` payload in settings.data and
@@ -266,6 +300,7 @@ export class GameScene extends Phaser.Scene {
     this.fx = new FxPool(this);
     this.overlays = new OverlayPool(this);
     this.areas = new AreaPool(this);
+    this.telegraphs = new TelegraphPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
     // Its colliders belong to the physics world; the scene keeps the system
     // itself only so a spell equipped mid-run can register its group too.
@@ -376,6 +411,9 @@ export class GameScene extends Phaser.Scene {
     // rather than a step late, and before the physics step, so the enemies a
     // tick slowed move at the speed it just set.
     this.areas.update(step.deltaMs);
+    // Same reasoning: a strike telegraphed this step starts falling here, and
+    // one that lands here has hit the crowd before the bodies move on.
+    this.telegraphs.update(step.deltaMs);
     this.physics.world.update(time, step.deltaMs);
     this.physics.world.postUpdate();
     // After the bodies have settled, so an overlay sits on where its host is
@@ -473,6 +511,17 @@ export class GameScene extends Phaser.Scene {
           this.areas,
           this.rng,
         );
+      case 'fire_meteor':
+        return new MeteorSpell(
+          spellId,
+          this.player,
+          this.enemies,
+          stats as Readonly<MeteorStats>,
+          damage,
+          this.telegraphs,
+          this.fx,
+          this.rng,
+        );
       case 'earth_shield':
         return new EarthShieldSpell(
           this,
@@ -499,6 +548,7 @@ export class GameScene extends Phaser.Scene {
     if (isCompanionSpellId(spellId)) return BASE_COMPANION_STATS[spellId];
     if (isShieldSpellId(spellId)) return BASE_SHIELD_STATS[spellId];
     if (isAreaSpellId(spellId)) return BASE_AREA_STATS[spellId];
+    if (isStrikeSpellId(spellId)) return BASE_STRIKE_STATS[spellId];
     return undefined;
   }
 
@@ -536,6 +586,11 @@ export class GameScene extends Phaser.Scene {
         id,
         name: AREA_CARDS[id].name,
         description: AREA_CARDS[id].description,
+      })),
+      ...STRIKE_SPELL_IDS.map((id) => ({
+        id,
+        name: STRIKE_CARDS[id].name,
+        description: STRIKE_CARDS[id].description,
       })),
     ].filter((card) => !casting.has(card.id));
   }

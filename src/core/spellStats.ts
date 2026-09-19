@@ -178,6 +178,27 @@ export interface GroundAreaStats {
   slowDuration: number;
 }
 
+/**
+ * Meteor (#138, spec §9.2): a strike committed to a ground point near a target,
+ * telegraphed for `fallDelay`, landing on the whole crowd within `aoeRadius`.
+ */
+export interface MeteorStats {
+  /** Seconds between casts. */
+  cooldown: number;
+  /** Damage the landing deals, scaled by `aoeDamageFactor` for everything it reaches. */
+  damage: number;
+  /** How far the landing reaches from the committed point, in px. */
+  aoeRadius: number;
+  /** Landing damage as a fraction of `damage`; Meteor's is Big Blast's 1 always. */
+  aoeDamageFactor: number;
+  /** Strikes per cast. */
+  projectiles: number;
+  /** How far from the player a target may be picked, in px. */
+  targetRange: number;
+  /** Seconds between the cast and the landing — how long the telegraph shows. */
+  fallDelay: number;
+}
+
 /** Which stat block each spell owns. */
 export interface SpellStatsBySpell {
   fire: FireStats;
@@ -192,6 +213,7 @@ export interface SpellStatsBySpell {
   earth_shield: EarthShieldStats;
   ice_blizzard: GroundAreaStats;
   earth_quake: GroundAreaStats;
+  fire_meteor: MeteorStats;
 }
 
 /** Every id a `Spell` may carry: the Phase 1 four plus the Phase 2 spells that exist. */

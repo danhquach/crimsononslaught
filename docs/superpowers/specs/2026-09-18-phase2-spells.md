@@ -444,6 +444,19 @@ heading. It expires after `duration` seconds of run clock — a curving flight
 covers more ground than the line to its target, so a distance range would
 expire it late or never on a target it circles.
 
+Meteor's sky strike (#138) aims at the nearest enemy within `targetRange` and
+**commits to a ground point** scattered around it — within `METEOR_SCATTER_PX`
+(24 px, a tuning value in `config/strikes.ts` the table above does not carry;
+#147's pass owns it) through the seeded RNG, so a replay lands every meteor on
+the same spot. A telegraph ring the size of `aoeRadius` holds on that point for
+`fallDelay` on the run clock — a paused run holds it mid-fall — and the strike
+then lands on the point, not on the enemy: everything within `aoeRadius` of it
+takes `damage × aoeDamageFactor`, whether the enemy it aimed at is still alive,
+still standing there or long gone. With nothing in `targetRange` the cast is
+spent on nothing rather than dropped at the player's feet. The telegraph is drawn
+above the crowd, not on the floor with the ground areas, because a warning the
+enemy cap can bury is not a warning.
+
 ### 9.3 Ice
 
 | Spell | id | Behaviour | Needs |

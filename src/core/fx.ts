@@ -6,6 +6,7 @@ import {
   LARGE_BURN_MIN_RADIUS,
   NOVA_SCALE_RADIUS,
   SPIN_BASE_ORBIT_SPEED,
+  TELEGRAPH_SCALE_RADIUS,
 } from '../config/fx';
 import type { Vec2 } from './input';
 
@@ -31,6 +32,11 @@ export function novaScale(radius: number): number {
 /** #135: a ground area is drawn at `radius / 100`, so the ring is the patch that ticks. */
 export function areaScale(radius: number): number {
   return Math.max(0, radius) / AREA_SCALE_RADIUS;
+}
+
+/** #138: a strike telegraph is drawn at `radius / 100`, so the ring is the blast to come. */
+export function telegraphScale(radius: number): number {
+  return Math.max(0, radius) / TELEGRAPH_SCALE_RADIUS;
 }
 
 /**
