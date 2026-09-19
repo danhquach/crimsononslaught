@@ -217,22 +217,21 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
 
   /**
    * What one companion attack costs the enemy it lands on: `damage`, plus the
-   * element's own mark — Fire's burn, Ice's chill, Earth's shove.
+   * element's own mark — Fire's burn, Ice's chill, Lightning's stagger (#139),
+   * Earth's shove.
    *
-   * Lightning's `staggerDuration` is carried in the block but not applied yet:
-   * stagger is a status the game does not have, and #139 introduces it. The one
-   * line that applies it belongs with that ticket rather than with a stand-in
-   * that would have to be unpicked. Fire's `burnDuration` is likewise the
-   * global `BURN_DURATION` today — `config/companions.test.ts` fails if the two
-   * ever disagree, so the block cannot quietly promise a window nothing honours.
+   * Fire's `burnDuration` is the global `BURN_DURATION` today —
+   * `config/companions.test.ts` fails if the two ever disagree, so the block
+   * cannot quietly promise a window nothing honours.
    */
   private onCompanionHit(enemy: Enemy): void {
-    const { damage, burn, slowPct, slowDuration, knockback } = this.companionStats;
+    const { damage, burn, slowPct, slowDuration, staggerDuration, knockback } = this.companionStats;
     this.landed += 1;
     const clip = COMPANION_FX[this.id];
     this.fx.burst(clip.hit, enemy.x, enemy.y, { scale: clip.hitScale });
     if (burn) enemy.applyBurn(burn);
     if (slowPct) enemy.applyFrost({ slowPct, slowDuration: slowDuration ?? 0, freeze: false });
+    if (staggerDuration) enemy.applyStagger(staggerDuration);
     // The shove is measured before the blow, so a killing hit drops its gems
     // where the enemy stood rather than where it would have been thrown.
     const push = knockback ? knockbackVector(this.position, enemy, knockback, this.caster) : null;

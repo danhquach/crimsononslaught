@@ -28,6 +28,16 @@ import {
   type FrostState,
 } from '../core/frostNova';
 import { tickBoulderCooldown, tryBoulderHit } from '../core/orbitingBoulders';
+import {
+  NO_BLEED,
+  applyBleed,
+  applyStagger,
+  hasBleed,
+  staggerSpeedFactor,
+  tickBleed,
+  tickStagger,
+  type BleedState,
+} from '../core/status';
 import { NO_FORCE, confineVelocity, heldForce, sumVelocities } from '../core/vortex';
 import { PLACEHOLDERS, type TextureKey } from '../config/colors';
 import { clearClip, clipDurationMs, showClip } from '../render/animate';
@@ -73,9 +83,12 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private hp = 0;
   private contactCooldownMs = 0;
   private burn: BurnState = { ...NO_BURN };
+  private bleed: BleedState = { ...NO_BLEED };
   private frost: FrostState = { ...NO_FROST };
   /** Seconds of stun left; 0 when moving freely. */
   private stunS = 0;
+  /** Seconds of stagger left (#139); its own clock, so it and a stun both run out on their own. */
+  private staggerS = 0;
   /** Seconds before a boulder may hit this enemy again; 0 when it may. */
   private boulderCooldownS = 0;
   /** Velocity the spells have asked for since the last chase step (#136); spent and cleared by it. */
@@ -119,6 +132,16 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return this.stunS > 0;
   }
 
+  /** #139: in the short stop of a stagger; the overlay pool marks it. */
+  get isStaggered(): boolean {
+    return this.staggerS > 0;
+  }
+
+  /** #139: a bleed is ticking on it; the overlay pool marks it. */
+  get isBleeding(): boolean {
+    return hasBleed(this.bleed);
+  }
+
   /** HP left; 0 once dead. What the boss bar (CO-051) and the debug readout show. */
   get remainingHp(): number {
     return this.hp;
@@ -148,8 +171,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.hp = stats.hp;
     this.contactCooldownMs = 0;
     this.burn = { ...NO_BURN };
+    this.bleed = { ...NO_BLEED };
     this.frost = { ...NO_FROST };
     this.stunS = 0;
+    this.staggerS = 0;
     this.boulderCooldownS = 0;
     this.force = NO_FORCE;
     this.facing = DEFAULT_FACING;
@@ -204,8 +229,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   /**
    * Driven by `EnemyPool`, not Phaser, so a paused Game freezes the crowd with it.
-   * Returns the burn damage this frame owes, for the caller to apply through the
-   * run's damage path — a burn kill drops gems like any other.
+   * Returns the damage-over-time this frame owes — burn plus bleed — for the
+   * caller to apply through the run's damage path, so a tick kill drops gems
+   * like any other. A dying enemy owes nothing: its statuses stop paying out
+   * the frame it dies.
    */
   chase(deltaMs: number, target: Readonly<Vec2>): number {
     if (this.dying) {
@@ -225,7 +252,12 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.hurtMs = Math.max(0, this.hurtMs - deltaMs);
     this.contactCooldownMs = tickContactCooldown(this.contactCooldownMs, deltaMs);
     const deltaS = deltaMs / 1000;
-    const speedFactor = frostSpeedFactor(this.frost) * stunSpeedFactor(this.stunS);
+    // Three stops multiply, so an enemy under a stun and a stagger stands
+    // still until the longer of the two has run out (#139).
+    const speedFactor =
+      frostSpeedFactor(this.frost) *
+      stunSpeedFactor(this.stunS) *
+      staggerSpeedFactor(this.staggerS);
     const { x, y } = this.move(this.steer(deltaS, target, speedFactor), speedFactor, deltaS);
     this.setVelocity(x, y);
     this.facing = facingFromVector({ x, y }, this.facing);
@@ -236,11 +268,15 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.frost = frost.state;
     const stun = tickStun(this.stunS, deltaS);
     this.stunS = stun.remainingS;
+    const stagger = tickStagger(this.staggerS, deltaS);
+    this.staggerS = stagger.remainingS;
     this.boulderCooldownS = tickBoulderCooldown(this.boulderCooldownS, deltaS);
-    if (frost.ended || stun.ended) this.refreshTint();
+    if (frost.ended || stun.ended || stagger.ended) this.refreshTint();
     const burn = tickBurn(this.burn, deltaS);
     this.burn = burn.state;
-    return burn.damage;
+    const bleed = tickBleed(this.bleed, deltaS);
+    this.bleed = bleed.state;
+    return burn.damage + bleed.damage;
   }
 
   /**
@@ -296,6 +332,17 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.refreshTint();
   }
 
+  /** #139: a short stop for `staggerS` s (refreshed, never stacked), on its own clock beside any stun. */
+  applyStagger(staggerS: number): void {
+    this.staggerS = applyStagger(this.staggerS, staggerS);
+    this.refreshTint();
+  }
+
+  /** #139: set (or refresh) a bleed of `dps` for `durationS`; the stronger and longer of two hits stands. */
+  applyBleed(dps: number, durationS: number): void {
+    this.bleed = applyBleed(this.bleed, dps, durationS);
+  }
+
   /**
    * Spec §5 Earth: claim a boulder hit. `true` means it lands and this enemy's
    * own 0.4 s window has just opened; any boulder inside it is ignored.
@@ -318,9 +365,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     );
   }
 
-  /** The tint says which effect holds the enemy: a stun over a slow, nothing when it moves freely. */
+  /** The tint says which effect holds the enemy: a stop (stun or stagger) over a slow, nothing when it moves freely. */
   protected refreshTint(): void {
-    if (this.stunS > 0) this.setTintFill(STUN_TINT);
+    if (this.stunS > 0 || this.staggerS > 0) this.setTintFill(STUN_TINT);
     else if (this.slowed) this.setTintFill(FROST_TINT);
     else this.clearTint();
   }

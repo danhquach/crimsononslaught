@@ -630,7 +630,7 @@ export class GameScene extends Phaser.Scene {
   /**
    * Put a hit through the run's shields and return what is left for the
    * player's HP (#134, spec §9.3: a shield absorbs before `damageReduction`,
-   * which applies in `core/health.ts` and lands with #139).
+   * which `core/health.ts` applies to what passes through — #139).
    *
    * Each shield takes what it can in equip order, so a run carrying two of them
    * — only the `?loadout=` hook can, an element owns one — spends the first
@@ -801,6 +801,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setMoveSpeed(after.moveSpeed);
     this.player.setPickupRadius(after.pickupRadius);
     this.player.setHpRegen(after.hpRegen);
+    this.player.setDamageReduction(after.damageReduction);
     if (after.maxHp !== before.maxHp) this.player.grantMaxHp(after.maxHp - before.maxHp, true);
   }
 
