@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { menuStep, pressedEdges, stickVector, wrapIndex, type MenuInputState } from '../core/input';
+import { audioOf } from '../render/audio';
 
 /**
  * Shared Phaser-side input helper. The math lives in `core/input.ts`; this file
@@ -52,7 +53,12 @@ export function attachMenuInput(scene: Phaser.Scene, items: readonly MenuItem[])
   // the pad appears is not read as a fresh press.
   let prev: MenuInputState | null = null;
 
+  // The move cue plays here (CO-102) and the confirm cue in the action each
+  // item runs, so a click, a key and a pad press through the same action all
+  // sound once.
+  const audio = audioOf(scene);
   const select = (index: number): void => {
+    if (index !== selected) audio.play('ui.move');
     selected = index;
     items.forEach((item, i) => item.setSelected(i === selected));
   };

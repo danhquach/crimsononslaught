@@ -111,6 +111,12 @@ export function nearestEnemies<T extends Vec2>(
  */
 export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
   readonly id: S;
+  /**
+   * Told after every cast the scheduler pays out (CO-102: the cast cue). A
+   * listener, not a participant: it runs after `cast()` and returns nothing, so
+   * it cannot change what the cast did or when the next one lands.
+   */
+  onCast: (() => void) | null = null;
   private currentStats: SpellStatsBySpell[S];
   private readonly scheduler = new CastScheduler();
 
@@ -152,7 +158,10 @@ export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
    */
   protected tick(deltaS: number): void {
     const casts = this.scheduler.due(deltaS, this.cooldown);
-    for (let i = 0; i < casts; i += 1) this.cast();
+    for (let i = 0; i < casts; i += 1) {
+      this.cast();
+      this.onCast?.();
+    }
   }
 
   /**

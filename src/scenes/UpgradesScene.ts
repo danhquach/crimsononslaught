@@ -4,6 +4,7 @@ import { SAVE_REGISTRY_KEY, SCENE } from '../core/scenePayloads';
 import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { buyUpgrade, canBuy, isUnlocked, nextCost, upgradeRank } from '../core/upgrades';
 import { storeSaveJson } from '../storage/localSave';
+import { audioOf } from '../render/audio';
 import { attachMenuInput, type MenuItem } from './input';
 import { addTextButton, textButtonItem } from './ui';
 
@@ -86,6 +87,7 @@ export class UpgradesScene extends Phaser.Scene {
   buy(upgradeId: string): boolean {
     const result = buyUpgrade(this.save, upgradeId);
     if (!result.ok) return false;
+    audioOf(this).play('ui.confirm');
     this.commit(result.save);
     return true;
   }
@@ -141,6 +143,7 @@ export class UpgradesScene extends Phaser.Scene {
 
   /** First press arms the wipe and relabels the button; the second wipes. Leaving the scene disarms it. */
   private onWipePressed(button: Phaser.GameObjects.Text): void {
+    audioOf(this).play('ui.confirm');
     if (!this.wipeArmed) {
       this.wipeArmed = true;
       button.setText('Really wipe? Click again');
@@ -161,6 +164,7 @@ export class UpgradesScene extends Phaser.Scene {
   private back(): void {
     if (this.leaving) return;
     this.leaving = true;
+    audioOf(this).play('ui.back');
     this.scene.start(SCENE.spellSelect);
   }
 }

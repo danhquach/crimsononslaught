@@ -11,7 +11,9 @@ import {
   type Outcome,
   type ResultPayload,
 } from '../core/scenePayloads';
-import { BOSS_EVENT } from '../core/boss';
+import { BOSS_EVENT, type BossPhasePayload } from '../core/boss';
+import { LOW_HEALTH_RATIO, castSoundFor } from '../config/sounds';
+import { audioOf, type Audio } from '../render/audio';
 import {
   LEVEL_UP_EVENT,
   resolveLevelUp,
@@ -154,6 +156,8 @@ export class GameScene extends Phaser.Scene {
   private offer: readonly OfferCard[] = [];
   /** `?invulnerable=1` (test hook): contact damage is dropped before it reaches the player. */
   private invulnerable = false;
+  /** The game's one audio layer (CO-102); every cue in the run goes through it. */
+  private audio!: Audio;
 
   constructor() {
     super(SCENE.game);
@@ -290,6 +294,7 @@ export class GameScene extends Phaser.Scene {
     this.pendingLevelUps = 0;
     this.offer = [];
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
+    this.audio = audioOf(this);
 
     this.buildArena();
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
@@ -340,11 +345,18 @@ export class GameScene extends Phaser.Scene {
       if (phase === 'boss') this.spawnBoss();
     };
     this.events.on(RUN_EVENT.phase, onPhase);
+    // The boss's wind-up and charge cues (CO-102) follow its cycle events.
+    const onBossPhase = ({ phase }: BossPhasePayload): void => {
+      if (phase === 'telegraph') this.audio.play('boss.telegraph');
+      else if (phase === 'charge') this.audio.play('boss.charge');
+    };
+    this.events.on(BOSS_EVENT.phase, onBossPhase);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(LEVEL_UP_EVENT.pick, onPick);
       this.events.off(PLAYER_EVENT.died, onDied);
       this.events.off(BOSS_EVENT.died, onBossDied);
       this.events.off(RUN_EVENT.phase, onPhase);
+      this.events.off(BOSS_EVENT.phase, onBossPhase);
     });
 
     this.scene.launch(SCENE.hud);
@@ -445,6 +457,15 @@ export class GameScene extends Phaser.Scene {
    * build cannot cast would leave a dead slot rather than fail loudly.
    */
   private createSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
+    const spell = this.buildSpell(spellId, stats);
+    // The cast cue (CO-102) hangs off the spell's own cast hook: one site for
+    // every spell, and nothing the spell does waits on it.
+    const cue = castSoundFor(spellId);
+    if (spell && cue) spell.onCast = () => this.audio.play(cue);
+    return spell;
+  }
+
+  private buildSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
     const damage = (enemy: Enemy, amount: number): void => this.damageEnemy(enemy, amount);
     switch (spellId) {
       case 'fire':
@@ -638,7 +659,18 @@ export class GameScene extends Phaser.Scene {
     // player never felt.
     if (this.player.immune) return;
     const throughShields = this.absorbOnShields(enemy.contactDamage);
-    if (throughShields > 0) this.player.takeDamage(throughShields);
+    if (throughShields <= 0) return;
+    const before = this.player.hp;
+    this.player.takeDamage(throughShields);
+    // Cues (CO-102) read the outcome; they never decide it. The death cue
+    // plays on the killing hit rather than at the end of the death clip.
+    const hp = this.player.hp;
+    if (hp >= before) return;
+    if (hp <= 0) this.audio.play('player.death');
+    else {
+      this.audio.play('player.hurt');
+      if (hp <= this.player.maxHp * LOW_HEALTH_RATIO) this.audio.play('player.lowHealth');
+    }
   }
 
   /**
@@ -663,6 +695,7 @@ export class GameScene extends Phaser.Scene {
   private onGemPickup(gem: XpGem): void {
     const gained = this.gems.collect(gem, this.player);
     if (gained === 0) return;
+    this.audio.play('progress.gem');
     // Avarice multiplies what a gem is worth as it is collected (spec §6.2), so
     // the gem keeps its face value everywhere else. The XP curve carries the
     // fraction: rounding a 1 XP gem would throw every Avarice rank away.
@@ -677,11 +710,17 @@ export class GameScene extends Phaser.Scene {
   private damageEnemy(enemy: Enemy, amount: number): void {
     if (!enemy.active) return;
     const { x, y, enemyType } = enemy;
-    if (!enemy.takeDamage(amount)) return;
+    const boss = enemy instanceof Boss;
+    if (!enemy.takeDamage(amount)) {
+      this.audio.play('enemy.hurt');
+      return;
+    }
     this.run.recordKill();
     // The boss's death is the win (spec §5, CO-051), not a gem drop; it lands
-    // as `BOSS_EVENT.died` once the boss has finished dying.
-    if (!(enemy instanceof Boss)) this.gems.dropFor(enemyType, x, y);
+    // as `BOSS_EVENT.died` once the boss has finished dying. Its death cue
+    // plays on the killing blow, with the clip, not after it.
+    this.audio.play(boss ? 'boss.death' : 'enemy.death');
+    if (!boss) this.gems.dropFor(enemyType, x, y);
   }
 
   /**
@@ -697,6 +736,7 @@ export class GameScene extends Phaser.Scene {
       this.rng.next() * Math.PI * 2,
     );
     this.enemies.spawnBoss(point.x, point.y);
+    this.audio.play('boss.spawn');
   }
 
   /**
@@ -757,6 +797,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.offer = resolution.cards;
     const payload: LevelUpPayload = { offer: resolution.cards };
+    this.audio.play('progress.levelUp');
     this.scene.pause();
     this.scene.launch(SCENE.levelUp, payload);
     return true;
@@ -776,6 +817,7 @@ export class GameScene extends Phaser.Scene {
     }
     const taken = card.kind === 'active' ? this.equipActive(card.id) : this.takePassive(card.id);
     if (!taken) return;
+    this.audio.play('progress.perk');
     // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
     this.run.recordPerk(card.name);
   }

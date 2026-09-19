@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { audioOf } from '../render/audio';
 import type { MenuItem } from './input';
 
 const BUTTON_FILL = '#333333';
@@ -25,7 +26,10 @@ export function addTextButton(
     .setOrigin(0.5)
     .setInteractive({ useHandCursor: true });
 
-  text.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => text.setAlpha(0.8));
+  text.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
+    text.setAlpha(0.8);
+    audioOf(scene).play('ui.move');
+  });
   text.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => text.setAlpha(1));
   text.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, onClick);
   return text;

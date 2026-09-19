@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json && eslint . && prettier --check .",
     "format": "prettier --write .",
-    "art:cut": "node scripts/cut-sheets.mjs"
+    "art:cut": "node scripts/cut-sheets.mjs",
+    "audio:gen": "node scripts/gen-audio.mjs"
   },
   "dependencies": {
     "phaser": "~3.88.2"

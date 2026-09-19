@@ -11,10 +11,12 @@ import {
   TIME_SCALE_REGISTRY_KEY,
 } from '../core/scenePayloads';
 import { validateLoadoutConfig } from '../core/loadout';
-import { parseSave, serializeSave } from '../core/save';
+import { isSave, parseSave, serializeSave } from '../core/save';
 import { validateMeta } from '../core/upgrades';
 import { loadSaveJson, storeSaveJson } from '../storage/localSave';
 import { installAtlas, queueAtlas, warnIfAtlasMissing } from '../render/atlas';
+import { installAudio, queueSounds, warnIfSoundsMissing } from '../render/audio';
+import { writeAudioSettings } from '../core/audioMix';
 import { generatePlaceholderTextures } from '../render/textures';
 
 /**
@@ -30,6 +32,7 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     queueAtlas(this);
+    queueSounds(this);
   }
 
   create(): void {
@@ -55,6 +58,20 @@ export class BootScene extends Phaser.Scene {
     }
     this.registry.set(SAVE_REGISTRY_KEY, parsed.save);
     this.registry.set(SAVE_RESET_REGISTRY_KEY, parsed.status === 'reset');
+
+    // Sound (CO-102): the clips are checked like the atlas, and the one
+    // `Audio` every scene plays through is built on the saved volumes. A
+    // settings change is folded into whatever save is current at that moment
+    // — a run may have been recorded since boot — and stored at once, so a
+    // mute survives a reload without waiting for the run to end.
+    warnIfSoundsMissing(this);
+    installAudio(this, parsed.save.settings, (settings) => {
+      const current: unknown = this.registry.get(SAVE_REGISTRY_KEY);
+      const base = isSave(current) ? current : parsed.save;
+      const save = { ...base, settings: writeAudioSettings(base.settings, settings) };
+      this.registry.set(SAVE_REGISTRY_KEY, save);
+      if (!storeSaveJson(serializeSave(save))) console.warn('[save] could not store settings');
+    });
 
     // Run seed: `?seed=<int>` reproduces a run; otherwise a fresh one per page
     // load. Logged so a bug report can quote it. SpellSelect reads it from the
