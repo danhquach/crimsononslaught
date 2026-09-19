@@ -22,6 +22,7 @@ export const TEXTURE_KEYS = [
   'proj_ice',
   'shield_ice',
   'fx_area',
+  'fx_telegraph',
 ] as const;
 
 export type TextureKey = (typeof TEXTURE_KEYS)[number];
@@ -63,4 +64,9 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // and Earthquake alike — the same call the companions' shared disc makes —
   // until their own art lands (#145). A ring, so the crowd inside stays visible.
   fx_area: { shape: 'ring', color: 0x90a4ae, width: 200, height: 200, thickness: 3 },
+  // #138: where a sky strike will land, drawn at `telegraphScale` of this size
+  // so the ring outlines exactly the blast that is coming. Fire's orange and a
+  // heavier stroke than the area ring, so it reads as a warning over a full
+  // crowd rather than as another patch; its own art is #145.
+  fx_telegraph: { shape: 'ring', color: 0xff8a65, width: 200, height: 200, thickness: 6 },
 };
