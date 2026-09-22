@@ -55,7 +55,7 @@ describe('resultRows', () => {
       ['Time survived', '4:32'],
       ['Level', '8'],
       ['Kills', '1,234'],
-      ['Spell', 'Fireball'],
+      ['Spell', 'Fire Bolt'],
       ['Upgrades taken', 'Power ×2, Meteor'],
     ]);
   });

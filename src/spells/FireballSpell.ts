@@ -17,11 +17,11 @@ import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
 
 /**
- * Fire (spec §5 "Fire — Fireball"): every `cooldown` s a volley of
- * `projectiles` fireballs leaves the caster, each at its own nearest enemy
- * within `range`. A hit deals `damage` to the enemy struck and lights it with
- * `burn` dps, then explodes: `damage * aoeDamageFactor` and the same burn to
- * every other enemy within `aoeRadius` of it.
+ * Fire Bolt (spec §9.2): every `cooldown` s a volley of `projectiles` bolts
+ * leaves the caster, each at its own nearest enemy within `range`. A hit deals
+ * `damage` to the enemy struck, then explodes: `damage * aoeDamageFactor` to
+ * every other enemy within `aoeRadius` of it. Burn is Fire Column's identity
+ * now (spec §9.2), not Fire Bolt's.
  *
  * The rules — targets, splash, explosion damage, burn — live in
  * `core/fireball.ts`; this class owns the projectile pool, registers it with
@@ -97,17 +97,15 @@ export class FireballSpell extends Spell<'fire'> {
     if (!(hitbox instanceof Projectile) || !hitbox.active || !enemy.active) return;
     hitbox.despawn();
 
-    const { damage, aoeRadius, burn } = this.stats;
+    const { damage, aoeRadius } = this.stats;
     // The blast is resolved against the crowd as it stands before the direct
     // hit lands, so a killing blow still explodes at the spot the enemy held.
     const splash = splashTargets(enemy, this.enemies.live, aoeRadius, enemy);
     const blast = explosionDamage(this.stats);
     this.fx.burst('fire.explode', enemy.x, enemy.y, { scale: explosionScale(aoeRadius) });
 
-    enemy.applyBurn(burn);
     this.damage(enemy, damage);
     for (const other of splash) {
-      other.applyBurn(burn);
       this.damage(other, blast);
     }
   }

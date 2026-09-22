@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ENEMY_ARCHETYPES, ENEMY_HURT_MS, type EnemyType } from '../config/enemies';
+import { BURN_DURATION } from '../config/spells';
 import {
   DEFAULT_FACING,
   enemyAnimation,
@@ -315,9 +316,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.force = sumVelocities(this.force, velocity);
   }
 
-  /** Spec §5 Fire: set (or refresh) a burn of `dps` for the burn duration. */
-  applyBurn(dps: number): void {
-    this.burn = applyBurn(this.burn, dps);
+  /** Spec §5 Fire: set (or refresh) a burn of `dps` for `durationS` (default the global burn duration). */
+  applyBurn(dps: number, durationS = BURN_DURATION): void {
+    this.burn = applyBurn(this.burn, dps, durationS);
   }
 
   /** Spec §5 Ice: slow (max, not additive) and maybe freeze; takes effect on the next chase step. */

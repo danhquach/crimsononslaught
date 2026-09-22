@@ -19,7 +19,8 @@ import { cardCenter, collectErrors, readHud, waitForScene } from './game';
 function baseStatsLeaveStatus(spellId: SpellId): boolean {
   switch (spellId) {
     case 'fire':
-      return BASE_SPELL_STATS.fire.burn > 0;
+      // Burn is Fire Column's identity now (spec §9.2); Fire Bolt leaves none.
+      return false;
     case 'ice':
       return BASE_SPELL_STATS.ice.slowPct > 0 || BASE_SPELL_STATS.ice.freezeChance > 0;
     case 'lightning':

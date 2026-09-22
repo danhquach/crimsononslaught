@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SPELLS_BY_ELEMENT, isRosterSpellId, elementOf } from './loadout';
 import { validateSpellFields } from '../core/playerProfile';
-import { BURN_DURATION } from './spells';
 import { ANIMATIONS } from './animations';
 import { TEXTURE_KEYS } from './colors';
 import {
@@ -71,10 +70,11 @@ describe('companion stat blocks', () => {
     expect(BASE_COMPANION_STATS.earth_companion.knockback).toBeGreaterThan(0);
   });
 
-  it('burns for the window the game actually applies', () => {
-    // `Enemy.applyBurn` runs on the global `BURN_DURATION`; a per-hit window is
-    // #139's. Until then a block promising a different one would be a lie.
-    expect(BASE_COMPANION_STATS.fire_companion.burnDuration).toBe(BURN_DURATION);
+  it('burns for a positive window', () => {
+    // `Enemy.applyBurn` takes a per-hit duration now (spec §9.2 Fire Column),
+    // so a companion's own window no longer has to match the global default —
+    // it only has to be a real, positive duration.
+    expect(BASE_COMPANION_STATS.fire_companion.burnDuration).toBeGreaterThan(0);
   });
 
   it('lets a melee companion swing without leaving the player behind', () => {
