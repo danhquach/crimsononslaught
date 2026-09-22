@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ANIMATIONS } from '../config/animations';
-import { ATLAS_KEY, FRAMES } from '../config/frames';
+import { FRAMES } from '../config/frames';
 import { SCENE } from '../core/scenePayloads';
 
 const COLS = 6;
@@ -69,7 +69,7 @@ export class TextureDebugScene extends Phaser.Scene {
       const fit = Math.min(3, (cellH - 34) / info.h, (cellW - 12) / info.w);
 
       const sprite = this.add
-        .sprite(cx, cy - 8, ATLAS_KEY, first)
+        .sprite(cx, cy - 8, info.page, first)
         .setScale(Math.max(1, Math.floor(fit)));
       sprite.play(anim.name);
 

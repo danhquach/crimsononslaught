@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ANIMATIONS, STATIC_FRAMES } from './animations';
 import { TEXTURE_KEYS } from './colors';
-import { FRAMES, FRAME_NAMES } from './frames';
+import { ATLAS_PAGES, FRAMES, FRAME_NAMES } from './frames';
 
 /**
  * The manifest and the atlas are generated artefacts; these tests are the tie
@@ -185,6 +185,33 @@ describe('generated frame data', () => {
     for (const anim of ANIMATIONS) {
       const anchors = new Set(anim.frames.map((f) => `${FRAMES[f].anchorX},${FRAMES[f].anchorY}`));
       expect(anchors.size, anim.name).toBe(1);
+    }
+  });
+});
+
+describe('atlas pages (CO-130)', () => {
+  it('puts every frame on a declared page', () => {
+    const keys = ATLAS_PAGES.map((page) => page.key);
+    for (const name of FRAME_NAMES) {
+      expect(keys, name).toContain(FRAMES[name].page);
+    }
+  });
+
+  it('ships no page without frames on it', () => {
+    const used = new Set(FRAME_NAMES.map((name) => FRAMES[name].page));
+    expect(ATLAS_PAGES.filter((page) => !used.has(page.key))).toEqual([]);
+  });
+
+  it('gives each page its own key and files', () => {
+    expect(new Set(ATLAS_PAGES.map((p) => p.key)).size).toBe(ATLAS_PAGES.length);
+    expect(new Set(ATLAS_PAGES.map((p) => p.texture)).size).toBe(ATLAS_PAGES.length);
+    expect(new Set(ATLAS_PAGES.map((p) => p.data)).size).toBe(ATLAS_PAGES.length);
+  });
+
+  it('keeps every animation on one page, so a clip never swaps texture mid-play', () => {
+    for (const anim of ANIMATIONS) {
+      const pages = new Set(anim.frames.map((f) => FRAMES[f].page));
+      expect([...pages], anim.name).toHaveLength(1);
     }
   });
 });

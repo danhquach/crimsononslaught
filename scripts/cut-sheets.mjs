@@ -3,9 +3,10 @@
  * Cut the authored sprite sheets into a Phaser atlas (CO-080). `npm run art:cut`.
  *
  *   in   docs/art/sheets/manifest.json + the 18 sheets it names (not shipped)
- *   out  public/assets/atlas/props.png   the packed atlas
- *        public/assets/atlas/props.json  Phaser JSON-hash frame data
- *        src/config/frames.ts            generated, checked in
+ *   out  public/assets/atlas/props.png    page 1, the packed atlas
+ *        public/assets/atlas/props.json   page 1 Phaser JSON-hash frame data
+ *        public/assets/atlas/propsN.png   one more pair per further page
+ *        src/config/frames.ts             generated, checked in
  *
  * The manifest is the only place that knows what any sheet contains; nothing
  * about a particular sheet is hardcoded here. The cut itself is in
@@ -15,7 +16,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,6 +58,8 @@ const TOL_SOLID = 130;
 const SCALE = 4;
 /** Clear space a `centred` animation keeps between its art and its frame edge, in native px. */
 const FRAME_MARGIN = 1;
+/** Byte budget each page carries on its own (CO-130). */
+const PAGE_BUDGET = 400 * 1024;
 
 const failures = [];
 function fail(message) {
@@ -184,28 +187,23 @@ function cutSheet(sheet) {
   return out;
 }
 
-function main() {
-  const manifest = JSON.parse(readFileSync(join(SHEET_DIR, 'manifest.json'), 'utf8'));
+/** Texture key, and so file name, of page `page`. Page 1 keeps the original name. */
+function pageKey(page) {
+  return page === 1 ? 'props' : `props${page}`;
+}
 
-  const frames = [];
-  const seen = new Set();
-  for (const sheet of manifest.sheets) {
-    for (const frame of cutSheet(sheet)) {
-      if (seen.has(frame.name)) fail(`${sheet.file}: duplicate frame name ${frame.name}`);
-      seen.add(frame.name);
-      frames.push(frame);
-    }
-  }
-
-  if (failures.length > 0) {
-    console.error(`art:cut failed with ${failures.length} problem(s):`);
-    for (const f of failures) console.error(`  - ${f}`);
-    process.exit(1);
-  }
-
+/**
+ * Pack, quantise and write one page. Returns its placements, tagged with the
+ * texture key that holds them, and the bytes the PNG came to.
+ *
+ * A page is quantised on its own, so each carries its own 256-colour palette
+ * and moving a sheet between pages shifts exact pixel colours on both (CO-130).
+ */
+function writePage(page, frames) {
+  const key = pageKey(page);
   const { placements, width, height } = packFrames(frames);
   if (width > 2048 || height > 2048) {
-    console.error(`art:cut failed: atlas is ${width}x${height}, over the 2048x2048 limit`);
+    console.error(`art:cut failed: page ${key} is ${width}x${height}, over the 2048x2048 limit`);
     process.exit(1);
   }
 
@@ -236,33 +234,114 @@ function main() {
     },
   };
 
-  mkdirSync(ATLAS_DIR, { recursive: true });
-  writeFileSync(join(ATLAS_DIR, 'props.png'), encodeIndexedPng(width, height, palette, indices));
-  writeFileSync(join(ATLAS_DIR, 'props.json'), `${JSON.stringify(json, null, 2)}\n`);
-  writeFileSync(FRAMES_TS, renderFramesTs(byName));
+  writeFileSync(join(ATLAS_DIR, `${key}.png`), encodeIndexedPng(width, height, palette, indices));
+  writeFileSync(join(ATLAS_DIR, `${key}.json`), `${JSON.stringify(json, null, 2)}\n`);
 
-  const bytes = readFileSync(join(ATLAS_DIR, 'props.png')).length;
+  const bytes = readFileSync(join(ATLAS_DIR, `${key}.png`)).length;
   console.log(
-    `art:cut wrote ${byName.length} frames, atlas ${width}x${height}, ${(bytes / 1024).toFixed(1)} KB`,
+    `art:cut wrote ${key}: ${byName.length} frames, ${width}x${height}, ${(bytes / 1024).toFixed(1)} KB`,
   );
-  if (bytes > 400 * 1024) {
-    console.error(
-      `art:cut failed: atlas is ${(bytes / 1024).toFixed(1)} KB, over the 400 KB budget`,
-    );
+  return { key, placements: byName.map((p) => ({ ...p, page: key })), bytes };
+}
+
+function main() {
+  const manifest = JSON.parse(readFileSync(join(SHEET_DIR, 'manifest.json'), 'utf8'));
+
+  const frames = [];
+  const seen = new Set();
+  for (const sheet of manifest.sheets) {
+    const page = sheet.page ?? 1;
+    if (!Number.isInteger(page) || page < 1) {
+      fail(`${sheet.file}: page must be a whole number from 1, not ${JSON.stringify(sheet.page)}`);
+      continue;
+    }
+    for (const frame of cutSheet(sheet)) {
+      if (seen.has(frame.name)) fail(`${sheet.file}: duplicate frame name ${frame.name}`);
+      seen.add(frame.name);
+      frames.push({ ...frame, page });
+    }
+  }
+
+  if (failures.length > 0) {
+    console.error(`art:cut failed with ${failures.length} problem(s):`);
+    for (const f of failures) console.error(`  - ${f}`);
+    process.exit(1);
+  }
+
+  mkdirSync(ATLAS_DIR, { recursive: true });
+  const pages = [...new Set(frames.map((f) => f.page))].sort((a, b) => a - b);
+  const written = pages.map((page) =>
+    writePage(
+      page,
+      frames.filter((f) => f.page === page),
+    ),
+  );
+
+  // A page the sheets no longer fill would otherwise sit in public/ for ever,
+  // shipped with the game and named by nothing, so the run owns the directory:
+  // whatever matches an atlas page's name and is not a page it just wrote goes.
+  const kept = new Set(written.flatMap((w) => [`${w.key}.png`, `${w.key}.json`]));
+  for (const file of readdirSync(ATLAS_DIR)) {
+    if (!/^props\d*\.(png|json)$/.test(file) || kept.has(file)) continue;
+    rmSync(join(ATLAS_DIR, file));
+    console.log(`art:cut removed ${file}, which no sheet fills any more`);
+  }
+
+  // Frame data across every page, in name order: the frames.ts each animation
+  // is checked against does not care which page a frame landed on, only which
+  // texture key to ask for.
+  const byName = written.flatMap((w) => w.placements).sort((a, b) => (a.name < b.name ? -1 : 1));
+  writeFileSync(
+    FRAMES_TS,
+    renderFramesTs(
+      byName,
+      written.map((w) => w.key),
+    ),
+  );
+
+  // Every page is written before any budget is enforced, so a run that busts
+  // the cap still leaves the art on disk to look at and names every page over.
+  const over = written.filter((w) => w.bytes > PAGE_BUDGET);
+  if (over.length > 0) {
+    for (const w of over) {
+      console.error(
+        `art:cut failed: page ${w.key} is ${(w.bytes / 1024).toFixed(1)} KB, over the ${PAGE_BUDGET / 1024} KB budget`,
+      );
+    }
     process.exit(1);
   }
 }
 
-function renderFramesTs(placements) {
+function renderFramesTs(placements, pageKeys) {
   const lines = placements.map(
     (p) =>
-      `  '${p.name}': { w: ${p.width}, h: ${p.height}, anchorX: ${p.anchorX}, anchorY: ${p.anchorY} },`,
+      `  '${p.name}': { w: ${p.width}, h: ${p.height}, anchorX: ${p.anchorX}, anchorY: ${p.anchorY}, page: '${p.page}' },`,
+  );
+  const pages = pageKeys.map(
+    (key) =>
+      `  { key: '${key}', texture: 'assets/atlas/${key}.png', data: 'assets/atlas/${key}.json' },`,
   );
   return `// GENERATED by scripts/cut-sheets.mjs (npm run art:cut). Do not edit by hand.
 //
-// Every frame in public/assets/atlas/props.png, with its native size and the
-// anchor point the sheet was drawn around. Checked in so src/config stays a
+// Every frame in the atlas, with its native size, the anchor point the sheet
+// was drawn around, and the page holding it. Checked in so src/config stays a
 // pure-data layer that unit tests can read without touching the atlas.
+
+export interface AtlasPage {
+  /** Phaser texture key. */
+  key: string;
+  /** Paths under public/, as the loader asks for them. */
+  texture: string;
+  data: string;
+}
+
+/** The atlas pages, in page order. */
+export const ATLAS_PAGES = [
+${pages.join('\n')}
+] as const satisfies readonly AtlasPage[];
+
+/** Texture key of an atlas page. */
+export type AtlasKey = (typeof ATLAS_PAGES)[number]['key'];
 
 export interface FrameInfo {
   /** Native frame size in game px. */
@@ -271,11 +350,12 @@ export interface FrameInfo {
   /** The cell's centre point, in px from the frame's top-left corner. */
   anchorX: number;
   anchorY: number;
+  /**
+   * The page holding this frame. Each page is its own texture with its own
+   * palette, so a frame is only ever drawn from the key named here.
+   */
+  page: AtlasKey;
 }
-
-export const ATLAS_KEY = 'props';
-export const ATLAS_TEXTURE = 'assets/atlas/props.png';
-export const ATLAS_DATA = 'assets/atlas/props.json';
 
 export const FRAMES = {
 ${lines.join('\n')}

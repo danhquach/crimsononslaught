@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
 import { CHAIN_CLIP, FX_DEPTH } from '../config/fx';
-import { ATLAS_KEY, FRAMES } from '../config/frames';
+import { FRAMES } from '../config/frames';
 import { resolveCast, rollStun, type BoltStats } from '../core/chainLightning';
 import { chainFrame, chainSegmentPose } from '../core/fx';
 import type { Vec2 } from '../core/input';
@@ -167,7 +167,7 @@ export class ChainLightningSpell extends Spell<BoltSpellId> {
   private makeStrip(): Phaser.GameObjects.TileSprite {
     const first = FRAMES[`${CHAIN_CLIP}.0`];
     const strip = this.hasAtlas
-      ? this.scene.add.tileSprite(0, 0, first.w, first.h, ATLAS_KEY, `${CHAIN_CLIP}.0`)
+      ? this.scene.add.tileSprite(0, 0, first.w, first.h, first.page, `${CHAIN_CLIP}.0`)
       : this.scene.add.tileSprite(
           0,
           0,
