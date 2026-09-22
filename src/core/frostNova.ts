@@ -1,18 +1,28 @@
 import { FREEZE_DURATION } from '../config/spells';
 import type { Vec2 } from './input';
 import type { Rng } from './rng';
-import type { IceStats } from './spellStats';
+import { nearestEnemies } from './spell';
+import type { NovaBombStats } from './spellStats';
 
 /**
- * Frost Nova rules that do not need an engine (spec §5 "Ice — Frost Nova"):
- * who a pulse reaches, what it pays out, and how the slow and freeze it leaves
- * on an enemy stack and run out.
+ * Frost rules that do not need an engine: how the slow and freeze any Ice
+ * spell leaves on an enemy stack and run out (spec §5, kept by every Phase 2
+ * Ice spell through `Enemy.applyFrost`), and the Frost Nova Bomb's own rules
+ * (spec §9.3) — where a throw is aimed, who its pulse reaches and what each
+ * enemy caught is left with.
  *
- * `spells/FrostNovaSpell.ts` is the Phaser side; everything decidable without
+ * `spells/NovaBombSpell.ts` is the Phaser side; everything decidable without
  * Phaser lives here so it is Vitest-covered.
  *
  * Pure TS, no Phaser import.
  */
+
+/**
+ * Bombs in flight the pool may ever hold. One leaves every 2.2 s and flies its
+ * 300 px `range` in under 1.5 s, so one is normally in the air; the cap leaves
+ * room for a Haste build and a long-range one together.
+ */
+export const MAX_LIVE_BOMBS = 8;
 
 /** The cold on one enemy; `NO_FROST` when there is none. */
 export interface FrostState {
@@ -32,6 +42,8 @@ export interface FrostHit {
   slowDuration: number;
   /** Whether this hit's freeze roll came up. */
   freeze: boolean;
+  /** Seconds the freeze lasts when it does; `FREEZE_DURATION` when the spell has no field for it. */
+  freezeDuration?: number;
 }
 
 /** Whether the enemy is moving slower than its archetype says — a frozen one counts. */
@@ -53,8 +65,8 @@ export function frostSpeedFactor(state: Readonly<FrostState>): number {
  * A pulse lands on an enemy (spec §5: "slow is max, not additive"). The slow in
  * force becomes the stronger of the two and its clock the longer, so a second
  * pulse refreshes a slow but never deepens or shortens it. A freeze restarts
- * its own `FREEZE_DURATION` stop. A hit with no slow to give leaves the state
- * untouched.
+ * its own stop — the hit's `freezeDuration`, or `FREEZE_DURATION` without one.
+ * A hit with no slow to give leaves the state untouched.
  */
 export function applyFrost(current: Readonly<FrostState>, hit: Readonly<FrostHit>): FrostState {
   const next: FrostState = { ...current };
@@ -63,7 +75,7 @@ export function applyFrost(current: Readonly<FrostState>, hit: Readonly<FrostHit
     next.slowPct = Math.max(active, hit.slowPct);
     next.slowRemainingS = Math.max(current.slowRemainingS, hit.slowDuration);
   }
-  if (hit.freeze) next.frozenS = FREEZE_DURATION;
+  if (hit.freeze) next.frozenS = hit.freezeDuration ?? FREEZE_DURATION;
   return next;
 }
 
@@ -87,13 +99,30 @@ export function tickFrost(
 }
 
 /**
- * Spec §5: `damage` to everything in the ring, +`shatterBonus` of it against an
- * enemy that was already slowed when the pulse reached it. "Already" matters:
- * the caller checks before applying this pulse's own slow, or every second hit
- * would shatter.
+ * Where a throw is aimed: the nearest enemy within `range` of the caster, or
+ * `undefined` with none in range — the cast is then spent on nothing, the same
+ * rule Fireball's volley follows with an empty crowd.
  */
-export function pulseDamage(stats: Readonly<IceStats>, slowed: boolean): number {
-  return stats.damage * (1 + (slowed ? stats.shatterBonus : 0));
+export function bombTarget<T extends Vec2>(
+  caster: Readonly<Vec2>,
+  enemies: readonly T[],
+  range: number,
+): T | undefined {
+  return nearestEnemies(caster, enemies, 1, range)[0];
+}
+
+/**
+ * What the pulse leaves on one enemy it catches: the bomb's slow, and its
+ * freeze if that enemy's roll came up. One roll per enemy, so a seed replays
+ * the same freezes.
+ */
+export function bombFrost(stats: Readonly<NovaBombStats>, rng: Rng): FrostHit {
+  return {
+    slowPct: stats.slowPct,
+    slowDuration: stats.slowDuration,
+    freeze: rollFreeze(rng, stats.freezeChance),
+    freezeDuration: stats.freezeDuration,
+  };
 }
 
 /** Everything a pulse from `origin` reaches: every enemy within `radius`, inclusive. */
@@ -111,8 +140,9 @@ export function pulseTargets<T extends Vec2>(
 }
 
 /**
- * One enemy's freeze roll. The unperked spell (`freezeChance` 0) draws nothing,
- * so picking Ice does not shift the seeded sequence the rest of the run reads.
+ * One enemy's freeze roll. A spell with no freeze (`freezeChance` 0) draws
+ * nothing, so equipping it does not shift the seeded sequence the rest of the
+ * run reads.
  */
 export function rollFreeze(rng: Rng, freezeChance: number): boolean {
   if (!(freezeChance > 0)) return false;

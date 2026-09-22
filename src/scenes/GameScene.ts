@@ -40,6 +40,7 @@ import type {
   IceStats,
   LightningStats,
   MeteorStats,
+  NovaBombStats,
 } from '../core/spellStats';
 import { buildLoadout } from '../core/loadout';
 import { currencyFor, emptySave, isSave, recordRun, serializeSave, type Save } from '../core/save';
@@ -64,6 +65,12 @@ import {
   isFireRosterSpellId,
 } from '../config/fireRoster';
 import {
+  BASE_ICE_ROSTER_STATS,
+  ICE_ROSTER_CARDS,
+  ICE_ROSTER_SPELL_IDS,
+  isIceRosterSpellId,
+} from '../config/iceRoster';
+import {
   BASE_COMPANION_STATS,
   COMPANION_CARDS,
   COMPANION_SPELL_IDS,
@@ -84,7 +91,8 @@ import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { FireballSpell } from '../spells/FireballSpell';
 import { FireColumnSpell } from '../spells/FireColumnSpell';
 import { FireDragonSpell } from '../spells/FireDragonSpell';
-import { FrostNovaSpell } from '../spells/FrostNovaSpell';
+import { IceArrowSpell } from '../spells/IceArrowSpell';
+import { NovaBombSpell } from '../spells/NovaBombSpell';
 import { CompanionSpell } from '../spells/CompanionSpell';
 import { GroundAreaSpell } from '../spells/GroundAreaSpell';
 import { MeteorSpell } from '../spells/MeteorSpell';
@@ -285,6 +293,20 @@ export class GameScene extends Phaser.Scene {
       .filter(
         (spell): spell is FireColumnSpell | FireDragonSpell =>
           spell instanceof FireColumnSpell || spell instanceof FireDragonSpell,
+      )
+      .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
+  }
+
+  /**
+   * Test hook (#141): Ice Arrow and Frost Nova Bomb, whichever is equipped —
+   * hits each has landed and shots each has in the air right now. The browser
+   * suite watches a run land hits with both and hold their pool caps.
+   */
+  get iceReport(): { id: RosterSpellId; hits: number; live: number }[] {
+    return this.spells.spells
+      .filter(
+        (spell): spell is IceArrowSpell | NovaBombSpell =>
+          spell instanceof IceArrowSpell || spell instanceof NovaBombSpell,
       )
       .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
   }
@@ -503,11 +525,22 @@ export class GameScene extends Phaser.Scene {
           this.fx,
         );
       case 'ice':
-        return new FrostNovaSpell(
+        return new IceArrowSpell(
           this,
           this.player,
           this.enemies,
+          this.collisions,
           stats as Readonly<IceStats>,
+          damage,
+          this.fx,
+        );
+      case 'ice_nova_bomb':
+        return new NovaBombSpell(
+          this,
+          this.player,
+          this.enemies,
+          this.collisions,
+          stats as Readonly<NovaBombStats>,
           damage,
           this.rng,
           this.fx,
@@ -623,6 +656,7 @@ export class GameScene extends Phaser.Scene {
     if (isAreaSpellId(spellId)) return BASE_AREA_STATS[spellId];
     if (isStrikeSpellId(spellId)) return BASE_STRIKE_STATS[spellId];
     if (isFireRosterSpellId(spellId)) return BASE_FIRE_ROSTER_STATS[spellId];
+    if (isIceRosterSpellId(spellId)) return BASE_ICE_ROSTER_STATS[spellId];
     return undefined;
   }
 
@@ -670,6 +704,11 @@ export class GameScene extends Phaser.Scene {
         id,
         name: FIRE_ROSTER_CARDS[id].name,
         description: FIRE_ROSTER_CARDS[id].description,
+      })),
+      ...ICE_ROSTER_SPELL_IDS.map((id) => ({
+        id,
+        name: ICE_ROSTER_CARDS[id].name,
+        description: ICE_ROSTER_CARDS[id].description,
       })),
     ].filter((card) => !casting.has(card.id));
   }

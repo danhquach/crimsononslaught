@@ -1,19 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_SPELL_STATS, FREEZE_DURATION } from '../config/spells';
+import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
+import { FREEZE_DURATION } from '../config/spells';
 import {
+  MAX_LIVE_BOMBS,
   NO_FROST,
   applyFrost,
+  bombFrost,
+  bombTarget,
   frostSpeedFactor,
   isSlowed,
-  pulseDamage,
   pulseTargets,
   rollFreeze,
   tickFrost,
 } from './frostNova';
 import { createRng } from './rng';
-import type { IceStats } from './spellStats';
+import type { NovaBombStats } from './spellStats';
 
-const base: IceStats = { ...BASE_SPELL_STATS.ice };
+const base: NovaBombStats = { ...BASE_NOVA_BOMB_STATS };
 
 describe('applyFrost slow stacking (CO-045)', () => {
   it('starts out unslowed at full speed', () => {
@@ -134,25 +137,54 @@ describe('tickFrost (CO-045)', () => {
   });
 });
 
-describe('pulseDamage and Shatter (CO-045)', () => {
-  it('deals the base damage to an unslowed enemy', () => {
-    expect(pulseDamage(base, false)).toBe(base.damage);
+describe('bombTarget (#141)', () => {
+  const caster = { x: 0, y: 0 };
+
+  it('aims at the nearest enemy inside the range', () => {
+    const near = { x: 100, y: 0 };
+    const far = { x: 250, y: 0 };
+    expect(bombTarget(caster, [far, near], 300)).toBe(near);
   });
 
-  it('without Shatter a slowed enemy takes the same damage', () => {
-    expect(pulseDamage(base, true)).toBe(base.damage);
+  it('aims at nothing with no enemy in range', () => {
+    expect(bombTarget(caster, [{ x: 301, y: 0 }], 300)).toBeUndefined();
+    expect(bombTarget(caster, [], 300)).toBeUndefined();
+  });
+});
+
+describe('bombFrost (#141)', () => {
+  it('carries the bomb slow and its own freeze duration', () => {
+    const hit = bombFrost({ ...base, freezeChance: 0 }, createRng(1));
+    expect(hit).toEqual({
+      slowPct: base.slowPct,
+      slowDuration: base.slowDuration,
+      freeze: false,
+      freezeDuration: base.freezeDuration,
+    });
   });
 
-  it('with Shatter a slowed enemy takes +50%', () => {
-    expect(pulseDamage({ ...base, shatterBonus: 0.5 }, true)).toBe(base.damage * 1.5);
+  it('freezes on the roll, for the block freeze duration rather than the constant', () => {
+    const hit = bombFrost({ ...base, freezeChance: 1, freezeDuration: 2.5 }, createRng(1));
+    expect(hit.freeze).toBe(true);
+    expect(applyFrost(NO_FROST, hit).frozenS).toBe(2.5);
   });
 
-  it('Shatter does nothing to an unslowed enemy', () => {
-    expect(pulseDamage({ ...base, shatterBonus: 0.5 }, false)).toBe(base.damage);
+  it('draws one roll per enemy, reproducible from the seed', () => {
+    const roll = (seed: number): boolean[] => {
+      const rng = createRng(seed);
+      return Array.from({ length: 40 }, () => bombFrost(base, rng).freeze);
+    };
+    expect(roll(3)).toEqual(roll(3));
+    expect(roll(3)).toContain(true);
+    expect(roll(3)).toContain(false);
   });
+});
 
-  it('Shatter compounds with +damage perks', () => {
-    expect(pulseDamage({ ...base, damage: 16, shatterBonus: 0.5 }, true)).toBe(24);
+describe('MAX_LIVE_BOMBS (#141)', () => {
+  it('holds every bomb a hasted, long-range build can have in flight', () => {
+    const cooldown = base.cooldown * 0.5;
+    const flight = (base.range * 1.5) / base.speed;
+    expect(MAX_LIVE_BOMBS).toBeGreaterThanOrEqual(Math.ceil(flight / cooldown));
   });
 });
 

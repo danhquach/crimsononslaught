@@ -26,20 +26,51 @@ export interface FireStats {
   range: number;
 }
 
+/**
+ * Ice Arrow (spec §9.3): a fast single-target bolt that chills what it hits.
+ * No splash, so it fires faster than Fire Bolt.
+ */
 export interface IceStats {
-  /** Seconds between pulses. */
+  /** Seconds between volleys. */
   cooldown: number;
+  /** Damage on a direct hit. */
   damage: number;
-  /** Pulse radius in px, measured from the player. */
+  /** Arrows per volley, each at its own target where possible. */
+  projectiles: number;
+  /** Arrow speed in px/s. */
+  speed: number;
+  /** How far an arrow flies before it expires, in px; also the targeting range. */
+  range: number;
+  /** Speed cut applied to the enemy hit, 0–1. */
+  slowPct: number;
+  /** Seconds that slow lasts. */
+  slowDuration: number;
+}
+
+/**
+ * Frost Nova Bomb (spec §9.3): Phase 1's nova, thrown. A slow bomb flies at
+ * the nearest enemy within `range` and detonates on its first hit or where its
+ * range runs out, pulsing `radius` around that point.
+ */
+export interface NovaBombStats {
+  /** Seconds between throws. */
+  cooldown: number;
+  /** Damage the pulse deals to every enemy inside `radius`. */
+  damage: number;
+  /** Pulse radius in px, measured from where the bomb detonated. */
   radius: number;
+  /** Bomb speed in px/s. */
+  speed: number;
+  /** How far the bomb flies before it detonates on its own, in px; also the targeting range. */
+  range: number;
   /** Speed cut applied to everything hit, 0–1. */
   slowPct: number;
   /** Seconds a slow lasts. */
   slowDuration: number;
-  /** Chance per hit of a full stop for `FREEZE_DURATION` s, 0–1. */
+  /** Chance per enemy hit of a full stop for `freezeDuration` s, 0–1. */
   freezeChance: number;
-  /** Shatter: extra damage against an already-slowed enemy, as a fraction of `damage`. */
-  shatterBonus: number;
+  /** Seconds a freeze lasts. */
+  freezeDuration: number;
 }
 
 export interface LightningStats {
@@ -252,6 +283,7 @@ export interface FireDragonStats {
 export interface SpellStatsBySpell {
   fire: FireStats;
   ice: IceStats;
+  ice_nova_bomb: NovaBombStats;
   lightning: LightningStats;
   earth: EarthStats;
   fire_companion: CompanionStats;

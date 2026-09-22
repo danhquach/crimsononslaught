@@ -60,10 +60,10 @@ describe('spell card stats match spec §5 base values', () => {
   });
   it('ice', () => {
     expect(SPELL_CARDS.ice.stats).toEqual([
-      ['Cooldown', '1.4 s'],
-      ['Damage', '12'],
-      ['Radius', '90'],
-      ['Slow', '30% for 1.5 s'],
+      ['Cooldown', '0.8 s'],
+      ['Damage', '10'],
+      ['Range', '420'],
+      ['Slow', '20% for 1.0 s'],
     ]);
   });
   it('lightning', () => {
@@ -114,7 +114,7 @@ describe('spell durations match spec §5', () => {
 });
 
 describe('base stat blocks', () => {
-  it('matches the spec §5 base table', () => {
+  it('matches the spec base tables', () => {
     expect(BASE_SPELL_STATS.fire).toEqual({
       cooldown: 1,
       damage: 12,
@@ -124,14 +124,15 @@ describe('base stat blocks', () => {
       speed: 350,
       range: 400,
     });
+    // Ice's block is Ice Arrow's (Phase 2 spec §9.3); Frost Nova is `ice_nova_bomb` now.
     expect(BASE_SPELL_STATS.ice).toEqual({
-      cooldown: 1.4,
-      damage: 12,
-      radius: 90,
-      slowPct: 0.3,
-      slowDuration: 1.5,
-      freezeChance: 0,
-      shatterBonus: 0,
+      cooldown: 0.8,
+      damage: 10,
+      projectiles: 1,
+      speed: 380,
+      range: 420,
+      slowPct: 0.2,
+      slowDuration: 1,
     });
     expect(BASE_SPELL_STATS.lightning).toEqual({
       cooldown: 1,

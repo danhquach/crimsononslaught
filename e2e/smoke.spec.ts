@@ -22,7 +22,7 @@ function baseStatsLeaveStatus(spellId: SpellId): boolean {
       // Burn is Fire Column's identity now (spec §9.2); Fire Bolt leaves none.
       return false;
     case 'ice':
-      return BASE_SPELL_STATS.ice.slowPct > 0 || BASE_SPELL_STATS.ice.freezeChance > 0;
+      return BASE_SPELL_STATS.ice.slowPct > 0;
     case 'lightning':
       return BASE_SPELL_STATS.lightning.stun > 0;
     case 'earth':

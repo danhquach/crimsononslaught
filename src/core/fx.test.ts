@@ -38,7 +38,7 @@ describe('effect scales (CO-082)', () => {
   });
 
   it('draws the nova at radius / 90', () => {
-    expect(novaScale(BASE_SPELL_STATS.ice.radius)).toBe(1);
+    expect(novaScale(90)).toBe(1);
     expect(novaScale(180)).toBe(2);
   });
 
