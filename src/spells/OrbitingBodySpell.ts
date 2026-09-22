@@ -24,9 +24,11 @@ export interface OrbitStats {
  * A ring of bodies circling the caster (spec §5 "Earth — Orbiting Boulders",
  * Phase 2 spec §9.4 "Lightning Sword"): `count` of them at `orbitRadius`,
  * turning `orbitSpeed` rad/s, each `size` px across. What a body does to the
- * enemy it rolls over is the one thing left to a subclass — Earth's boulders
- * crush and shove, Lightning's blade cuts and staggers — so #142 generalised
- * `OrbitingBouldersSpell` into this rather than copying its ring.
+ * enemy it rolls over is the one thing left to a subclass — Lightning's blade
+ * cuts and staggers — so #142 generalised this out of Phase 1's Earth ring
+ * rather than copying it. #143 retired that ring's own spell: `earth` is Earth
+ * Spike now, and the stones live on in `spells/EarthShieldSpell.ts`, which
+ * carries a pool of its own instead of extending this.
  *
  * The rules — spacing, the turn, the position — live in
  * `core/orbitingBoulders.ts`; this class owns the body pool, registers it with

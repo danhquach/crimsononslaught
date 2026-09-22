@@ -1,23 +1,26 @@
-import type { EnemyType } from '../config/enemies';
 import { BOULDER_HIT_COOLDOWN } from '../config/spells';
 import type { Vec2 } from './input';
-import type { EarthStats } from './spellStats';
 
 /**
- * Orbiting Boulders rules that do not need an engine (spec §5 "Earth — Orbiting
- * Boulders"): where each boulder sits on the ring, how the ring turns, what a
- * hit pays out and which way it shoves, and the per-enemy window between hits.
+ * The orbiting-ring rules that do not need an engine (spec §5 "Earth —
+ * Orbiting Boulders", Phase 2 spec §9.4-§9.5): where each body sits on the
+ * ring, how the ring turns, which way a hit shoves, and the per-enemy window
+ * between hits.
  *
- * `spells/OrbitingBouldersSpell.ts` is the Phaser side; everything decidable
+ * Phase 1's Earth default owned all of this; the ring is now worn by Earth
+ * Shield (`spells/EarthShieldSpell.ts`) and Lightning Sword
+ * (`spells/LightningSwordSpell.ts`, over `spells/OrbitingBodySpell.ts`), and
+ * `knockbackVector` is the shove every Earth spell pushes with, thrown boulder
+ * and spike included. Those classes are the Phaser side; everything decidable
  * without Phaser lives here so it is Vitest-covered.
  *
  * Pure TS, no Phaser import.
  */
 
 /**
- * Boulders the pool may ever hold. Base count 2 plus two ranks of Extra
- * Boulder is 4; the headroom keeps a config change from silently spawning
- * nothing rather than exhausting the pool mid-frame.
+ * Bodies the ring's pool may ever hold. Earth Shield's base `count` is 3 and
+ * Lightning Sword's is 1; the headroom keeps a config change from silently
+ * spawning nothing rather than exhausting the pool mid-frame.
  */
 export const MAX_BOULDERS = 8;
 
@@ -79,15 +82,6 @@ function scaled(dx: number, dy: number, length: number): Vec2 | undefined {
   const distance = Math.hypot(dx, dy);
   if (distance === 0) return undefined;
   return { x: (dx / distance) * length, y: (dy / distance) * length };
-}
-
-/**
- * What a hit costs the enemy struck: `damage`, times `crushMultiplier` when it
- * is a Tank (spec §5 Crush: "x2 dmg to Tanks"). Unperked the multiplier is 1,
- * so a Tank takes the same hit as anything else.
- */
-export function boulderDamage(stats: Readonly<EarthStats>, enemyType: EnemyType): number {
-  return stats.damage * (enemyType === 'tank' ? stats.crushMultiplier : 1);
 }
 
 /**

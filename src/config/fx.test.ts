@@ -20,7 +20,7 @@ import {
   TELEGRAPH_SCALE_RADIUS,
 } from './fx';
 import { PLACEHOLDERS } from './colors';
-import { BASE_SPELL_STATS } from './spells';
+import { BASE_EARTH_SHIELD_STATS } from './shields';
 
 describe('fx config (CO-082)', () => {
   it('scales the explosion and nova as the ticket states', () => {
@@ -29,7 +29,7 @@ describe('fx config (CO-082)', () => {
   });
 
   it('spins at the authored rate at the base orbit speed', () => {
-    expect(SPIN_BASE_ORBIT_SPEED).toBe(BASE_SPELL_STATS.earth.orbitSpeed);
+    expect(SPIN_BASE_ORBIT_SPEED).toBe(BASE_EARTH_SHIELD_STATS.orbitSpeed);
   });
 
   it('gives the tank and anything larger the big flame', () => {

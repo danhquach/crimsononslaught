@@ -25,8 +25,8 @@ import type { SpellStats } from './spellStats';
 
 /**
  * Builds the spell for an id, with the block it should cast at. `undefined` for
- * an id this build has no implementation for — the roster spells land with
- * #140-#143 and nothing may be equipped before then.
+ * an id this build has no implementation for — every roster spell has one since
+ * #143, so this is the door for an id added to the roster ahead of its class.
  */
 export type SpellFactory = (spellId: RosterSpellId, stats: SpellStatBlock) => Spell | undefined;
 

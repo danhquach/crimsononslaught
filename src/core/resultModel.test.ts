@@ -63,7 +63,7 @@ describe('resultRows', () => {
   it('names the spell for every id', () => {
     expect(rowValue({ ...stats, spellId: 'ice' }, 'Spell')).toBe('Ice Arrow');
     expect(rowValue({ ...stats, spellId: 'lightning' }, 'Spell')).toBe('Lightning Bolt');
-    expect(rowValue({ ...stats, spellId: 'earth' }, 'Spell')).toBe('Orbiting Boulders');
+    expect(rowValue({ ...stats, spellId: 'earth' }, 'Spell')).toBe('Earth Spike');
   });
 
   it('renders a fresh run as 0:00, level 1, no kills, no perks', () => {
@@ -72,7 +72,7 @@ describe('resultRows', () => {
       ['Time survived', '0:00'],
       ['Level', '1'],
       ['Kills', '0'],
-      ['Spell', 'Orbiting Boulders'],
+      ['Spell', 'Earth Spike'],
       ['Upgrades taken', 'none'],
     ]);
   });

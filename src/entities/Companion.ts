@@ -9,7 +9,7 @@ import Phaser from 'phaser';
  * the way to guarantee all three is to give it nothing for the physics world to
  * overlap. `spells/CompanionSpell.ts` walks it with `core/companion.ts`'s
  * `stepPosition` and resolves its melee strikes by distance, the way
- * `OrbitingBouldersSpell` places boulders rather than driving them.
+ * `OrbitingBodySpell` places the ring's bodies rather than driving them.
  *
  * It draws under the FX layer so an explosion is never hidden behind an ally.
  * Facings and an attack clip arrive with its character sheet (#146); until then

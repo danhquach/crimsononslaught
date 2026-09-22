@@ -1,6 +1,6 @@
 import { ANIMATIONS } from './animations';
 import { ENEMY_ARCHETYPES, MAX_LIVE_ENEMIES } from './enemies';
-import { BASE_SPELL_STATS } from './spells';
+import { BASE_EARTH_SHIELD_STATS } from './shields';
 
 /**
  * Spell FX tunables (CO-082): how the atlas effects are sized and paced
@@ -22,9 +22,11 @@ export const NOVA_SCALE_RADIUS = 90;
 
 /**
  * The boulder's spin plays at its authored frame rate at the base orbit speed
- * and speeds up in proportion, so a faster ring visibly rolls faster.
+ * and speeds up in proportion, so a faster ring visibly rolls faster. Earth
+ * Shield is the ring the base is read from (spec §9.5): #143 made `earth`
+ * itself Earth Spike, which has no orbit.
  */
-export const SPIN_BASE_ORBIT_SPEED = BASE_SPELL_STATS.earth.orbitSpeed;
+export const SPIN_BASE_ORBIT_SPEED = BASE_EARTH_SHIELD_STATS.orbitSpeed;
 
 /** An enemy with a body this large or larger burns with the big flame; the tank is the smallest such. */
 export const LARGE_BURN_MIN_RADIUS = ENEMY_ARCHETYPES.tank.radius;

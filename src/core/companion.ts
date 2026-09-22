@@ -17,7 +17,7 @@ import { nearestEnemies } from './spell';
  *   to the player once there is nothing worth charging.
  *
  * A companion is not an Arcade body: `spells/CompanionSpell.ts` steps it with
- * `stepPosition` the way `OrbitingBouldersSpell` places boulders, which is what
+ * `stepPosition` the way `OrbitingBodySpell` places the ring's bodies, which is what
  * makes it undamageable and non-colliding by construction rather than by a
  * filter — nothing can overlap a sprite with no body.
  *

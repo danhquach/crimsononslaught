@@ -189,13 +189,14 @@ describe('validateSpellFields', () => {
   it('categorises every field exactly once', () => {
     const fields = Object.keys(STAT_CATEGORIES) as SpellStatField[];
     expect(new Set(fields).size).toBe(fields.length);
-    // 46 since #142 retired Phase 1 Lightning's `stun` for `stunChance` / `stunDuration`.
-    expect(fields.length).toBe(46);
+    // 45 since #143 retired Crush with Phase 1's Orbiting Boulders: `earth` is
+    // Earth Spike now, and no spell multiplies damage by enemy type.
+    expect(fields.length).toBe(45);
   });
 
   // CO-109 routes every equipped spell's block through the category map, so a
   // field the shipped blocks carry but the map has not is a stat no passive can
-  // ever reach. The roster blocks join these with #140-#143.
+  // ever reach. Each roster config checks its own blocks the same way.
   it('categorises every field the shipped spells carry', () => {
     expect(validateSpellFields(BASE_SPELL_STATS)).toEqual([]);
   });
