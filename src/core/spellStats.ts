@@ -73,20 +73,90 @@ export interface NovaBombStats {
   freezeDuration: number;
 }
 
+/**
+ * Lightning Bolt (#142, Phase 2 spec §9.4): the element's default. Every
+ * `cooldown` s, `strikes` bolts each hit the nearest enemy within `targetRange`
+ * for `damage`, stagger it for `staggerDuration` and, on a `stunChance` roll,
+ * stun it for `stunDuration`.
+ */
 export interface LightningStats {
-  /** Seconds between strikes. */
+  /** Seconds between casts. */
   cooldown: number;
+  /** Damage the first target of a bolt takes. */
   damage: number;
+  /** Bolts per cast, each starting at its own target where possible. */
+  strikes: number;
+  /** How far from the caster a bolt's first target may be picked, in px. */
+  targetRange: number;
+  /** Seconds a hit enemy is staggered (#139). */
+  staggerDuration: number;
+  /** Chance per enemy hit of a stun for `stunDuration` s, 0–1. */
+  stunChance: number;
+  /** Seconds a stun lasts. */
+  stunDuration: number;
+}
+
+/**
+ * Chain Lightning (spec §9.4): Lightning Bolt that jumps on. After its first
+ * target a bolt chains up to `chains` times to the nearest unhit enemy within
+ * `chainRange`, each chained hit paying `damage * chainFalloff`.
+ */
+export interface ChainLightningStats extends LightningStats {
   /** Extra enemies one bolt jumps to after its first target. */
   chains: number;
   /** How far a chain may jump, in px. */
   chainRange: number;
-  /** Bolts per cast, each starting at its own target where possible. */
-  strikes: number;
-  /** Seconds a hit enemy is stunned. 0 = no stun. */
-  stun: number;
-  /** Damage multiplier applied per chain jump; No Falloff takes it to 1. */
+  /** Damage multiplier applied per chained hit; 1 is no falloff. */
   chainFalloff: number;
+}
+
+/**
+ * Tornado (spec §9.4, #136): a ground area (`core/groundArea.ts`) that drifts
+ * from the caster at `speed` px/s toward where its target stood, pulling every
+ * enemy within `pullRadius` toward its eye at `pullForce` px/s and dealing
+ * `tickDamage` every `tickRate` s to everything inside `radius`, for `duration`.
+ */
+export interface TornadoStats {
+  /** Seconds between casts. */
+  cooldown: number;
+  /** Damage one tick deals to every enemy inside `radius`. */
+  tickDamage: number;
+  /** Seconds between two ticks. */
+  tickRate: number;
+  /** How far the damaging eye reaches from the centre, in px. */
+  radius: number;
+  /** How far the pull reaches from the centre, in px. */
+  pullRadius: number;
+  /** Pull velocity toward the centre, in px/s. */
+  pullForce: number;
+  /** Drift speed in px/s. */
+  speed: number;
+  /** How far from the caster a target may be picked, in px. */
+  targetRange: number;
+  /** Seconds the tornado lives. */
+  duration: number;
+}
+
+/**
+ * Lightning Sword (spec §9.4): `count` blades circle the caster on the
+ * orbiting-body ring (`core/orbitingBoulders.ts`), each cutting an enemy it
+ * passes for `damage` and a stagger, at most once per `hitCooldown` s per enemy.
+ */
+export interface SwordStats {
+  /** Blades in orbit. */
+  count: number;
+  /** Orbit radius in px. */
+  orbitRadius: number;
+  /** Orbit angular speed in rad/s. */
+  orbitSpeed: number;
+  /** Damage one cut deals. */
+  damage: number;
+  /** Blade body radius in px. */
+  size: number;
+  /** Seconds between two cuts on the same enemy. */
+  hitCooldown: number;
+  /** Seconds a cut enemy is staggered (#139). */
+  staggerDuration: number;
 }
 
 export interface EarthStats {
@@ -285,6 +355,9 @@ export interface SpellStatsBySpell {
   ice: IceStats;
   ice_nova_bomb: NovaBombStats;
   lightning: LightningStats;
+  lightning_chain: ChainLightningStats;
+  lightning_tornado: TornadoStats;
+  lightning_sword: SwordStats;
   earth: EarthStats;
   fire_companion: CompanionStats;
   ice_companion: CompanionStats;

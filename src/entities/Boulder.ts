@@ -1,11 +1,23 @@
 import Phaser from 'phaser';
-import { PLACEHOLDERS } from '../config/colors';
-import { FRAMES } from '../config/frames';
+import { PLACEHOLDERS, type TextureKey } from '../config/colors';
+import { FRAMES, type FrameInfo } from '../config/frames';
 import { spinTimeScale } from '../core/fx';
 import { clearClip, showClip } from '../render/animate';
 
 /** The clip a boulder plays on the ring (CO-082). */
 const SPIN_CLIP = 'earth.spin';
+
+/**
+ * What a body on the ring is drawn as: a placeholder texture and, when the
+ * atlas carries it, the clip it plays. Earth's boulders are the default; a
+ * Lightning Sword (#142) rides the same ring as the bolt bar.
+ */
+export interface BodyLook {
+  readonly texture: TextureKey;
+  readonly clip?: string;
+}
+
+export const BOULDER_LOOK: BodyLook = { texture: 'boulder', clip: SPIN_CLIP };
 
 /**
  * One boulder on the ring (spec §5 "Earth — Orbiting Boulders"). It has no
@@ -30,21 +42,31 @@ export class Boulder extends Phaser.Physics.Arcade.Sprite {
     super(scene, x, y, 'boulder');
   }
 
-  /** Take this pooled object out of the pool at (x, y) as a boulder of `size` px radius. */
-  spawn(x: number, y: number, size: number): void {
+  /**
+   * Take this pooled object out of the pool at (x, y) as a body of `size` px
+   * radius wearing `look` — a boulder unless told otherwise.
+   */
+  spawn(x: number, y: number, size: number, look: BodyLook = BOULDER_LOOK): void {
     clearClip(this);
-    this.setTexture('boulder');
+    this.setTexture(look.texture);
     this.setOrigin(0.5, 0.5);
+    this.setRotation(0);
     this.enableBody(true, x, y, true, true);
     // The body is a circle filling the unscaled disc; `resize` scales the
     // sprite, and Arcade scales the body with it, so the hitbox stays the disc
-    // whatever size this pooled boulder was last time. `showClip` re-centres
-    // the same circle on the spin frame's anchor when the atlas is there.
-    const shown = showClip(this, SPIN_CLIP, FRAMES['earth.spin.0'].w / 2);
-    this.drawnWidth = shown ? FRAMES['earth.spin.0'].w : PLACEHOLDERS.boulder.width;
+    // whatever size this pooled body was last time. `showClip` re-centres the
+    // same circle on the clip's first frame when the atlas carries it.
+    const first = look.clip
+      ? (FRAMES as Readonly<Record<string, FrameInfo | undefined>>)[`${look.clip}.0`]
+      : undefined;
+    const shown = look.clip && first ? showClip(this, look.clip, first.w / 2) : false;
+    this.drawnWidth = shown && first ? first.w : PLACEHOLDERS[look.texture].width;
     if (!shown) {
       const body = this.body as Phaser.Physics.Arcade.Body;
-      body.setCircle(this.drawnWidth / 2, 0, 0);
+      // Centred on the sprite, so a bar as wide as it is short still hits as a
+      // disc of half its width around its middle.
+      const placeholder = PLACEHOLDERS[look.texture];
+      body.setCircle(this.drawnWidth / 2, 0, (placeholder.height - this.drawnWidth) / 2);
     }
     this.radius = 0;
     this.resize(size);

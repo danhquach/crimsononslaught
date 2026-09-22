@@ -29,6 +29,7 @@ import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
 import { Spellbook } from '../core/spellbook';
 import type {
+  ChainLightningStats,
   CompanionStats,
   EarthShieldStats,
   GroundAreaStats,
@@ -41,6 +42,8 @@ import type {
   LightningStats,
   MeteorStats,
   NovaBombStats,
+  SwordStats,
+  TornadoStats,
 } from '../core/spellStats';
 import { buildLoadout } from '../core/loadout';
 import { currencyFor, emptySave, isSave, recordRun, serializeSave, type Save } from '../core/save';
@@ -71,6 +74,12 @@ import {
   isIceRosterSpellId,
 } from '../config/iceRoster';
 import {
+  BASE_LIGHTNING_ROSTER_STATS,
+  LIGHTNING_ROSTER_CARDS,
+  LIGHTNING_ROSTER_SPELL_IDS,
+  isLightningRosterSpellId,
+} from '../config/lightningRoster';
+import {
   BASE_COMPANION_STATS,
   COMPANION_CARDS,
   COMPANION_SPELL_IDS,
@@ -98,7 +107,9 @@ import { GroundAreaSpell } from '../spells/GroundAreaSpell';
 import { MeteorSpell } from '../spells/MeteorSpell';
 import { EarthShieldSpell } from '../spells/EarthShieldSpell';
 import { IceShieldSpell } from '../spells/IceShieldSpell';
+import { LightningSwordSpell } from '../spells/LightningSwordSpell';
 import { OrbitingBouldersSpell } from '../spells/OrbitingBouldersSpell';
+import { TornadoSpell } from '../spells/TornadoSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
 import { AreaPool } from '../systems/AreaPool';
 import { TelegraphPool } from '../systems/TelegraphPool';
@@ -307,6 +318,23 @@ export class GameScene extends Phaser.Scene {
       .filter(
         (spell): spell is IceArrowSpell | NovaBombSpell =>
           spell instanceof IceArrowSpell || spell instanceof NovaBombSpell,
+      )
+      .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
+  }
+
+  /**
+   * Test hook (#142): the Lightning roster, whichever of it is equipped — hits
+   * each spell has landed and what each has out right now (bolt strips, live
+   * tornadoes, blades on the ring). The browser suite watches a run land hits
+   * with every one and hold their pool caps.
+   */
+  get lightningReport(): { id: RosterSpellId; hits: number; live: number }[] {
+    return this.spells.spells
+      .filter(
+        (spell): spell is ChainLightningSpell | LightningSwordSpell | TornadoSpell =>
+          spell instanceof ChainLightningSpell ||
+          spell instanceof LightningSwordSpell ||
+          spell instanceof TornadoSpell,
       )
       .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
   }
@@ -546,11 +574,31 @@ export class GameScene extends Phaser.Scene {
           this.fx,
         );
       case 'lightning':
+      case 'lightning_chain':
         return new ChainLightningSpell(
           this,
+          spellId,
           this.player,
           this.enemies,
-          stats as Readonly<LightningStats>,
+          stats as Readonly<LightningStats | ChainLightningStats>,
+          damage,
+          this.rng,
+          this.fx,
+        );
+      case 'lightning_tornado':
+        return new TornadoSpell(
+          this.player,
+          this.enemies,
+          stats as Readonly<TornadoStats>,
+          damage,
+          this.areas,
+        );
+      case 'lightning_sword':
+        return new LightningSwordSpell(
+          this,
+          this.player,
+          this.collisions,
+          stats as Readonly<SwordStats>,
           damage,
           this.fx,
         );
@@ -657,6 +705,7 @@ export class GameScene extends Phaser.Scene {
     if (isStrikeSpellId(spellId)) return BASE_STRIKE_STATS[spellId];
     if (isFireRosterSpellId(spellId)) return BASE_FIRE_ROSTER_STATS[spellId];
     if (isIceRosterSpellId(spellId)) return BASE_ICE_ROSTER_STATS[spellId];
+    if (isLightningRosterSpellId(spellId)) return BASE_LIGHTNING_ROSTER_STATS[spellId];
     return undefined;
   }
 
@@ -709,6 +758,11 @@ export class GameScene extends Phaser.Scene {
         id,
         name: ICE_ROSTER_CARDS[id].name,
         description: ICE_ROSTER_CARDS[id].description,
+      })),
+      ...LIGHTNING_ROSTER_SPELL_IDS.map((id) => ({
+        id,
+        name: LIGHTNING_ROSTER_CARDS[id].name,
+        description: LIGHTNING_ROSTER_CARDS[id].description,
       })),
     ].filter((card) => !casting.has(card.id));
   }

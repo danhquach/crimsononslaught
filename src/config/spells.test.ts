@@ -68,10 +68,10 @@ describe('spell card stats match spec §5 base values', () => {
   });
   it('lightning', () => {
     expect(SPELL_CARDS.lightning.stats).toEqual([
-      ['Cooldown', '1.0 s'],
-      ['Damage', '12'],
-      ['Chains', '2'],
-      ['Chain range', '120'],
+      ['Cooldown', '0.9 s'],
+      ['Damage', '14'],
+      ['Stagger', '0.5 s'],
+      ['Stun', '8% for 2 s'],
     ]);
   });
   it('earth', () => {
@@ -134,14 +134,15 @@ describe('base stat blocks', () => {
       slowPct: 0.2,
       slowDuration: 1,
     });
+    // Lightning's block is Lightning Bolt's (Phase 2 spec §9.4); Chain Lightning is `lightning_chain` now.
     expect(BASE_SPELL_STATS.lightning).toEqual({
-      cooldown: 1,
-      damage: 12,
-      chains: 2,
-      chainRange: 120,
+      cooldown: 0.9,
+      damage: 14,
       strikes: 1,
-      stun: 0,
-      chainFalloff: 0.8,
+      targetRange: 400,
+      staggerDuration: 0.5,
+      stunChance: 0.08,
+      stunDuration: 2,
     });
     expect(BASE_SPELL_STATS.earth).toEqual({
       count: 3,

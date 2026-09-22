@@ -1,17 +1,26 @@
 import type { Vec2 } from './input';
+import type { Rng } from './rng';
 import { nearestEnemies } from './spell';
-import type { LightningStats } from './spellStats';
+import type { ChainLightningStats, LightningStats } from './spellStats';
 
 /**
- * Chain Lightning rules that do not need an engine (spec §5 "Lightning — Chain
- * Lightning"): where each bolt starts, who it jumps to, what every hit pays out,
- * and how the stun it leaves on an enemy runs out.
+ * Lightning Bolt and Chain Lightning rules that do not need an engine (Phase 2
+ * spec §9.4, #142): where each bolt starts, who it jumps to, what every hit pays
+ * out, whether a hit stuns, and how the stun it leaves on an enemy runs out.
  *
- * `spells/ChainLightningSpell.ts` is the Phaser side; everything decidable
- * without Phaser lives here so it is Vitest-covered.
+ * The two spells are one rule: a bolt with no chain fields is Lightning Bolt
+ * (`lightning`), and one with them is Chain Lightning (`lightning_chain`).
+ * `spells/ChainLightningSpell.ts` is the Phaser side of both; everything
+ * decidable without Phaser lives here so it is Vitest-covered.
  *
  * Pure TS, no Phaser import.
  */
+
+/**
+ * The numbers a cast is resolved from: Lightning Bolt's block, or Chain
+ * Lightning's with its jumps. A missing `chains` is no jump at all.
+ */
+export type BoltStats = Readonly<LightningStats & Partial<ChainLightningStats>>;
 
 /** One enemy struck by a bolt and what it took. */
 export interface BoltHit<T extends Vec2> {
@@ -23,13 +32,13 @@ export interface BoltHit<T extends Vec2> {
 export type Bolt<T extends Vec2> = BoltHit<T>[];
 
 /**
- * Spec §5: the first target takes `damage`; every enemy the bolt chains to
- * takes `damage * chainFalloff` (80%, or 100% with No Falloff). The falloff is
- * flat per chained hit, not compounded per jump — the spec reads "each chain
- * damage * 0.8".
+ * Spec §9.4: the first target takes `damage`; every enemy the bolt chains to
+ * takes `damage * chainFalloff` (80% at base, 100% with no falloff). The
+ * falloff is flat per chained hit, not compounded per jump — the spec reads
+ * "each chain damage * 0.8". A block with no falloff field chains at full damage.
  */
-export function hitDamage(stats: Readonly<LightningStats>, chained: boolean): number {
-  return stats.damage * (chained ? stats.chainFalloff : 1);
+export function hitDamage(stats: BoltStats, chained: boolean): number {
+  return stats.damage * (chained ? (stats.chainFalloff ?? 1) : 1);
 }
 
 /**
@@ -62,30 +71,31 @@ export function chainPath<T extends Vec2>(
 
 /**
  * One cast from `origin`: `strikes` bolts, resolved in order. Each bolt starts
- * at the nearest enemy nothing in this cast has struck yet (the stat block's
- * "its own target where possible") and chains among the enemies still unhit,
- * so a Forked cast spreads across a crowd instead of arcing the same path
- * twice. Once every enemy has been struck, a further bolt lands on the nearest
- * enemy again with nothing left to chain to — extra strikes are never wasted
- * against a lone target. With no enemy at all there are no bolts.
+ * at the nearest enemy within `targetRange` that nothing in this cast has
+ * struck yet (the stat block's "its own target where possible") and chains
+ * among the enemies still unhit, so a Forked cast spreads across a crowd
+ * instead of arcing the same path twice. Once every enemy in range has been
+ * struck, a further bolt lands on the nearest enemy again with nothing left to
+ * chain to — extra strikes are never wasted against a lone target. With no
+ * enemy in range there are no bolts, and the cast is spent on nothing.
  *
- * The first target has no range: the spec gives Lightning none, so a bolt
- * always finds the nearest enemy in the arena.
+ * A Lightning Bolt block has no chain fields, so its bolts are single hits.
  */
 export function resolveCast<T extends Vec2>(
   origin: Readonly<Vec2>,
   enemies: readonly T[],
-  stats: Readonly<LightningStats>,
+  stats: BoltStats,
 ): Bolt<T>[] {
   const bolts: Bolt<T>[] = [];
   const hit = new Set<T>();
+  const inRange = nearestEnemies(origin, enemies, enemies.length, stats.targetRange);
   for (let strike = 0; strike < Math.floor(stats.strikes); strike += 1) {
-    const unhit = enemies.filter((enemy) => !hit.has(enemy));
-    // Everything already struck: this bolt lands on the nearest enemy again, and
-    // `chainPath` finds nothing left to jump to, so it is a single hit.
-    const [first] = nearestEnemies(origin, unhit.length > 0 ? unhit : enemies, 1);
+    const unhit = inRange.filter((enemy) => !hit.has(enemy));
+    // Everything in range already struck: this bolt lands on the nearest enemy
+    // again, and `chainPath` finds nothing left to jump to, so it is a single hit.
+    const [first] = unhit.length > 0 ? unhit : inRange;
     if (!first) break;
-    const path = chainPath(first, enemies, stats.chains, stats.chainRange, hit);
+    const path = chainPath(first, enemies, stats.chains ?? 0, stats.chainRange ?? 0, hit);
     for (const target of path) hit.add(target);
     bolts.push(path.map((target, i) => ({ target, damage: hitDamage(stats, i > 0) })));
   }
@@ -93,9 +103,19 @@ export function resolveCast<T extends Vec2>(
 }
 
 /**
- * A stun is a full stop (spec §5 "Stun 0.3 s"). A fresh hit brings the
+ * One enemy's stun roll (spec §9.4: "small stun chance"). A block with no
+ * chance draws nothing, so a spell that cannot stun never shifts the seeded
+ * sequence the rest of the run reads — the rule `rollFreeze` set.
+ */
+export function rollStun(rng: Rng, stunChance: number): boolean {
+  if (!(stunChance > 0)) return false;
+  return rng.next() < stunChance;
+}
+
+/**
+ * A stun is a full stop (spec §9.4 `stunDuration`). A fresh hit brings the
  * remaining stop up to `stunS` and never shortens it, so stuns refresh rather
- * than stack. `stunS` 0 is the unperked spell: nothing happens.
+ * than stack. `stunS` 0 is no stun: nothing happens.
  */
 export function applyStun(remainingS: number, stunS: number): number {
   if (!(stunS > 0)) return remainingS;

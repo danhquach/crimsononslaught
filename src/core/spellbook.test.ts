@@ -111,10 +111,10 @@ describe('Spellbook (CO-109)', () => {
     const lightning = equip(spells, 'lightning');
     runFor(spells, 14);
 
-    // 14 s at the base cooldowns: fire and lightning 1.0 s, ice 0.8 s.
+    // 14 s at the base cooldowns: fire 1.0 s, ice 0.8 s, lightning 0.9 s.
     expect(fire.casts).toBe(14);
     expect(ice.casts).toBe(17);
-    expect(lightning.casts).toBe(14);
+    expect(lightning.casts).toBe(15);
     // Each cast on its own boundary, within the frame that crossed it.
     ice.castTimes.forEach((at, index) => {
       const boundary = (index + 1) * BASE_SPELL_STATS.ice.cooldown;
@@ -146,9 +146,9 @@ describe('Spellbook (CO-109)', () => {
     runFor(spells, 3);
 
     expect(fire.casts).toBe(8);
-    // Same cooldown, three seconds of life: no share of the charge fire built up.
+    // Three seconds of life at its own 0.9 s cooldown: no share of the charge fire built up.
     expect(lightning.casts).toBe(3);
-    expect(lightning.castTimes[0]).toBeGreaterThan(1 - 1e-9);
+    expect(lightning.castTimes[0]).toBeGreaterThan(BASE_SPELL_STATS.lightning.cooldown - 1e-9);
   });
 
   it('pushes a passive onto every equipped spell at once', () => {
