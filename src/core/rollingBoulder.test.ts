@@ -33,12 +33,12 @@ describe('rollTarget', () => {
 describe('rollSpent', () => {
   it('keeps rolling until it has struck pierce enemies', () => {
     expect(rollSpent(1, base.pierce)).toBe(false);
-    expect(rollSpent(2, base.pierce)).toBe(false);
-    expect(rollSpent(3, base.pierce)).toBe(true);
+    expect(rollSpent(base.pierce - 1, base.pierce)).toBe(false);
+    expect(rollSpent(base.pierce, base.pierce)).toBe(true);
   });
 
   it('never rolls past its pierce, however many it overlapped in one frame', () => {
-    expect(rollSpent(5, base.pierce)).toBe(true);
+    expect(rollSpent(base.pierce + 2, base.pierce)).toBe(true);
   });
 
   it('a fractional pierce is floored, never rounded up', () => {

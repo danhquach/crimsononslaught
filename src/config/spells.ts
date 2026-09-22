@@ -33,7 +33,7 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     stats: [
       ['Cooldown', '1.0 s'],
       ['Damage', '12'],
-      ['Blast radius', '50'],
+      ['Blast radius', '65'],
       ['Projectiles', '1'],
     ],
   },
@@ -67,7 +67,7 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     stats: [
       ['Cooldown', '1.1 s'],
       ['Damage', '16'],
-      ['Radius', '40'],
+      ['Radius', '55'],
       ['Knockback', '70'],
       ['Bleed', '4 dps for 3 s'],
     ],
@@ -95,7 +95,7 @@ export const BASE_SPELL_STATS: Readonly<{
   fire: {
     cooldown: 1,
     damage: 12,
-    aoeRadius: 50,
+    aoeRadius: 65,
     aoeDamageFactor: 0.5,
     projectiles: 1,
     speed: 350,
@@ -122,7 +122,7 @@ export const BASE_SPELL_STATS: Readonly<{
   earth: {
     cooldown: 1.1,
     damage: 16,
-    radius: 40,
+    radius: 55,
     targetRange: 320,
     knockback: 70,
     bleed: 4,

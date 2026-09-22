@@ -48,8 +48,8 @@ describe('loadout config', () => {
     }
   });
 
-  it('unlocks the two extra active slots at levels 3 and 7 (spec §3.1)', () => {
-    expect(SLOT_UNLOCK_LEVELS).toEqual([3, 7]);
+  it('unlocks the two extra active slots at levels 2 and 5 (spec §3.1)', () => {
+    expect(SLOT_UNLOCK_LEVELS).toEqual([2, 5]);
   });
 
   it('maps a spell back to its element, and rejects anything else', () => {

@@ -41,7 +41,7 @@ describe('earth roster stat blocks', () => {
       radius: 36,
       speed: 280,
       range: 460,
-      pierce: 3,
+      pierce: 5,
       knockback: 120,
     });
     expect(BASE_EARTH_ROSTER_STATS.earth_boulder).toBe(BASE_BOULDER_STATS);

@@ -58,7 +58,7 @@ describe('passives config', () => {
       moveSpeed: 180,
       maxHp: 100,
       hpRegen: 0,
-      pickupRadius: 40,
+      pickupRadius: 60,
       xpGain: 1,
       damageMul: 1,
       cooldownMul: 1,

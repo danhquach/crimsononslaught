@@ -4,8 +4,8 @@ import { GEM_DRIFT_SPEED, GEM_XP_VALUE, MAX_LIVE_GEMS, PICKUP_RADIUS } from './g
 import { PLAYER_SPEED } from './player';
 
 describe('gem tunables', () => {
-  it('matches the spec §5 XP table', () => {
-    expect(PICKUP_RADIUS).toBe(40);
+  it('matches the spec §5 XP table, as CO-125 retuned it', () => {
+    expect(PICKUP_RADIUS).toBe(60);
     expect(GEM_XP_VALUE).toBe(1);
   });
 

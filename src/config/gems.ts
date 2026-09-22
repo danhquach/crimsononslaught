@@ -5,8 +5,15 @@
  * table. `core/gems.ts` holds the pickup and drift rules that read them.
  */
 
-/** Spec §5: "Pickup radius 40 px for XP gems (perk can increase)". */
-export const PICKUP_RADIUS = 40;
+/**
+ * Pickup radius in px for XP gems; a passive can increase it (Magnet).
+ *
+ * The spec's first guess was 40. At 40 a CO-125 baseline run left ~540 gems
+ * lying in the arena at 5:00 against ~165 XP banked — the crowd stands between
+ * the player and everything it dropped, so the run could not level into its own
+ * loadout. See `docs/tuning/phase2-balance.md` round 1.
+ */
+export const PICKUP_RADIUS = 60;
 
 /**
  * Drift speed in px/s once a gem is inside the pickup radius. Comfortably above

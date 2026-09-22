@@ -15,7 +15,7 @@ const MUZZLE_X = 120;
 const SPELL_INTERVAL_MS = 500;
 const SPELL_SPEED = 400;
 
-/** Gem drop offset on both axes: ~34 px away, inside the 40 px pickup radius. */
+/** Gem drop offset on both axes: ~34 px away, inside the 60 px pickup radius. */
 const GEM_DROP_OFFSET = 24;
 
 /** Every pair `CollisionSystem` registers, in the order they are listed on screen. */

@@ -63,10 +63,11 @@ editing pass over the Phase 1 spec, not a change to anything below.
 | Active 3 | Any unequipped active of the same element | Level-up, once unlocked | No |
 | Passives | Any number of passive ranks | Level-up, whenever no active slot is open | Never removed |
 
-- **Active 2 unlocks at level 3, active 3 at level 7.** The Phase 1 tuning pass
-  recorded Fire and Lightning reaching level 10–12 by 5:00 and Ice and Earth
-  13–20, so both slots fill mid-run for every element, and the slower elements
-  are not punished for levelling fast on a crowd they cannot kill.
+- **Active 2 unlocks at level 2, active 3 at level 5.** This document first
+  guessed 3 and 7 from the Phase 1 tuning pass's level counts. Those counts came
+  from *invulnerable* runs; CO-125's mortal sweep never got a run past level 7,
+  so slot 3 existed only on paper. At 2 and 5 a run that survives to the fourth
+  wave is holding its whole kit — see `docs/tuning/phase2-balance.md` round 1.
 - A slot that is unlocked and empty is **open**. A slot that has been filled is
   final for the rest of the run — no swap, no re-roll, no sell.
 - Passive slots are uncapped: a run can hold any number of passive ranks.
@@ -121,7 +122,7 @@ can change.
 | `moveSpeed` | 180 | px/s, before diagonal normalisation |
 | `maxHp` | 100 | Player max HP |
 | `hpRegen` | 0 | HP per second, healed continuously |
-| `pickupRadius` | 40 | Gem pickup radius, px |
+| `pickupRadius` | 60 | Gem pickup radius, px |
 | `xpGain` | 1 | Multiplier on XP collected |
 | `damageMul` | 1 | Multiplier on every damage field a spell deals |
 | `cooldownMul` | 1 | Multiplier on every cooldown field (below 1 = faster) |
@@ -414,12 +415,12 @@ type-specific damage.
 
 | Field | `fire` | `fire_meteor` | `fire_column` | `fire_companion` | `fire_dragon` |
 |---|---|---|---|---|---|
-| `cooldown` | 1.0 | 4.0 | 3.0 | — | 2.5 |
+| `cooldown` | 1.0 | 3.2 | 2.2 | — | 2.5 |
 | `attackCooldown` | — | — | — | 1.2 | — |
 | `damage` | 12 | 60 | 18 | 8 | 45 |
-| `aoeRadius` | 50 | 110 | — | — | 30 |
+| `aoeRadius` | 65 | 130 | — | — | 30 |
 | `aoeDamageFactor` | 0.5 | 1.0 | — | — | 0.4 |
-| `radius` | — | — | 40 | — | — |
+| `radius` | — | — | 55 | — | — |
 | `projectiles` | 1 | 1 | 1 | 1 | 1 |
 | `speed` | 350 | — | 120 | 320 | 260 |
 | `range` | 400 | — | 500 | — | — |
@@ -429,7 +430,7 @@ type-specific damage.
 | `duration` | — | — | — | — | 3.0 |
 | `leashRadius` | — | — | — | 60 | — |
 | `hitCooldown` | — | — | 0.5 | — | — |
-| `burn` | — | — | 6 | 2 | — |
+| `burn` | — | — | 8 | 2 | — |
 | `burnDuration` | — | — | 3.0 | 2.0 | — |
 
 Fire Bolt is today's Fire block with `burn` removed — burn is Fire Column's
@@ -571,13 +572,13 @@ stagger refreshes the timer.
 | `damage` | 16 | 40 | 10 | — | 14 |
 | `tickDamage` | — | — | — | 8 | — |
 | `tickRate` | — | — | — | 0.5 | — |
-| `radius` | 40 | 36 | — | 160 | — |
+| `radius` | 55 | 36 | — | 180 | — |
 | `speed` | — | 280 | — | — | — |
 | `chaseSpeed` | — | — | — | — | 200 |
 | `range` | — | 460 | — | — | — |
 | `targetRange` | 320 | — | — | 360 | 200 |
 | `leashRadius` | — | — | — | — | 200 |
-| `pierce` | — | 3 | — | — | — |
+| `pierce` | — | 5 | — | — | — |
 | `count` | — | — | 3 | — | — |
 | `orbitRadius` | — | — | 80 | — | — |
 | `orbitSpeed` | — | — | 2.5 rad/s | — | — |
@@ -679,7 +680,7 @@ Answered here:
 
 | Question | Decision |
 |---|---|
-| When do active slots unlock? | Levels 3 and 7 (§3.1) |
+| When do active slots unlock? | Levels 2 and 5 (§3.1) |
 | Can a filled slot be swapped? | No, final for the run (§3.1) |
 | How many passives can a run hold? | Unlimited ranks; some passives cap their own rank (§5) |
 | How do stacked passives combine? | Adds summed, then muls multiplied, then clamps (§4.2) |
@@ -702,8 +703,10 @@ Deferred, deliberately:
 - **Passive rarity or weighting.** Every eligible passive is equally likely;
   weighting is a #147 lever if the offers feel flat.
 - **Enemy-type-specific damage.** The Crush node is dropped with no replacement.
-- **Final numbers.** Every value in §9 and §5 is a starting point; #147 owns the
-  measured pass and reconciles this document with what ships.
+- **Final numbers.** Resolved. #147's measured pass has run and this document's
+  §3.1, §9.2 and §9.5 numbers are the shipped ones; the method, the rounds and
+  what each change bought are in `docs/tuning/phase2-balance.md`. §5's passive
+  table went through the pass unchanged.
 
 ## 14. Ticket map
 

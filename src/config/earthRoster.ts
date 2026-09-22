@@ -33,7 +33,7 @@ export const BASE_BOULDER_STATS: Readonly<BoulderStats> = {
   radius: 36,
   speed: 280,
   range: 460,
-  pierce: 3,
+  pierce: 5,
   knockback: 120,
 };
 
@@ -61,7 +61,7 @@ export const EARTH_ROSTER_CARDS: Readonly<Record<EarthRosterSpellId, SpellCard>>
     stats: [
       ['Cooldown', '2 s'],
       ['Damage', '40'],
-      ['Pierces', '3 enemies'],
+      ['Pierces', '5 enemies'],
       ['Knockback', '120'],
     ],
   },

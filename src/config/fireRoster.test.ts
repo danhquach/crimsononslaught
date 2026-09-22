@@ -32,14 +32,14 @@ describe('fire roster ids', () => {
 describe('fire roster stat blocks', () => {
   it('carries the spec §9.2 numbers for Fire Column', () => {
     expect(BASE_FIRE_COLUMN_STATS).toEqual({
-      cooldown: 3,
+      cooldown: 2.2,
       damage: 18,
-      radius: 40,
+      radius: 55,
       projectiles: 1,
       speed: 120,
       range: 500,
       hitCooldown: 0.5,
-      burn: 6,
+      burn: 8,
       burnDuration: 3,
     });
     expect(BASE_FIRE_ROSTER_STATS.fire_column).toBe(BASE_FIRE_COLUMN_STATS);

@@ -25,8 +25,18 @@ const EXTRA = SHIELD_SPELL_IDS;
 /** What both pools hold together, straight from the spec's blocks. */
 const TOTAL_POOL = BASE_SHIELD_STATS.ice_shield.shieldHp + BASE_SHIELD_STATS.earth_shield.shieldHp;
 
-/** Run time is 10x wall time, so this window is about 100 s of run. */
-const WINDOW_MS = 10_000;
+/**
+ * Run time is 10x wall time, so this window is about 150 s of run.
+ *
+ * It was 10 s (about 100 s of run) until CO-125 trimmed the wave 3-5 spawn
+ * rates: a slower-filling arena reaches a standing player later, so the first
+ * contact now lands around 75 s of run and a 100 s window ended mid-drain,
+ * before either pool's recharge delay (6 s and 8 s) had a chance to elapse.
+ * The guard went from reliable to a coin flip on CI. At 150 s the run covers a
+ * whole drain-and-recharge cycle with room to spare, and still stops well short
+ * of the ~170 s where a standing player's pools bottom out for good.
+ */
+const WINDOW_MS = 15_000;
 const SAMPLE_MS = 100;
 
 /** The pools as the run holds them and as the HUD was told, read together. */

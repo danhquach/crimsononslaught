@@ -7,9 +7,9 @@ describe('wave table', () => {
     expect(WAVES).toEqual([
       { startTime: 0, types: ['swarm'], spawnsPerSecond: 1.5 },
       { startTime: 60, types: ['swarm', 'fast'], spawnsPerSecond: 2.5 },
-      { startTime: 120, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 3.5 },
-      { startTime: 180, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 4.5 },
-      { startTime: 240, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 5 },
+      { startTime: 120, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 3 },
+      { startTime: 180, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 3.5 },
+      { startTime: 240, types: ['swarm', 'fast', 'tank'], spawnsPerSecond: 4 },
       { startTime: 300, types: [], spawnsPerSecond: 0 },
     ]);
   });
