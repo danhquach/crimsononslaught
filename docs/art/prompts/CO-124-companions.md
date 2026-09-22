@@ -24,7 +24,10 @@ is for.
 two ``` lines — and paste it as the prompt. Nothing else to add.** Each block is
 complete on its own: subject, canvas and grid, character, palette, frames, style
 and delivery. The style and grid rules are repeated word for word in all eight
-blocks on purpose, so there is never a second thing to remember to paste.
+blocks on purpose, so there is never a second thing to remember to paste. The
+one place they differ is the two earth blocks, where the sentence about holding
+a weapon in the same hand in the left and right rows is about the sash instead,
+because that companion carries no weapon.
 
 Two things that live outside the block, the same for every sheet:
 
@@ -47,7 +50,9 @@ the pixel size the tool reports.
 docs/art/sheets/CO-124/<filename>.png
 ```
 
-Filenames are the ones in the table below, exactly —
+That folder does not exist yet — nothing is committed under it until the first
+sheet lands, so create it when you save the first one. Filenames are the ones in
+the table below, exactly —
 `docs/art/sheets/manifest.json` will point at `CO-124/<filename>.png`, and the
 cutter reads only the manifest. PNG, not JPEG: every JPEG sheet so far came back
 with ~130k unique colours and a halo on every hard edge, and a halo on a 24 px
@@ -104,7 +109,9 @@ cell size, which is also why a delivery that comes back at some other canvas
 size is fine as long as the grid is still 6 × 4 or 4 × 4.
 
 Cut at 40 px native, the set is 160 frames — 4 companions × (24 + 16) — for
-about 256k native pixels, roughly a third of what CO-123 added. The atlas runs
+256,000 native pixels. That is about a fifth of CO-123's sixteen accepted
+sheets, which come to 1,178,536 native pixels summed over their manifest
+entries. The atlas runs
 four pages today and each carries its own 400 KB budget
 ([#173](https://github.com/danhquach/crimsononslaught/issues/173)), so these
 take a fifth page of their own rather than crowding one of the four. Pages have
