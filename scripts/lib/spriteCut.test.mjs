@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   centreBounds,
+  alphaCell,
   clearOutside,
   cornerKey,
   crop,
@@ -11,6 +12,7 @@ import {
   expandRow,
   gridSplit,
   insetRect,
+  isPreKeyed,
   keyCell,
   nextPowerOfTwo,
   opaqueBounds,
@@ -222,6 +224,43 @@ describe('clearOutside', () => {
     clearOutside(img, { x: 5, y: 5, w: 4, h: 4 });
     const bounds = opaqueBounds(img);
     expect(bounds).toEqual({ x: 5, y: 5, w: 4, h: 4 });
+  });
+});
+
+describe('isPreKeyed / alphaCell', () => {
+  // A sheet delivered as an RGBA cut-out rather than art flattened onto a key.
+  const cutOut = image(20, 20, (x, y) =>
+    x >= 8 && x < 12 && y >= 8 && y < 12 ? [0, 0, 0, 255] : [0, 0, 0, 0],
+  );
+  const flattened = image(20, 20, (x, y) =>
+    x >= 8 && x < 12 && y >= 8 && y < 12 ? [0, 0, 0, 255] : [...MAGENTA, 255],
+  );
+
+  it('tells a cut-out sheet from one flattened onto a key', () => {
+    expect(isPreKeyed(cutOut)).toBe(true);
+    expect(isPreKeyed(flattened)).toBe(false);
+  });
+
+  it('does not call a sheet pre-keyed for a handful of soft pixels', () => {
+    const almostOpaque = image(20, 20, (x, y) =>
+      x === 0 && y === 0 ? [0, 0, 0, 0] : [1, 2, 3, 255],
+    );
+    expect(isPreKeyed(almostOpaque)).toBe(false);
+  });
+
+  it('keeps black art that colour-keying a transparent corner would erase', () => {
+    const rect = { x: 0, y: 0, w: 20, h: 20 };
+    // The corner of a cut-out sheet reads as black, and so does the outline
+    // every sprite in this style is drawn with; keying by colour loses it.
+    expect(opaqueBounds(keyCell(cutOut, rect, cornerKey(cutOut, rect), 60, 130))).toBeNull();
+    expect(opaqueBounds(alphaCell(cutOut, rect))).toEqual({ x: 8, y: 8, w: 4, h: 4 });
+  });
+
+  it('takes one cell out of the sheet, alpha and all', () => {
+    const cell = alphaCell(cutOut, { x: 8, y: 8, w: 4, h: 4 });
+    expect(cell.width).toBe(4);
+    expect(cell.height).toBe(4);
+    expect([...cell.data.slice(0, 4)]).toEqual([0, 0, 0, 255]);
   });
 });
 

@@ -124,6 +124,39 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('earth.spin', 6, 12, LOOP),
   spec('earth.impact', 5, 15, ONCE),
   spec('earth.dust', 5, 12, ONCE),
+
+  // Phase 2 spell FX (CO-123, #145). Every spell the Phase 2 roster added that
+  // does not reuse a Phase 1 clip; what each one reuses instead is listed in
+  // `docs/art/prompts/CO-123-spell-fx.md`.
+  //
+  // Meteor's mark is paced to the 1 s `fallDelay` in `config/strikes.ts`: four
+  // frames at 4 fps is one pulse per fall, so the ring finishes its cycle as
+  // the meteor lands rather than cutting off mid-pulse.
+  spec('fire.meteorMark', 4, 4, LOOP),
+  spec('fire.meteor', 4, 12, LOOP),
+  spec('fire.column', 4, 12, LOOP),
+  spec('fire.columnHit', 4, 15, ONCE),
+  spec('fire.dragon', 4, 8, LOOP),
+
+  spec('ice.arrow', 4, 12, LOOP),
+  spec('ice.arrowHit', 4, 15, ONCE),
+  spec('ice.bomb', 4, 8, LOOP),
+  spec('ice.shield', 4, 6, LOOP),
+  spec('ice.shieldBreak', 4, 15, ONCE),
+  spec('ice.blizzard', 4, 8, LOOP),
+
+  spec('lightning.tornado', 4, 10, LOOP),
+  spec('lightning.sword', 4, 12, LOOP),
+
+  spec('earth.spike', 5, 15, ONCE),
+  spec('earth.shield', 4, 6, LOOP),
+
+  // Cross-element status overlays (#139): bleed and stagger are applied by
+  // spells of any element, so they hang off `status` rather than off the
+  // element that happened to land the hit. Stagger plays at `lightning.stun`'s
+  // rate, the overlay it replaces. Bleed's sheet is not accepted yet, so bleed
+  // still borrows `fire.burn` (`core/fx.ts`).
+  spec('status.stagger', 4, 10, LOOP),
 ];
 
 /**
@@ -151,4 +184,12 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   // between two enemies.
   fx_bolt: 'lightning.chain.0',
   boulder: 'earth.spin.0',
+  // #145. The ice bolt's flight art, the ice shield's layer, the strike
+  // telegraph and Fire Column's body; each cut to the size of the placeholder
+  // it replaces, so the sprites the spells already build keep the size they
+  // were tuned at (`docs/art/sheets/manifest.json` `sheetCell`).
+  proj_ice: 'ice.arrow.0',
+  shield_ice: 'ice.shield.0',
+  fx_telegraph: 'fire.meteorMark.0',
+  fx_column: 'fire.column.0',
 };

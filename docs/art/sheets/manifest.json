@@ -851,6 +851,361 @@
           }
         ]
       ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-123",
+      "file": "CO-123/fire_meteor_telegraph.png",
+      "page": 3,
+      "cols": 2,
+      "rows": 2,
+      "sheetCell": 1112,
+      "rowSpecs": [
+        [
+          {
+            "anim": "meteorMark",
+            "cols": [
+              1,
+              2
+            ],
+            "centred": true
+          }
+        ],
+        [
+          {
+            "anim": "meteorMark",
+            "cols": [
+              1,
+              2
+            ],
+            "centred": true
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-123",
+      "file": "CO-123/fire_meteor_body.png",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 512,
+      "rowSpecs": [
+        [
+          {
+            "anim": "meteor",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-123",
+      "file": "CO-123/fire_column_body.png",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 888,
+      "rowSpecs": [
+        [
+          {
+            "anim": "column",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-123",
+      "file": "CO-123/fire_column_impact.png",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 512,
+      "rowSpecs": [
+        [
+          {
+            "anim": "columnHit",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-123",
+      "file": "CO-123/fire_dragon_body.jpg",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 512,
+      "rowSpecs": [
+        [
+          {
+            "anim": "dragon",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-123",
+      "file": "CO-123/ice_arrow_body.jpg",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 192,
+      "rowSpecs": [
+        [
+          {
+            "anim": "arrow",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-123",
+      "file": "CO-123/ice_arrow_impact.jpg",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [
+          {
+            "anim": "arrowHit",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-123",
+      "file": "CO-123/ice_bomb_body.jpg",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [
+          {
+            "anim": "bomb",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-123",
+      "file": "CO-123/ice_shield_body.jpg",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 188,
+      "rowSpecs": [
+        [
+          {
+            "anim": "shield",
+            "cols": [
+              1,
+              4
+            ],
+            "centred": true
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-123",
+      "file": "CO-123/ice_shield_break.jpg",
+      "page": 3,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 188,
+      "rowSpecs": [
+        [
+          {
+            "anim": "shieldBreak",
+            "cols": [
+              1,
+              4
+            ],
+            "centred": true
+          }
+        ]
+      ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-123",
+      "file": "CO-123/ice_blizzard_area.jpg",
+      "page": 4,
+      "cols": 2,
+      "rows": 2,
+      "sheetCell": 768,
+      "rowSpecs": [
+        [
+          {
+            "anim": "blizzard",
+            "cols": [
+              1,
+              2
+            ],
+            "centred": true
+          }
+        ],
+        [
+          {
+            "anim": "blizzard",
+            "cols": [
+              1,
+              2
+            ],
+            "centred": true
+          }
+        ]
+      ]
+    },
+    {
+      "key": "lightning",
+      "ticket": "CO-123",
+      "file": "CO-123/lightning_tornado.jpg",
+      "page": 4,
+      "cols": 2,
+      "rows": 2,
+      "sheetCell": 768,
+      "rowSpecs": [
+        [
+          {
+            "anim": "tornado",
+            "cols": [
+              1,
+              2
+            ],
+            "centred": true
+          }
+        ],
+        [
+          {
+            "anim": "tornado",
+            "cols": [
+              1,
+              2
+            ],
+            "centred": true
+          }
+        ]
+      ]
+    },
+    {
+      "key": "lightning",
+      "ticket": "CO-123",
+      "file": "CO-123/lightning_sword.jpg",
+      "page": 4,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [
+          {
+            "anim": "sword",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-123",
+      "file": "CO-123/earth_spike.jpg",
+      "page": 4,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 512,
+      "rowSpecs": [
+        [
+          {
+            "anim": "spike",
+            "cols": [
+              1,
+              5
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-123",
+      "file": "CO-123/earth_shield_stone.jpg",
+      "page": 4,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [
+          {
+            "anim": "shield",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "status",
+      "ticket": "CO-123",
+      "file": "CO-123/status_stagger.jpg",
+      "page": 4,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 160,
+      "rowSpecs": [
+        [
+          {
+            "anim": "stagger",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
     }
   ]
 }

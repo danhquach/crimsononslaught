@@ -218,6 +218,49 @@ export function keyCell(img, rect, key, tol0, tol1) {
 }
 
 /**
+ * True when a sheet arrived already keyed: it carries a real alpha channel
+ * whose background is transparent, rather than art flattened onto a flat
+ * colour to key out.
+ *
+ * A property of the file, not of the sheet, so the manifest says nothing about
+ * it: three of the CO-123 sheets came back as RGBA PNGs with the background
+ * already cut away. Keying those by colour would be actively wrong — the key
+ * sampled from a transparent corner is black, and black is the outline every
+ * sprite in this style is drawn with, so the outlines would be erased.
+ *
+ * `minFraction` guards against an opaque sheet with a few stray soft pixels;
+ * a real cut-out background is most of the image.
+ */
+export function isPreKeyed(img, minFraction = 0.02) {
+  let clear = 0;
+  for (let i = 3; i < img.data.length; i += 4) {
+    if (img.data[i] === 0) clear += 1;
+  }
+  return clear >= img.width * img.height * minFraction;
+}
+
+/**
+ * Take one cell out of an already-keyed image, keeping the alpha it arrived
+ * with. The counterpart of `keyCell` for a sheet `isPreKeyed` accepts: no key
+ * to sample, no despill to undo, and no ruled grid lines to trim, because a
+ * sheet delivered with a transparent background has none.
+ */
+export function alphaCell(img, rect) {
+  const data = new Uint8ClampedArray(rect.w * rect.h * 4);
+  for (let y = 0; y < rect.h; y += 1) {
+    for (let x = 0; x < rect.w; x += 1) {
+      const px = pixelAt(img, rect.x + x, rect.y + y);
+      const o = (y * rect.w + x) * 4;
+      data[o] = px[0];
+      data[o + 1] = px[1];
+      data[o + 2] = px[2];
+      data[o + 3] = px[3];
+    }
+  }
+  return { width: rect.w, height: rect.h, data };
+}
+
+/**
  * Bounding box of the art, or null if the cell holds none.
  *
  * A pixel only counts if at least two of its four neighbours are also above
