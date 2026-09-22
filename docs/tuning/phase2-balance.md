@@ -312,6 +312,13 @@ the tests that pinned the old numbers were updated with them.
 - **A survival-side passive policy sweep**, the Earth mortal half that was cut
   here, would confirm that Ward and Vitality are not always-picks on the axis
   where they actually pay.
+- **`e2e/shield.spec.ts` was timing-coupled to the spawn rates** and this pass
+  broke it: the wave 3-5 trim means a standing player is first touched around
+  75 s of run instead of ~40 s, so the guard's 100 s window ended mid-drain and
+  never saw a pool recharge. Widened to 150 s of run here, which holds 4 of 4
+  under a 4x and 8x CPU throttle. Any future spawn-rate change should re-check
+  it — an e2e guard that samples a fixed window is a hidden dependency on how
+  fast the arena fills.
 - **Earth's boss fight is the shortest and dips under the floor.** Mortal TTK
   across its five seeds is 37 · 38 · 48 · 49 · 50 s (mean 44.4); two of the five
   are under 45 s. Earth is the only element that both reaches the boss every
