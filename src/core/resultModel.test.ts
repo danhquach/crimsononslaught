@@ -61,7 +61,7 @@ describe('resultRows', () => {
   });
 
   it('names the spell for every id', () => {
-    expect(rowValue({ ...stats, spellId: 'ice' }, 'Spell')).toBe('Frost Nova');
+    expect(rowValue({ ...stats, spellId: 'ice' }, 'Spell')).toBe('Ice Arrow');
     expect(rowValue({ ...stats, spellId: 'lightning' }, 'Spell')).toBe('Chain Lightning');
     expect(rowValue({ ...stats, spellId: 'earth' }, 'Spell')).toBe('Orbiting Boulders');
   });

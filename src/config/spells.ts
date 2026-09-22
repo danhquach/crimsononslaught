@@ -38,14 +38,14 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     ],
   },
   ice: {
-    name: 'Frost Nova',
-    color: PLACEHOLDERS.fx_nova.color,
-    description: 'Pulses a freezing ring that damages and slows everything nearby.',
+    name: 'Ice Arrow',
+    color: PLACEHOLDERS.proj_ice.color,
+    description: 'Fires a fast arrow at the nearest enemy; a chill on hit, no blast.',
     stats: [
-      ['Cooldown', '1.4 s'],
-      ['Damage', '12'],
-      ['Radius', '90'],
-      ['Slow', '30% for 1.5 s'],
+      ['Cooldown', '0.8 s'],
+      ['Damage', '10'],
+      ['Range', '420'],
+      ['Slow', '20% for 1.0 s'],
     ],
   },
   lightning: {
@@ -78,10 +78,12 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
  * player profile (Phase 2 spec §6.2). The field meanings live with the types in
  * `core/spellStats.ts`.
  *
- * Four fields the spec's base table skips: `aoeDamageFactor` and `chainFalloff`
+ * Three fields the spec's base table skips: `aoeDamageFactor` and `chainFalloff`
  * hold the defaults the spec states in prose (half damage in the blast, 80% per
- * chain), and `shatterBonus` / `crushMultiplier` start at "no bonus". Fire's
- * `range` is a tuning value the spec never gives a baseline for.
+ * chain), and `crushMultiplier` starts at "no bonus". Fire's `range` is a
+ * tuning value the spec never gives a baseline for. Ice's block is Ice Arrow's
+ * (Phase 2 spec §9.3): Frost Nova lives on as Frost Nova Bomb in
+ * `config/iceRoster.ts`.
  */
 export const BASE_SPELL_STATS: Readonly<{
   [S in SpellId]: Readonly<SpellStatsBySpell[S]>;
@@ -96,13 +98,13 @@ export const BASE_SPELL_STATS: Readonly<{
     range: 400,
   },
   ice: {
-    cooldown: 1.4,
-    damage: 12,
-    radius: 90,
-    slowPct: 0.3,
-    slowDuration: 1.5,
-    freezeChance: 0,
-    shatterBonus: 0,
+    cooldown: 0.8,
+    damage: 10,
+    projectiles: 1,
+    speed: 380,
+    range: 420,
+    slowPct: 0.2,
+    slowDuration: 1,
   },
   lightning: {
     cooldown: 1,
@@ -127,7 +129,7 @@ export const BASE_SPELL_STATS: Readonly<{
 /** Spec §5 Fire: burn ticks for this long after a hit. A run's passives never scale it. */
 export const BURN_DURATION = 2;
 
-/** Spec §5 Ice: a freeze is a full stop for this long. A run's passives never scale it. */
+/** Spec §5 Ice: how long a freeze lasts for a hit that names no `freezeDuration` of its own. */
 export const FREEZE_DURATION = 1;
 
 /** Spec §5 Earth: one boulder can hit the same enemy this often. A run's passives never scale it. */

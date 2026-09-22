@@ -189,7 +189,7 @@ describe('validateSpellFields', () => {
   it('categorises every field exactly once', () => {
     const fields = Object.keys(STAT_CATEGORIES) as SpellStatField[];
     expect(new Set(fields).size).toBe(fields.length);
-    expect(fields.length).toBe(48);
+    expect(fields.length).toBe(47);
   });
 
   // CO-109 routes every equipped spell's block through the category map, so a

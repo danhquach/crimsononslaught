@@ -72,7 +72,6 @@ export const STAT_CATEGORIES = {
   stunChance: 'unscaled',
   chainFalloff: 'unscaled',
   aoeDamageFactor: 'unscaled',
-  shatterBonus: 'unscaled',
   crushMultiplier: 'unscaled',
   knockback: 'unscaled',
   pullForce: 'unscaled',

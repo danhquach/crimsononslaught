@@ -111,9 +111,9 @@ describe('Spellbook (CO-109)', () => {
     const lightning = equip(spells, 'lightning');
     runFor(spells, 14);
 
-    // 14 s at the base cooldowns: fire and lightning 1.0 s, ice 1.4 s.
+    // 14 s at the base cooldowns: fire and lightning 1.0 s, ice 0.8 s.
     expect(fire.casts).toBe(14);
-    expect(ice.casts).toBe(10);
+    expect(ice.casts).toBe(17);
     expect(lightning.casts).toBe(14);
     // Each cast on its own boundary, within the frame that crossed it.
     ice.castTimes.forEach((at, index) => {
@@ -130,7 +130,7 @@ describe('Spellbook (CO-109)', () => {
     // One second of wall clock at scale 10 is ten seconds of run time, for both.
     runFor(spells, 1, 10);
     expect(fire.casts).toBe(10);
-    expect(ice.casts).toBe(7);
+    expect(ice.casts).toBe(12);
 
     // A paused Game stops calling `update` at all; nothing may creep forward.
     const held = [fire.casts, ice.casts];
