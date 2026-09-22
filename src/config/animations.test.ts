@@ -119,18 +119,12 @@ describe('static texture keys', () => {
   });
 
   it('covers every key whose art has landed', () => {
-    // The companion's sheets are #146, and the ice bolt's flight art, the ice
-    // shield's layer, the ground-area ring, the strike telegraph and Fire
-    // Column's body are #145; all keep their placeholder until then.
+    // The companion's sheets are #146. `fx_area` is the one key #145 left on
+    // its placeholder: Blizzard and Earthquake share it, so a single frame
+    // would draw one spell's patch for the other, and Earthquake's sheet was
+    // not accepted anyway. It needs a texture per area spell, not a frame here.
     const withoutArt = TEXTURE_KEYS.filter((key) => STATIC_FRAMES[key] === undefined);
-    expect(withoutArt).toEqual([
-      'companion',
-      'proj_ice',
-      'shield_ice',
-      'fx_area',
-      'fx_telegraph',
-      'fx_column',
-    ]);
+    expect(withoutArt).toEqual(['companion', 'fx_area']);
   });
 
   it('resolves every mapped key to a real atlas frame', () => {

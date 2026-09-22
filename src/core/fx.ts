@@ -79,13 +79,13 @@ export interface EnemyStatus {
  * Within Ice the freeze block covers the slow; a stun outranks a stagger
  * because the enemy is stopped for longer.
  *
- * Stagger and bleed borrow the stun and burn clips until #145 lands
- * `lightning.stagger` and `earth.bleed`.
+ * Stagger has its own clip since #145; bleed still borrows the burn flames,
+ * because its sheet is the one CO-123 did not accept.
  */
 export function statusOverlay(status: Readonly<EnemyStatus>): string | null {
   if (status.frozen) return 'ice.freeze';
   if (status.stunned) return 'lightning.stun';
-  if (status.staggered) return 'lightning.stun';
+  if (status.staggered) return 'status.stagger';
   if (status.slowed) return 'ice.slow';
   if (status.burning || status.bleeding) {
     return status.radius >= LARGE_BURN_MIN_RADIUS ? 'fire.burnBig' : 'fire.burn';

@@ -44,6 +44,39 @@ The folder already exists in this branch. Filenames are the ones in the table be
 
 Drop them in as they come; they do not have to arrive together. Tell me which ones landed and I will measure them, add the manifest entries and run `npm run art:cut`.
 
+## What came back
+
+All nineteen were delivered and measured against the table below. Sixteen were
+accepted and cut; three were not. None of them arrived at the canvas size its
+prompt asked for and fifteen came back as JPEG rather than PNG, so the manifest
+carries the grid each sheet was actually drawn on and a `sheetCell` chosen to
+land the native frame at the size the effect replaces. That is what `sheetCell`
+has always absorbed — the cutter divides by `cols x rows` and never looks for
+the drawn grid lines — so an off-size delivery is only a problem when it changes
+the *shape* of the grid, which none of the sixteen did.
+
+Three came back with the background already cut away as RGBA rather than
+flattened onto magenta (`fire_meteor_body`, `fire_column_impact`,
+`fire_meteor_telegraph`). Those are cut through `alphaCell` instead of the
+colour key: a key sampled from a transparent corner is black, and black is the
+outline every sprite in this style is drawn with, so colour-keying them would
+have erased roughly one drawn pixel in six on the meteor alone.
+
+Not accepted, and why:
+
+| File | Why not |
+|---|---|
+| `status_bleed.jpeg` | 2048 x 2048 on a 2 x 2 grid rather than 640 x 160 on 4 x 1, first cell empty, a pink background the drops themselves are drawn in, and a vendor watermark plus a badge burned into two corners. The watermark alone rules it out: this repository is public. |
+| `earth_shield_break.jpg` | Frame 3's lower rock is flush against the bottom of its cell and clipped by it. `art:cut` fails the sheet, which is the check doing its job; `allowEdge` would only silence it. |
+| `earth_quake_area.jpg` | The crater is a radial gradient that fades out into the key colour, so the effect and the background are the same colour. Keying keeps the pink half of the gradient as opaque art — about a sixth of every frame — and leaves a magenta fringe on every crack. No cutter setting recovers it; the art has to be redrawn with the crater opaque against flat magenta. |
+
+All three are being redrawn. Blocks 16, 17 and 18 below have been rewritten for
+that: each now names its groups' centres in pixels and never mentions a grid —
+the form sheet 19 uses, which is the one late delivery that came back with a
+usable layout — and each carries a rule aimed at the way its own first attempt
+failed. Nothing else in this file changed; the sixteen accepted blocks are as
+they were.
+
 ## The sheets
 
 `cell` is the authored cell size; the cutter's native frame is `cell / 4`, which is the size the effect is drawn at in game before the engine scales it. `art` is how wide the drawing may be inside its cell — the rest is margin.
@@ -388,61 +421,79 @@ Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole
 
 Save as `docs/art/sheets/CO-123/earth_shield_break.png`. Copy the whole block below; it is the complete prompt.
 
+Redraw. The first delivery was good art, but the lower rock of the third group
+was flush against the bottom of the image and cut off by it, which fails the
+cut. This rewrite names each group's centre in pixels and shrinks the spread,
+and is written without the word "cell", the way sheet 19 is: every delivery that
+was told about a grid drew one.
+
 ```text
-Create one pixel-art animation sheet for a top-down 2D game: the ring of stones around the player breaking apart. Draw only the stone and dust, no player and no ground.
+One pixel-art image, 2048 by 512 pixels, filled edge to edge with flat magenta #FF00FF. The only things painted on that magenta are four groups of grey-brown rock. The magenta is identical everywhere behind and between them, fully opaque: no panels, tiles, boxes, frames, lines, borders, shading, text or transparency anywhere in the image.
 
-The canvas is 2048 by 512 pixels, a grid of 512 pixel square cells, four cells across and one cell down. They read left to right. Each drawing is centred in its cell and none is wider than 320 pixels, which leaves at least 96 pixels of plain magenta between the drawing and every cell edge.
+The four groups sit in a row, centred at 256, 768, 1280 and 1792 pixels across and 256 pixels down. Every painted pixel of a group stays within 150 pixels of its centre in every direction, so at least 100 pixels of clear magenta surround each group on all four sides, including above and below. Nothing is painted in the top 100 or the bottom 100 pixels of the image at any point across its width. Draw a group smaller rather than let it reach that far: the clearance is measured on the delivered file.
 
-The stone is grey-brown, hex #8D6E63, with pale break faces and brown-grey dust.
+The rock is grey-brown, hex #8D6E63, with pale break faces and brown-grey dust. Chunky hard-edged pixels: no blur, no anti-aliasing, no gradients, no outlines, no glow.
 
-The four drawings play once, in this order. First three chunky stone slabs sit in a ring about 200 pixels across, with white-hot cracks flashing across them. Second the slabs split into halves, the ring now about 250 pixels across, with the first puff of dust between them. Third ten to fourteen rock chips fly outward, about 320 pixels across, through a thick ring of brown-grey dust. Fourth the chips are near the outer edge of that spread, small and tumbling, with the dust thinning around them; still clearly visible and never fully gone. All four drawings share the same centre point.
+The four groups are one burst played once, in order. First: three chunky stone slabs in a ring about 200 pixels across, with white-hot cracks flashing across them. Second: the slabs split into halves, the ring about 250 pixels across, with the first puff of dust between them. Third: ten to fourteen rock chips fly outward through a thick ring of brown-grey dust, the whole spread no more than 300 pixels across. Fourth: the chips are near the outer edge of that spread, small and tumbling, with the dust thinning around them, still clearly visible and never fully gone. Every group has visible art in it; none is empty.
 
-Style, the same for every sheet in this project: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from the top-left; a grim fantasy look in the subject's own colours, never in the background; original design; match the attached reference sheet.
-Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
-The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
-Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one lossless PNG, not JPEG, exactly 2048 by 512 pixels, and report the pixel size.
 ```
+
+---
 
 ## 17. `earth_quake_area.png` — the earthquake on the ground
 
 Save as `docs/art/sheets/CO-123/earth_quake_area.png`. Copy the whole block below; it is the complete prompt.
 
+Redraw, and the one that has to change most. The first delivery painted the
+crater as a radial glow fading outward into the background, so the effect and
+the key were the same colour: keying it kept the pink half of the gradient as
+opaque art and left a magenta fringe on every crack. Nothing in the cutter
+recovers that. This rewrite bans every pink and red from the sheet outright,
+puts the ember in amber instead, and requires every painted pixel to be fully
+opaque and nothing like the background.
+
 ```text
-Create one pixel-art animation sheet for a top-down 2D game: a circular patch of cracked, rumbling ground, seen from straight above. This is drawn as a layer over the arena floor, the way cracks would show on whatever is already there, so draw only the cracking and the debris: no soil fill, no grass, no stone texture and no creatures.
+One pixel-art image, 1536 by 1536 pixels, filled edge to edge with flat magenta #FF00FF. The only things painted on that magenta are four groups of cracked ground. The magenta is identical everywhere behind and between them, fully opaque: no panels, tiles, boxes, frames, lines, borders, shading, text or transparency anywhere in the image.
 
-The canvas is 1536 by 1536 pixels, a grid of 768 pixel square cells, two cells across and two cells down, so there are four cells in total. They read left to right along the top row and then left to right along the bottom row. Each drawing is about 520 pixels across and is centred in its cell, which leaves about 120 pixels of plain magenta between the drawing and every cell edge.
+No pixel anywhere in this image is pink, rose, crimson, red, purple or violet, and no painted pixel is any shade close to the magenta background. Every painted pixel is fully opaque and plainly a different colour from the background. The background never glows, brightens, darkens, tints or fades anywhere: there is no halo, aura, bloom, vignette or gradient of any kind, and the magenta immediately beside a crack is the same magenta as in the far corner of the image.
 
-The patch is a circle about 520 pixels across, marked out by a broken rim of upheaved grey-brown rock, hex #8D6E63, about twenty pixels thick, with a web of hard-edged dark cracks running inward from it toward the centre, a dull ember glow deep inside the widest cracks, and small loose stones and grey-brown dust puffs scattered between them. Everything the cracks, stones and dust do not cover stays plain magenta: the floor beneath shows through, and a creature standing in the patch is plainly visible.
+The four groups sit in a square, centred at 384 and 1152 pixels across and 384 and 1152 pixels down, read left to right along the top pair and then left to right along the bottom pair. Every painted pixel of a group stays within 260 pixels of its centre, so at least 124 pixels of clear magenta surround each group on all four sides.
 
-The four drawings are one rumble that repeats. The cracks widen and narrow and throw off a few short new splinters in different places, the ember glow in them brightens and dims, the loose stones hop a pixel or two to different spots as the ground shakes under them, and dust puffs rise in a different part of the circle each drawing. The rim and the circle it marks do not move: the patch keeps exactly the same diameter and the same centre in all four cells, because that edge is what tells a player where the ground is dangerous. The shaking is in the cracks, the stones and the dust, never in the outline.
+A group is a broken ring of upheaved grey-brown rock, hex #8D6E63, about 20 pixels thick, marking out a circle about 520 pixels across, with a web of hard-edged dark brown cracks running inward from it toward the centre. Deep inside the widest cracks sit a few small solid patches of amber, hex #FFA000 — flat blocks of colour with hard edges, not a light source and never fading outward. Small loose stones and grey-brown dust puffs are scattered between the cracks. Everything the ring, cracks, stones and dust do not cover stays plain magenta, right through the middle of the circle: the floor beneath shows through and a creature standing in the patch is plainly visible. Chunky hard-edged pixels: no blur, no anti-aliasing, no gradients, no outlines, no glow.
 
-Style, the same for every sheet in this project: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from the top-left; a grim fantasy look in the subject's own colours, never in the background; original design; match the attached reference sheet.
-Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
-The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
-Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+The four groups are one rumble that repeats. The cracks widen and narrow and throw off a few short new splinters in different places, the amber patches grow and shrink by a few pixels, the loose stones hop a pixel or two as the ground shakes, and dust puffs rise in a different part of the circle each time. The ring and the circle it marks do not move: the same diameter and the same centre in all four groups, because that edge is what tells a player where the ground is dangerous. The shaking is in the cracks, the stones and the dust, never in the outline. Every group has visible art in it; none is empty.
+
+Deliver one lossless PNG, not JPEG, exactly 1536 by 1536 pixels, and report the pixel size.
 ```
+
+---
 
 ## 18. `status_bleed.png` — the bleed overlay
 
 Save as `docs/art/sheets/CO-123/status_bleed.png`. Copy the whole block below; it is the complete prompt.
 
+Redraw. The first delivery came back at 2048 by 2048 on a two-by-two layout
+instead of 640 by 160 in a row, with its first group empty, the droplets drawn
+on a pink background the same family as the droplets themselves, panels ruled
+around each group — and a vendor watermark and badge burned into two corners.
+The watermark alone rules a sheet out: this repository is public.
+
 ```text
-Create one pixel-art animation sheet of a status effect for a top-down 2D game. No creature is drawn anywhere on this sheet: the effect floats alone on magenta, with no body, blob, silhouette or shading beneath it, and nothing left empty or transparent.
+One pixel-art image, 640 by 160 pixels, wider than it is tall, filled edge to edge with flat magenta #FF00FF. The only things painted on that magenta are four small groups of blood droplets. The magenta is identical everywhere behind and between them, fully opaque: no panels, tiles, boxes, frames, lines, borders, shading, transparency or background of any other colour anywhere in the image.
 
-The canvas is 640 by 160 pixels, a grid of 160 pixel square cells, four cells across and one cell down. They read left to right. Each drawing covers an invisible creature about 80 pixels wide and about 60 pixels tall in the middle of its cell, which leaves at least 40 pixels of plain magenta between the drawing and every cell edge.
+Nothing may be added to this image that is not one of the four groups of droplets. No text, letters, numbers, labels or captions. No logo, wordmark, signature, badge, stamp, icon, corner mark or watermark of any kind, in any corner or anywhere else, whether from the tool that draws it or from anything else. A single such mark ruins the sheet.
 
-The effect is bleeding: four or five deep crimson droplets, hex #B71C1C, with darker cores and a small bright highlight on each, plus a short spatter of fine red specks low in the area the creature would occupy.
+The four groups sit in a row, centred at 80, 240, 400 and 560 pixels across and 80 pixels down, each fitting inside about 80 by 60 pixels so at least 40 pixels of clear magenta surround it on all four sides.
 
-The four drawings are one loop: the droplets fall a little further in each drawing, the lowest one breaking into specks as it lands, and a new droplet forms at the top, so the fourth drawing leads back into the first. The droplets sit over the creature's area and never spread beyond it.
+A group is four or five deep crimson droplets, hex #B71C1C, each with a darker core and one small bright highlight, plus a short spatter of fine red specks low in the group. The droplets are solid blocks of colour with hard edges. Chunky hard-edged pixels: no blur, no anti-aliasing, no gradients, no outlines, no glow.
 
-Style, the same for every sheet in this project: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from the top-left; a grim fantasy look in the subject's own colours, never in the background; original design; match the attached reference sheet.
-Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
-The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
-Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+The four groups are one four-step loop: the droplets fall a little further in each group, the lowest one breaking into specks as it lands, and a new droplet forms at the top, so the fourth group leads back into the first. Every group has visible droplets in it; none is empty, including the first.
+
+Deliver one lossless PNG, not JPEG, exactly 640 by 160 pixels, and report the pixel size.
 ```
+
+---
 
 ## 19. `status_stagger.png` — the stagger overlay
 

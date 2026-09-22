@@ -21,6 +21,7 @@ import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  alphaCell,
   blit,
   centreBounds,
   clearOutside,
@@ -31,6 +32,7 @@ import {
   expandRow,
   gridSplit,
   insetRect,
+  isPreKeyed,
   keyCell,
   opaqueBounds,
   packFrames,
@@ -84,6 +86,9 @@ function cutSheet(sheet) {
   const img = loadImage(join(SHEET_DIR, sheet.file));
   const cells = gridSplit(img.width, img.height, sheet.cols, sheet.rows);
   const nativeCell = sheet.sheetCell / SCALE;
+  // A sheet that arrived with its background already cut away is taken as it
+  // is; only a flattened one is keyed by colour (CO-123).
+  const preKeyed = isPreKeyed(img);
   const cut = [];
   // Frame numbering continues across rows, so the boss death can span two.
   let counters = {};
@@ -100,6 +105,10 @@ function cutSheet(sheet) {
     // ruled line cannot poison it.
     const cellOf = (col) => {
       const cell = cells[row * sheet.cols + col];
+      if (preKeyed) {
+        const local = { x: 0, y: 0, w: cell.w, h: cell.h };
+        return { cell, keyed: alphaCell(img, cell), local };
+      }
       const key = cornerKey(img, insetRect(cell, KEY_INSET));
       const kept = trimBorderLines(img, cell, key, TOL_KEYED, TOL_SOLID);
       const local = { x: kept.x - cell.x, y: kept.y - cell.y, w: kept.w, h: kept.h };
