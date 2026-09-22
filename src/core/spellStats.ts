@@ -24,8 +24,6 @@ export interface FireStats {
   speed: number;
   /** How far a projectile flies before it expires, in px; also the targeting range. */
   range: number;
-  /** Burn damage per second for `BURN_DURATION` s. 0 = no burn. */
-  burn: number;
 }
 
 export interface IceStats {
@@ -199,6 +197,57 @@ export interface MeteorStats {
   fallDelay: number;
 }
 
+/**
+ * Fire Column (spec §9.2): a wide, slow projectile that is not spent on hit —
+ * it travels from the caster toward the nearest enemy within `range` and burns
+ * every enemy it passes through, at most once per `hitCooldown` s per enemy.
+ */
+export interface FireColumnStats {
+  /** Seconds between casts. */
+  cooldown: number;
+  /** Damage one hit deals. */
+  damage: number;
+  /** Body radius of the column, in px. */
+  radius: number;
+  /** Columns per cast. */
+  projectiles: number;
+  /** Column speed in px/s. */
+  speed: number;
+  /** How far the column travels before it despawns, in px; also the targeting range. */
+  range: number;
+  /** Seconds between two hits on the same enemy. */
+  hitCooldown: number;
+  /** Burn damage per second applied on hit. */
+  burn: number;
+  /** Seconds that burn lasts. */
+  burnDuration: number;
+}
+
+/**
+ * Fire Dragon (#137, spec §9.2): a homing missile with heavy single-target
+ * damage and a small splash, that expires after `duration` seconds of flight.
+ */
+export interface FireDragonStats {
+  /** Seconds between casts. */
+  cooldown: number;
+  /** Damage on a direct hit. */
+  damage: number;
+  /** Splash radius in px. */
+  aoeRadius: number;
+  /** Splash damage as a fraction of `damage`. */
+  aoeDamageFactor: number;
+  /** Dragons per cast. */
+  projectiles: number;
+  /** Flight speed in px/s. */
+  speed: number;
+  /** How far from the caster a target may be picked, in px. */
+  targetRange: number;
+  /** Maximum turn rate while homing, in rad/s. */
+  homingTurnRate: number;
+  /** Seconds a dragon flies before it expires. */
+  duration: number;
+}
+
 /** Which stat block each spell owns. */
 export interface SpellStatsBySpell {
   fire: FireStats;
@@ -214,6 +263,8 @@ export interface SpellStatsBySpell {
   ice_blizzard: GroundAreaStats;
   earth_quake: GroundAreaStats;
   fire_meteor: MeteorStats;
+  fire_column: FireColumnStats;
+  fire_dragon: FireDragonStats;
 }
 
 /** Every id a `Spell` may carry: the Phase 1 four plus the Phase 2 spells that exist. */

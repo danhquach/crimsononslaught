@@ -82,14 +82,24 @@ export function hasBurn(state: Readonly<BurnState>): boolean {
 }
 
 /**
- * A fireball hit lands on an enemy with `dps` burn (spec §5: "dmg/s for 2 s").
- * A fresh hit restarts the clock and keeps whichever dps is higher, so a burn
- * never stacks and a weaker hit never shortens a stronger one. `dps` 0 is the
- * unperked spell: nothing happens.
+ * A hit lands on an enemy with `dps` burn for `durationS` s (spec §5: "dmg/s
+ * for 2 s"; Fire Column's own window is spec §9.2's `burnDuration`). A fresh
+ * hit keeps whichever dps is higher and whichever clock runs longer — its own
+ * duration or what is already left — so a burn never stacks and a shorter,
+ * weaker hit never cuts a stronger one short. `dps` 0 is the unperked spell:
+ * nothing happens.
  */
-export function applyBurn(current: Readonly<BurnState>, dps: number): BurnState {
+export function applyBurn(
+  current: Readonly<BurnState>,
+  dps: number,
+  durationS: number = BURN_DURATION,
+): BurnState {
   if (!(dps > 0)) return { ...current };
-  return { dps: Math.max(dps, hasBurn(current) ? current.dps : 0), remainingS: BURN_DURATION };
+  const running = hasBurn(current);
+  return {
+    dps: Math.max(dps, running ? current.dps : 0),
+    remainingS: Math.max(durationS, running ? current.remainingS : 0),
+  };
 }
 
 /**

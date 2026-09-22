@@ -123,7 +123,6 @@ describe('base stat blocks', () => {
       projectiles: 1,
       speed: 350,
       range: 400,
-      burn: 0,
     });
     expect(BASE_SPELL_STATS.ice).toEqual({
       cooldown: 1.4,

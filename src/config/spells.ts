@@ -27,9 +27,9 @@ export interface SpellCard {
 
 export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
   fire: {
-    name: 'Fireball',
+    name: 'Fire Bolt',
     color: PLACEHOLDERS.proj_fire.color,
-    description: 'Hurls fireballs at the nearest enemy; each explodes on hit.',
+    description: 'Fires a fast bolt at the nearest enemy; a small explosion on hit.',
     stats: [
       ['Cooldown', '1.0 s'],
       ['Damage', '12'],
@@ -94,7 +94,6 @@ export const BASE_SPELL_STATS: Readonly<{
     projectiles: 1,
     speed: 350,
     range: 400,
-    burn: 0,
   },
   ice: {
     cooldown: 1.4,

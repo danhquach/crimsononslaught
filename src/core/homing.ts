@@ -22,6 +22,13 @@ import { nearestEnemies } from './spell';
  * Pure TS, no Phaser import.
  */
 
+/**
+ * Dragons in flight the pool may ever hold (spec §9.2 Fire Dragon): a big
+ * single-target hit on a 2.5 s cooldown, so one is normally in the air at a
+ * time; the cap leaves room for a Haste build.
+ */
+export const MAX_LIVE_DRAGONS = 8;
+
 /** What a homing shot needs of its target: where it is, and whether it still counts. */
 export interface HomingTarget extends Vec2 {
   readonly active: boolean;

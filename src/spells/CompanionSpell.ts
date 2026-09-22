@@ -15,6 +15,7 @@ import {
   spawnPosition,
   stepPosition,
 } from '../core/companion';
+import { BURN_DURATION } from '../config/spells';
 import { dustFlip } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
@@ -219,17 +220,14 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
    * What one companion attack costs the enemy it lands on: `damage`, plus the
    * element's own mark — Fire's burn, Ice's chill, Lightning's stagger (#139),
    * Earth's shove.
-   *
-   * Fire's `burnDuration` is the global `BURN_DURATION` today —
-   * `config/companions.test.ts` fails if the two ever disagree, so the block
-   * cannot quietly promise a window nothing honours.
    */
   private onCompanionHit(enemy: Enemy): void {
-    const { damage, burn, slowPct, slowDuration, staggerDuration, knockback } = this.companionStats;
+    const { damage, burn, burnDuration, slowPct, slowDuration, staggerDuration, knockback } =
+      this.companionStats;
     this.landed += 1;
     const clip = COMPANION_FX[this.id];
     this.fx.burst(clip.hit, enemy.x, enemy.y, { scale: clip.hitScale });
-    if (burn) enemy.applyBurn(burn);
+    if (burn) enemy.applyBurn(burn, burnDuration ?? BURN_DURATION);
     if (slowPct) enemy.applyFrost({ slowPct, slowDuration: slowDuration ?? 0, freeze: false });
     if (staggerDuration) enemy.applyStagger(staggerDuration);
     // The shove is measured before the blow, so a killing hit drops its gems

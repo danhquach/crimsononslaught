@@ -33,6 +33,8 @@ import type {
   EarthShieldStats,
   GroundAreaStats,
   EarthStats,
+  FireColumnStats,
+  FireDragonStats,
   FireStats,
   IceShieldStats,
   IceStats,
@@ -56,6 +58,12 @@ import { ARENA_DEPTH } from '../config/fx';
 import type { SpellStatBlock } from '../config/spellFields';
 import { BASE_SPELL_STATS, SPELL_CARDS, isSpellId } from '../config/spells';
 import {
+  BASE_FIRE_ROSTER_STATS,
+  FIRE_ROSTER_CARDS,
+  FIRE_ROSTER_SPELL_IDS,
+  isFireRosterSpellId,
+} from '../config/fireRoster';
+import {
   BASE_COMPANION_STATS,
   COMPANION_CARDS,
   COMPANION_SPELL_IDS,
@@ -74,6 +82,8 @@ import { Player } from '../entities/Player';
 import { XpGem } from '../entities/XpGem';
 import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { FireballSpell } from '../spells/FireballSpell';
+import { FireColumnSpell } from '../spells/FireColumnSpell';
+import { FireDragonSpell } from '../spells/FireDragonSpell';
 import { FrostNovaSpell } from '../spells/FrostNovaSpell';
 import { CompanionSpell } from '../spells/CompanionSpell';
 import { GroundAreaSpell } from '../spells/GroundAreaSpell';
@@ -263,6 +273,20 @@ export class GameScene extends Phaser.Scene {
       landed: spells.reduce((total, spell) => total + spell.landed, 0),
       hits: spells.reduce((total, spell) => total + spell.hits, 0),
     };
+  }
+
+  /**
+   * Test hook (#140): Fire Column and Fire Dragon, whichever is equipped —
+   * hits each has landed and shots each has in the air right now. The browser
+   * suite watches a run land hits with both and hold their pool caps.
+   */
+  get fireReport(): { id: RosterSpellId; hits: number; live: number }[] {
+    return this.spells.spells
+      .filter(
+        (spell): spell is FireColumnSpell | FireDragonSpell =>
+          spell instanceof FireColumnSpell || spell instanceof FireDragonSpell,
+      )
+      .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
   }
 
   init(data: unknown): void {
@@ -540,6 +564,26 @@ export class GameScene extends Phaser.Scene {
           this.areas,
           this.rng,
         );
+      case 'fire_column':
+        return new FireColumnSpell(
+          this,
+          this.player,
+          this.enemies,
+          this.collisions,
+          stats as Readonly<FireColumnStats>,
+          damage,
+          this.fx,
+        );
+      case 'fire_dragon':
+        return new FireDragonSpell(
+          this,
+          this.player,
+          this.enemies,
+          this.collisions,
+          stats as Readonly<FireDragonStats>,
+          damage,
+          this.fx,
+        );
       case 'fire_meteor':
         return new MeteorSpell(
           spellId,
@@ -578,6 +622,7 @@ export class GameScene extends Phaser.Scene {
     if (isShieldSpellId(spellId)) return BASE_SHIELD_STATS[spellId];
     if (isAreaSpellId(spellId)) return BASE_AREA_STATS[spellId];
     if (isStrikeSpellId(spellId)) return BASE_STRIKE_STATS[spellId];
+    if (isFireRosterSpellId(spellId)) return BASE_FIRE_ROSTER_STATS[spellId];
     return undefined;
   }
 
@@ -620,6 +665,11 @@ export class GameScene extends Phaser.Scene {
         id,
         name: STRIKE_CARDS[id].name,
         description: STRIKE_CARDS[id].description,
+      })),
+      ...FIRE_ROSTER_SPELL_IDS.map((id) => ({
+        id,
+        name: FIRE_ROSTER_CARDS[id].name,
+        description: FIRE_ROSTER_CARDS[id].description,
       })),
     ].filter((card) => !casting.has(card.id));
   }

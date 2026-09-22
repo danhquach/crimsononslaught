@@ -20,6 +20,8 @@ const SPEC_KEYS = [
   'shield_ice',
   'fx_area',
   'fx_telegraph',
+  // #140: Fire Column's body.
+  'fx_column',
 ];
 
 describe('placeholder texture config', () => {

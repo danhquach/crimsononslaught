@@ -106,6 +106,17 @@ describe('burn (CO-044)', () => {
     expect(tickBurn(state, 10)).toEqual({ state: NO_BURN, damage: 6 });
   });
 
+  it('takes a per-hit duration, defaulting to BURN_DURATION', () => {
+    expect(applyBurn(NO_BURN, 6, 3)).toEqual({ dps: 6, remainingS: 3 });
+    expect(applyBurn(NO_BURN, 6)).toEqual({ dps: 6, remainingS: BURN_DURATION });
+  });
+
+  it('a shorter fresh hit never cuts a running burn short, a longer one extends it', () => {
+    const { state: mid } = tickBurn(applyBurn(NO_BURN, 3, 5), 1);
+    expect(applyBurn(mid, 4, 2)).toEqual({ dps: 4, remainingS: 4 });
+    expect(applyBurn(mid, 2, 6)).toEqual({ dps: 3, remainingS: 6 });
+  });
+
   it('a second hit refreshes the duration and keeps the stronger dps', () => {
     const { state: half } = tickBurn(applyBurn(NO_BURN, 6), 1);
     expect(applyBurn(half, 3)).toEqual({ dps: 6, remainingS: BURN_DURATION });
