@@ -35,7 +35,7 @@ const idle: EnemyStatus = {
 describe('effect scales (CO-082)', () => {
   it('draws the explosion at aoeRadius / 40', () => {
     expect(explosionScale(40)).toBe(1);
-    expect(explosionScale(BASE_SPELL_STATS.fire.aoeRadius)).toBeCloseTo(1.25);
+    expect(explosionScale(BASE_SPELL_STATS.fire.aoeRadius)).toBeCloseTo(1.625);
   });
 
   it('draws the nova at radius / 90', () => {
@@ -52,7 +52,7 @@ describe('effect scales (CO-082)', () => {
 
   it('draws a telegraph at radius / 100, so the ring is the blast to come', () => {
     expect(telegraphScale(100)).toBe(1);
-    expect(telegraphScale(BASE_METEOR_STATS.aoeRadius)).toBeCloseTo(1.1);
+    expect(telegraphScale(BASE_METEOR_STATS.aoeRadius)).toBeCloseTo(1.3);
     expect(telegraphScale(-50)).toBe(0);
   });
 

@@ -185,7 +185,9 @@ src/
 - Input: WASD + arrow keys, or gamepad left stick / D-pad (Phaser Gamepad plugin, deadzone 0.2, analog magnitude scales speed). Both live at once; non-zero input wins, keyboard on tie. Speed 180 px/s. No dash, no aim.
 - Gamepad in menus/overlays: A = confirm, D-pad or left stick changes selection. Mouse and keyboard remain primary.
 - HP 100. On contact damage: take damage, 0.5 s invulnerability with flicker.
-- Pickup radius 40 px for XP gems (perk can increase).
+- Pickup radius 60 px for XP gems (a passive can increase it). Phase 1 shipped
+  40; CO-125 raised it — at 40 a Phase 2 run left most of what it killed on the
+  ground and could not level into its own loadout.
 
 ### Enemies
 | Type | HP | Speed | Contact dmg | Radius | Notes |
@@ -205,13 +207,16 @@ src/
 |---|---|---|
 | 0 | Swarm | 1.5 |
 | 60 | Swarm, Fast | 2.5 |
-| 120 | Swarm, Fast, Tank | 3.5 |
-| 180 | Swarm, Fast, Tank | 4.5 |
-| 240 | Swarm, Fast, Tank | 5 |
+| 120 | Swarm, Fast, Tank | 3 |
+| 180 | Swarm, Fast, Tank | 3.5 |
+| 240 | Swarm, Fast, Tank | 4 |
 | 300 | none (boss phase) | 0 |
 
 ### Boss
-- Spawns at 5:00 off-camera. HP 1500, speed 70, contact dmg 30, radius 40.
+- Spawns at 5:00 off-camera. HP 2400, speed 70, contact dmg 30, radius 40.
+  Phase 1 shipped 1500 against one spell and a seven-node perk tree; CO-125
+  raised it to hold the boss fight in its 45–90 s window against a three-active
+  loadout and an uncapped passive stack.
 - Every 4 s: 0.8 s telegraph (color flash), then charge toward player's
   position at 400 px/s for 0.6 s.
 - Remaining regular enemies keep living but no new spawns.

@@ -34,9 +34,9 @@ describe('strike ids', () => {
 describe('strike stat blocks', () => {
   it('carries the spec §9.2 numbers for Meteor', () => {
     expect(BASE_METEOR_STATS).toEqual({
-      cooldown: 4,
+      cooldown: 3.2,
       damage: 60,
-      aoeRadius: 110,
+      aoeRadius: 130,
       aoeDamageFactor: 1,
       projectiles: 1,
       targetRange: 420,

@@ -25,9 +25,11 @@ describe('withinPickupRadius', () => {
 
   it('measures true distance, not per-axis', () => {
     const gem = { x: 0, y: 0 };
-    // (30, 30) is inside 40 on each axis but 42.4 px away.
-    expect(withinPickupRadius(gem, { x: 30, y: 30 })).toBe(false);
-    expect(withinPickupRadius(gem, { x: 28, y: 28 })).toBe(true);
+    // A point at 0.75 x the radius on each axis is inside it per-axis but 1.06 x it away.
+    const outside = PICKUP_RADIUS * 0.75;
+    const inside = PICKUP_RADIUS * 0.7;
+    expect(withinPickupRadius(gem, { x: outside, y: outside })).toBe(false);
+    expect(withinPickupRadius(gem, { x: inside, y: inside })).toBe(true);
   });
 
   it('honours a widened radius, as a perk will ask for', () => {

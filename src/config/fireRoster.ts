@@ -23,14 +23,14 @@ export function isFireRosterSpellId(value: unknown): value is FireRosterSpellId 
 
 /** Spec §9.2 base block. */
 export const BASE_FIRE_COLUMN_STATS: Readonly<FireColumnStats> = {
-  cooldown: 3,
+  cooldown: 2.2,
   damage: 18,
-  radius: 40,
+  radius: 55,
   projectiles: 1,
   speed: 120,
   range: 500,
   hitCooldown: 0.5,
-  burn: 6,
+  burn: 8,
   burnDuration: 3,
 };
 
@@ -61,9 +61,9 @@ export const FIRE_ROSTER_CARDS: Readonly<Record<FireRosterSpellId, SpellCard>> =
     color: PLACEHOLDERS.fx_column.color,
     description: 'Sends a wide column of flame outward, burning everything it passes through.',
     stats: [
-      ['Cooldown', '3.0 s'],
+      ['Cooldown', '2.2 s'],
       ['Damage', '18'],
-      ['Burn', '6 dps for 3.0 s'],
+      ['Burn', '8 dps for 3.0 s'],
       ['Range', '500'],
     ],
   },

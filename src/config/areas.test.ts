@@ -51,7 +51,7 @@ describe('area stat blocks', () => {
       cooldown: 14,
       tickDamage: 8,
       tickRate: 0.5,
-      radius: 160,
+      radius: 180,
       targetRange: 360,
     });
   });

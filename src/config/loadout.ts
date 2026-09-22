@@ -70,7 +70,11 @@ export function elementOf(spellId: string): ElementId | undefined {
 }
 
 /**
- * Spec §3.1: active slot 2 unlocks at level 3, slot 3 at level 7. Index is the
- * slot index (0 = the first extra slot); the default spell needs no unlock.
+ * Active slot 2 unlocks at level 2, slot 3 at level 5. Index is the slot index
+ * (0 = the first extra slot); the default spell needs no unlock.
+ *
+ * The spec's §3.1 first guess was 3 and 7. CO-125's baseline sweep never got a
+ * mortal run past level 7, so slot 3 existed only on paper: see
+ * `docs/tuning/phase2-balance.md` round 1.
  */
-export const SLOT_UNLOCK_LEVELS: readonly [number, number] = [3, 7];
+export const SLOT_UNLOCK_LEVELS: readonly [number, number] = [2, 5];

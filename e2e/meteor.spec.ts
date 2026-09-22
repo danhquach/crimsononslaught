@@ -96,7 +96,7 @@ test('meteors telegraph a point, hold for the fall and land on the crowd', async
     (last?.committed ?? 0) - (last?.landed ?? 0),
     'strikes still in the air at the end',
   ).toBeLessThanOrEqual(MAX_LIVE_TELEGRAPHS);
-  // And the landings found a crowd: a 110 px blast aimed at the nearest enemy
+  // And the landings found a crowd: a 130 px blast aimed at the nearest enemy
   // in a filling arena hits more than one enemy per strike on average.
   expect(last?.hits, 'enemies hit by landings').toBeGreaterThan(last?.landed ?? 0);
 

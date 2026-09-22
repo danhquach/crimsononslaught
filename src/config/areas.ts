@@ -47,7 +47,7 @@ export const BASE_QUAKE_STATS: Readonly<GroundAreaStats> = {
   cooldown: 14,
   tickDamage: 8,
   tickRate: 0.5,
-  radius: 160,
+  radius: 180,
   duration: 8,
   targetRange: 360,
   slowPct: 0.3,
@@ -89,7 +89,7 @@ export const AREA_CARDS: Readonly<Record<AreaSpellId, SpellCard>> = {
     stats: [
       ['Cooldown', '14 s'],
       ['Damage', '8 every 0.5 s'],
-      ['Radius', '160'],
+      ['Radius', '180'],
       ['Lasts', '8 s'],
     ],
   },

@@ -29,9 +29,9 @@ export function isStrikeSpellId(value: unknown): value is StrikeSpellId {
 
 /** Spec §9.2 base block. */
 export const BASE_METEOR_STATS: Readonly<MeteorStats> = {
-  cooldown: 4,
+  cooldown: 3.2,
   damage: 60,
-  aoeRadius: 110,
+  aoeRadius: 130,
   aoeDamageFactor: 1,
   projectiles: 1,
   targetRange: 420,
@@ -63,9 +63,9 @@ export const STRIKE_CARDS: Readonly<Record<StrikeSpellId, SpellCard>> = {
     color: PLACEHOLDERS.fx_telegraph.color,
     description: 'Calls a meteor down on the nearest enemy; it lands a moment later, hard.',
     stats: [
-      ['Cooldown', '4 s'],
+      ['Cooldown', '3.2 s'],
       ['Damage', '60'],
-      ['Blast radius', '110'],
+      ['Blast radius', '130'],
       ['Falls in', '1 s'],
     ],
   },
