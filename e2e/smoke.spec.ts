@@ -24,7 +24,7 @@ function baseStatsLeaveStatus(spellId: SpellId): boolean {
     case 'ice':
       return BASE_SPELL_STATS.ice.slowPct > 0;
     case 'lightning':
-      return BASE_SPELL_STATS.lightning.stun > 0;
+      return BASE_SPELL_STATS.lightning.staggerDuration > 0;
     case 'earth':
       return false;
   }

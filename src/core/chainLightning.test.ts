@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest';
+import { BASE_CHAIN_LIGHTNING_STATS } from '../config/lightningRoster';
 import { BASE_SPELL_STATS } from '../config/spells';
 import {
   applyStun,
   chainPath,
   hitDamage,
   resolveCast,
+  rollStun,
   stunSpeedFactor,
   tickStun,
 } from './chainLightning';
-import type { LightningStats } from './spellStats';
+import { createRng } from './rng';
+import type { ChainLightningStats, LightningStats } from './spellStats';
 
 type Vec = { x: number; y: number };
 
-const base: LightningStats = { ...BASE_SPELL_STATS.lightning };
+/** Chain Lightning's block: the one with jumps, which most of these rules are about. */
+const base: ChainLightningStats = { ...BASE_CHAIN_LIGHTNING_STATS };
+/** Lightning Bolt's block: no chain fields at all (#142). */
+const bolt: LightningStats = { ...BASE_SPELL_STATS.lightning };
 const origin = { x: 0, y: 0 };
 
 /** Enemies on a line, each `gap` px further along x from the origin. */
@@ -35,6 +41,10 @@ describe('hitDamage and falloff (CO-046)', () => {
 
   it('falloff compounds with +damage perks', () => {
     expect(hitDamage({ ...base, damage: 19 }, true)).toBeCloseTo(15.2, 9);
+  });
+
+  it('a block with no falloff field (Lightning Bolt) pays full damage', () => {
+    expect(hitDamage(bolt, true)).toBe(bolt.damage);
   });
 });
 
@@ -119,9 +129,27 @@ describe('resolveCast (CO-046)', () => {
     expect(bolt?.map((hit) => hit.target)).toEqual(enemies.slice(0, 4));
   });
 
-  it('the first target has no range limit', () => {
-    const far = { x: 5000, y: 0 };
-    expect(resolveCast(origin, [far], base)).toEqual([[{ target: far, damage: base.damage }]]);
+  it('the first target must be within targetRange, inclusive (spec §9.4)', () => {
+    const edge = { x: base.targetRange, y: 0 };
+    const beyond = { x: base.targetRange + 1, y: 0 };
+    expect(resolveCast(origin, [edge], base)).toEqual([[{ target: edge, damage: base.damage }]]);
+    expect(resolveCast(origin, [beyond], base)).toEqual([]);
+  });
+
+  it('a chain may reach past targetRange once the first target is in range', () => {
+    const near = { x: base.targetRange, y: 0 };
+    const beyond = { x: base.targetRange + 100, y: 0 };
+    const [arc] = resolveCast(origin, [near, beyond], base);
+    expect(arc?.map((hit) => hit.target)).toEqual([near, beyond]);
+  });
+
+  it('Lightning Bolt (no chain fields) is a single hit per strike', () => {
+    const enemies = row(3);
+    expect(resolveCast(origin, enemies, bolt)).toEqual([
+      [{ target: enemies[0], damage: bolt.damage }],
+    ]);
+    const two = resolveCast(origin, enemies, { ...bolt, strikes: 2 });
+    expect(two.map((arc) => arc.map((hit) => hit.target))).toEqual([[enemies[0]], [enemies[1]]]);
   });
 
   it('No Falloff pays full damage down the whole arc', () => {
@@ -164,6 +192,35 @@ describe('resolveCast (CO-046)', () => {
     const snapshot = enemies.map((enemy) => ({ ...enemy }));
     resolveCast(origin, enemies, { ...base, strikes: 2 });
     expect(enemies).toEqual(snapshot);
+  });
+});
+
+describe('rollStun (#142)', () => {
+  it('draws nothing for a spell with no stun chance, so the sequence is untouched', () => {
+    const rng = createRng(7);
+    const before = rng.next();
+    const again = createRng(7);
+    expect(rollStun(again, 0)).toBe(false);
+    expect(rollStun(again, -1)).toBe(false);
+    expect(again.next()).toBe(before);
+  });
+
+  it('stuns at about the stated rate, reproducibly from a seed', () => {
+    const roll = (seed: number): number => {
+      const rng = createRng(seed);
+      let stuns = 0;
+      for (let i = 0; i < 10_000; i += 1) if (rollStun(rng, bolt.stunChance)) stuns += 1;
+      return stuns;
+    };
+    const rate = roll(1) / 10_000;
+    expect(rate).toBeGreaterThan(bolt.stunChance - 0.02);
+    expect(rate).toBeLessThan(bolt.stunChance + 0.02);
+    expect(roll(1)).toBe(roll(1));
+  });
+
+  it('a certain chance always stuns', () => {
+    const rng = createRng(3);
+    for (let i = 0; i < 20; i += 1) expect(rollStun(rng, 1)).toBe(true);
   });
 });
 

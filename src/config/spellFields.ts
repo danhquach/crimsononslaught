@@ -57,7 +57,6 @@ export const STAT_CATEGORIES = {
   bleedDuration: 'duration',
   slowDuration: 'duration',
   freezeDuration: 'duration',
-  stun: 'duration',
   stunDuration: 'duration',
   staggerDuration: 'duration',
 

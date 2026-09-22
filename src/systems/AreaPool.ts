@@ -7,10 +7,26 @@ import { advanceArea, type GroundArea } from '../core/groundArea';
 /** What a patch does to the arena on one of its ticks, given where it stands. */
 export type AreaTick = (area: Readonly<GroundArea>) => void;
 
+/**
+ * What a patch does every simulation step, before its clock advances: a
+ * tornado (#142) drifts and pulls here. It returns the patch to step from —
+ * moved, or the same one — so the position is data the pool holds, never state
+ * the spell has to keep in step with the sprite.
+ */
+export type AreaStep = (area: Readonly<GroundArea>, deltaS: number) => GroundArea;
+
+/** What a patch may do besides tick: step every frame, and hear that it ran out. */
+export interface AreaHooks {
+  readonly onStep?: AreaStep;
+  /** Called once, the frame the patch expires and its sprite is freed. */
+  readonly onExpire?: () => void;
+}
+
 interface LiveArea {
   area: GroundArea;
   readonly sprite: Phaser.GameObjects.Sprite;
   readonly onTick: AreaTick;
+  readonly hooks: AreaHooks;
 }
 
 /**
@@ -55,11 +71,12 @@ export class AreaPool {
   }
 
   /**
-   * Put `area` on the ground, ticking `onTick` as it goes. Returns whether it
-   * was placed: a pool at its cap drops the patch outright, the way a burst
-   * past `MAX_LIVE_FX` is dropped.
+   * Put `area` on the ground, ticking `onTick` as it goes and, with `hooks`,
+   * stepping it every frame first and telling the spell when it runs out.
+   * Returns whether it was placed: a pool at its cap drops the patch outright,
+   * the way a burst past `MAX_LIVE_FX` is dropped.
    */
-  place(area: GroundArea, onTick: AreaTick): boolean {
+  place(area: GroundArea, onTick: AreaTick, hooks: AreaHooks = {}): boolean {
     const sprite = this.group.get(area.x, area.y, AREA_TEXTURE) as Phaser.GameObjects.Sprite | null;
     if (!sprite) return false;
     sprite
@@ -67,7 +84,7 @@ export class AreaPool {
       .setVisible(true)
       .setPosition(area.x, area.y)
       .setScale(areaScale(area.radius));
-    this.live.push({ area, sprite, onTick });
+    this.live.push({ area, sprite, onTick, hooks });
     return true;
   }
 
@@ -84,11 +101,19 @@ export class AreaPool {
     const deltaS = deltaMs / 1000;
     const surviving: LiveArea[] = [];
     for (const entry of this.live) {
-      const step = advanceArea(entry.area, deltaS);
+      const { onStep, onExpire } = entry.hooks;
+      const stepped = onStep ? onStep(entry.area, deltaS) : entry.area;
+      const step = advanceArea(stepped, deltaS);
       entry.area = step.area;
+      // A moving patch is drawn where it now stands, so the ring says where the ticks land.
+      if (onStep) entry.sprite.setPosition(step.area.x, step.area.y);
       for (let tick = 0; tick < step.ticks; tick += 1) entry.onTick(step.area);
-      if (step.expired) this.group.killAndHide(entry.sprite);
-      else surviving.push(entry);
+      if (step.expired) {
+        this.group.killAndHide(entry.sprite);
+        onExpire?.();
+      } else {
+        surviving.push(entry);
+      }
     }
     this.live = surviving;
   }

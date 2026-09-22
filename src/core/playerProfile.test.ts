@@ -189,7 +189,8 @@ describe('validateSpellFields', () => {
   it('categorises every field exactly once', () => {
     const fields = Object.keys(STAT_CATEGORIES) as SpellStatField[];
     expect(new Set(fields).size).toBe(fields.length);
-    expect(fields.length).toBe(47);
+    // 46 since #142 retired Phase 1 Lightning's `stun` for `stunChance` / `stunDuration`.
+    expect(fields.length).toBe(46);
   });
 
   // CO-109 routes every equipped spell's block through the category map, so a

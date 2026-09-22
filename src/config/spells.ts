@@ -49,14 +49,14 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     ],
   },
   lightning: {
-    name: 'Chain Lightning',
+    name: 'Lightning Bolt',
     color: PLACEHOLDERS.fx_bolt.color,
-    description: 'Bolts strike the nearest enemy and chain to others close by.',
+    description: 'A bolt strikes the nearest enemy, staggering it; sometimes it stuns.',
     stats: [
-      ['Cooldown', '1.0 s'],
-      ['Damage', '12'],
-      ['Chains', '2'],
-      ['Chain range', '120'],
+      ['Cooldown', '0.9 s'],
+      ['Damage', '14'],
+      ['Stagger', '0.5 s'],
+      ['Stun', '8% for 2 s'],
     ],
   },
   earth: {
@@ -83,7 +83,8 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
  * chain), and `crushMultiplier` starts at "no bonus". Fire's `range` is a
  * tuning value the spec never gives a baseline for. Ice's block is Ice Arrow's
  * (Phase 2 spec §9.3): Frost Nova lives on as Frost Nova Bomb in
- * `config/iceRoster.ts`.
+ * `config/iceRoster.ts`. Lightning's is Lightning Bolt's (spec §9.4): Chain
+ * Lightning lives on as `lightning_chain` in `config/lightningRoster.ts`.
  */
 export const BASE_SPELL_STATS: Readonly<{
   [S in SpellId]: Readonly<SpellStatsBySpell[S]>;
@@ -107,13 +108,13 @@ export const BASE_SPELL_STATS: Readonly<{
     slowDuration: 1,
   },
   lightning: {
-    cooldown: 1,
-    damage: 12,
-    chains: 2,
-    chainRange: 120,
+    cooldown: 0.9,
+    damage: 14,
     strikes: 1,
-    stun: 0,
-    chainFalloff: 0.8,
+    targetRange: 400,
+    staggerDuration: 0.5,
+    stunChance: 0.08,
+    stunDuration: 2,
   },
   earth: {
     count: 3,
