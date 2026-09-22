@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FX_DEPTH, MAX_LIVE_OVERLAYS } from '../config/fx';
-import { ATLAS_KEY } from '../config/frames';
+import { ATLAS_PAGES } from '../config/frames';
 import { statusOverlay } from '../core/fx';
 import { OverlayLedger } from '../core/overlayPool';
 import type { Enemy } from '../entities/Enemy';
@@ -62,7 +62,13 @@ export class OverlayPool {
   }
 
   private take(host: Enemy, clip: string): void {
-    const sprite = this.group.get(host.x, host.y, ATLAS_KEY) as Phaser.GameObjects.Sprite | null;
+    // As in `FxPool`: the clip sets the page, so the key here is only what the
+    // pooled sprite is born on.
+    const sprite = this.group.get(
+      host.x,
+      host.y,
+      ATLAS_PAGES[0].key,
+    ) as Phaser.GameObjects.Sprite | null;
     // The ledger and the group share a cap, so a slot the ledger granted has a
     // sprite; this only guards a group that refused anyway.
     if (!sprite) return;

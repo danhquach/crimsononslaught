@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { ANIMATIONS, STATIC_FRAMES } from '../config/animations';
 import { TEXTURE_KEYS } from '../config/colors';
-import { ATLAS_DATA, ATLAS_KEY, ATLAS_TEXTURE, FRAMES } from '../config/frames';
+import { ATLAS_PAGES, FRAMES } from '../config/frames';
 
 /**
  * Load and install the sprite atlas cut by `npm run art:cut` (CO-080).
@@ -10,7 +10,7 @@ import { ATLAS_DATA, ATLAS_KEY, ATLAS_TEXTURE, FRAMES } from '../config/frames';
  * from it: `queueAtlas` in `preload`, `installAtlas` in `create`.
  */
 export function queueAtlas(scene: Phaser.Scene): void {
-  scene.load.atlas(ATLAS_KEY, ATLAS_TEXTURE, ATLAS_DATA);
+  for (const page of ATLAS_PAGES) scene.load.atlas(page.key, page.texture, page.data);
 }
 
 /**
@@ -23,8 +23,10 @@ export function queueAtlas(scene: Phaser.Scene): void {
  * for the failed files on top of this.
  */
 export function warnIfAtlasMissing(scene: Phaser.Scene): void {
-  if (scene.textures.exists(ATLAS_KEY)) return;
-  console.warn(`[atlas] ${ATLAS_TEXTURE} did not load; using placeholder shapes`);
+  const missing = ATLAS_PAGES.filter((page) => !scene.textures.exists(page.key));
+  if (missing.length === 0) return;
+  const files = missing.map((page) => page.texture).join(', ');
+  console.warn(`[atlas] ${files} did not load; using placeholder shapes`);
 }
 
 /**
@@ -38,12 +40,16 @@ export function warnIfAtlasMissing(scene: Phaser.Scene): void {
  * Safe to call twice; returns the keys it aliased.
  */
 export function installAtlas(scene: Phaser.Scene): string[] {
-  if (!scene.textures.exists(ATLAS_KEY)) return [];
+  // All or nothing: half a roster of art beside half a roster of placeholders
+  // would be harder to read than the placeholders alone (CO-130).
+  if (!ATLAS_PAGES.every((page) => scene.textures.exists(page.key))) return [];
 
   // The sheets are pixel art downscaled to native size, so the atlas must be
   // sampled nearest-neighbour or every sprite renders soft. Set on the atlas
   // alone rather than globally, to leave the placeholder shapes as they were.
-  scene.textures.get(ATLAS_KEY).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  for (const page of ATLAS_PAGES) {
+    scene.textures.get(page.key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
 
   const aliased: string[] = [];
   for (const key of TEXTURE_KEYS) {
@@ -55,7 +61,7 @@ export function installAtlas(scene: Phaser.Scene): string[] {
     const info = FRAMES[frameName];
     const canvas = scene.textures.createCanvas(key, info.w, info.h);
     if (!canvas) continue;
-    canvas.drawFrame(ATLAS_KEY, frameName, 0, 0);
+    canvas.drawFrame(info.page, frameName, 0, 0);
     canvas.refresh();
     canvas.setFilter(Phaser.Textures.FilterMode.NEAREST);
     aliased.push(key);
@@ -65,7 +71,7 @@ export function installAtlas(scene: Phaser.Scene): string[] {
     if (scene.anims.exists(anim.name)) continue;
     scene.anims.create({
       key: anim.name,
-      frames: anim.frames.map((frame) => ({ key: ATLAS_KEY, frame })),
+      frames: anim.frames.map((frame) => ({ key: FRAMES[frame].page, frame })),
       frameRate: anim.frameRate,
       repeat: anim.repeat,
     });

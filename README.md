@@ -121,10 +121,17 @@ npm run art:cut
 ```
 
 Reads the 18 authored sheets under `docs/art/sheets/` (source of truth, not
-shipped) and writes `public/assets/atlas/props.png` + `props.json` and the
-generated `src/config/frames.ts`. The run is deterministic: the same sheets
-always produce byte-identical output, so a re-run with nothing changed leaves
-a clean working tree.
+shipped) and writes one `public/assets/atlas/props*.png` + `.json` pair per
+atlas page, plus the generated `src/config/frames.ts`. The run is
+deterministic: the same sheets always produce byte-identical output, so a
+re-run with nothing changed leaves a clean working tree.
+
+A sheet's `page` in the manifest says which page its frames are packed into
+(1 by default), and each page is packed, quantised and held under 400 KB on
+its own — which is what makes room for a roster bigger than one page. A page
+carries its own 256-colour palette, so moving a sheet between pages shifts
+exact pixel colours on both pages; nothing may assert an atlas colour it did
+not read from the loaded texture.
 
 `docs/art/sheets/manifest.json` is the single place that maps grid cells to
 animation frames — which sheet, how many columns and rows, and what each row

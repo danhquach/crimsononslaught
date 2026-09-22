@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FX_DEPTH, MAX_LIVE_FX } from '../config/fx';
-import { ATLAS_KEY } from '../config/frames';
+import { ATLAS_PAGES } from '../config/frames';
 import { showEffect } from '../render/animate';
 
 /** How a burst is placed: drawn at `scale`, turned by `rotation`, mirrored on `flipX`. */
@@ -45,7 +45,9 @@ export class FxPool {
   /** Play `clip` once at (x, y). Returns whether anything was shown. */
   burst(clip: string, x: number, y: number, options: BurstOptions = {}): boolean {
     if (!this.group.scene.anims.exists(clip)) return false;
-    const sprite = this.group.get(x, y, ATLAS_KEY) as Phaser.GameObjects.Sprite | null;
+    // Any loaded texture will do to take a sprite from the pool: playing the
+    // clip points it at whichever atlas page holds that clip's frames.
+    const sprite = this.group.get(x, y, ATLAS_PAGES[0].key) as Phaser.GameObjects.Sprite | null;
     if (!sprite) return false;
     sprite
       .setActive(true)

@@ -196,12 +196,15 @@ describe('body placement (CO-081)', () => {
   };
 
   it('puts the origin on the frame anchor', () => {
-    const origin = frameOrigin({ w: 40, h: 20, anchorX: 10, anchorY: 15 });
+    const origin = frameOrigin({ w: 40, h: 20, anchorX: 10, anchorY: 15, page: 'props' });
     expect(origin).toEqual({ x: 0.25, y: 0.75 });
   });
 
   it('centres the circle body on the anchor', () => {
-    expect(bodyOffset({ w: 40, h: 20, anchorX: 10, anchorY: 15 }, 4)).toEqual({ x: 6, y: 11 });
+    expect(bodyOffset({ w: 40, h: 20, anchorX: 10, anchorY: 15, page: 'props' }, 4)).toEqual({
+      x: 6,
+      y: 11,
+    });
   });
 
   it('keeps the body centre on the sprite position for every frame and entity radius', () => {
