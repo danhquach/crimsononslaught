@@ -60,14 +60,16 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     ],
   },
   earth: {
-    name: 'Orbiting Boulders',
+    name: 'Earth Spike',
     color: PLACEHOLDERS.boulder.color,
-    description: 'Boulders circle you, crushing and knocking back whatever they touch.',
+    description:
+      'A spike erupts under a nearby enemy, hurling the group back and leaving it bleeding.',
     stats: [
-      ['Boulders', '3'],
-      ['Damage', '10'],
-      ['Orbit radius', '80'],
-      ['Knockback', '60'],
+      ['Cooldown', '1.1 s'],
+      ['Damage', '16'],
+      ['Radius', '40'],
+      ['Knockback', '70'],
+      ['Bleed', '4 dps for 3 s'],
     ],
   },
 };
@@ -78,13 +80,14 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
  * player profile (Phase 2 spec §6.2). The field meanings live with the types in
  * `core/spellStats.ts`.
  *
- * Three fields the spec's base table skips: `aoeDamageFactor` and `chainFalloff`
+ * Two fields the spec's base table skips: `aoeDamageFactor` and `chainFalloff`
  * hold the defaults the spec states in prose (half damage in the blast, 80% per
- * chain), and `crushMultiplier` starts at "no bonus". Fire's `range` is a
- * tuning value the spec never gives a baseline for. Ice's block is Ice Arrow's
- * (Phase 2 spec §9.3): Frost Nova lives on as Frost Nova Bomb in
- * `config/iceRoster.ts`. Lightning's is Lightning Bolt's (spec §9.4): Chain
- * Lightning lives on as `lightning_chain` in `config/lightningRoster.ts`.
+ * chain). Fire's `range` is a tuning value the spec never gives a baseline for.
+ * Ice's block is Ice Arrow's (Phase 2 spec §9.3): Frost Nova lives on as Frost
+ * Nova Bomb in `config/iceRoster.ts`. Lightning's is Lightning Bolt's
+ * (spec §9.4): Chain Lightning lives on as `lightning_chain` in
+ * `config/lightningRoster.ts`. Earth's is Earth Spike's (spec §9.5): Orbiting
+ * Boulders lives on as Earth Shield in `config/shields.ts`.
  */
 export const BASE_SPELL_STATS: Readonly<{
   [S in SpellId]: Readonly<SpellStatsBySpell[S]>;
@@ -117,13 +120,13 @@ export const BASE_SPELL_STATS: Readonly<{
     stunDuration: 2,
   },
   earth: {
-    count: 3,
-    orbitRadius: 80,
-    orbitSpeed: 2.5,
-    damage: 10,
-    knockback: 60,
-    size: 14,
-    crushMultiplier: 1,
+    cooldown: 1.1,
+    damage: 16,
+    radius: 40,
+    targetRange: 320,
+    knockback: 70,
+    bleed: 4,
+    bleedDuration: 3,
   },
 };
 
@@ -133,7 +136,11 @@ export const BURN_DURATION = 2;
 /** Spec §5 Ice: how long a freeze lasts for a hit that names no `freezeDuration` of its own. */
 export const FREEZE_DURATION = 1;
 
-/** Spec §5 Earth: one boulder can hit the same enemy this often. A run's passives never scale it. */
+/**
+ * Spec §5 Earth: one stone of the ring can hit the same enemy this often, a
+ * window every stone shares (`Enemy.tryBoulderHit`). Earth Shield is the ring
+ * now (spec §9.5); a run's passives never scale it.
+ */
 export const BOULDER_HIT_COOLDOWN = 0.4;
 
 /** Keyboard shortcut: `'1'`–`'4'` (KeyboardEvent.key) pick the card in that slot. */

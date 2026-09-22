@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ANIMATIONS } from '../config/animations';
 import { ENEMY_ARCHETYPES } from '../config/enemies';
 import { BASE_SPELL_STATS } from '../config/spells';
+import { BASE_EARTH_SHIELD_STATS } from '../config/shields';
 import { BASE_AREA_STATS } from '../config/areas';
 import { BASE_METEOR_STATS } from '../config/strikes';
 import {
@@ -56,7 +57,7 @@ describe('effect scales (CO-082)', () => {
   });
 
   it('spins at the authored rate at the base orbit speed and in proportion above it', () => {
-    const base = BASE_SPELL_STATS.earth.orbitSpeed;
+    const base = BASE_EARTH_SHIELD_STATS.orbitSpeed;
     expect(spinTimeScale(base)).toBe(1);
     expect(spinTimeScale(base * 2)).toBe(2);
     expect(spinTimeScale(0)).toBe(0);

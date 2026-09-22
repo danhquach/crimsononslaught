@@ -76,10 +76,11 @@ describe('spell card stats match spec §5 base values', () => {
   });
   it('earth', () => {
     expect(SPELL_CARDS.earth.stats).toEqual([
-      ['Boulders', '3'],
-      ['Damage', '10'],
-      ['Orbit radius', '80'],
-      ['Knockback', '60'],
+      ['Cooldown', '1.1 s'],
+      ['Damage', '16'],
+      ['Radius', '40'],
+      ['Knockback', '70'],
+      ['Bleed', '4 dps for 3 s'],
     ]);
   });
 });
@@ -144,14 +145,16 @@ describe('base stat blocks', () => {
       stunChance: 0.08,
       stunDuration: 2,
     });
+    // Earth's block is Earth Spike's (Phase 2 spec §9.5); Orbiting Boulders is
+    // `earth_shield` now.
     expect(BASE_SPELL_STATS.earth).toEqual({
-      count: 3,
-      orbitRadius: 80,
-      orbitSpeed: 2.5,
-      damage: 10,
-      knockback: 60,
-      size: 14,
-      crushMultiplier: 1,
+      cooldown: 1.1,
+      damage: 16,
+      radius: 40,
+      targetRange: 320,
+      knockback: 70,
+      bleed: 4,
+      bleedDuration: 3,
     });
   });
 

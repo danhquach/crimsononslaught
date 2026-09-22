@@ -29,6 +29,7 @@ import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
 import { Spellbook } from '../core/spellbook';
 import type {
+  BoulderStats,
   ChainLightningStats,
   CompanionStats,
   EarthShieldStats,
@@ -86,6 +87,12 @@ import {
   isCompanionSpellId,
 } from '../config/companions';
 import {
+  BASE_EARTH_ROSTER_STATS,
+  EARTH_ROSTER_CARDS,
+  EARTH_ROSTER_SPELL_IDS,
+  isEarthRosterSpellId,
+} from '../config/earthRoster';
+import {
   BASE_SHIELD_STATS,
   SHIELD_CARDS,
   SHIELD_SPELL_IDS,
@@ -106,9 +113,10 @@ import { CompanionSpell } from '../spells/CompanionSpell';
 import { GroundAreaSpell } from '../spells/GroundAreaSpell';
 import { MeteorSpell } from '../spells/MeteorSpell';
 import { EarthShieldSpell } from '../spells/EarthShieldSpell';
+import { EarthSpikeSpell } from '../spells/EarthSpikeSpell';
 import { IceShieldSpell } from '../spells/IceShieldSpell';
 import { LightningSwordSpell } from '../spells/LightningSwordSpell';
-import { OrbitingBouldersSpell } from '../spells/OrbitingBouldersSpell';
+import { RollingBoulderSpell } from '../spells/RollingBoulderSpell';
 import { TornadoSpell } from '../spells/TornadoSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
 import { AreaPool } from '../systems/AreaPool';
@@ -339,6 +347,21 @@ export class GameScene extends Phaser.Scene {
       .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
   }
 
+  /**
+   * Test hook (#143): Earth Spike and Boulder, whichever is equipped — hits
+   * each has landed and what each has out right now (the spike is
+   * instantaneous, so always none; boulders are what is still rolling). The
+   * browser suite watches a run land hits with both and hold the pool cap.
+   */
+  get earthReport(): { id: RosterSpellId; hits: number; live: number }[] {
+    return this.spells.spells
+      .filter(
+        (spell): spell is EarthSpikeSpell | RollingBoulderSpell =>
+          spell instanceof EarthSpikeSpell || spell instanceof RollingBoulderSpell,
+      )
+      .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
+  }
+
   init(data: unknown): void {
     this.payload = isGamePayload(data) ? data : null;
     // Phaser keeps the last `start(key, data)` payload in settings.data and
@@ -526,9 +549,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * One spell, built on the pools and collision wiring above. `undefined` for a
-   * Phase 2 roster id: those spells land with #140-#143, and equipping one this
-   * build cannot cast would leave a dead slot rather than fail loudly.
+   * One spell, built on the pools and collision wiring above. Every roster id
+   * has a case since #143; `undefined` is left for an id added to the roster
+   * without one, so equipping it leaves a dead slot rather than failing loudly.
    */
   private createSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
     const spell = this.buildSpell(spellId, stats);
@@ -603,11 +626,20 @@ export class GameScene extends Phaser.Scene {
           this.fx,
         );
       case 'earth':
-        return new OrbitingBouldersSpell(
+        return new EarthSpikeSpell(
+          this.player,
+          this.enemies,
+          stats as Readonly<EarthStats>,
+          damage,
+          this.fx,
+        );
+      case 'earth_boulder':
+        return new RollingBoulderSpell(
           this,
           this.player,
+          this.enemies,
           this.collisions,
-          stats as Readonly<EarthStats>,
+          stats as Readonly<BoulderStats>,
           damage,
           this.fx,
         );
@@ -693,9 +725,9 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * The block a spell's stats are resolved from, before the loadout's passives
-   * scale it (spec §6.2). `undefined` for a roster spell this build cannot
-   * cast yet — those land with #140-#143, and `activeCatalog` keeps them out of
-   * the offers until they do.
+   * scale it (spec §6.2). Every roster spell has a block since #143;
+   * `undefined` is left for an id added to the roster without one, which
+   * `activeCatalog` then keeps out of the offers.
    */
   private baseStatsFor(spellId: RosterSpellId): SpellStatBlock | undefined {
     if (isSpellId(spellId)) return BASE_SPELL_STATS[spellId];
@@ -706,15 +738,15 @@ export class GameScene extends Phaser.Scene {
     if (isFireRosterSpellId(spellId)) return BASE_FIRE_ROSTER_STATS[spellId];
     if (isIceRosterSpellId(spellId)) return BASE_ICE_ROSTER_STATS[spellId];
     if (isLightningRosterSpellId(spellId)) return BASE_LIGHTNING_ROSTER_STATS[spellId];
+    if (isEarthRosterSpellId(spellId)) return BASE_EARTH_ROSTER_STATS[spellId];
     return undefined;
   }
 
   /**
    * Every active this build can actually cast and is not already casting, as a
-   * level-up card reads it: the four Phase 1 spells — each its element's
-   * default — and the four companions (#133). The rest of the roster lands with
-   * #140-#143; until then a level-up that cannot offer a spell draws passives
-   * (spec §7.1).
+   * level-up card reads it: the whole Phase 2 roster, twenty spells over four
+   * elements, complete since #143. `canEquip` is what keeps an offer to the
+   * run's own element; this list only says what exists.
    *
    * What is already casting is filtered out here rather than by `canEquip`,
    * because `?loadout=` puts a spell on the board without spending a slot
@@ -763,6 +795,11 @@ export class GameScene extends Phaser.Scene {
         id,
         name: LIGHTNING_ROSTER_CARDS[id].name,
         description: LIGHTNING_ROSTER_CARDS[id].description,
+      })),
+      ...EARTH_ROSTER_SPELL_IDS.map((id) => ({
+        id,
+        name: EARTH_ROSTER_CARDS[id].name,
+        description: EARTH_ROSTER_CARDS[id].description,
       })),
     ].filter((card) => !casting.has(card.id));
   }

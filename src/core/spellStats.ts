@@ -159,20 +159,50 @@ export interface SwordStats {
   staggerDuration: number;
 }
 
+/**
+ * Earth Spike (#143, Phase 2 spec §9.5): the element's default. Every
+ * `cooldown` s a spike erupts under the nearest enemy within `targetRange`,
+ * hitting everything within `radius` of it for `damage`, shoving each of them
+ * `knockback` px away from the eruption and leaving a bleed behind.
+ */
 export interface EarthStats {
-  /** Boulders in orbit. */
-  count: number;
-  /** Orbit radius in px. */
-  orbitRadius: number;
-  /** Orbit angular speed in rad/s. */
-  orbitSpeed: number;
+  /** Seconds between casts. */
+  cooldown: number;
+  /** Damage the eruption deals to every enemy it catches. */
   damage: number;
-  /** Knockback distance in px. */
+  /** How far the eruption reaches from the spike, in px. */
+  radius: number;
+  /** How far from the caster the spike may erupt, in px. */
+  targetRange: number;
+  /** Knockback distance in px, away from the spike. */
   knockback: number;
+  /** Bleed damage per second applied on hit (#139). */
+  bleed: number;
+  /** Seconds that bleed lasts. */
+  bleedDuration: number;
+}
+
+/**
+ * Boulder (#143, spec §9.5): a heavy rolling projectile thrown at the nearest
+ * enemy within `range`. It is not spent on its first hit — it strikes each
+ * enemy it rolls over once for `damage` and a heavy `knockback`, until it has
+ * struck `pierce` of them or has flown its `range`.
+ */
+export interface BoulderStats {
+  /** Seconds between throws. */
+  cooldown: number;
+  /** Damage one strike deals. */
+  damage: number;
   /** Boulder body radius in px. */
-  size: number;
-  /** Crush: damage multiplier against Tanks. */
-  crushMultiplier: number;
+  radius: number;
+  /** Roll speed in px/s. */
+  speed: number;
+  /** How far it rolls before it despawns, in px; also the targeting range. */
+  range: number;
+  /** Enemies one boulder may strike before it is spent. */
+  pierce: number;
+  /** Knockback distance in px, away from the boulder. */
+  knockback: number;
 }
 
 /**
@@ -359,6 +389,7 @@ export interface SpellStatsBySpell {
   lightning_tornado: TornadoStats;
   lightning_sword: SwordStats;
   earth: EarthStats;
+  earth_boulder: BoulderStats;
   fire_companion: CompanionStats;
   ice_companion: CompanionStats;
   lightning_companion: CompanionStats;

@@ -20,10 +20,11 @@ export interface BodyLook {
 export const BOULDER_LOOK: BodyLook = { texture: 'boulder', clip: SPIN_CLIP };
 
 /**
- * One boulder on the ring (spec §5 "Earth — Orbiting Boulders"). It has no
- * motion of its own: `spells/OrbitingBouldersSpell.ts` places it every frame
- * from the orbit maths in `core/orbitingBoulders.ts`, and Arcade reads the new
- * position on its next step, so the body is where the sprite is drawn.
+ * One body on the ring (spec §5 "Earth — Orbiting Boulders"). It has no motion
+ * of its own: `spells/OrbitingBodySpell.ts` and `spells/EarthShieldSpell.ts`
+ * place it every frame from the orbit maths in `core/orbitingBoulders.ts`, and
+ * Arcade reads the new position on its next step, so the body is where the
+ * sprite is drawn.
  *
  * Pooled — never constructed per perk. The spell owns the pool and calls
  * `spawn` / `despawn`; an inactive boulder has its body disabled, so it costs

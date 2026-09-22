@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_SPELL_STATS, BOULDER_HIT_COOLDOWN } from '../config/spells';
+import { BASE_EARTH_SHIELD_STATS } from '../config/shields';
+import { BOULDER_HIT_COOLDOWN } from '../config/spells';
 import {
   MAX_BOULDERS,
   advanceOrbit,
   boulderAngles,
-  boulderDamage,
   boulderPosition,
   knockbackVector,
   tickBoulderCooldown,
   tryBoulderHit,
 } from './orbitingBoulders';
-import type { EarthStats } from './spellStats';
+import type { EarthShieldStats } from './spellStats';
 
-const base: EarthStats = { ...BASE_SPELL_STATS.earth };
+/** The ring is Earth Shield's now (spec §9.5); #143 made `earth` itself a spike. */
+const base: EarthShieldStats = { ...BASE_EARTH_SHIELD_STATS };
 const TAU = Math.PI * 2;
 
 describe('boulderAngles spacing (CO-047)', () => {
@@ -95,7 +96,7 @@ describe('knockbackVector (CO-047)', () => {
     expect(Math.hypot(push.x, push.y)).toBeCloseTo(60, 9);
   });
 
-  it('is the spell stat, so the Impact perk pushes further', () => {
+  it('is the spell stat, so a heavier block pushes further', () => {
     const boulder = { x: 0, y: 0 };
     const enemy = { x: 10, y: 0 };
     expect(knockbackVector(boulder, enemy, base.knockback, { x: 0, y: 0 })).toEqual({
@@ -120,28 +121,6 @@ describe('knockbackVector (CO-047)', () => {
     const origin = { x: 0, y: 0 };
     expect(knockbackVector(origin, origin, 60, origin)).toEqual({ x: 0, y: 0 });
     expect(knockbackVector(origin, { x: 1, y: 0 }, 0, origin)).toEqual({ x: 0, y: 0 });
-  });
-});
-
-describe('boulderDamage and Crush (CO-047)', () => {
-  it('deals damage to a swarm or fast enemy', () => {
-    expect(boulderDamage(base, 'swarm')).toBe(10);
-    expect(boulderDamage(base, 'fast')).toBe(10);
-  });
-
-  it('without Crush a tank takes the same damage', () => {
-    expect(boulderDamage(base, 'tank')).toBe(10);
-  });
-
-  it('Crush doubles damage against tanks only', () => {
-    const crush = { ...base, crushMultiplier: 2 };
-    expect(boulderDamage(crush, 'tank')).toBe(20);
-    expect(boulderDamage(crush, 'swarm')).toBe(10);
-    expect(boulderDamage(crush, 'fast')).toBe(10);
-  });
-
-  it('Crush compounds with +damage perks', () => {
-    expect(boulderDamage({ ...base, damage: 19, crushMultiplier: 2 }, 'tank')).toBe(38);
   });
 });
 
