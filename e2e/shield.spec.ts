@@ -4,7 +4,7 @@ import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
-import { cardCenter, collectErrors, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, waitForScene } from './game';
 
 /**
  * #134 in the browser: a run carrying both shields, equipped through the
@@ -26,7 +26,9 @@ const EXTRA = SHIELD_SPELL_IDS;
 const TOTAL_POOL = BASE_SHIELD_STATS.ice_shield.shieldHp + BASE_SHIELD_STATS.earth_shield.shieldHp;
 
 /**
- * Run time is 10x wall time, so this window is about 150 s of run.
+ * The window is 150 s of run, read off the HUD's timer rather than budgeted in
+ * wall clock (#187): at 10x a slow runner covers less run per wall second, and
+ * a wall-clock window there ends short of the recharge this test is watching.
  *
  * It was 10 s (about 100 s of run) until CO-125 trimmed the wave 3-5 spawn
  * rates: a slower-filling arena reaches a standing player later, so the first
@@ -36,7 +38,9 @@ const TOTAL_POOL = BASE_SHIELD_STATS.ice_shield.shieldHp + BASE_SHIELD_STATS.ear
  * whole drain-and-recharge cycle with room to spare, and still stops well short
  * of the ~170 s where a standing player's pools bottom out for good.
  */
-const WINDOW_MS = 15_000;
+const RUN_MS = 150_000;
+/** Sampling gives up after this much wall clock and asserts on what it saw. */
+const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
 
 /** The pools as the run holds them and as the HUD was told, read together. */
@@ -109,12 +113,14 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   // inside the window — the player is standing still — so the loop stops when
   // it does and everything below is asserted on what was actually seen.
   const trace: Sample[] = [];
-  const until = Date.now() + WINDOW_MS;
-  while (Date.now() < until) {
+  const until = Date.now() + WALL_CAP_MS;
+  let runMs = 0;
+  while (runMs < RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
     if (!current) break;
     trace.push(current);
+    runMs = (await readHud(page)).elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);

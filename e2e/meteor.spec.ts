@@ -4,7 +4,7 @@ import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { BASE_METEOR_STATS, STRIKE_SPELL_IDS } from '../src/config/strikes';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, waitForScene } from './game';
 
 /**
  * #138 in the browser: a run carrying Meteor, equipped through the `?loadout=`
@@ -28,8 +28,17 @@ const EXTRA = STRIKE_SPELL_IDS;
  */
 const SMALLEST_RADIUS = BASE_METEOR_STATS.aoeRadius;
 
-/** Run time is 10x wall time, so this window is about 100 s of run. */
-const WINDOW_MS = 10_000;
+/**
+ * The window is budgeted in run time, read off the HUD's timer, not in wall
+ * clock (#187). It used to be 10 s of wall clock at 10x, which a developer
+ * machine turns into 112-116 s of run and the CI runner into only 100-108 s,
+ * and spawn pacing steps up as a run goes on, so the crowd the checks below
+ * see depended on the machine. 115 s of run is what they were passing on
+ * locally; now every machine samples that same stretch of run.
+ */
+const RUN_MS = 115_000;
+/** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
+const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
 
 /** The floor the frame rate must hold at, the same one `groundArea` uses. */
@@ -75,18 +84,21 @@ test('meteors telegraph a point, hold for the fall and land on the crowd', async
   // Sampled through the run rather than only at the end: a telegraph that
   // appeared and landed in between would leave no trace in a final reading.
   const trace: Report[] = [];
-  const until = Date.now() + WINDOW_MS;
-  while (Date.now() < until) {
+  const until = Date.now() + WALL_CAP_MS;
+  let runMs = 0;
+  while (runMs < RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
     if (!current) break;
     trace.push(current);
+    runMs = (await readHud(page)).elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);
+  expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
   const last = trace[trace.length - 1];
-  // A 4 s cooldown over ~100 s of run: many strikes committed.
+  // A 4 s cooldown over ~115 s of run: many strikes committed.
   expect(last?.committed, 'strikes committed over the run').toBeGreaterThan(10);
   // Every strike lands, one fall after it is committed; only the one in the
   // air at the last sample may be outstanding.
