@@ -21,6 +21,7 @@ export const RUN_EVENT = {
   phase: 'run:phase',
   bossHp: 'run:bossHp',
   shield: 'run:shield',
+  loadout: 'run:loadout',
 } as const;
 
 export type RunEventName = keyof typeof RUN_EVENT;
@@ -41,6 +42,27 @@ export interface RunEventPayloads {
    * a run with no shield equipped, which is what the HUD hides the bar on.
    */
   shield: { pool: number; max: number };
+  /**
+   * What the run is carrying (#144): every spell casting, default first then
+   * in equip order, with how far its cooldown has run, and every passive held.
+   * Sent once a frame, since the cooldowns move every frame.
+   */
+  loadout: { spells: LoadoutSpellView[]; passives: LoadoutPassiveView[] };
+}
+
+/** One casting spell as the HUD shows it. `progress` is `null` for a spell with no cooldown. */
+export interface LoadoutSpellView {
+  id: string;
+  name: string;
+  /** 24-bit RGB, the spell's card colour. */
+  color: number;
+  progress: number | null;
+}
+
+/** One passive held, with the ranks taken of it. */
+export interface LoadoutPassiveView {
+  name: string;
+  rank: number;
 }
 
 /** Discriminated union of every event, for reducers that handle them uniformly. */

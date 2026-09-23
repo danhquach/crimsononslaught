@@ -1,4 +1,5 @@
-import type { RunEvent, RunPhase } from './runEvents';
+import { SLOT_UNLOCK_LEVELS } from '../config/loadout';
+import type { LoadoutPassiveView, LoadoutSpellView, RunEvent, RunPhase } from './runEvents';
 
 /**
  * View-model behind the HUD overlay: everything HudScene draws, reduced from
@@ -19,7 +20,16 @@ export interface HudModel {
   /** #134: the absorption pool the run's shields hold, and what they hold at full. */
   shield: number;
   shieldMax: number;
+  /** #144: the spells casting, default first, and the passives held. */
+  spells: readonly LoadoutSpellView[];
+  passives: readonly LoadoutPassiveView[];
 }
+
+/** One slot box on the HUD: a spell casting in it, or why it is empty (spec §10). */
+export type SlotRow =
+  | { kind: 'spell'; name: string; color: number; progress: number | null }
+  | { kind: 'open' }
+  | { kind: 'locked'; unlockLevel: number };
 
 /**
  * Run-start values (spec §5). `xpToNext` starts at 0 so the XP bar is empty
@@ -38,6 +48,8 @@ export const INITIAL_HUD: Readonly<HudModel> = {
   bossMaxHp: 0,
   shield: 0,
   shieldMax: 0,
+  spells: [],
+  passives: [],
 };
 
 /** Returns a new model with the event applied; the input is never mutated. */
@@ -58,7 +70,43 @@ export function applyRunEvent(model: Readonly<HudModel>, event: RunEvent): HudMo
       return { ...model, bossHp: event.payload.hp, bossMaxHp: event.payload.maxHp };
     case 'shield':
       return { ...model, shield: event.payload.pool, shieldMax: event.payload.max };
+    case 'loadout':
+      return { ...model, spells: event.payload.spells, passives: event.payload.passives };
   }
+}
+
+/**
+ * The slot boxes, top to bottom: every spell casting, then the slots still
+ * empty — locked with the level that opens them, or open. Built from what is
+ * casting rather than from the slots, so a `?loadout=` run, which casts its
+ * extras without spending a slot, still shows them; a run past three spells
+ * gets a box for each.
+ */
+export function slotRows(model: Readonly<HudModel>): SlotRow[] {
+  const rows: SlotRow[] = model.spells.map(({ name, color, progress }) => ({
+    kind: 'spell',
+    name,
+    color,
+    progress,
+  }));
+  // Row 0 is the default spell's, which is always equipped; it is only empty
+  // before the first loadout event lands.
+  for (const unlockLevel of [1, ...SLOT_UNLOCK_LEVELS].slice(rows.length)) {
+    rows.push(model.level >= unlockLevel ? { kind: 'open' } : { kind: 'locked', unlockLevel });
+  }
+  return rows;
+}
+
+/** What a slot box says. */
+export function slotLabel(row: Readonly<SlotRow>): string {
+  if (row.kind === 'spell') return row.name;
+  if (row.kind === 'open') return 'Open';
+  return `Locked · Lv ${row.unlockLevel}`;
+}
+
+/** One line per passive, in the order taken, each with its rank (spec §10). */
+export function passiveLines(model: Readonly<HudModel>): string[] {
+  return model.passives.map(({ name, rank }) => `${name} ×${rank}`);
 }
 
 /** The shield bar exists only while the run has a shield equipped (#134). */

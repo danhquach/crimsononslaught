@@ -189,6 +189,19 @@ describe('Spell', () => {
     expect(spell.timeToNextCast).toBeCloseTo(cooldown - 0.6, 10);
   });
 
+  it('reports how far its cooldown has run, and null when it has none (#144)', () => {
+    const spell = new StubSpell();
+    const { cooldown } = spell.stats;
+    expect(spell.castProgress).toBe(0);
+    spell.update(cooldown * 250);
+    expect(spell.castProgress).toBeCloseTo(0.25, 10);
+    // Haste shrinks the cooldown under the charge held: full, never past it.
+    spell.setStats({ ...spell.stats, cooldown: cooldown * 0.2 });
+    expect(spell.castProgress).toBe(1);
+    spell.setStats({ ...spell.stats, cooldown: Infinity });
+    expect(spell.castProgress).toBeNull();
+  });
+
   it('copies the stats it is handed, so the block it came from cannot change it', () => {
     const stats = fireStats();
     const spell = new StubSpell(stats);

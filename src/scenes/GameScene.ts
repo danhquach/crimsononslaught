@@ -51,7 +51,12 @@ import { currencyFor, emptySave, isSave, recordRun, serializeSave, type Save } f
 import { upgradeRanks } from '../core/upgrades';
 import { storeSaveJson } from '../storage/localSave';
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
-import { BASE_PLAYER_PROFILE, isPassiveId, type PlayerProfile } from '../config/passives';
+import {
+  BASE_PLAYER_PROFILE,
+  isPassiveId,
+  passiveById,
+  type PlayerProfile,
+} from '../config/passives';
 import { AREA_CARDS, AREA_SPELL_IDS, BASE_AREA_STATS, isAreaSpellId } from '../config/areas';
 import {
   BASE_STRIKE_STATS,
@@ -185,6 +190,8 @@ export class GameScene extends Phaser.Scene {
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
+  /** Each roster spell's name and colour, as the HUD's slot boxes show them (#144). */
+  private cards!: ReadonlyMap<string, { name: string; color: number }>;
   /** Kept so a spell equipped mid-run can be given the arena's overlaps. */
   private collisions!: CollisionSystem;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
@@ -426,6 +433,7 @@ export class GameScene extends Phaser.Scene {
       (id, stats) => this.createSpell(id, stats),
       (id) => this.baseStatsFor(id),
     );
+    this.cards = new Map(this.rosterCards().map((card) => [card.id, card]));
     this.syncPlayerStats(BASE_PLAYER_PROFILE);
     this.equipSpell(spellId);
     for (const extra of this.extraActives()) this.equipSpell(extra);
@@ -486,6 +494,29 @@ export class GameScene extends Phaser.Scene {
     // a HUD that subscribed late (it is launched from `create`) is right after
     // the first one rather than only after the first hit.
     this.publishShield();
+    this.publishLoadout();
+  }
+
+  /**
+   * Spec §10: the HUD shows the loadout, each spell's cooldown and the passives
+   * held. Once a frame, like the shield: the cooldowns move every frame, and a
+   * late-subscribing HUD is right after one.
+   */
+  private publishLoadout(): void {
+    const spells = this.spells.spells.map((spell) => {
+      const card = this.cards.get(spell.id);
+      return {
+        id: spell.id,
+        name: card?.name ?? spell.id,
+        color: card?.color ?? 0xffffff,
+        progress: spell.castProgress,
+      };
+    });
+    const passives = [...this.spells.loadout.passives].map(([id, rank]) => ({
+      name: passiveById(id)?.name ?? id,
+      rank,
+    }));
+    emitRunEvent(this.events, 'loadout', { spells, passives });
   }
 
   /**
@@ -757,53 +788,69 @@ export class GameScene extends Phaser.Scene {
    */
   private activeCatalog(): ActiveCard[] {
     const casting = new Set<string>(this.equippedSpellIds);
+    return this.rosterCards()
+      .filter((card) => !casting.has(card.id))
+      .map(({ id, name, description }) => ({ id, name, description }));
+  }
+
+  /** Every roster spell's card: its name and line for a level-up, its colour for the HUD (#144). */
+  private rosterCards(): (ActiveCard & { color: number })[] {
     return [
       ...ROSTER_SPELL_IDS.filter(isSpellId).map((id) => ({
         id,
         name: SPELL_CARDS[id].name,
         description: SPELL_CARDS[id].description,
+        color: SPELL_CARDS[id].color,
       })),
       ...COMPANION_SPELL_IDS.map((id) => ({
         id,
         name: COMPANION_CARDS[id].name,
         description: COMPANION_CARDS[id].description,
+        color: COMPANION_CARDS[id].color,
       })),
       ...SHIELD_SPELL_IDS.map((id) => ({
         id,
         name: SHIELD_CARDS[id].name,
         description: SHIELD_CARDS[id].description,
+        color: SHIELD_CARDS[id].color,
       })),
       ...AREA_SPELL_IDS.map((id) => ({
         id,
         name: AREA_CARDS[id].name,
         description: AREA_CARDS[id].description,
+        color: AREA_CARDS[id].color,
       })),
       ...STRIKE_SPELL_IDS.map((id) => ({
         id,
         name: STRIKE_CARDS[id].name,
         description: STRIKE_CARDS[id].description,
+        color: STRIKE_CARDS[id].color,
       })),
       ...FIRE_ROSTER_SPELL_IDS.map((id) => ({
         id,
         name: FIRE_ROSTER_CARDS[id].name,
         description: FIRE_ROSTER_CARDS[id].description,
+        color: FIRE_ROSTER_CARDS[id].color,
       })),
       ...ICE_ROSTER_SPELL_IDS.map((id) => ({
         id,
         name: ICE_ROSTER_CARDS[id].name,
         description: ICE_ROSTER_CARDS[id].description,
+        color: ICE_ROSTER_CARDS[id].color,
       })),
       ...LIGHTNING_ROSTER_SPELL_IDS.map((id) => ({
         id,
         name: LIGHTNING_ROSTER_CARDS[id].name,
         description: LIGHTNING_ROSTER_CARDS[id].description,
+        color: LIGHTNING_ROSTER_CARDS[id].color,
       })),
       ...EARTH_ROSTER_SPELL_IDS.map((id) => ({
         id,
         name: EARTH_ROSTER_CARDS[id].name,
         description: EARTH_ROSTER_CARDS[id].description,
+        color: EARTH_ROSTER_CARDS[id].color,
       })),
-    ].filter((card) => !casting.has(card.id));
+    ];
   }
 
   /** The save Boot parsed into the registry; an empty one if something else got there first. */

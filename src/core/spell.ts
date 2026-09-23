@@ -140,6 +140,16 @@ export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
   }
 
   /**
+   * How far the current cooldown has run, in [0, 1], for the HUD (#144). `null`
+   * for a spell that never waits on one — an orbit or a shield is simply out.
+   */
+  get castProgress(): number | null {
+    const cooldown = this.cooldown;
+    if (!(cooldown > 0) || !Number.isFinite(cooldown)) return null;
+    return Math.min(1, Math.max(0, this.scheduler.pending / cooldown));
+  }
+
+  /**
    * One frame, in milliseconds of run time — the same unit `RunState.tick`
    * returns and the pools are stepped with.
    */

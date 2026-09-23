@@ -35,6 +35,11 @@ describe('onRunEvents', () => {
     emitRunEvent(emitter, 'phase', { phase: 'over' });
     emitRunEvent(emitter, 'bossHp', { hp: 7, maxHp: 8 });
     emitRunEvent(emitter, 'shield', { pool: 9, max: 10 });
+    const loadout = {
+      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff0000, progress: 0.5 }],
+      passives: [{ name: 'Haste', rank: 2 }],
+    };
+    emitRunEvent(emitter, 'loadout', loadout);
     emitter.emit('shutdown', { not: 'ours' });
 
     expect(received).toEqual([
@@ -45,6 +50,7 @@ describe('onRunEvents', () => {
       { name: 'phase', payload: { phase: 'over' } },
       { name: 'bossHp', payload: { hp: 7, maxHp: 8 } },
       { name: 'shield', payload: { pool: 9, max: 10 } },
+      { name: 'loadout', payload: loadout },
     ]);
   });
 
@@ -77,8 +83,17 @@ describe('emitRunEvent', () => {
 });
 
 describe('RUN_EVENT', () => {
-  it('covers every channel the run publishes (spec §4, CO-030; shield #134)', () => {
-    expect(RUN_EVENT_NAMES).toEqual(['timer', 'hp', 'xp', 'kill', 'phase', 'bossHp', 'shield']);
+  it('covers every channel the run publishes (spec §4, CO-030; shield #134; loadout #144)', () => {
+    expect(RUN_EVENT_NAMES).toEqual([
+      'timer',
+      'hp',
+      'xp',
+      'kill',
+      'phase',
+      'bossHp',
+      'shield',
+      'loadout',
+    ]);
     expect(Object.keys(RUN_EVENT).sort()).toEqual([...RUN_EVENT_NAMES].sort());
   });
 
