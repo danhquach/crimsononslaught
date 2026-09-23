@@ -26,19 +26,25 @@ const EXTRA = SHIELD_SPELL_IDS;
 const TOTAL_POOL = BASE_SHIELD_STATS.ice_shield.shieldHp + BASE_SHIELD_STATS.earth_shield.shieldHp;
 
 /**
- * The window is 150 s of run, read off the HUD's timer rather than budgeted in
- * wall clock (#187): at 10x a slow runner covers less run per wall second, and
- * a wall-clock window there ends short of the recharge this test is watching.
+ * The run starts at 2:00 (`?startAt=`), where fast enemies join and the crowd
+ * presses a standing player within seconds.
  *
- * It was 10 s (about 100 s of run) until CO-125 trimmed the wave 3-5 spawn
- * rates: a slower-filling arena reaches a standing player later, so the first
- * contact now lands around 75 s of run and a 100 s window ended mid-drain,
- * before either pool's recharge delay (6 s and 8 s) had a chance to elapse.
- * The guard went from reliable to a coin flip on CI. At 150 s the run covers a
- * whole drain-and-recharge cycle with room to spare, and still stops well short
- * of the ~170 s where a standing player's pools bottom out for good.
+ * On the 20-minute table (#127) a run from 0:00 fills slowly. Steady contact
+ * starts around 2:05, so a regrow inside the 150 s window this used came
+ * either from one stray enemy touching the player around 1:10, or from a
+ * lull in the first seconds of the crowd. On CI neither happened on some runs
+ * (2026-09-23: first contact at 2:05, still draining at 2:35). From 2:00,
+ * contact lands about 12 s into the window and the first regrow 28-39 s in
+ * (native and 10 fps frames, measured 2026-09-23).
  */
-const RUN_MS = 150_000;
+const START_AT_S = 120;
+
+/**
+ * Run time sampled after the start, read off the HUD's timer rather than
+ * budgeted in wall clock (#187). It ends at 4:00, before tanks join, with
+ * about 3x the regrow time to spare.
+ */
+const RUN_MS = 120_000;
 /** Sampling gives up after this much wall clock and asserts on what it saw. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
@@ -83,7 +89,7 @@ async function answerLevelUp(page: Page): Promise<void> {
 test('shields soak real contact damage and grow back over a run', async ({ page }) => {
   const errors = collectErrors(page);
 
-  await page.goto(`/?seed=1&timeScale=10&loadout=${EXTRA.join(',')}`);
+  await page.goto(`/?seed=1&timeScale=10&startAt=${START_AT_S}&loadout=${EXTRA.join(',')}`);
   await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
@@ -116,7 +122,7 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   const trace: Sample[] = [];
   const until = Date.now() + WALL_CAP_MS;
   let runMs = 0;
-  while (runMs < RUN_MS && Date.now() < until) {
+  while (runMs < START_AT_S * 1000 + RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
     if (!current) break;
