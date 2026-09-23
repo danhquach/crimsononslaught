@@ -92,6 +92,12 @@ export const TELEGRAPH_SCALE_RADIUS = 100;
 export const FX_DEPTH = 5;
 
 /**
+ * Damage numbers (#125) sit above the effects and the shield aura (6), so a
+ * blast never hides what it dealt.
+ */
+export const NUMBER_DEPTH = 7;
+
+/**
  * Ground areas are on the ground: below the enemies standing in them and the
  * effects that play over them, above the arena floor (`ARENA_DEPTH`).
  */

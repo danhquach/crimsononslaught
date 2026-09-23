@@ -22,6 +22,11 @@ export interface BurstOptions {
  */
 export class FxPool {
   private readonly group: Phaser.GameObjects.Group;
+  /**
+   * #125: told of every burst asked for, shown or dropped, so the scene can
+   * shake on a big one without each spell knowing about the camera.
+   */
+  onBurst?: (clip: string, scale: number) => void;
 
   constructor(scene: Phaser.Scene) {
     this.group = scene.add.group({
@@ -44,6 +49,7 @@ export class FxPool {
 
   /** Play `clip` once at (x, y). Returns whether anything was shown. */
   burst(clip: string, x: number, y: number, options: BurstOptions = {}): boolean {
+    this.onBurst?.(clip, options.scale ?? 1);
     if (!this.group.scene.anims.exists(clip)) return false;
     // Any loaded texture will do to take a sprite from the pool: playing the
     // clip points it at whichever atlas page holds that clip's frames.

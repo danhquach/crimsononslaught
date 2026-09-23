@@ -110,7 +110,7 @@ export class TornadoSpell extends Spell<'lightning_tornado'> {
     for (const enemy of membersOf(area, this.enemies.live)) {
       if (!enemy.active) continue;
       this.ticked += 1;
-      this.damage(enemy, tickDamage);
+      this.damage(enemy, tickDamage, 'tick');
     }
   }
 }

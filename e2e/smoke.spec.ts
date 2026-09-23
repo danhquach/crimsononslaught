@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { MAX_LIVE_NUMBERS } from '../src/config/hitFeedback';
 import { BASE_SPELL_STATS, SPELL_IDS, type SpellId } from '../src/config/spells';
 import { formatTimer } from '../src/core/hudModel';
 import { SCENE } from '../src/core/scenePayloads';
@@ -56,11 +57,17 @@ for (const [index, spellId] of SPELL_IDS.entries()) {
       const { game } = await import('/src/main.ts');
       if (!game.scene.isActive(gameKey) && !game.scene.isPaused(gameKey)) return null;
       const scene = game.scene.getScene(gameKey) as GameScene;
-      return { overlays: scene.overlayCount, enemies: scene.liveEnemyCount };
+      return {
+        overlays: scene.overlayCount,
+        enemies: scene.liveEnemyCount,
+        numbers: scene.numberCount,
+      };
     }, SCENE.game);
     if (pools) {
       expect(pools.overlays).toBeLessThanOrEqual(pools.enemies);
       if (!baseStatsLeaveStatus(spellId)) expect(pools.overlays).toBe(0);
+      // #125: damage numbers are pooled and capped however many hits land.
+      expect(pools.numbers).toBeLessThanOrEqual(MAX_LIVE_NUMBERS);
     }
 
     expect(errors).toEqual([]);

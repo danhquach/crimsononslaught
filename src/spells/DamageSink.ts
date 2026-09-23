@@ -1,3 +1,4 @@
+import type { HitKind } from '../core/hitFeedback';
 import type { Enemy } from '../entities/Enemy';
 
 /**
@@ -5,5 +6,8 @@ import type { Enemy } from '../entities/Enemy';
  * drop — is `GameScene`'s business, so a spell reports the damage it dealt and
  * the scene applies it. Shared by every spell (Epic D); it names an entity, so
  * it lives here rather than in `core/`.
+ *
+ * `kind` says how the damage arrived (#125): a spell's own hit is a `hit`,
+ * which may crit; a periodic pulse passes `tick`, which never does.
  */
-export type DamageSink = (enemy: Enemy, amount: number) => void;
+export type DamageSink = (enemy: Enemy, amount: number, kind?: HitKind) => void;
