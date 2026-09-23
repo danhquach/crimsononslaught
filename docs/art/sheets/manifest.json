@@ -1218,6 +1218,184 @@
           }
         ]
       ]
+    },
+    {
+      "key": "companionFire",
+      "ticket": "CO-124",
+      "file": "CO-124/companion_fire_locomotion.png",
+      "page": 5,
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 116,
+      "alphaThreshold": 240,
+      "rowSpecs": [
+        [
+          { "anim": "idle", "facing": "down", "cols": [1, 2] },
+          { "anim": "move", "facing": "down", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "up", "cols": [1, 2] },
+          { "anim": "move", "facing": "up", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "left", "cols": [1, 2] },
+          { "anim": "move", "facing": "left", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "right", "cols": [1, 2] },
+          { "anim": "move", "facing": "right", "cols": [3, 6] }
+        ]
+      ]
+    },
+    {
+      "key": "companionFire",
+      "ticket": "CO-124",
+      "file": "CO-124/companion_fire_attack.png",
+      "page": 5,
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 140,
+      "alphaThreshold": 240,
+      "rowSpecs": [
+        [{ "anim": "attack", "facing": "down", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "up", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "left", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "right", "cols": [1, 4] }]
+      ]
+    },
+    {
+      "key": "companionIce",
+      "ticket": "CO-124",
+      "file": "CO-124/companion_ice_locomotion.png",
+      "page": 5,
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 120,
+      "alphaThreshold": 240,
+      "rowSpecs": [
+        [
+          { "anim": "idle", "facing": "down", "cols": [1, 2] },
+          { "anim": "move", "facing": "down", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "up", "cols": [1, 2] },
+          { "anim": "move", "facing": "up", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "left", "cols": [1, 2] },
+          { "anim": "move", "facing": "left", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "right", "cols": [1, 2] },
+          { "anim": "move", "facing": "right", "cols": [3, 6] }
+        ]
+      ]
+    },
+    {
+      "key": "companionIce",
+      "ticket": "CO-124",
+      "file": "CO-124/companion_ice_attack.png",
+      "page": 5,
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 148,
+      "alphaThreshold": 240,
+      "rowSpecs": [
+        [{ "anim": "attack", "facing": "down", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "up", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "left", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "right", "cols": [1, 4] }]
+      ]
+    },
+    {
+      "key": "companionLightning",
+      "ticket": "CO-124",
+      "file": "CO-124/companion_lightning_locomotion.png",
+      "page": 5,
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 164,
+      "alphaThreshold": 240,
+      "$comment": "Rows 3 and 4 are drawn right then left, the reverse of every other sheet. Measured, not assumed: the bird's head points right in row 3 and left in row 4 on both of its sheets. The labels below follow the art rather than the convention, so nothing has to be redrawn.",
+      "rowSpecs": [
+        [
+          { "anim": "idle", "facing": "down", "cols": [1, 2] },
+          { "anim": "move", "facing": "down", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "up", "cols": [1, 2] },
+          { "anim": "move", "facing": "up", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "right", "cols": [1, 2] },
+          { "anim": "move", "facing": "right", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "left", "cols": [1, 2] },
+          { "anim": "move", "facing": "left", "cols": [3, 6] }
+        ]
+      ]
+    },
+    {
+      "key": "companionLightning",
+      "ticket": "CO-124",
+      "file": "CO-124/companion_lightning_attack.png",
+      "page": 5,
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 200,
+      "alphaThreshold": 240,
+      "rowSpecs": [
+        [{ "anim": "attack", "facing": "down", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "up", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "right", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "left", "cols": [1, 4] }]
+      ]
+    },
+    {
+      "key": "companionEarth",
+      "ticket": "CO-124",
+      "file": "CO-124/companion_earth_locomotion.png",
+      "page": 5,
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 144,
+      "alphaThreshold": 240,
+      "$comment": "Rows 3 and 4 are assumed left then right. Unlike the other three, the golem's head faces the camera in both, so its facing could not be read from the sheet. If it moonwalks in game, swap these two labels; no art has to change.",
+      "rowSpecs": [
+        [
+          { "anim": "idle", "facing": "down", "cols": [1, 2] },
+          { "anim": "move", "facing": "down", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "up", "cols": [1, 2] },
+          { "anim": "move", "facing": "up", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "left", "cols": [1, 2] },
+          { "anim": "move", "facing": "left", "cols": [3, 6] }
+        ],
+        [
+          { "anim": "idle", "facing": "right", "cols": [1, 2] },
+          { "anim": "move", "facing": "right", "cols": [3, 6] }
+        ]
+      ]
+    },
+    {
+      "key": "companionEarth",
+      "ticket": "CO-124",
+      "file": "CO-124/companion_earth_attack.png",
+      "page": 5,
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 176,
+      "alphaThreshold": 240,
+      "rowSpecs": [
+        [{ "anim": "attack", "facing": "down", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "up", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "left", "cols": [1, 4] }],
+        [{ "anim": "attack", "facing": "right", "cols": [1, 4] }]
+      ]
     }
   ]
 }

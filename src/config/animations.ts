@@ -157,6 +157,30 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // rate, the overlay it replaces. Bleed's sheet is not accepted yet, so bleed
   // still borrows `fire.burn` (`core/fx.ts`).
   spec('status.stagger', 4, 10, LOOP),
+
+  // Companions (CO-124). Four elemental creatures on the hero's own sheet
+  // layout, so `facings` applies unchanged. Move runs at the hero's walk rate
+  // even though each companion chases at its own speed, because they all sit
+  // near the player's 180 px/s and a per-element rate would only make the
+  // slowest of them skate. Attack is four frames at 10, so the swing lands in
+  // 0.4 s and finishes inside every companion's cooldown — the shortest is
+  // Lightning's 0.8 s (`config/companions.ts`).
+  //
+  // Lightning's left and right are drawn in the reverse order to every other
+  // sheet; the manifest labels its rows to match the art, so nothing here has
+  // to know about it.
+  ...facings('companionFire.idle', 2, 4, LOOP),
+  ...facings('companionFire.move', 4, 8, LOOP),
+  ...facings('companionFire.attack', 4, 10, ONCE),
+  ...facings('companionIce.idle', 2, 4, LOOP),
+  ...facings('companionIce.move', 4, 8, LOOP),
+  ...facings('companionIce.attack', 4, 10, ONCE),
+  ...facings('companionLightning.idle', 2, 4, LOOP),
+  ...facings('companionLightning.move', 4, 8, LOOP),
+  ...facings('companionLightning.attack', 4, 10, ONCE),
+  ...facings('companionEarth.idle', 2, 4, LOOP),
+  ...facings('companionEarth.move', 4, 8, LOOP),
+  ...facings('companionEarth.attack', 4, 10, ONCE),
 ];
 
 /**
@@ -168,8 +192,11 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
  *
  * Partial on purpose (Phase 2 §10): a spell registers its texture key and
  * placeholder colour on the day it lands, and the sheet follows in its own art
- * ticket. A key missing here keeps the generated placeholder — `companion` does
- * until #146 — so the entity draws either way and nothing has to wait on art.
+ * ticket. A key missing here keeps the generated placeholder, so the entity
+ * draws either way and nothing has to wait on art. `companion` is missing on
+ * purpose even though its frames are now in the atlas (CO-124): one key covers
+ * all four companions, so mapping it would draw one element's creature for
+ * every element. Giving each companion its own key is #184.
  */
 export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   player: 'hero.idle.down.0',
