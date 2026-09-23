@@ -5,9 +5,24 @@ import {
   bossBarVisible,
   formatTimer,
   fraction,
+  passiveLines,
   shieldBarVisible,
+  slotLabel,
+  slotRows,
   type HudModel,
 } from './hudModel';
+import type { RunEventPayloads } from './runEvents';
+
+const FIRE = { id: 'fire', name: 'Fire Bolt', color: 0xff4400, progress: 0.25 };
+const COLUMN = { id: 'fire_column', name: 'Fire Column', color: 0xffaa00, progress: 0.75 };
+
+function withLoadout(model: Readonly<HudModel>, payload: RunEventPayloads['loadout']): HudModel {
+  return applyRunEvent(model, { name: 'loadout', payload });
+}
+
+function atLevel(level: number): HudModel {
+  return applyRunEvent(INITIAL_HUD, { name: 'xp', payload: { xp: 0, xpToNext: 10, level } });
+}
 
 describe('formatTimer', () => {
   it('formats elapsed ms as m:ss, flooring to whole seconds', () => {
@@ -59,6 +74,8 @@ describe('applyRunEvent', () => {
       bossMaxHp: 0,
       shield: 0,
       shieldMax: 0,
+      spells: [],
+      passives: [],
     });
   });
 
@@ -105,6 +122,13 @@ describe('applyRunEvent', () => {
     expect(m.shieldMax).toBe(60);
   });
 
+  it('loadout sets the spells casting and the passives held (#144)', () => {
+    const payload = { spells: [FIRE, COLUMN], passives: [{ name: 'Haste', rank: 2 }] };
+    const m = withLoadout(INITIAL_HUD, payload);
+    expect(m.spells).toEqual([FIRE, COLUMN]);
+    expect(m.passives).toEqual([{ name: 'Haste', rank: 2 }]);
+  });
+
   it('leaves unrelated fields untouched and never mutates its input', () => {
     const before: HudModel = { ...INITIAL_HUD, kills: 7, level: 2 };
     const frozen = Object.freeze({ ...before });
@@ -134,5 +158,69 @@ describe('bossBarVisible', () => {
     expect(bossBarVisible(boss)).toBe(true);
     const over = applyRunEvent(boss, { name: 'phase', payload: { phase: 'over' } });
     expect(bossBarVisible(over)).toBe(false);
+  });
+});
+
+describe('slotRows', () => {
+  it('shows the default spell, then both slots locked with their unlock levels at level 1', () => {
+    const m = withLoadout(INITIAL_HUD, { spells: [FIRE], passives: [] });
+    expect(slotRows(m)).toEqual([
+      { kind: 'spell', name: 'Fire Bolt', color: 0xff4400, progress: 0.25 },
+      { kind: 'locked', unlockLevel: 2 },
+      { kind: 'locked', unlockLevel: 5 },
+    ]);
+  });
+
+  it('opens a slot on the level that unlocks it, and fills it with the pick', () => {
+    const level2 = withLoadout(atLevel(2), { spells: [FIRE], passives: [] });
+    expect(slotRows(level2).map((row) => row.kind)).toEqual(['spell', 'open', 'locked']);
+    const level5 = withLoadout(atLevel(5), { spells: [FIRE], passives: [] });
+    expect(slotRows(level5).map((row) => row.kind)).toEqual(['spell', 'open', 'open']);
+    const picked = withLoadout(level5, { spells: [FIRE, COLUMN], passives: [] });
+    expect(slotRows(picked)).toEqual([
+      { kind: 'spell', name: 'Fire Bolt', color: 0xff4400, progress: 0.25 },
+      { kind: 'spell', name: 'Fire Column', color: 0xffaa00, progress: 0.75 },
+      { kind: 'open' },
+    ]);
+  });
+
+  it('gives every casting spell a box, even past three (the ?loadout= hook casts without slots)', () => {
+    const fourth = { ...COLUMN, id: 'fire_meteor', name: 'Meteor' };
+    const third = { ...COLUMN, id: 'fire_dragon', name: 'Fire Dragon', progress: null };
+    const m = withLoadout(INITIAL_HUD, { spells: [FIRE, COLUMN, third, fourth], passives: [] });
+    expect(slotRows(m).map(slotLabel)).toEqual([
+      'Fire Bolt',
+      'Fire Column',
+      'Fire Dragon',
+      'Meteor',
+    ]);
+  });
+
+  it('reads as open, not locked, before the first loadout event lands', () => {
+    expect(slotRows(INITIAL_HUD).map((row) => row.kind)).toEqual(['open', 'locked', 'locked']);
+  });
+});
+
+describe('slotLabel', () => {
+  it('names the spell, says open, or says locked with the unlock level (spec §10)', () => {
+    expect(slotLabel({ kind: 'spell', name: 'Fire Bolt', color: 0, progress: null })).toBe(
+      'Fire Bolt',
+    );
+    expect(slotLabel({ kind: 'open' })).toBe('Open');
+    expect(slotLabel({ kind: 'locked', unlockLevel: 5 })).toBe('Locked · Lv 5');
+  });
+});
+
+describe('passiveLines', () => {
+  it('lists each passive with its rank, in the order taken', () => {
+    const m = withLoadout(INITIAL_HUD, {
+      spells: [],
+      passives: [
+        { name: 'Haste', rank: 3 },
+        { name: 'Power', rank: 1 },
+      ],
+    });
+    expect(passiveLines(m)).toEqual(['Haste ×3', 'Power ×1']);
+    expect(passiveLines(INITIAL_HUD)).toEqual([]);
   });
 });

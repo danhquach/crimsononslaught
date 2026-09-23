@@ -72,6 +72,16 @@ test('three actives cast in one run and the arena still draws', async ({ page })
   }, SCENE.game);
   expect(equipped).toEqual([PICKED, ...EXTRA]);
 
+  // #144: the HUD has a box for each of the three, each on a cooldown of its own.
+  await expect
+    .poll(async () => (await readHud(page)).spells.map((spell) => spell.id))
+    .toEqual([PICKED, ...EXTRA]);
+  for (const { progress } of (await readHud(page)).spells) {
+    expect(progress).not.toBeNull();
+    expect(progress).toBeGreaterThanOrEqual(0);
+    expect(progress).toBeLessThanOrEqual(1);
+  }
+
   const runMs = await playUntil(page, RUN_MS, Date.now() + WALL_CAP_MS);
   expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
