@@ -3,7 +3,7 @@ import { SOUND_KEYS } from '../src/config/sounds';
 import { AUDIO_REGISTRY_KEY, SCENE } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
-import { cardCenter, collectErrors, waitForScene } from './game';
+import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
 
 /**
  * Sound (CO-102): every clip loads with the rest of the assets, a cue plays
@@ -17,6 +17,7 @@ test('loads every clip, plays after the first click, and M mutes across a reload
   const errors = collectErrors(page);
 
   await page.goto('/?seed=1');
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
   const missing = await page.evaluate(async (keys) => {
@@ -52,6 +53,7 @@ test('loads every clip, plays after the first click, and M mutes across a reload
   );
 
   await page.reload();
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
   const afterReload = await page.evaluate(async (registryKey) => {
     const { game } = await import('/src/main.ts');

@@ -12,6 +12,9 @@ import { MAX_OFFER_SIZE, isOfferCard, type OfferCard } from './levelUp';
 /** Scene keys, so transitions never rely on string literals scattered across scenes. */
 export const SCENE = {
   boot: 'Boot',
+  intro: 'Intro',
+  settings: 'Settings',
+  profile: 'Profile',
   spellSelect: 'SpellSelect',
   game: 'Game',
   hud: 'Hud',
@@ -52,7 +55,7 @@ export const LOADOUT_REGISTRY_KEY = 'loadout';
  */
 export const SAVE_REGISTRY_KEY = 'save';
 
-/** Registry flag Boot sets when the stored save was unreadable and reset, so SpellSelect can say so once. */
+/** Registry flag Boot sets when the stored save was unreadable and reset, so Intro can say so once. */
 export const SAVE_RESET_REGISTRY_KEY = 'saveReset';
 
 /** Registry key under which Boot stores the game's `Audio` (CO-102); scenes reach it through `render/audio.ts#audioOf`. */

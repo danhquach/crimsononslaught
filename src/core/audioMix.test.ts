@@ -5,6 +5,7 @@ import {
   effectiveVolume,
   readAudioSettings,
   shouldPlay,
+  stepVolume,
   writeAudioSettings,
   type AudioSettings,
   type PlayLedger,
@@ -115,5 +116,25 @@ describe('settings round trip', () => {
       [AUDIO_SETTING_KEYS.music]: 0.5,
       [AUDIO_SETTING_KEYS.muted]: true,
     });
+  });
+});
+
+describe('stepVolume', () => {
+  it('moves one tenth per press and lands on the notch grid', () => {
+    expect(stepVolume(1, -1)).toBe(0.9);
+    expect(stepVolume(0.2, 1)).toBe(0.3);
+    let volume = 1;
+    for (let i = 0; i < 7; i += 1) volume = stepVolume(volume, -1);
+    expect(volume).toBe(0.3);
+  });
+
+  it('stops at both ends', () => {
+    expect(stepVolume(1, 1)).toBe(1);
+    expect(stepVolume(0, -1)).toBe(0);
+  });
+
+  it('snaps an off-grid volume to the nearest notch before stepping', () => {
+    expect(stepVolume(0.44, 1)).toBe(0.5);
+    expect(stepVolume(Number.NaN, 1)).toBe(0.1);
   });
 });

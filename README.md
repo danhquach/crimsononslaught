@@ -32,10 +32,11 @@ until the asset pass.
 
 ## Controls
 
-|                    | Keyboard / mouse                                  | Gamepad                                         |
-| ------------------ | ------------------------------------------------- | ----------------------------------------------- |
-| Move               | WASD or arrow keys                                | Left stick (analog, deadzone 0.2) or D-pad      |
-| Menus and overlays | Click, or the number keys / Enter shown on screen | D-pad or left stick to select, **A** to confirm |
+|                      | Keyboard / mouse                                  | Gamepad                                         |
+| -------------------- | ------------------------------------------------- | ----------------------------------------------- |
+| Move                 | WASD or arrow keys                                | Left stick (analog, deadzone 0.2) or D-pad      |
+| Menus and overlays   | Click, or the number keys / Enter shown on screen | D-pad or left stick to select, **A** to confirm |
+| Intro and its panels | Arrow keys to select, Enter to confirm, Esc back  | D-pad or left stick to select, **A** to confirm |
 
 Both input sources are live at once, and a pad plugged in mid-run is picked up
 without a reload. Mouse and keyboard stay primary: nothing is highlighted until
@@ -64,7 +65,7 @@ needs the browser installed once with `npx playwright install chromium`.
 ```
 src/config/   tunable data: spells, loadout, passives, meta (upgrades, milestones, currency), enemies, waves, boss, progression, player, gems, animations, FX
 src/core/     pure game logic, no engine imports, unit-tested: run state, loadout, level-up offers, spawn director, spell math, save schema and upgrade shop
-src/scenes/   Boot, SpellSelect, Upgrades, Game, HUD, LevelUp, Result, two dev-only debug scenes
+src/scenes/   Boot, Intro, Settings, Profile, SpellSelect, Upgrades, Game, HUD, LevelUp, Result, two dev-only debug scenes
 src/entities/ Player, Enemy, Boss, XpGem, Projectile, Boulder
 src/spells/   one Phaser-side class per spell over its `src/core/` math, plus the damage sink
 src/systems/  Phaser-side wrappers: spawn director, collisions, enemy / gem / FX / overlay pools

@@ -4,7 +4,7 @@ import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
-import { cardCenter, collectErrors, readHud, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #134 in the browser: a run carrying both shields, equipped through the
@@ -84,6 +84,7 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   const errors = collectErrors(page);
 
   await page.goto(`/?seed=1&timeScale=10&loadout=${EXTRA.join(',')}`);
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));

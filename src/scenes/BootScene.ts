@@ -27,7 +27,7 @@ import { generatePlaceholderTextures } from '../render/textures';
 
 /**
  * First scene: loads the sprite atlas, fills any gap with a placeholder
- * texture, fixes the run seed, then hands off to SpellSelect.
+ * texture, fixes the run seed, then hands off to Intro.
  * `?debug=textures` opens the CO-005 texture check instead, `?debug=collisions`
  * the CO-032 overlap check.
  */
@@ -56,7 +56,7 @@ export class BootScene extends Phaser.Scene {
 
     // Saved progress (CO-101): parsed once here, then lives in the registry.
     // A save this build cannot read is reset and overwritten rather than left
-    // to fail the same way on every boot; the player is told on SpellSelect.
+    // to fail the same way on every boot; the player is told on Intro.
     const parsed = parseSave(loadSaveJson());
     if (parsed.status === 'reset') {
       console.warn(`[save] stored save was unreadable (${parsed.reason}); starting fresh`);
@@ -119,6 +119,6 @@ export class BootScene extends Phaser.Scene {
       return;
     }
 
-    this.scene.start(SCENE.spellSelect);
+    this.scene.start(SCENE.intro);
   }
 }
