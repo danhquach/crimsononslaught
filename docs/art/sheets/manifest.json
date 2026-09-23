@@ -33,7 +33,19 @@
     "            rather than flush against a box it exactly fills. Off by",
     "            default: the box is left where the art sits, which is what",
     "            keeps a feet-anchored walk cycle steady, and frames the game",
-    "            measures (the boulder, the chain strip) read their own size."
+    "            measures (the boulder, the chain strip) read their own size.",
+    "",
+    "alphaThreshold  a sheet delivered with an alpha channel only. Alpha at or",
+    "            above this is made fully opaque and everything below it is",
+    "            cleared, colour and all, before the cell is measured or cut.",
+    "            Off (0) by default, because a sheet whose soft edges are the",
+    "            art -- the meteor, the fire column's impact -- must keep them.",
+    "            The CO-124 companions need it: they arrive as a soft matte with",
+    "            no fully opaque pixel anywhere, so at native alpha one figure's",
+    "            glow reaches into the next cell and the bounds of both are",
+    "            wrong. 240 is the settled value there. Raise it until the cut",
+    "            passes rather than reaching for allowEdge, which only silences",
+    "            the check and leaves the neighbour's halo in the frame."
   ],
   "sheets": [
     {

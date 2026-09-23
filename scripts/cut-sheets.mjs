@@ -107,7 +107,7 @@ function cutSheet(sheet) {
       const cell = cells[row * sheet.cols + col];
       if (preKeyed) {
         const local = { x: 0, y: 0, w: cell.w, h: cell.h };
-        return { cell, keyed: alphaCell(img, cell), local };
+        return { cell, keyed: alphaCell(img, cell, sheet.alphaThreshold ?? 0), local };
       }
       const key = cornerKey(img, insetRect(cell, KEY_INSET));
       const kept = trimBorderLines(img, cell, key, TOL_KEYED, TOL_SOLID);

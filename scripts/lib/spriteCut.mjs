@@ -244,17 +244,29 @@ export function isPreKeyed(img, minFraction = 0.02) {
  * with. The counterpart of `keyCell` for a sheet `isPreKeyed` accepts: no key
  * to sample, no despill to undo, and no ruled grid lines to trim, because a
  * sheet delivered with a transparent background has none.
+ *
+ * `threshold` above 0 hardens the alpha to binary: at or above it the pixel is
+ * fully opaque, below it the pixel is cleared outright, colour and all. The
+ * companion sheets arrive as a soft matte with not one fully opaque pixel on
+ * them, so their glow spreads across the whole canvas at low alpha and a
+ * neighbouring cell's halo lands inside this one's bounds. Clearing the colour
+ * as well as the alpha matters downstream: `quantize` reads every pixel, and a
+ * cleared pixel that kept its yellow would still spend a palette slot on it.
+ *
+ * Left at 0 the alpha passes through untouched, which is what the sheets cut
+ * before this existed rely on — their soft edges are the art.
  */
-export function alphaCell(img, rect) {
+export function alphaCell(img, rect, threshold = 0) {
   const data = new Uint8ClampedArray(rect.w * rect.h * 4);
   for (let y = 0; y < rect.h; y += 1) {
     for (let x = 0; x < rect.w; x += 1) {
       const px = pixelAt(img, rect.x + x, rect.y + y);
       const o = (y * rect.w + x) * 4;
-      data[o] = px[0];
-      data[o + 1] = px[1];
-      data[o + 2] = px[2];
-      data[o + 3] = px[3];
+      const cleared = threshold > 0 && px[3] < threshold;
+      data[o] = cleared ? 0 : px[0];
+      data[o + 1] = cleared ? 0 : px[1];
+      data[o + 2] = cleared ? 0 : px[2];
+      data[o + 3] = threshold > 0 ? (cleared ? 0 : 255) : px[3];
     }
   }
   return { width: rect.w, height: rect.h, data };

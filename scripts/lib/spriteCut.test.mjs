@@ -262,6 +262,44 @@ describe('isPreKeyed / alphaCell', () => {
     expect(cell.height).toBe(4);
     expect([...cell.data.slice(0, 4)]).toEqual([0, 0, 0, 255]);
   });
+
+  describe('alphaThreshold', () => {
+    // How the companion sheets arrive: a solid body, and a halo that fades out
+    // across the cell edge with no fully opaque pixel anywhere on the sheet.
+    const rect = { x: 0, y: 0, w: 20, h: 20 };
+    const soft = image(20, 20, (x, y) => {
+      const body = x >= 8 && x < 12 && y >= 8 && y < 12;
+      const halo = x >= 2 && x < 18 && y >= 2 && y < 18;
+      if (body) return [200, 200, 200, 250];
+      if (halo) return [255, 238, 88, 90];
+      return [0, 0, 0, 0];
+    });
+
+    it('leaves the alpha alone when off, which is the default', () => {
+      const cell = alphaCell(soft, rect);
+      expect(cell.data[(2 * 20 + 2) * 4 + 3]).toBe(90);
+      expect(cell.data[(8 * 20 + 8) * 4 + 3]).toBe(250);
+      expect(alphaCell(soft, rect, 0).data).toEqual(cell.data);
+    });
+
+    it('makes what survives fully opaque and clears the rest outright', () => {
+      const cell = alphaCell(soft, rect, 240);
+      const at = (x, y) => [...cell.data.slice((y * 20 + x) * 4, (y * 20 + x) * 4 + 4)];
+      expect(at(8, 8)).toEqual([200, 200, 200, 255]);
+      // the halo goes, and takes its colour with it so quantize never sees it
+      expect(at(2, 2)).toEqual([0, 0, 0, 0]);
+    });
+
+    it('shrinks the bounds to the body, which is the point of it', () => {
+      expect(opaqueBounds(alphaCell(soft, rect))).toEqual({ x: 2, y: 2, w: 16, h: 16 });
+      expect(opaqueBounds(alphaCell(soft, rect, 240))).toEqual({ x: 8, y: 8, w: 4, h: 4 });
+    });
+
+    it('clears a cell that is halo only, rather than calling it art', () => {
+      const haloOnly = image(20, 20, () => [255, 238, 88, 90]);
+      expect(opaqueBounds(alphaCell(haloOnly, rect, 240))).toBeNull();
+    });
+  });
 });
 
 describe('edgesTouched', () => {
