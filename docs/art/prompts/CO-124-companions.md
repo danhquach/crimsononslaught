@@ -20,7 +20,9 @@ ice are ranged allies, lightning and earth are melee (§9 spell tables).
 
 **Copy the whole `text` block under a sheet's heading and paste it as the
 prompt.** Each block is complete on its own: subject, grid, creature, palette,
-frames, style, delivery. The shared rules are repeated verbatim in all eight.
+frames, style, delivery. The shared rules are repeated in all eight, word for
+word except where a sentence has to name the creature's own anatomy — hooves,
+coils, wings, feet.
 
 Two things outside the block, same for every sheet:
 
@@ -31,7 +33,7 @@ Two things outside the block, same for every sheet:
 - Negative-prompt field, if the tool has one:
 
   ```text
-  text, letters, numbers, words, labels, captions, title, watermark, checkerboard, transparency grid, background colour, white background, drop shadow, blur, gradient, jpeg artifacts
+  text, letters, numbers, words, labels, captions, title, watermark, checkerboard, transparency grid, background colour, white background, grid lines, cell borders, panels, drop shadow, blur, gradient, feathered edges, halo, coloured fringe, speckles, jpeg artifacts
   ```
 
 ## Background: transparent, not keyed
@@ -47,6 +49,75 @@ One failure mode to watch: some tools *draw* the grey checkerboard into the
 pixels instead of writing alpha. That sheet is unusable — the negative prompt
 bans it and every block names it. Check the alpha on the first sheet back
 before commissioning the other seven.
+
+## What came back — round one
+
+All eight were delivered and measured against their declared grids with the
+cutter's own key, split and edge tests (`scripts/lib/spriteCut.mjs`). **One is
+cuttable.** The blocks below have been rewritten against what actually failed;
+nothing else in the file changed.
+
+| Sheet | Canvas | Format | Background as delivered | Verdict |
+|---|---|---|---|---|
+| `companion_earth_locomotion` | 1536 × 1024 ✓ | PNG | real alpha | **accepted** — 0 problems, 7.8% margin |
+| `companion_fire_attack` | 1024 × 1024 ✓ | JPEG | flat grey `#525252` | keys cleanly, but no alpha and a JPEG halo |
+| `companion_earth_attack` | 1254 × 1254 | PNG | real alpha | 6 cells overrun; red and yellow fringe on every alpha edge |
+| `companion_lightning_locomotion` | 1536 × 1024 ✓ | PNG | alpha, but a blurred haze fills it | rows 1 and 2 bleed into each other, 8 cells |
+| `companion_lightning_attack` | 1254 × 1254 | PNG | alpha carrying yellow/red speckle throughout | gaps are full of semi-opaque junk |
+| `companion_fire_locomotion` | 1264 × 848 | JPEG | chequerboard **drawn** + ruled black cell borders | 24 of 24 cells fail |
+| `companion_ice_locomotion` | 1264 × 848 | JPEG | chequerboard drawn + ruled borders | 24 of 24 fail |
+| `companion_ice_attack` | 1024 × 1024 ✓ | JPEG | chequerboard drawn + ruled borders | 16 of 16 fail |
+
+Four rules come straight out of that table and are now in every block:
+
+- **Binary alpha.** Alpha 0 or 255 and nothing between. A feathered matte is
+  what left the fringe on `earth_attack`, and partial alpha is what let the
+  speckle survive on `lightning_attack`.
+- **The chequerboard and the ruled border are named together** as things drawn
+  into the pixels, in the same breath as the painted background. All three
+  chequerboard sheets arrived as JPEG, which cannot carry alpha at all — so the
+  format rule and the background rule are now one argument rather than two
+  paragraphs apart.
+- **Nothing crosses into a neighbouring cell**, and the glow around a creature
+  counts as part of the drawing. That is what bled `lightning_locomotion`.
+- **One size across the whole sheet.** On the accepted earth sheet the side rows
+  are drawn at about 60% of the front and back rows, so the golem will shrink
+  when it turns.
+
+A JPEG renamed to `.png` is also called out, after one arrived byte-identical to
+its `.jpg` twin: the cutter trusts the extension, hands the bytes to `pngjs` and
+dies on `unrecognised content at end of stream`.
+
+## What came back — round two
+
+The four chequerboard JPEGs were re-run against the rewritten blocks. **Every
+format fault is gone**: real PNG signatures, real alpha channels, no
+chequerboard drawn as art, no ruled cell borders, and the locomotion sheets came
+back at the asked-for 1536 × 1024 on a clean 6 × 4 with four distinct facings.
+
+One fault replaced them, and it is why the size rule above now has a paragraph
+of its own. The creatures were drawn at **75–85% of their cell** against the
+59% the prompt asked for, so they overran into their neighbours:
+
+| Sheet | Art height | Sprites overflowing | Worst overflow |
+|---|---|---|---|
+| `companion_fire_locomotion` | 82% of cell | 9 | **78px** |
+| `companion_ice_locomotion` | 80% | 10 | 22px |
+| `companion_fire_attack` | 85% | 4 | 9px |
+| `companion_ice_attack` | 75% | 9 | 21px |
+
+Size alone would not have mattered — `sheetCell` absorbs scale, which is what it
+is for. The overflow is what cannot be absorbed.
+
+Three of the four were recovered by sliding the art back inside its cells, per
+row and per column so that each row keeps whatever alignment it had, and all
+three now pass every cell check at `alphaThreshold` 240. `fire_locomotion` was
+not recoverable: 78px of overrun cannot be slid into a cell that is already 82%
+full, so it is the one sheet still to re-run.
+
+The attack sheets also arrive at 1254 × 1254 rather than 1024 × 1024. Harmless —
+the grid shape is what matters and the cutter divides by `cols × rows` — but it
+is why the delivery rule now says "never larger".
 
 ## Where the finished sheets go
 
@@ -173,7 +244,7 @@ Save as `docs/art/sheets/CO-124/companion_fire_locomotion.png`.
 ```text
 Pixel-art animation sheet for a top-down 2D game: a small friendly kirin, a gentle deer-like beast that carries fire, fighting alongside the player, idle and trotting, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px along its longest side, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px along its longest side, centred in its cell.
 
 Creature: a slender hooved quadruped the size of a large hound, deer-like, with a long neck, a deep chest and cloven hooves. Its coat is white, #F5F5F5, turning to fine white scales at the shoulders and haunches, with crimson markings, #DC143C — a band across its chest and a blaze down its brow. Ember orange fire, #FF6D00, burns as a mane along its neck, as a plume at its tail, and as a low flame above each hoof. It has one short forward-curving horn on its brow, rounded at the tip, and warm gold eyes.
 
@@ -184,11 +255,12 @@ Rows are facings: row 1 trotting towards the viewer, face and chest visible; row
 Cells 1-2 are an idle, cells 3-6 a trot. The idle is one breath — the chest rises and settles, the mane fire flickers to a different shape, the tail plume sways, hooves still. The trot is one full four-legged cycle — near foreleg reaching, legs gathered under the body, far foreleg reaching, gathered again — with the leg change large enough to read at a glance and the mane and tail moving with it.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
-Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
+Background: transparent, as a real alpha channel — alpha 0 everywhere the creature is not, alpha 255 everywhere it is, nothing in between. Do not paint a background: no colour, white, magenta, grey, panel or vignette, and above all no chequered pattern — the grey-and-white chequerboard is how an editor displays emptiness, and drawn into the pixels it is simply art, which throws the sheet away. A format that cannot carry alpha is already the wrong format. Outside the creature's own outline there are no pixels at all: no shadow, no vignette, no halo or coloured fringe along its edge, no soft or feathered edge, and no stray specks, dust or drifting colour anywhere in the empty space.
+Size, measured on the delivered file, and the rule most often broken: the creature fits inside a box 150 pixels square at the centre of its 256 pixel cell, which leaves 53 pixels of empty space between that box and every cell edge. Nothing of it reaches outside that box — not a tail, a wing, a flame, a horn, a raised limb, and not the glow around it. If a pose will not fit, draw the whole creature smaller; never let it grow to fill the cell, and never let one pose be drawn larger than another. Drawn any bigger it runs into the neighbouring cells, and the sheet cannot be cut.
+Cells are a measurement, not something to draw. Nothing whatever marks where one cell ends and the next begins: no line, border, divider, frame, panel, tile, box or square of colour, and no change of tone between a cell and its neighbour. A ruled grid drawn over the sheet is as fatal as a painted background; the grid exists only so a script can cut the frames at fixed positions. No text anywhere either — one letter, number, label or watermark ruins the sheet.
 Each row faces only its own direction: head, body and hooves point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson chest band and brow blaze sit the same way round in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The hooves land on the same line and the body holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
-Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
+Every drawing belongs to one cell and stays inside it at the margin above, never touching an edge; draw it smaller rather than spill, the margin is measured on the delivered file. Nothing crosses into a neighbouring cell — not a wing, a tail, a raised limb, and not the fire, frost or lightning around the creature, which counts as part of the drawing. The hooves land on the same line and the body holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing, and the creature is drawn at one size across the whole sheet — the side-facing rows at the same scale as the front and back rows, never smaller.
+Deliver one lossless PNG carrying a real alpha channel — an actual PNG file, not a JPEG renamed to .png, and never JPEG in any form: it cannot hold alpha and it leaves a halo on every hard edge. Deliver it at exactly the canvas size above; if it must be smaller, scale the whole canvas down proportionally and keep the same number of cells, never below half, never larger, and never a different shape. Report the exact pixel size.
 ```
 
 ## 2. `companion_fire_attack.png` — fire kirin breathing an ember
@@ -198,7 +270,7 @@ Save as `docs/art/sheets/CO-124/companion_fire_attack.png`.
 ```text
 Pixel-art animation sheet for a top-down 2D game: a small friendly kirin, a gentle deer-like beast that carries fire, fighting alongside the player, breathing a small ember, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px along its longest side, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px along its longest side, centred in its cell.
 
 Creature: a slender hooved quadruped the size of a large hound, deer-like, with a long neck, a deep chest and cloven hooves. Its coat is white, #F5F5F5, turning to fine white scales at the shoulders and haunches, with crimson markings, #DC143C — a band across its chest and a blaze down its brow. Ember orange fire, #FF6D00, burns as a mane along its neck, as a plume at its tail, and as a low flame above each hoof. It has one short forward-curving horn on its brow, rounded at the tip, and warm gold eyes.
 
@@ -211,11 +283,12 @@ The four cells of a row are one shot in time order. 1: it braces, forehooves pla
 The shot itself is not drawn — the game draws the bolt that flies out. Nothing travels away from the creature, crosses the cell or leaves it; the spark in cell 3 touches the muzzle and goes no further. The mouth opens only enough to let the ember out; no teeth are shown. The brow horn is never used to strike.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
-Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
+Background: transparent, as a real alpha channel — alpha 0 everywhere the creature is not, alpha 255 everywhere it is, nothing in between. Do not paint a background: no colour, white, magenta, grey, panel or vignette, and above all no chequered pattern — the grey-and-white chequerboard is how an editor displays emptiness, and drawn into the pixels it is simply art, which throws the sheet away. A format that cannot carry alpha is already the wrong format. Outside the creature's own outline there are no pixels at all: no shadow, no vignette, no halo or coloured fringe along its edge, no soft or feathered edge, and no stray specks, dust or drifting colour anywhere in the empty space.
+Size, measured on the delivered file, and the rule most often broken: the creature fits inside a box 150 pixels square at the centre of its 256 pixel cell, which leaves 53 pixels of empty space between that box and every cell edge. Nothing of it reaches outside that box — not a tail, a wing, a flame, a horn, a raised limb, and not the glow around it. If a pose will not fit, draw the whole creature smaller; never let it grow to fill the cell, and never let one pose be drawn larger than another. Drawn any bigger it runs into the neighbouring cells, and the sheet cannot be cut.
+Cells are a measurement, not something to draw. Nothing whatever marks where one cell ends and the next begins: no line, border, divider, frame, panel, tile, box or square of colour, and no change of tone between a cell and its neighbour. A ruled grid drawn over the sheet is as fatal as a painted background; the grid exists only so a script can cut the frames at fixed positions. No text anywhere either — one letter, number, label or watermark ruins the sheet.
 Each row faces only its own direction: head, body and hooves point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson chest band and brow blaze sit the same way round in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The hooves land on the same line and the body holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
-Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
+Every drawing belongs to one cell and stays inside it at the margin above, never touching an edge; draw it smaller rather than spill, the margin is measured on the delivered file. Nothing crosses into a neighbouring cell — not a wing, a tail, a raised limb, and not the fire, frost or lightning around the creature, which counts as part of the drawing. The hooves land on the same line and the body holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing, and the creature is drawn at one size across the whole sheet — the side-facing rows at the same scale as the front and back rows, never smaller.
+Deliver one lossless PNG carrying a real alpha channel — an actual PNG file, not a JPEG renamed to .png, and never JPEG in any form: it cannot hold alpha and it leaves a halo on every hard edge. Deliver it at exactly the canvas size above; if it must be smaller, scale the whole canvas down proportionally and keep the same number of cells, never below half, never larger, and never a different shape. Report the exact pixel size.
 ```
 
 ## 3. `companion_ice_locomotion.png` — ice serpent, idle and gliding
@@ -225,7 +298,7 @@ Save as `docs/art/sheets/CO-124/companion_ice_locomotion.png`.
 ```text
 Pixel-art animation sheet for a top-down 2D game: a small friendly serpent made of ice that fights alongside the player, idle and gliding, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px along its longest side measured across its curved body, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px along its longest side measured across its curved body, centred in its cell.
 
 Creature: a slender legless serpent held in a loose S-curve, thick as a wrist and long enough to coil. Its scales are white, #F5F5F5, with crimson bands, #DC143C, just behind the head and again near the tail. A crest of blue-white ice crystal, #40C4FF, runs the length of its spine and its underside is frosted the same blue. Its head is a smooth rounded wedge with warm pale-blue eyes and a closed mouth.
 
@@ -236,11 +309,12 @@ Rows are facings: row 1 head towards the viewer, face visible, body trailing beh
 Cells 1-2 are an idle, cells 3-6 a glide. The idle is one slow breath — the coil rises and settles, the crystal crest catches the light differently, the head sways a little. The glide is one full cycle of a wave travelling from head to tail: the S-curve shifts one quarter of its length along the body in each cell and returns to the first shape, so the loop is seamless and the change of curve reads at a glance.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
-Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
+Background: transparent, as a real alpha channel — alpha 0 everywhere the creature is not, alpha 255 everywhere it is, nothing in between. Do not paint a background: no colour, white, magenta, grey, panel or vignette, and above all no chequered pattern — the grey-and-white chequerboard is how an editor displays emptiness, and drawn into the pixels it is simply art, which throws the sheet away. A format that cannot carry alpha is already the wrong format. Outside the creature's own outline there are no pixels at all: no shadow, no vignette, no halo or coloured fringe along its edge, no soft or feathered edge, and no stray specks, dust or drifting colour anywhere in the empty space.
+Size, measured on the delivered file, and the rule most often broken: the creature fits inside a box 150 pixels square at the centre of its 256 pixel cell, which leaves 53 pixels of empty space between that box and every cell edge. Nothing of it reaches outside that box — not a tail, a wing, a flame, a horn, a raised limb, and not the glow around it. If a pose will not fit, draw the whole creature smaller; never let it grow to fill the cell, and never let one pose be drawn larger than another. Drawn any bigger it runs into the neighbouring cells, and the sheet cannot be cut.
+Cells are a measurement, not something to draw. Nothing whatever marks where one cell ends and the next begins: no line, border, divider, frame, panel, tile, box or square of colour, and no change of tone between a cell and its neighbour. A ruled grid drawn over the sheet is as fatal as a painted background; the grid exists only so a script can cut the frames at fixed positions. No text anywhere either — one letter, number, label or watermark ruins the sheet.
 Each row faces only its own direction: the head points that way in every cell of the row. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson bands sit the same distance behind the head in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The lowest coil of the body rests on the same line and the head holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
-Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
+Every drawing belongs to one cell and stays inside it at the margin above, never touching an edge; draw it smaller rather than spill, the margin is measured on the delivered file. Nothing crosses into a neighbouring cell — not a wing, a tail, a raised limb, and not the fire, frost or lightning around the creature, which counts as part of the drawing. The lowest coil of the body rests on the same line and the head holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing, and the creature is drawn at one size across the whole sheet — the side-facing rows at the same scale as the front and back rows, never smaller.
+Deliver one lossless PNG carrying a real alpha channel — an actual PNG file, not a JPEG renamed to .png, and never JPEG in any form: it cannot hold alpha and it leaves a halo on every hard edge. Deliver it at exactly the canvas size above; if it must be smaller, scale the whole canvas down proportionally and keep the same number of cells, never below half, never larger, and never a different shape. Report the exact pixel size.
 ```
 
 ## 4. `companion_ice_attack.png` — ice serpent spitting a shard
@@ -250,7 +324,7 @@ Save as `docs/art/sheets/CO-124/companion_ice_attack.png`.
 ```text
 Pixel-art animation sheet for a top-down 2D game: a small friendly serpent made of ice that fights alongside the player, spitting a frost shard, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px along its longest side measured across its curved body, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px along its longest side measured across its curved body, centred in its cell.
 
 Creature: a slender legless serpent held in a loose S-curve, thick as a wrist and long enough to coil. Its scales are white, #F5F5F5, with crimson bands, #DC143C, just behind the head and again near the tail. A crest of blue-white ice crystal, #40C4FF, runs the length of its spine and its underside is frosted the same blue. Its head is a smooth rounded wedge with warm pale-blue eyes and a closed mouth.
 
@@ -263,11 +337,12 @@ The four cells of a row are one shot in time order. 1: the body gathers into a t
 The shard in flight is not drawn — the game draws the bolt that flies out. Nothing travels away from the creature, crosses the cell or leaves it; the shard in cell 3 touches the mouth and goes no further. The mouth opens only enough to let the shard out; no fangs are shown.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
-Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
+Background: transparent, as a real alpha channel — alpha 0 everywhere the creature is not, alpha 255 everywhere it is, nothing in between. Do not paint a background: no colour, white, magenta, grey, panel or vignette, and above all no chequered pattern — the grey-and-white chequerboard is how an editor displays emptiness, and drawn into the pixels it is simply art, which throws the sheet away. A format that cannot carry alpha is already the wrong format. Outside the creature's own outline there are no pixels at all: no shadow, no vignette, no halo or coloured fringe along its edge, no soft or feathered edge, and no stray specks, dust or drifting colour anywhere in the empty space.
+Size, measured on the delivered file, and the rule most often broken: the creature fits inside a box 150 pixels square at the centre of its 256 pixel cell, which leaves 53 pixels of empty space between that box and every cell edge. Nothing of it reaches outside that box — not a tail, a wing, a flame, a horn, a raised limb, and not the glow around it. If a pose will not fit, draw the whole creature smaller; never let it grow to fill the cell, and never let one pose be drawn larger than another. Drawn any bigger it runs into the neighbouring cells, and the sheet cannot be cut.
+Cells are a measurement, not something to draw. Nothing whatever marks where one cell ends and the next begins: no line, border, divider, frame, panel, tile, box or square of colour, and no change of tone between a cell and its neighbour. A ruled grid drawn over the sheet is as fatal as a painted background; the grid exists only so a script can cut the frames at fixed positions. No text anywhere either — one letter, number, label or watermark ruins the sheet.
 Each row faces only its own direction: the head points that way in every cell of the row. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson bands sit the same distance behind the head in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The lowest coil of the body rests on the same line and the coil holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
-Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
+Every drawing belongs to one cell and stays inside it at the margin above, never touching an edge; draw it smaller rather than spill, the margin is measured on the delivered file. Nothing crosses into a neighbouring cell — not a wing, a tail, a raised limb, and not the fire, frost or lightning around the creature, which counts as part of the drawing. The lowest coil of the body rests on the same line and the coil holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing, and the creature is drawn at one size across the whole sheet — the side-facing rows at the same scale as the front and back rows, never smaller.
+Deliver one lossless PNG carrying a real alpha channel — an actual PNG file, not a JPEG renamed to .png, and never JPEG in any form: it cannot hold alpha and it leaves a halo on every hard edge. Deliver it at exactly the canvas size above; if it must be smaller, scale the whole canvas down proportionally and keep the same number of cells, never below half, never larger, and never a different shape. Report the exact pixel size.
 ```
 
 ## 5. `companion_lightning_locomotion.png` — thunderbird, hovering and flying
@@ -277,7 +352,7 @@ Save as `docs/art/sheets/CO-124/companion_lightning_locomotion.png`.
 ```text
 Pixel-art animation sheet for a top-down 2D game: a small friendly thunderbird, a bird that carries lightning, fighting alongside the player, hovering and flying, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px across its open wings, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px across its open wings, centred in its cell.
 
 Creature: a hawk-sized bird seen from above and slightly behind, wings open, tail fanned. Its plumage is white, #F5F5F5, with a crimson crest and a crimson bar across the tail, #DC143C. Pale yellow lightning, #FFEE58, with a white core arcs along the trailing edge of each wing and sparks at its talons. Its beak is short and blunt and its eyes are warm gold. Its silhouette is unmistakably a bird: the open wings span wider than the body is long, the tail is fanned, and the head is clearly visible between them. It is never a lean pointed dart or a rigid arrow shape, it has no fins, and its wings stay open and separate from the body rather than folding into one streamlined point.
 
@@ -288,11 +363,12 @@ Rows are facings: row 1 flying towards the viewer, head and breast visible; row 
 Cells 1-2 are a hover, cells 3-6 a flight cycle. The hover is two shallow wingbeats in place — wings high, then level — with the arcs flickering to a different shape and the body barely rising. The flight is one full wingbeat cycle — wings high, wings level with the body reaching forward, wings down and swept, wings rising again — large enough to read at a glance, with the tail fanning and closing with the beat.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
-Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
+Background: transparent, as a real alpha channel — alpha 0 everywhere the creature is not, alpha 255 everywhere it is, nothing in between. Do not paint a background: no colour, white, magenta, grey, panel or vignette, and above all no chequered pattern — the grey-and-white chequerboard is how an editor displays emptiness, and drawn into the pixels it is simply art, which throws the sheet away. A format that cannot carry alpha is already the wrong format. Outside the creature's own outline there are no pixels at all: no shadow, no vignette, no halo or coloured fringe along its edge, no soft or feathered edge, and no stray specks, dust or drifting colour anywhere in the empty space.
+Size, measured on the delivered file, and the rule most often broken: the creature fits inside a box 150 pixels square at the centre of its 256 pixel cell, which leaves 53 pixels of empty space between that box and every cell edge. Nothing of it reaches outside that box — not a tail, a wing, a flame, a horn, a raised limb, and not the glow around it. If a pose will not fit, draw the whole creature smaller; never let it grow to fill the cell, and never let one pose be drawn larger than another. Drawn any bigger it runs into the neighbouring cells, and the sheet cannot be cut.
+Cells are a measurement, not something to draw. Nothing whatever marks where one cell ends and the next begins: no line, border, divider, frame, panel, tile, box or square of colour, and no change of tone between a cell and its neighbour. A ruled grid drawn over the sheet is as fatal as a painted background; the grid exists only so a script can cut the frames at fixed positions. No text anywhere either — one letter, number, label or watermark ruins the sheet.
 Each row faces only its own direction: the head, the body and the fanned tail point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson crest sits the same way round in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The bird flies rather than walks, so its body holds the same spot in every cell of a row — only the wings and tail move — and the animation does not slide. Every cell holds a full drawing.
-Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
+Every drawing belongs to one cell and stays inside it at the margin above, never touching an edge; draw it smaller rather than spill, the margin is measured on the delivered file. Nothing crosses into a neighbouring cell — not a wing, a tail, a raised limb, and not the fire, frost or lightning around the creature, which counts as part of the drawing. The bird flies rather than walks, so its body holds the same spot in every cell of a row — only the wings and tail move — and the animation does not slide. Every cell holds a full drawing, and the creature is drawn at one size across the whole sheet — the side-facing rows at the same scale as the front and back rows, never smaller.
+Deliver one lossless PNG carrying a real alpha channel — an actual PNG file, not a JPEG renamed to .png, and never JPEG in any form: it cannot hold alpha and it leaves a halo on every hard edge. Deliver it at exactly the canvas size above; if it must be smaller, scale the whole canvas down proportionally and keep the same number of cells, never below half, never larger, and never a different shape. Report the exact pixel size.
 ```
 
 ## 6. `companion_lightning_attack.png` — thunderbird diving
@@ -302,7 +378,7 @@ Save as `docs/art/sheets/CO-124/companion_lightning_attack.png`.
 ```text
 Pixel-art animation sheet for a top-down 2D game: a small friendly thunderbird, a bird that carries lightning, fighting alongside the player, diving and striking with its talons, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px across its open wings, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px across its open wings, centred in its cell.
 
 Creature: a hawk-sized bird seen from above and slightly behind, wings open, tail fanned. Its plumage is white, #F5F5F5, with a crimson crest and a crimson bar across the tail, #DC143C. Pale yellow lightning, #FFEE58, with a white core arcs along the trailing edge of each wing and sparks at its talons. Its beak is short and blunt and its eyes are warm gold. Its silhouette is unmistakably a bird: the open wings span wider than the body is long, the tail is fanned, and the head is clearly visible between them. It is never a lean pointed dart or a rigid arrow shape, it has no fins, and its wings stay open and separate from the body rather than folding into one streamlined point.
 
@@ -315,11 +391,12 @@ The four cells of a row are one strike in time order. 1: it rears back, wings th
 Nothing struck is drawn — the game draws the enemy and the hit. Nothing is drawn where a target would be; the talons and the arc stay within a wing's reach of the body and never cross the cell or touch its edge.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
-Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
+Background: transparent, as a real alpha channel — alpha 0 everywhere the creature is not, alpha 255 everywhere it is, nothing in between. Do not paint a background: no colour, white, magenta, grey, panel or vignette, and above all no chequered pattern — the grey-and-white chequerboard is how an editor displays emptiness, and drawn into the pixels it is simply art, which throws the sheet away. A format that cannot carry alpha is already the wrong format. Outside the creature's own outline there are no pixels at all: no shadow, no vignette, no halo or coloured fringe along its edge, no soft or feathered edge, and no stray specks, dust or drifting colour anywhere in the empty space.
+Size, measured on the delivered file, and the rule most often broken: the creature fits inside a box 150 pixels square at the centre of its 256 pixel cell, which leaves 53 pixels of empty space between that box and every cell edge. Nothing of it reaches outside that box — not a tail, a wing, a flame, a horn, a raised limb, and not the glow around it. If a pose will not fit, draw the whole creature smaller; never let it grow to fill the cell, and never let one pose be drawn larger than another. Drawn any bigger it runs into the neighbouring cells, and the sheet cannot be cut.
+Cells are a measurement, not something to draw. Nothing whatever marks where one cell ends and the next begins: no line, border, divider, frame, panel, tile, box or square of colour, and no change of tone between a cell and its neighbour. A ruled grid drawn over the sheet is as fatal as a painted background; the grid exists only so a script can cut the frames at fixed positions. No text anywhere either — one letter, number, label or watermark ruins the sheet.
 Each row faces only its own direction: the head, the body and the fanned tail point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson crest sits the same way round in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The bird flies rather than walks, so its body holds the same spot in every cell of a row and the animation does not slide. Every cell holds a full drawing.
-Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
+Every drawing belongs to one cell and stays inside it at the margin above, never touching an edge; draw it smaller rather than spill, the margin is measured on the delivered file. Nothing crosses into a neighbouring cell — not a wing, a tail, a raised limb, and not the fire, frost or lightning around the creature, which counts as part of the drawing. The bird flies rather than walks, so its body holds the same spot in every cell of a row and the animation does not slide. Every cell holds a full drawing, and the creature is drawn at one size across the whole sheet — the side-facing rows at the same scale as the front and back rows, never smaller.
+Deliver one lossless PNG carrying a real alpha channel — an actual PNG file, not a JPEG renamed to .png, and never JPEG in any form: it cannot hold alpha and it leaves a halo on every hard edge. Deliver it at exactly the canvas size above; if it must be smaller, scale the whole canvas down proportionally and keep the same number of cells, never below half, never larger, and never a different shape. Report the exact pixel size.
 ```
 
 ## 7. `companion_earth_locomotion.png` — earth golem, idle and walking
@@ -329,7 +406,7 @@ Save as `docs/art/sheets/CO-124/companion_earth_locomotion.png`.
 ```text
 Pixel-art animation sheet for a top-down 2D game: a small friendly golem made of stone that fights alongside the player, idle and walking, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The golem is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The golem is about 150px tall, centred in its cell.
 
 Creature: a squat, round-shouldered golem carved from pale stone, #F5F5F5, with the brown-grey of raw rock, #8D6E63, at its joints and along the seams of its arms. A crimson sash, #DC143C, is bound across its chest. It has no weapon — its hands are two oversized stone fists. Its head is a smooth rounded block with two small warm-lit eyes and no mouth. It is bare carved stone and never armoured: no plate, no metal, no rivets, no helmet and no shoulder spikes — its shoulders are smooth rounded stone. Its surface stays pale and chalky, never dark and never metallic, and the crimson sash is the only thing it wears.
 
@@ -340,11 +417,12 @@ Rows are facings: row 1 down, eyes to the viewer; row 2 up, back of the head; ro
 Cells 1-2 are an idle, cells 3-6 a walk. The idle is one slow settle — the shoulders drop and rise, the sash sways, feet still. The walk is one full cycle — left foot forward, feet together, right foot forward, feet together — heavy and flat-footed, with the leg change large enough to read at a glance.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the golem is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
-Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
+Background: transparent, as a real alpha channel — alpha 0 everywhere the golem is not, alpha 255 everywhere it is, nothing in between. Do not paint a background: no colour, white, magenta, grey, panel or vignette, and above all no chequered pattern — the grey-and-white chequerboard is how an editor displays emptiness, and drawn into the pixels it is simply art, which throws the sheet away. A format that cannot carry alpha is already the wrong format. Outside the golem's own outline there are no pixels at all: no shadow, no vignette, no halo or coloured fringe along its edge, no soft or feathered edge, and no stray specks, dust or drifting colour anywhere in the empty space.
+Size, measured on the delivered file, and the rule most often broken: the creature fits inside a box 150 pixels square at the centre of its 256 pixel cell, which leaves 53 pixels of empty space between that box and every cell edge. Nothing of it reaches outside that box — not a tail, a wing, a flame, a horn, a raised limb, and not the glow around it. If a pose will not fit, draw the whole creature smaller; never let it grow to fill the cell, and never let one pose be drawn larger than another. Drawn any bigger it runs into the neighbouring cells, and the sheet cannot be cut.
+Cells are a measurement, not something to draw. Nothing whatever marks where one cell ends and the next begins: no line, border, divider, frame, panel, tile, box or square of colour, and no change of tone between a cell and its neighbour. A ruled grid drawn over the sheet is as fatal as a painted background; the grid exists only so a script can cut the frames at fixed positions. No text anywhere either — one letter, number, label or watermark ruins the sheet.
 Each row faces only its own direction: head, hands and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the sash is knotted on the same side in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
-Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
+Every drawing belongs to one cell and stays inside it at the margin above, never touching an edge; draw it smaller rather than spill, the margin is measured on the delivered file. Nothing crosses into a neighbouring cell — not a wing, a tail, a raised limb, and not the fire, frost or lightning around the creature, which counts as part of the drawing. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing, and the creature is drawn at one size across the whole sheet — the side-facing rows at the same scale as the front and back rows, never smaller.
+Deliver one lossless PNG carrying a real alpha channel — an actual PNG file, not a JPEG renamed to .png, and never JPEG in any form: it cannot hold alpha and it leaves a halo on every hard edge. Deliver it at exactly the canvas size above; if it must be smaller, scale the whole canvas down proportionally and keep the same number of cells, never below half, never larger, and never a different shape. Report the exact pixel size.
 ```
 
 ## 8. `companion_earth_attack.png` — earth golem slamming
@@ -354,7 +432,7 @@ Save as `docs/art/sheets/CO-124/companion_earth_attack.png`.
 ```text
 Pixel-art animation sheet for a top-down 2D game: a small friendly golem made of stone that fights alongside the player, slamming both fists down, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The golem is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The golem is about 150px tall, centred in its cell.
 
 Creature: a squat, round-shouldered golem carved from pale stone, #F5F5F5, with the brown-grey of raw rock, #8D6E63, at its joints and along the seams of its arms. A crimson sash, #DC143C, is bound across its chest. It has no weapon — its hands are two oversized stone fists. Its head is a smooth rounded block with two small warm-lit eyes and no mouth. It is bare carved stone and never armoured: no plate, no metal, no rivets, no helmet and no shoulder spikes — its shoulders are smooth rounded stone. Its surface stays pale and chalky, never dark and never metallic, and the crimson sash is the only thing it wears.
 
@@ -367,11 +445,12 @@ The four cells of a row are one slam in time order. 1: both feet planted, both f
 Nothing struck is drawn — the game draws the enemy and the hit. Nothing is drawn where a target would be; the fists and the chips stay within arm's reach and never cross the cell or touch its edge.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the golem is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
-Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
+Background: transparent, as a real alpha channel — alpha 0 everywhere the golem is not, alpha 255 everywhere it is, nothing in between. Do not paint a background: no colour, white, magenta, grey, panel or vignette, and above all no chequered pattern — the grey-and-white chequerboard is how an editor displays emptiness, and drawn into the pixels it is simply art, which throws the sheet away. A format that cannot carry alpha is already the wrong format. Outside the golem's own outline there are no pixels at all: no shadow, no vignette, no halo or coloured fringe along its edge, no soft or feathered edge, and no stray specks, dust or drifting colour anywhere in the empty space.
+Size, measured on the delivered file, and the rule most often broken: the creature fits inside a box 150 pixels square at the centre of its 256 pixel cell, which leaves 53 pixels of empty space between that box and every cell edge. Nothing of it reaches outside that box — not a tail, a wing, a flame, a horn, a raised limb, and not the glow around it. If a pose will not fit, draw the whole creature smaller; never let it grow to fill the cell, and never let one pose be drawn larger than another. Drawn any bigger it runs into the neighbouring cells, and the sheet cannot be cut.
+Cells are a measurement, not something to draw. Nothing whatever marks where one cell ends and the next begins: no line, border, divider, frame, panel, tile, box or square of colour, and no change of tone between a cell and its neighbour. A ruled grid drawn over the sheet is as fatal as a painted background; the grid exists only so a script can cut the frames at fixed positions. No text anywhere either — one letter, number, label or watermark ruins the sheet.
 Each row faces only its own direction: head, hands and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the sash is knotted on the same side in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
-Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
+Every drawing belongs to one cell and stays inside it at the margin above, never touching an edge; draw it smaller rather than spill, the margin is measured on the delivered file. Nothing crosses into a neighbouring cell — not a wing, a tail, a raised limb, and not the fire, frost or lightning around the creature, which counts as part of the drawing. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing, and the creature is drawn at one size across the whole sheet — the side-facing rows at the same scale as the front and back rows, never smaller.
+Deliver one lossless PNG carrying a real alpha channel — an actual PNG file, not a JPEG renamed to .png, and never JPEG in any form: it cannot hold alpha and it leaves a halo on every hard edge. Deliver it at exactly the canvas size above; if it must be smaller, scale the whole canvas down proportionally and keep the same number of cells, never below half, never larger, and never a different shape. Report the exact pixel size.
 ```
 
 ## Done when
