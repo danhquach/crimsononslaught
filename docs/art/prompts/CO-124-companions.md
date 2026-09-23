@@ -5,22 +5,29 @@ Ticket: [#146](https://github.com/danhquach/crimsononslaught/issues/146) · Epic
 Eight sheets: a locomotion and an attack sheet for each of the four companions.
 **One sheet per run**, so a bad one is redone on its own.
 
-These are the only characters on the player's side; everything else that moves
-is an enemy, so the set has to not read as one. They replace the single green
-disc `src/config/colors.ts` draws for all four today — *"Green so an ally never
-reads as an enemy at a glance."* The palette contract below carries that read
-with drawing instead.
+The four companions are **elemental creatures, not people**: a fire kirin, an
+ice serpent, a thunderbird and an earth golem. They are the only things on the
+player's side, and everything else that moves is an enemy — so the whole job of
+the set is that four beasts do not read as four more monsters. They replace the
+single green disc `src/config/colors.ts` draws for all four today — *"Green so
+an ally never reads as an enemy at a glance."* The palette contract below
+carries that read with drawing instead.
+
+Attack types come from the spec and do not change with the redesign: fire and
+ice are ranged allies, lightning and earth are melee (§9 spell tables).
 
 ## How to run this
 
 **Copy the whole `text` block under a sheet's heading and paste it as the
-prompt.** Each block is complete on its own: subject, grid, character, palette,
+prompt.** Each block is complete on its own: subject, grid, creature, palette,
 frames, style, delivery. The shared rules are repeated verbatim in all eight.
 
 Two things outside the block, same for every sheet:
 
 - Attach `docs/art/sheets/CO-070/hero_locomotion.jpg` as the style reference —
-  it fixes the livery, camera height and proportions. Not the prop sheet.
+  it fixes the camera height, the pixel density and the crimson-and-white the
+  creatures are marked in. The hero is a human; only his palette and camera
+  carry over, not his proportions.
 - Negative-prompt field, if the tool has one:
 
   ```text
@@ -30,7 +37,7 @@ Two things outside the block, same for every sheet:
 ## Background: transparent, not keyed
 
 **Every sheet is a PNG with a real alpha channel, transparent everywhere the
-character is not.** No magenta, no white, no fill.
+creature is not.** No magenta, no white, no fill.
 
 `isPreKeyed` in `scripts/lib/spriteCut.mjs` detects the alpha and routes the
 sheet through `alphaCell`: no colour to sample, no despill to undo, no halo
@@ -38,7 +45,8 @@ where a keyed edge used to be.
 
 One failure mode to watch: some tools *draw* the grey checkerboard into the
 pixels instead of writing alpha. That sheet is unusable — the negative prompt
-bans it and every block names it.
+bans it and every block names it. Check the alpha on the first sheet back
+before commissioning the other seven.
 
 ## Where the finished sheets go
 
@@ -48,51 +56,80 @@ docs/art/sheets/CO-124/<filename>.png
 
 Folder does not exist yet; create it with the first sheet. Filenames exactly as
 the table gives them — `docs/art/sheets/manifest.json` points at
-`CO-124/<filename>.png` and the cutter reads only the manifest.
+`CO-124/<filename>.png` and the cutter reads only the manifest. The filenames
+stay element-keyed (`companion_fire_*`), not creature-keyed, so the manifest
+and `animations.ts` are unaffected by the redesign.
 
 Never JPEG: every JPEG sheet so far came back with ~130k unique colours and a
-halo on every hard edge, and a halo on a 24 px character is most of the
-character. JPEG also has no alpha.
+halo on every hard edge, and a halo on a 24 px creature is most of the creature.
+JPEG also has no alpha.
 
 Drop them in as they land, in any order. Tell me which arrived and I will
 measure them, add manifest entries and run `npm run art:cut`.
 
-## Reading as friendly, not as another enemy
+## Reading as friendly, not as another monster
 
-The one acceptance criterion art alone decides. In every block three ways —
-livery, banned colours, silhouette.
+The one acceptance criterion art alone decides, and it got harder with the
+redesign: the enemies are beasts too, so a beast on the player's side has to be
+marked as one. In every block three ways — markings, banned colours, bearing.
 
-- **Livery is the player's own**: white `#F5F5F5`, crimson trim `#DC143C`, the
-  hero's cloak colours. White and crimson on screen means friendly.
+- **The player's colours, worn as markings**: a white body `#F5F5F5` with
+  crimson `#DC143C` markings — a chest band, a crest, a sash. White and
+  crimson on screen means friendly, exactly as it does on the hero's cloak.
 - **One element accent each**, no other strong colour: fire `#FF6D00`, ice
   `#40C4FF`, lightning `#FFEE58`, earth `#8D6E63` — the Phase 1 FX hexes, so a
   companion matches what it casts.
 - **Never the enemy colours**: swarm `#FF5252`, runner `#FFB300`, brute
   `#8E1B1B`, boss `#9C27B0`.
-- **Never the hero's silhouette**: he is tall, hooded, with a staff. None of the
-  four is hooded and none carries a staff.
-- **No claws, fangs, horns or spikes**; upright and open-shouldered. Every enemy
-  is hunched or horned.
+- **Tame bearing, not predatory.** Every enemy is hunched, horned or jagged, so
+  these are the opposite: rounded forms, head up and alert rather than lowered
+  and stalking, warm-lit friendly eyes, no red eyes, no bared fangs, no spikes,
+  no gore. An animal has claws and teeth — the rule is that they are never
+  *displayed*.
+- **No horns, with one deliberate exception.** The boss is a huge horned demon
+  lord, so horns read as hostile. The kirin keeps the single blunt brow horn its
+  myth requires and nothing else: one short forward-curving horn, rounded at the
+  tip, never a pair and never swept back. The other three carry no horns at all.
+- **Never mistakable for the hero**: he is a tall hooded human with a staff.
+  Four beasts cannot be confused with him, so this rule costs nothing now, but
+  no companion is given a hood, a cloak or a staff.
+- **Two silhouettes sit close to an existing enemy and are pushed apart on
+  purpose.** The runner is a *"lean, pointed, dart-shaped flyer"* that points
+  straight up in every frame ([CO-072](CO-072-fast.md)), so the thunderbird is
+  written as the opposite shape: wings always open and wider than the body is
+  long, tail fanned, head visible between them, no fins, never a rigid arrow.
+  The brute is a *"heavy squat armored brute"* in iron-grey plate with shoulder
+  spikes ([CO-073](CO-073-tank.md)), so the golem is bare pale stone with
+  smooth rounded shoulders — no plate, no metal, no rivets, no helmet, no
+  spikes. Both contrasts are stated positively inside the blocks; the enemies
+  themselves are never described to the image model, which would only invite it
+  to draw one.
 
 ## Sizes
 
-| # | File | Grid | Canvas | cell | art ≤ | Plays |
-|---|---|---|---|---|---|---|
-| 1 | `companion_fire_locomotion.png` | 6 × 4 | 1536 × 1024 | 256 | 150 | loop |
-| 2 | `companion_fire_attack.png` | 4 × 4 | 1024 × 1024 | 256 | 150 | once |
-| 3 | `companion_ice_locomotion.png` | 6 × 4 | 1536 × 1024 | 256 | 150 | loop |
-| 4 | `companion_ice_attack.png` | 4 × 4 | 1024 × 1024 | 256 | 150 | once |
-| 5 | `companion_lightning_locomotion.png` | 6 × 4 | 1536 × 1024 | 256 | 150 | loop |
-| 6 | `companion_lightning_attack.png` | 4 × 4 | 1024 × 1024 | 256 | 150 | once |
-| 7 | `companion_earth_locomotion.png` | 6 × 4 | 1536 × 1024 | 256 | 150 | loop |
-| 8 | `companion_earth_attack.png` | 4 × 4 | 1024 × 1024 | 256 | 150 | once |
+Unchanged by the redesign.
+
+| # | File | Creature | Grid | Canvas | cell | art ≤ | Plays |
+|---|---|---|---|---|---|---|---|
+| 1 | `companion_fire_locomotion.png` | fire kirin | 6 × 4 | 1536 × 1024 | 256 | 150 | loop |
+| 2 | `companion_fire_attack.png` | fire kirin | 4 × 4 | 1024 × 1024 | 256 | 150 | once |
+| 3 | `companion_ice_locomotion.png` | ice serpent | 6 × 4 | 1536 × 1024 | 256 | 150 | loop |
+| 4 | `companion_ice_attack.png` | ice serpent | 4 × 4 | 1024 × 1024 | 256 | 150 | once |
+| 5 | `companion_lightning_locomotion.png` | thunderbird | 6 × 4 | 1536 × 1024 | 256 | 150 | loop |
+| 6 | `companion_lightning_attack.png` | thunderbird | 4 × 4 | 1024 × 1024 | 256 | 150 | once |
+| 7 | `companion_earth_locomotion.png` | earth golem | 6 × 4 | 1536 × 1024 | 256 | 150 | loop |
+| 8 | `companion_earth_attack.png` | earth golem | 4 × 4 | 1024 × 1024 | 256 | 150 | once |
 
 Every cell holds a frame — no blanks anywhere, on purpose: "leave this one
 empty" is what made an earlier model write the word *empty* into the picture.
 
+The 150 px limit is the creature's longest dimension, not its height: the kirin
+and the serpent are wider than they are tall, and the serpent is measured across
+its coiled length.
+
 `cell` is the authored cell, chosen for drawing quality; 24 distinct poses at
 128 px come back as mush. It is not the delivered frame size. The manifest
-declares `sheetCell` 160, so the native frame is 40 px and the figure lands at
+declares `sheetCell` 160, so the native frame is 40 px and the creature lands at
 about 24 px — the size the placeholder disc holds today. The cutter divides the
 delivered image by `cols × rows` and never reads the authored cell size, so a
 proportionally smaller delivery is fine as long as the grid is still 6 × 4 or
@@ -117,6 +154,10 @@ Manifest keys `companionFire`, `companionIce`, `companionLightning`,
 | `_locomotion` | down, up, left, right | `idle` cols 1–2 (loop), `move` cols 3–6 (loop) |
 | `_attack` | down, up, left, right | `attack` cols 1–4 (once) |
 
+A creature that flies or slithers still needs four facings and the same
+six-then-four split, so nothing in `animations.ts` changes; only the pose inside
+each cell does.
+
 No hurt or death sheet: a companion is not damageable (#133), so it is never hit
 and never dies on screen. Spawned when its slot is filled, removed at end of run.
 
@@ -125,199 +166,199 @@ placeholder disc — is the rest of #146, not this document.
 
 ---
 
-## 1. `companion_fire_locomotion.png` — fire companion, idle and walking
+## 1. `companion_fire_locomotion.png` — fire kirin, idle and trotting
 
 Save as `docs/art/sheets/CO-124/companion_fire_locomotion.png`.
 
 ```text
-Pixel-art animation sheet for a top-down 2D game: a small friendly ally who fights alongside the player, idle and walking, in four facings. Draw only this character — no player, no enemies, no ground.
+Pixel-art animation sheet for a top-down 2D game: a small friendly kirin, a gentle deer-like beast that carries fire, fighting alongside the player, idle and trotting, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The figure is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px along its longest side, centred in its cell, at least 50px clear of every cell edge.
 
-Character: a short, stocky acolyte in a white tunic and short shoulder cape, #F5F5F5, crimson trim #DC143C at collar and hem, dark grey boots, bare-headed with cropped dark hair. Its right hand holds a short iron rod topped with a small caged lantern; the flame inside the cage is ember orange #FF6D00, and the same orange glows at its belt.
+Creature: a slender hooved quadruped the size of a large hound, deer-like, with a long neck, a deep chest and cloven hooves. Its coat is white, #F5F5F5, turning to fine white scales at the shoulders and haunches, with crimson markings, #DC143C — a band across its chest and a blaze down its brow. Ember orange fire, #FF6D00, burns as a mane along its neck, as a plume at its tail, and as a low flame above each hoof. It has one short forward-curving horn on its brow, rounded at the tip, and warm gold eyes.
 
-It must read as friendly at a glance: the white-and-crimson livery is the largest thing on it and ember orange the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0. No claws, fangs, horns or spikes; upright and open-shouldered, not hunched. No hood and no staff — the player's own character is a tall hooded figure with a staff and the two must never be confused.
+It must read as friendly at a glance, because the enemies are beasts too: the white coat and crimson markings are the largest thing on it and ember orange the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0, and never red eyes. Rounded forms, head carried high and alert, never lowered and stalking. No bared fangs, no spikes, no gore. The single blunt brow horn is the only horn on it — never a pair, never swept back, nothing like a horned demon. It wears no hood, cloak, armour, saddle or harness.
 
-Rows are facings: row 1 down, face to the viewer; row 2 up, back of the head; row 3 left; row 4 right.
+Rows are facings: row 1 trotting towards the viewer, face and chest visible; row 2 away, the tail plume and haunches towards the viewer; row 3 left; row 4 right.
 
-Cells 1-2 are an idle, cells 3-6 a walk. The idle is one breath — shoulders lift and settle, cape and lantern sway, feet still. The walk is one full cycle — left foot forward, feet together, right foot forward, feet together — with the leg change large enough to read at a glance.
+Cells 1-2 are an idle, cells 3-6 a trot. The idle is one breath — the chest rises and settles, the mane fire flickers to a different shape, the tail plume sways, hooves still. The trot is one full four-legged cycle — near foreleg reaching, legs gathered under the body, far foreleg reaching, gathered again — with the leg change large enough to read at a glance and the mane and tail moving with it.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the character is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
+Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
 Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
-Each row faces only its own direction: head, weapon and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the lantern stays in the same hand in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
+Each row faces only its own direction: head, body and hooves point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson chest band and brow blaze sit the same way round in both.
+Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The hooves land on the same line and the body holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
 Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
 ```
 
-## 2. `companion_fire_attack.png` — fire companion shooting
+## 2. `companion_fire_attack.png` — fire kirin breathing an ember
 
 Save as `docs/art/sheets/CO-124/companion_fire_attack.png`.
 
 ```text
-Pixel-art animation sheet for a top-down 2D game: a small friendly ally who fights alongside the player, firing a shot, in four facings. Draw only this character — no player, no enemies, no ground.
+Pixel-art animation sheet for a top-down 2D game: a small friendly kirin, a gentle deer-like beast that carries fire, fighting alongside the player, breathing a small ember, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The figure is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px along its longest side, centred in its cell, at least 50px clear of every cell edge.
 
-Character: a short, stocky acolyte in a white tunic and short shoulder cape, #F5F5F5, crimson trim #DC143C at collar and hem, dark grey boots, bare-headed with cropped dark hair. Its right hand holds a short iron rod topped with a small caged lantern; the flame inside the cage is ember orange #FF6D00, and the same orange glows at its belt.
+Creature: a slender hooved quadruped the size of a large hound, deer-like, with a long neck, a deep chest and cloven hooves. Its coat is white, #F5F5F5, turning to fine white scales at the shoulders and haunches, with crimson markings, #DC143C — a band across its chest and a blaze down its brow. Ember orange fire, #FF6D00, burns as a mane along its neck, as a plume at its tail, and as a low flame above each hoof. It has one short forward-curving horn on its brow, rounded at the tip, and warm gold eyes.
 
-It must read as friendly at a glance: the white-and-crimson livery is the largest thing on it and ember orange the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0. No claws, fangs, horns or spikes; upright and open-shouldered, not hunched. No hood and no staff — the player's own character is a tall hooded figure with a staff and the two must never be confused.
+It must read as friendly at a glance, because the enemies are beasts too: the white coat and crimson markings are the largest thing on it and ember orange the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0, and never red eyes. Rounded forms, head carried high and alert, never lowered and stalking. No bared fangs, no spikes, no gore. The single blunt brow horn is the only horn on it — never a pair, never swept back, nothing like a horned demon. It wears no hood, cloak, armour, saddle or harness.
 
-Rows are facings: row 1 down, face to the viewer; row 2 up, back of the head; row 3 left; row 4 right.
+Rows are facings: row 1 facing the viewer; row 2 facing away, the tail plume towards the viewer; row 3 left; row 4 right.
 
-The four cells of a row are one shot in time order. 1: feet planted, lantern swung back beside the shoulder. 2: the flame swells and a bright ember gathers at the top of the cage. 3: the lantern thrusts forward at arm's length and the ember leaves the cage as a small bright spark at its mouth. 4: settling back, lantern low, flame small again.
+The four cells of a row are one shot in time order. 1: it braces, forehooves planted, head drawn back and the mane fire swelling. 2: it draws breath and a bright ember gathers behind its closed mouth, the throat glowing orange. 3: the head thrusts forward and the ember sits right at its muzzle as a small bright spark, the whole mane flaring. 4: it settles back, head high, mouth closed, mane fire small again.
 
-The shot itself is not drawn — the game draws the bolt that flies out. Nothing travels away from the figure, crosses the cell or leaves it; the spark in cell 3 touches the lantern and goes no further.
+The shot itself is not drawn — the game draws the bolt that flies out. Nothing travels away from the creature, crosses the cell or leaves it; the spark in cell 3 touches the muzzle and goes no further. The mouth opens only enough to let the ember out; no teeth are shown. The brow horn is never used to strike.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the character is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
+Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
 Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
-Each row faces only its own direction: head, weapon and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the lantern stays in the same hand in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
+Each row faces only its own direction: head, body and hooves point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson chest band and brow blaze sit the same way round in both.
+Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The hooves land on the same line and the body holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
 Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
 ```
 
-## 3. `companion_ice_locomotion.png` — ice companion, idle and walking
+## 3. `companion_ice_locomotion.png` — ice serpent, idle and gliding
 
 Save as `docs/art/sheets/CO-124/companion_ice_locomotion.png`.
 
 ```text
-Pixel-art animation sheet for a top-down 2D game: a small friendly ally who fights alongside the player, idle and walking, in four facings. Draw only this character — no player, no enemies, no ground.
+Pixel-art animation sheet for a top-down 2D game: a small friendly serpent made of ice that fights alongside the player, idle and gliding, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The figure is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px along its longest side measured across its curved body, centred in its cell, at least 50px clear of every cell edge.
 
-Character: a slim archer in a white tabard, #F5F5F5, crimson trim #DC143C at hem and sleeves, pale grey leggings and dark grey boots, bare-headed with pale hair in one long braid. Its left hand holds a short recurve bow cut from blue-white ice crystal, #40C4FF, and a small quiver of ice shards of the same colour hangs at its hip.
+Creature: a slender legless serpent held in a loose S-curve, thick as a wrist and long enough to coil. Its scales are white, #F5F5F5, with crimson bands, #DC143C, just behind the head and again near the tail. A crest of blue-white ice crystal, #40C4FF, runs the length of its spine and its underside is frosted the same blue. Its head is a smooth rounded wedge with warm pale-blue eyes and a closed mouth.
 
-It must read as friendly at a glance: the white-and-crimson livery is the largest thing on it and ice blue the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0. No claws, fangs, horns or spikes; upright and open-shouldered, not hunched. No hood and no staff — the player's own character is a tall hooded figure with a staff and the two must never be confused.
+It must read as friendly at a glance, because the enemies are beasts too: the white scales and crimson bands are the largest thing on it and ice blue the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0, and never red eyes. Rounded forms, head up and alert, never lowered and stalking. No bared fangs, no forked tongue, no horns, no spikes beyond the smooth crystal crest, no gore. It wears no hood, cloak, armour or harness.
 
-Rows are facings: row 1 down, face to the viewer; row 2 up, back of the head and the braid; row 3 left; row 4 right.
+Rows are facings: row 1 head towards the viewer, face visible, body trailing behind it; row 2 head away, the crest and back towards the viewer; row 3 head left; row 4 head right.
 
-Cells 1-2 are an idle, cells 3-6 a walk. The idle is one breath — shoulders lift and settle, braid and bow sway, feet still. The walk is one full cycle — left foot forward, feet together, right foot forward, feet together — with the leg change large enough to read at a glance.
+Cells 1-2 are an idle, cells 3-6 a glide. The idle is one slow breath — the coil rises and settles, the crystal crest catches the light differently, the head sways a little. The glide is one full cycle of a wave travelling from head to tail: the S-curve shifts one quarter of its length along the body in each cell and returns to the first shape, so the loop is seamless and the change of curve reads at a glance.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the character is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
+Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
 Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
-Each row faces only its own direction: head, bow and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the bow stays in the same hand in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
+Each row faces only its own direction: the head points that way in every cell of the row. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson bands sit the same distance behind the head in both.
+Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The lowest coil of the body rests on the same line and the head holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
 Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
 ```
 
-## 4. `companion_ice_attack.png` — ice companion shooting
+## 4. `companion_ice_attack.png` — ice serpent spitting a shard
 
 Save as `docs/art/sheets/CO-124/companion_ice_attack.png`.
 
 ```text
-Pixel-art animation sheet for a top-down 2D game: a small friendly ally who fights alongside the player, loosing an arrow, in four facings. Draw only this character — no player, no enemies, no ground.
+Pixel-art animation sheet for a top-down 2D game: a small friendly serpent made of ice that fights alongside the player, spitting a frost shard, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The figure is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px along its longest side measured across its curved body, centred in its cell, at least 50px clear of every cell edge.
 
-Character: a slim archer in a white tabard, #F5F5F5, crimson trim #DC143C at hem and sleeves, pale grey leggings and dark grey boots, bare-headed with pale hair in one long braid. Its left hand holds a short recurve bow cut from blue-white ice crystal, #40C4FF, and a small quiver of ice shards of the same colour hangs at its hip.
+Creature: a slender legless serpent held in a loose S-curve, thick as a wrist and long enough to coil. Its scales are white, #F5F5F5, with crimson bands, #DC143C, just behind the head and again near the tail. A crest of blue-white ice crystal, #40C4FF, runs the length of its spine and its underside is frosted the same blue. Its head is a smooth rounded wedge with warm pale-blue eyes and a closed mouth.
 
-It must read as friendly at a glance: the white-and-crimson livery is the largest thing on it and ice blue the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0. No claws, fangs, horns or spikes; upright and open-shouldered, not hunched. No hood and no staff — the player's own character is a tall hooded figure with a staff and the two must never be confused.
+It must read as friendly at a glance, because the enemies are beasts too: the white scales and crimson bands are the largest thing on it and ice blue the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0, and never red eyes. Rounded forms, head up and alert, never lowered and stalking. No bared fangs, no forked tongue, no horns, no spikes beyond the smooth crystal crest, no gore. It wears no hood, cloak, armour or harness.
 
-Rows are facings: row 1 down, face to the viewer; row 2 up, back of the head and the braid; row 3 left; row 4 right.
+Rows are facings: row 1 head towards the viewer; row 2 head away, the crest towards the viewer; row 3 head left; row 4 head right.
 
-The four cells of a row are one shot in time order. 1: the bow lifts and a shard is laid on the string. 2: the string draws back to the cheek and the shard grows into a bright crystal arrow. 3: the loose — string forward, arms open, a small bright flash at the bow itself. 4: the bow lowers and the string settles.
+The four cells of a row are one shot in time order. 1: the body gathers into a tight coil and the head draws back over it. 2: the crest brightens and frost gathers at the closed mouth as a pale bloom. 3: the head darts forward to the full length of the neck and a small bright shard of ice sits right at its mouth. 4: the head draws back over the coil, the crest dim again.
 
-The arrow in flight is not drawn — the game draws the bolt that flies out. Nothing travels away from the figure, crosses the cell or leaves it; the flash in cell 3 touches the bow and goes no further.
+The shard in flight is not drawn — the game draws the bolt that flies out. Nothing travels away from the creature, crosses the cell or leaves it; the shard in cell 3 touches the mouth and goes no further. The mouth opens only enough to let the shard out; no fangs are shown.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the character is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
+Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
 Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
-Each row faces only its own direction: head, bow and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the bow stays in the same hand in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
+Each row faces only its own direction: the head points that way in every cell of the row. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson bands sit the same distance behind the head in both.
+Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The lowest coil of the body rests on the same line and the coil holds the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
 Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
 ```
 
-## 5. `companion_lightning_locomotion.png` — lightning companion, idle and walking
+## 5. `companion_lightning_locomotion.png` — thunderbird, hovering and flying
 
 Save as `docs/art/sheets/CO-124/companion_lightning_locomotion.png`.
 
 ```text
-Pixel-art animation sheet for a top-down 2D game: a small friendly ally who fights alongside the player, idle and walking, in four facings. Draw only this character — no player, no enemies, no ground.
+Pixel-art animation sheet for a top-down 2D game: a small friendly thunderbird, a bird that carries lightning, fighting alongside the player, hovering and flying, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The figure is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The creature is about 150px across its open wings, centred in its cell, at least 50px clear of every cell edge.
 
-Character: a lean, wiry squire in a white tabard, #F5F5F5, over a charcoal jerkin, crimson trim #DC143C at hem and shoulders, dark grey boots, bare-headed with short hair standing on end. It holds a short straight blade in each hand; the blades are pale yellow lightning, #FFEE58, with a white core, and a few small arcs of the same yellow jump between its shoulders.
+Creature: a hawk-sized bird seen from above and slightly behind, wings open, tail fanned. Its plumage is white, #F5F5F5, with a crimson crest and a crimson bar across the tail, #DC143C. Pale yellow lightning, #FFEE58, with a white core arcs along the trailing edge of each wing and sparks at its talons. Its beak is short and blunt and its eyes are warm gold. Its silhouette is unmistakably a bird: the open wings span wider than the body is long, the tail is fanned, and the head is clearly visible between them. It is never a lean pointed dart or a rigid arrow shape, it has no fins, and its wings stay open and separate from the body rather than folding into one streamlined point.
 
-It must read as friendly at a glance: the white-and-crimson livery is the largest thing on it and lightning yellow the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0. No claws, fangs, horns or spikes; upright and open-shouldered, not hunched. No hood and no staff — the player's own character is a tall hooded figure with a staff and the two must never be confused.
+It must read as friendly at a glance, because the enemies are beasts too: the white plumage and crimson crest are the largest thing on it and lightning yellow the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0, and never red eyes. Rounded forms, head up and alert, never lowered and stalking. No bared talons held forward, no horns, no spikes, no gore. It wears no hood, cloak, armour or harness.
 
-Rows are facings: row 1 down, face to the viewer; row 2 up, back of the head; row 3 left; row 4 right.
+Rows are facings: row 1 flying towards the viewer, head and breast visible; row 2 flying away, the back and tail towards the viewer; row 3 flying left; row 4 flying right.
 
-Cells 1-2 are an idle, cells 3-6 a walk. The idle is one breath — shoulders lift and settle, blades dip, the arcs jump off a different part of each blade, feet still. The walk is one full cycle — left foot forward, feet together, right foot forward, feet together — with the leg change large enough to read at a glance.
+Cells 1-2 are a hover, cells 3-6 a flight cycle. The hover is two shallow wingbeats in place — wings high, then level — with the arcs flickering to a different shape and the body barely rising. The flight is one full wingbeat cycle — wings high, wings level with the body reaching forward, wings down and swept, wings rising again — large enough to read at a glance, with the tail fanning and closing with the beat.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the character is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
+Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
 Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
-Each row faces only its own direction: head, blades and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the same blade leads in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
+Each row faces only its own direction: the head, the body and the fanned tail point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson crest sits the same way round in both.
+Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The bird flies rather than walks, so its body holds the same spot in every cell of a row — only the wings and tail move — and the animation does not slide. Every cell holds a full drawing.
 Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
 ```
 
-## 6. `companion_lightning_attack.png` — lightning companion striking
+## 6. `companion_lightning_attack.png` — thunderbird diving
 
 Save as `docs/art/sheets/CO-124/companion_lightning_attack.png`.
 
 ```text
-Pixel-art animation sheet for a top-down 2D game: a small friendly ally who fights alongside the player, striking with two blades, in four facings. Draw only this character — no player, no enemies, no ground.
+Pixel-art animation sheet for a top-down 2D game: a small friendly thunderbird, a bird that carries lightning, fighting alongside the player, diving and striking with its talons, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The figure is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The creature is about 150px across its open wings, centred in its cell, at least 50px clear of every cell edge.
 
-Character: a lean, wiry squire in a white tabard, #F5F5F5, over a charcoal jerkin, crimson trim #DC143C at hem and shoulders, dark grey boots, bare-headed with short hair standing on end. It holds a short straight blade in each hand; the blades are pale yellow lightning, #FFEE58, with a white core, and a few small arcs of the same yellow jump between its shoulders.
+Creature: a hawk-sized bird seen from above and slightly behind, wings open, tail fanned. Its plumage is white, #F5F5F5, with a crimson crest and a crimson bar across the tail, #DC143C. Pale yellow lightning, #FFEE58, with a white core arcs along the trailing edge of each wing and sparks at its talons. Its beak is short and blunt and its eyes are warm gold. Its silhouette is unmistakably a bird: the open wings span wider than the body is long, the tail is fanned, and the head is clearly visible between them. It is never a lean pointed dart or a rigid arrow shape, it has no fins, and its wings stay open and separate from the body rather than folding into one streamlined point.
 
-It must read as friendly at a glance: the white-and-crimson livery is the largest thing on it and lightning yellow the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0. No claws, fangs, horns or spikes; upright and open-shouldered, not hunched. No hood and no staff — the player's own character is a tall hooded figure with a staff and the two must never be confused.
+It must read as friendly at a glance, because the enemies are beasts too: the white plumage and crimson crest are the largest thing on it and lightning yellow the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0, and never red eyes. Rounded forms, head up and alert, never lowered and stalking. No horns, no spikes, no gore.
 
-Rows are facings: row 1 down, face to the viewer; row 2 up, back of the head; row 3 left; row 4 right.
+Rows are facings: row 1 diving towards the viewer; row 2 diving away, the back towards the viewer; row 3 diving left; row 4 diving right.
 
-The four cells of a row are one strike in time order. 1: a crouch, both blades drawn back, the lightning on them brightening. 2: a step forward into the row's facing, leading blade rising. 3: the hit — both blades sweep across in front and leave one short bright arc of lightning hanging just past the hands. 4: a guard, blades low, lightning dim again.
+The four cells of a row are one strike in time order. 1: it rears back, wings thrown high and swept, the lightning on them brightening. 2: it pitches forward into the row's facing, wings half folded, talons swinging down and ahead. 3: the hit — the talons rake through and one short bright arc of lightning hangs in the air just past them, the wings snapped wide. 4: it recovers, wings level, talons tucked, lightning dim again.
 
-Nothing struck is drawn — the game draws the enemy and the hit. Nothing is drawn where a target would be; the swing and its arc stay within arm's reach and never cross the cell or touch its edge.
+Nothing struck is drawn — the game draws the enemy and the hit. Nothing is drawn where a target would be; the talons and the arc stay within a wing's reach of the body and never cross the cell or touch its edge.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the character is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
+Background: fully transparent — a real alpha channel, alpha 0 everywhere the creature is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
 Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
-Each row faces only its own direction: head, blades and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the same blade leads in both.
-Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
+Each row faces only its own direction: the head, the body and the fanned tail point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the crimson crest sits the same way round in both.
+Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The bird flies rather than walks, so its body holds the same spot in every cell of a row and the animation does not slide. Every cell holds a full drawing.
 Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
 ```
 
-## 7. `companion_earth_locomotion.png` — earth companion, idle and walking
+## 7. `companion_earth_locomotion.png` — earth golem, idle and walking
 
 Save as `docs/art/sheets/CO-124/companion_earth_locomotion.png`.
 
 ```text
-Pixel-art animation sheet for a top-down 2D game: a small friendly ally who fights alongside the player, idle and walking, in four facings. Draw only this character — no player, no enemies, no ground.
+Pixel-art animation sheet for a top-down 2D game: a small friendly golem made of stone that fights alongside the player, idle and walking, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The figure is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1536x1024: a grid of 256px square cells, 6 across and 4 down, 24 in all, read left to right, top row first. The golem is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
 
-Character: a squat, round-shouldered guardian carved from pale stone, #F5F5F5, with the brown-grey of raw rock, #8D6E63, at its joints and along the seams of its arms. A crimson sash, #DC143C, is tied across its chest. It carries no weapon — its hands are two oversized stone fists. Its head is a smooth rounded block with two small warm-lit eyes and no mouth.
+Creature: a squat, round-shouldered golem carved from pale stone, #F5F5F5, with the brown-grey of raw rock, #8D6E63, at its joints and along the seams of its arms. A crimson sash, #DC143C, is bound across its chest. It has no weapon — its hands are two oversized stone fists. Its head is a smooth rounded block with two small warm-lit eyes and no mouth. It is bare carved stone and never armoured: no plate, no metal, no rivets, no helmet and no shoulder spikes — its shoulders are smooth rounded stone. Its surface stays pale and chalky, never dark and never metallic, and the crimson sash is the only thing it wears.
 
-It must read as friendly at a glance: the pale stone and crimson sash are the largest things on it and rock brown the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0. No claws, fangs, horns or spikes — its edges are worn round, not jagged. Upright and open-shouldered, not hunched. No hood and no staff — the player's own character is a tall hooded figure with a staff and the two must never be confused.
+It must read as friendly at a glance, because the enemies are beasts too: the pale stone and crimson sash are the largest things on it and rock brown the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0, and never red eyes. Its edges are worn round, never jagged. Upright and open-shouldered, not hunched. No claws, fangs, horns, spikes or gore. It wears no hood, cloak or armour, and carries no staff.
 
 Rows are facings: row 1 down, eyes to the viewer; row 2 up, back of the head; row 3 left; row 4 right.
 
-Cells 1-2 are an idle, cells 3-6 a walk. The idle is one slow settle — shoulders drop and rise, the sash sways, feet still. The walk is one full cycle — left foot forward, feet together, right foot forward, feet together — heavy and flat-footed, with the leg change large enough to read at a glance.
+Cells 1-2 are an idle, cells 3-6 a walk. The idle is one slow settle — the shoulders drop and rise, the sash sways, feet still. The walk is one full cycle — left foot forward, feet together, right foot forward, feet together — heavy and flat-footed, with the leg change large enough to read at a glance.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the character is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
+Background: fully transparent — a real alpha channel, alpha 0 everywhere the golem is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
 Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
 Each row faces only its own direction: head, hands and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the sash is knotted on the same side in both.
 Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
 Deliver one lossless PNG with alpha, never JPEG, at the canvas size above or the whole canvas scaled down proportionally but never below half. Report the exact pixel size.
 ```
 
-## 8. `companion_earth_attack.png` — earth companion slamming
+## 8. `companion_earth_attack.png` — earth golem slamming
 
 Save as `docs/art/sheets/CO-124/companion_earth_attack.png`.
 
 ```text
-Pixel-art animation sheet for a top-down 2D game: a small friendly ally who fights alongside the player, slamming both fists down, in four facings. Draw only this character — no player, no enemies, no ground.
+Pixel-art animation sheet for a top-down 2D game: a small friendly golem made of stone that fights alongside the player, slamming both fists down, in four facings. Draw only this creature — no player, no people, no enemies, no ground.
 
-Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The figure is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
+Canvas 1024x1024: a grid of 256px square cells, 4 across and 4 down, 16 in all, read left to right, top row first. The golem is about 150px tall, centred in its cell, at least 50px clear of every cell edge.
 
-Character: a squat, round-shouldered guardian carved from pale stone, #F5F5F5, with the brown-grey of raw rock, #8D6E63, at its joints and along the seams of its arms. A crimson sash, #DC143C, is tied across its chest. It carries no weapon — its hands are two oversized stone fists. Its head is a smooth rounded block with two small warm-lit eyes and no mouth.
+Creature: a squat, round-shouldered golem carved from pale stone, #F5F5F5, with the brown-grey of raw rock, #8D6E63, at its joints and along the seams of its arms. A crimson sash, #DC143C, is bound across its chest. It has no weapon — its hands are two oversized stone fists. Its head is a smooth rounded block with two small warm-lit eyes and no mouth. It is bare carved stone and never armoured: no plate, no metal, no rivets, no helmet and no shoulder spikes — its shoulders are smooth rounded stone. Its surface stays pale and chalky, never dark and never metallic, and the crimson sash is the only thing it wears.
 
-It must read as friendly at a glance: the pale stone and crimson sash are the largest things on it and rock brown the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0. No claws, fangs, horns or spikes — its edges are worn round, not jagged. Upright and open-shouldered, not hunched. No hood and no staff — the player's own character is a tall hooded figure with a staff and the two must never be confused.
+It must read as friendly at a glance, because the enemies are beasts too: the pale stone and crimson sash are the largest things on it and rock brown the only other strong colour. Never the enemy colours #FF5252, #FFB300, #8E1B1B or #9C27B0, and never red eyes. Its edges are worn round, never jagged. Upright and open-shouldered, not hunched. No claws, fangs, horns, spikes or gore. It wears no hood, cloak or armour, and carries no staff.
 
 Rows are facings: row 1 down, eyes to the viewer; row 2 up, back of the head; row 3 left; row 4 right.
 
@@ -326,7 +367,7 @@ The four cells of a row are one slam in time order. 1: both feet planted, both f
 Nothing struck is drawn — the game draws the enemy and the hit. Nothing is drawn where a target would be; the fists and the chips stay within arm's reach and never cross the cell or touch its edge.
 
 Style: chunky pixel art, crisp hard edges, no blur, anti-aliasing or gradients; three-quarter top-down camera, light from top-left; grim fantasy colour on the subject only; original design; match the attached reference.
-Background: fully transparent — a real alpha channel, alpha 0 everywhere the character is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
+Background: fully transparent — a real alpha channel, alpha 0 everywhere the golem is not. No background colour, white, magenta, checkerboard or transparency grid painted as pixels, no shadow, glow or vignette.
 Cells are a measurement, not something to draw: no tile, panel, line, border, divider or frame marks where one ends. No text anywhere — one letter, number or watermark ruins the sheet.
 Each row faces only its own direction: head, hands and feet point that way in every cell. No row is a copy, mirror or rotation of another; the left and right rows are separate drawings and the sash is knotted on the same side in both.
 Every drawing stays inside its cell at the margin above and never touches an edge; draw it smaller rather than spill, the margin is measured on the delivered file. The feet land on the same line and the same spot in every cell of a row so the animation does not slide. Every cell holds a full drawing.
