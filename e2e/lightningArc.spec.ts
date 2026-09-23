@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { SPELL_IDS } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
-import { cardCenter, collectErrors, waitForScene } from './game';
+import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
 
 /**
  * Spec §5 "Lightning — Chain Lightning" (CO-046, #99): the bolt a cast draws is
@@ -73,6 +73,7 @@ test('a lightning cast draws its bolt where a player can see it', async ({ page 
   const errors = collectErrors(page);
 
   await page.goto('/?seed=1&timeScale=1');
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
   const { x, y } = cardCenter(SPELL_IDS.indexOf('lightning'));

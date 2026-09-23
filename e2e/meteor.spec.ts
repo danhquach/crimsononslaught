@@ -4,7 +4,7 @@ import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { BASE_METEOR_STATS, STRIKE_SPELL_IDS } from '../src/config/strikes';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #138 in the browser: a run carrying Meteor, equipped through the `?loadout=`
@@ -69,6 +69,7 @@ test('meteors telegraph a point, hold for the fall and land on the crowd', async
   // Invulnerable, so the window is spent watching strikes rather than possibly
   // ending early on a player who is standing still in a filling arena.
   await page.goto(`/?seed=1&timeScale=10&invulnerable=1&loadout=${EXTRA.join(',')}`);
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));

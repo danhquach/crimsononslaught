@@ -1,6 +1,7 @@
 import { CURRENCY_NAME } from '../config/meta';
-import { SPELL_CARDS } from '../config/spells';
+import { SPELL_CARDS, SPELL_IDS, type SpellId } from '../config/spells';
 import { formatTimer } from './hudModel';
+import type { SaveProfile } from './save';
 import type { Outcome, ResultPayload, RunStats } from './scenePayloads';
 
 /**
@@ -64,5 +65,36 @@ export function rewardRows(payload: Pick<ResultPayload, 'earned' | 'balance'>): 
   return [
     [`${CURRENCY_NAME} earned`, `+${formatCount(payload.earned)}`],
     [`${CURRENCY_NAME} total`, formatCount(payload.balance)],
+  ];
+}
+
+/**
+ * The spell the most runs started with, or `null` before any run. A tie goes
+ * to the spell listed first on spell select; ids this build has no card for
+ * (a spell since removed) are skipped.
+ */
+export function mostPlayedSpell(spellCounts: Readonly<Record<string, number>>): SpellId | null {
+  let best: SpellId | null = null;
+  for (const spellId of SPELL_IDS) {
+    const count = spellCounts[spellId] ?? 0;
+    if (count > 0 && (best === null || count > (spellCounts[best] ?? 0))) best = spellId;
+  }
+  return best;
+}
+
+/**
+ * Lifetime totals for the profile panel (#121), formatted the way the result
+ * screen formats one run's stats. Empty before the first run, so the panel can
+ * say so instead of showing a column of zeroes.
+ */
+export function profileRows(profile: Readonly<SaveProfile>): StatRow[] {
+  if (profile.runs <= 0) return [];
+  const spell = mostPlayedSpell(profile.spellCounts);
+  return [
+    ['Runs played', formatCount(profile.runs)],
+    ['Best time survived', formatTimer(profile.bestTimeMs)],
+    ['Best level', formatCount(profile.bestLevel)],
+    ['Total kills', formatCount(profile.totalKills)],
+    ['Most played spell', spell ? SPELL_CARDS[spell].name : 'none'],
   ];
 }

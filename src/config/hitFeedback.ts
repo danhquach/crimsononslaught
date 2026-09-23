@@ -116,8 +116,7 @@ export const HIT_FLASH_TINT = 0xffffff;
 
 /**
  * The accessibility settings (#125), held in the save's `settings` like the
- * audio ones. Settings (#121) is where they will be changed; until then they
- * sit at their defaults unless a save carries them.
+ * audio ones, and changed from the Settings panel (#121).
  */
 export const FEEDBACK_SETTING_KEYS = {
   numbers: 'feedback.numbers',

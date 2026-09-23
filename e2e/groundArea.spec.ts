@@ -4,7 +4,7 @@ import { MAX_LIVE_AREAS } from '../src/config/fx';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #135 in the browser: a run carrying both ground areas, equipped through the
@@ -72,6 +72,7 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
   // Invulnerable, so the window is spent watching patches rather than possibly
   // ending early on a player who is standing still in a filling arena.
   await page.goto(`/?seed=1&timeScale=10&invulnerable=1&loadout=${EXTRA.join(',')}`);
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));

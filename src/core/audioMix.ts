@@ -109,3 +109,12 @@ export function writeAudioSettings(
     [AUDIO_SETTING_KEYS.muted]: audio.muted === true,
   };
 }
+
+/**
+ * A volume moved one notch of `step` (Settings, #121), snapped to the notch
+ * grid and clamped into [0, 1], so repeated presses never drift to 0.30000004.
+ */
+export function stepVolume(volume: number, direction: 1 | -1, step = 0.1): number {
+  const notches = Math.round(clampVolume(volume, 0) / step) + direction;
+  return clampVolume(Math.round(notches * step * 1000) / 1000, 0);
+}

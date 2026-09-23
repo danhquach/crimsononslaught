@@ -7,7 +7,7 @@ import { SCENE, type ResultPayload } from '../src/core/scenePayloads';
 import type { HudScene } from '../src/scenes/HudScene';
 import type { ResultScene } from '../src/scenes/ResultScene';
 import type { UpgradesScene } from '../src/scenes/UpgradesScene';
-import { cardCenter, collectErrors, forceFrameLength, waitForScene } from './game';
+import { cardCenter, collectErrors, forceFrameLength, startFromIntro, waitForScene } from './game';
 
 /**
  * Spec §8 full run (CO-061): a seeded run at an accelerated clock, played
@@ -134,6 +134,7 @@ for (const spellId of SPELLS) {
     const errors = collectErrors(page);
 
     await page.goto(`/?seed=1&timeScale=${TIME_SCALE}&invulnerable=1`);
+    await startFromIntro(page);
     await waitForScene(page, SCENE.spellSelect);
     await forceFrameLength(page, FRAME_MS);
 
@@ -160,6 +161,7 @@ for (const spellId of SPELLS) {
     expect(result.earned).toBeGreaterThan(0);
     expect(result.balance).toBe(result.earned);
     await page.reload();
+    await startFromIntro(page);
     await waitForScene(page, SCENE.spellSelect);
     const save = await readSave(page);
     expect(save.profile.runs).toBe(1);

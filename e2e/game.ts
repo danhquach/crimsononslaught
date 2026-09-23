@@ -75,3 +75,25 @@ export function collectErrors(page: Page): string[] {
   page.on('pageerror', (error) => errors.push(error.message));
   return errors;
 }
+
+/**
+ * Get past the front door (#121): wait for Intro and press Enter, which starts
+ * a game with nothing highlighted. Every suite that used to land on
+ * SpellSelect calls this after `goto` or `reload`, then waits for SpellSelect
+ * as before.
+ */
+export async function startFromIntro(page: Page): Promise<void> {
+  await waitForScene(page, SCENE.intro);
+  await page.keyboard.press('Enter');
+}
+
+/** Every text object a scene is showing, in display order. */
+export function sceneTexts(page: Page, key: string): Promise<string[]> {
+  return page.evaluate(async (sceneKey) => {
+    const { game } = await import('/src/main.ts');
+    return game.scene
+      .getScene(sceneKey)
+      .children.list.filter((child) => child.type === 'Text')
+      .map((child) => (child as unknown as { text: string }).text);
+  }, key);
+}
