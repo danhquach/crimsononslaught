@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ENEMY_ARCHETYPES, ENEMY_HURT_MS, type EnemyType } from '../config/enemies';
+import { HIT_FLASH_MS, HIT_FLASH_TINT } from '../config/hitFeedback';
 import { BURN_DURATION } from '../config/spells';
 import {
   DEFAULT_FACING,
@@ -98,6 +99,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** Run-clock ms left of the arrival hold, the hurt flash and the death clip. */
   private spawnMs = 0;
   private hurtMs = 0;
+  /** Run-clock ms left of the white hit flash (#125); presentation only. */
+  private flashMs = 0;
   private deathMs = 0;
   private dying = false;
 
@@ -180,6 +183,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.force = NO_FORCE;
     this.facing = DEFAULT_FACING;
     this.hurtMs = 0;
+    this.flashMs = 0;
     this.deathMs = 0;
     this.dying = false;
     this.clearTint();
@@ -241,6 +245,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.deathMs -= deltaMs;
       if (this.deathMs <= 0) this.despawn();
       return 0;
+    }
+    if (this.flashMs > 0) {
+      this.flashMs -= deltaMs;
+      if (this.flashMs <= 0) this.refreshTint();
     }
     if (this.spawnMs > 0) {
       // Arriving: the clip plays out where it landed before the chase starts.
@@ -364,6 +372,18 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       Phaser.Math.Clamp(this.x + push.x, bounds.left, bounds.right),
       Phaser.Math.Clamp(this.y + push.y, bounds.top, bounds.bottom),
     );
+  }
+
+  /**
+   * #125: flash white for a moment, so a hit reads on the sprite itself. Only
+   * the tint changes — scale would resize the Arcade body and move the
+   * collisions — and the status tint comes back when it ends. A dying enemy
+   * plays its death clip instead.
+   */
+  flash(): void {
+    if (this.dying) return;
+    this.flashMs = HIT_FLASH_MS;
+    this.setTintFill(HIT_FLASH_TINT);
   }
 
   /** The tint says which effect holds the enemy: a stop (stun or stagger) over a slow, nothing when it moves freely. */

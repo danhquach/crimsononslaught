@@ -1,6 +1,7 @@
 import { isRosterSpellId, type RosterSpellId } from '../config/loadout';
 import type { SpellId } from '../config/spells';
 import { BOSS_START_TIME } from '../config/waves';
+import { NO_HIT_STOP, requestHitStop, spendHitStop, type HitStopState } from './hitFeedback';
 import { emitRunEvent, type RunEventEmitter, type RunPhase } from './runEvents';
 import type { RunStats } from './scenePayloads';
 import { applyXpGain, xpToNext } from './xp';
@@ -95,6 +96,7 @@ export class RunState {
   private levelValue = 1;
   private xpValue = 0;
   private readonly perksTaken: string[] = [];
+  private freeze: HitStopState = NO_HIT_STOP;
 
   /**
    * `timeScale` multiplies every frame delta (spec §8's smoke tests run at 10).
@@ -147,6 +149,11 @@ export class RunState {
    *
    * A finished run returns a zero-length window: Game keeps rendering the last
    * frame, but nothing moves and no event fires.
+   *
+   * A hit-stop owed (`hitStop`) is taken from the front of the window: that
+   * much of the frame is frozen — the clock holds, and the window is shorter
+   * by it — and the rest moves. A fully frozen frame is a zero-length window
+   * that still publishes the timer, so the HUD holds with the arena.
    */
   tick(deltaMs: number): RunFrame {
     const startMs = this.elapsed;
@@ -154,13 +161,28 @@ export class RunState {
       return { startMs, deltaMs: 0 };
     }
 
-    const scaled = deltaMs * this.timeScale;
+    const spent = spendHitStop(this.freeze, deltaMs * this.timeScale);
+    this.freeze = spent.state;
+    const scaled = deltaMs * this.timeScale - spent.frozenMs;
     this.elapsed = startMs + scaled;
     emitRunEvent(this.emitter, 'timer', { elapsedMs: this.elapsed });
     // Timer first, then the phase it crossed into: a listener that redraws on
     // either event already has the clock that explains the new phase.
     if (this.current === 'waves' && this.elapsed >= BOSS_START_MS) this.setPhase('boss');
     return { startMs, deltaMs: scaled };
+  }
+
+  /**
+   * #125: freeze the arena for `ms` of run time from the next frame on. The
+   * freeze is in run time, not wall time, so a scaled run freezes for the same
+   * share of itself as a real-time one; requests never add up, and they are
+   * paid from a budget that caps how much of a run is ever frozen
+   * (`core/hitFeedback.ts`). Nothing the arena decides reads the freeze — it
+   * only delays when the next steps run.
+   */
+  hitStop(ms: number): void {
+    if (this.current === 'over') return;
+    this.freeze = requestHitStop(this.freeze, ms);
   }
 
   /** End of the run (spec §4 step 4): the clock stops and the phase is final. */

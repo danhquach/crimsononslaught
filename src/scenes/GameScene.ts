@@ -65,6 +65,17 @@ import {
   isStrikeSpellId,
 } from '../config/strikes';
 import { ARENA_DEPTH } from '../config/fx';
+import { LARGE_EXPLOSION_SCALE, SHAKES, type ShakeKind } from '../config/hitFeedback';
+import {
+  NO_SHAKE,
+  critDamage,
+  hitStopMs,
+  nextShake,
+  readFeedbackSettings,
+  rollCrit,
+  type HitKind,
+  type ShakeState,
+} from '../core/hitFeedback';
 import type { SpellStatBlock } from '../config/spellFields';
 import { BASE_SPELL_STATS, SPELL_CARDS, isSpellId } from '../config/spells';
 import {
@@ -127,6 +138,7 @@ import { ShieldSpell } from '../spells/ShieldSpell';
 import { AreaPool } from '../systems/AreaPool';
 import { TelegraphPool } from '../systems/TelegraphPool';
 import { CollisionSystem } from '../systems/CollisionSystem';
+import { DamageNumberPool } from '../systems/DamageNumberPool';
 import { EnemyPool } from '../systems/EnemyPool';
 import { FxPool } from '../systems/FxPool';
 import { GemPool } from '../systems/GemPool';
@@ -141,6 +153,13 @@ const ARENA_FILL = 0x121212;
 const ARENA_LINE = 0x1f1f1f;
 const ARENA_BORDER = 0x5a1620;
 const GRID_CELL = 200;
+
+/**
+ * Crits roll on a stream of their own (#125), seeded from the run's: drawing
+ * them from the run's RNG would move every spawn angle and level-up offer of
+ * an existing seed the first time a crit build rolled.
+ */
+const CRIT_STREAM = 0xc717;
 
 /**
  * The run: a 3000 x 3000 bounded arena with the player at its centre and the
@@ -187,6 +206,8 @@ export class GameScene extends Phaser.Scene {
   /** Sky strikes in the air (#138): every telegraph counting down, whichever spell cast it. */
   private telegraphs!: TelegraphPool;
   private rng!: Rng;
+  /** Crit rolls only (#125); see `CRIT_STREAM`. */
+  private critRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -202,6 +223,10 @@ export class GameScene extends Phaser.Scene {
   private invulnerable = false;
   /** The game's one audio layer (CO-102); every cue in the run goes through it. */
   private audio!: Audio;
+  /** Hit feedback (#125): the numbers, and the settings that turn the rest down. */
+  private numbers!: DamageNumberPool;
+  private feedback = readFeedbackSettings({});
+  private shake: ShakeState = NO_SHAKE;
 
   constructor() {
     super(SCENE.game);
@@ -214,6 +239,11 @@ export class GameScene extends Phaser.Scene {
    */
   get overlayCount(): number {
     return this.overlays.count;
+  }
+
+  /** Test hook (#125): damage numbers on screen right now; never past `MAX_LIVE_NUMBERS`. */
+  get numberCount(): number {
+    return this.numbers.count;
   }
 
   /** Test hook: enemies alive in the arena, the bound `overlayCount` must respect. */
@@ -388,6 +418,7 @@ export class GameScene extends Phaser.Scene {
     }
     const { spellId, seed } = this.payload;
     this.rng = createRng(seed);
+    this.critRng = createRng(seed ^ CRIT_STREAM);
     this.run = new RunState(this.events, this.timeScale());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -401,6 +432,8 @@ export class GameScene extends Phaser.Scene {
     this.offer = [];
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
     this.audio = audioOf(this);
+    this.feedback = readFeedbackSettings(this.save().settings);
+    this.shake = NO_SHAKE;
 
     this.buildArena();
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
@@ -413,6 +446,10 @@ export class GameScene extends Phaser.Scene {
     });
     this.gems = new GemPool(this);
     this.fx = new FxPool(this);
+    this.fx.onBurst = (clip, scale) => {
+      if (clip === 'fire.explode' && scale >= LARGE_EXPLOSION_SCALE) this.shakeFor('explosion');
+    };
+    this.numbers = new DamageNumberPool(this);
     this.overlays = new OverlayPool(this);
     this.areas = new AreaPool(this);
     this.telegraphs = new TelegraphPool(this);
@@ -455,7 +492,10 @@ export class GameScene extends Phaser.Scene {
     // The boss's wind-up and charge cues (CO-102) follow its cycle events.
     const onBossPhase = ({ phase }: BossPhasePayload): void => {
       if (phase === 'telegraph') this.audio.play('boss.telegraph');
-      else if (phase === 'charge') this.audio.play('boss.charge');
+      else if (phase === 'charge') {
+        this.audio.play('boss.charge');
+        this.shakeFor('bossCharge');
+      }
     };
     this.events.on(BOSS_EVENT.phase, onBossPhase);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -553,7 +593,7 @@ export class GameScene extends Phaser.Scene {
     this.spawns.update(step.startMs / 1000, step.deltaMs / 1000);
     this.player.update(step.deltaMs);
     this.enemies.update(step.deltaMs, this.player, (enemy, amount) =>
-      this.damageEnemy(enemy, amount),
+      this.damageEnemy(enemy, amount, 'dot'),
     );
     this.gems.update(step.deltaMs, this.player);
     this.spells.update(step.deltaMs);
@@ -569,6 +609,7 @@ export class GameScene extends Phaser.Scene {
     // After the bodies have settled, so an overlay sits on where its host is
     // drawn this frame; one not in the live set — status over, host dead — is freed.
     this.overlays.update(this.enemies.live);
+    this.numbers.update(step.deltaMs);
   }
 
   /**
@@ -596,7 +637,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
-    const damage = (enemy: Enemy, amount: number): void => this.damageEnemy(enemy, amount);
+    const damage = (enemy: Enemy, amount: number, kind?: HitKind): void =>
+      this.damageEnemy(enemy, amount, kind);
     switch (spellId) {
       case 'fire':
         return new FireballSpell(
@@ -895,6 +937,7 @@ export class GameScene extends Phaser.Scene {
     // plays on the killing hit rather than at the end of the death clip.
     const hp = this.player.hp;
     if (hp >= before) return;
+    this.shakeFor('playerHurt');
     if (hp <= 0) this.audio.play('player.death');
     else {
       this.audio.play('player.hurt');
@@ -935,21 +978,57 @@ export class GameScene extends Phaser.Scene {
    * Every point of damage an enemy takes comes through here — spell hits and
    * burn ticks alike — so a death is tallied and drops its gems where the
    * enemy fell (spec §5: 1, or 3 for a tank) whatever killed it.
+   *
+   * A `hit` rolls for a crit first (spec §6, #125); a `tick` or `dot` never
+   * does. What the hit then looks like — its number, the flash, the freeze —
+   * is `showHit`'s, and reads the outcome without touching it.
    */
-  private damageEnemy(enemy: Enemy, amount: number): void {
+  private damageEnemy(enemy: Enemy, amount: number, kind: HitKind = 'hit'): void {
     if (!enemy.active) return;
     const { x, y, enemyType } = enemy;
     const boss = enemy instanceof Boss;
-    if (!enemy.takeDamage(amount)) {
+    const { critChance, critMultiplier } = this.spells.profile;
+    const crit = kind === 'hit' && rollCrit(this.critRng, critChance);
+    const dealt = crit ? critDamage(amount, critMultiplier) : amount;
+    // A dying enemy takes nothing, so it shows nothing.
+    if (!enemy.isDying) this.showHit(enemy, dealt, kind, crit);
+    if (!enemy.takeDamage(dealt)) {
       this.audio.play('enemy.hurt');
       return;
     }
+    this.numbers.flushDot(enemy);
     this.run.recordKill();
     // The boss's death is the win (spec §5, CO-051), not a gem drop; it lands
     // as `BOSS_EVENT.died` once the boss has finished dying. Its death cue
     // plays on the killing blow, with the clip, not after it.
     this.audio.play(boss ? 'boss.death' : 'enemy.death');
     if (!boss) this.gems.dropFor(enemyType, x, y);
+  }
+
+  /**
+   * #125: a hit's feedback, read from where the enemy stood as it was struck.
+   * A burn or bleed sliver joins its enemy's tally rather than printing;
+   * everything else prints now, flashes, and may freeze. A killing blow's flash
+   * is cleared at once by its death clip, which is the kill's own feedback.
+   */
+  private showHit(enemy: Enemy, amount: number, kind: HitKind, crit: boolean): void {
+    if (kind === 'dot') {
+      if (this.feedback.numbers) this.numbers.addDot(enemy, amount);
+      return;
+    }
+    if (this.feedback.numbers) {
+      this.numbers.show(enemy.x, enemy.y - enemy.bodyRadius, amount, kind, crit);
+    }
+    enemy.flash();
+    const freeze = hitStopMs(amount, kind, crit, this.feedback.hitStop);
+    if (freeze > 0) this.run.hitStop(freeze);
+  }
+
+  /** #125: shake the camera, if the rules let this one through (`nextShake`). */
+  private shakeFor(kind: ShakeKind): void {
+    const next = nextShake(this.shake, SHAKES[kind], this.time.now, this.feedback.shake);
+    this.shake = next.state;
+    if (next.play) this.cameras.main.shake(next.play.durationMs, next.play.intensity, true);
   }
 
   /**

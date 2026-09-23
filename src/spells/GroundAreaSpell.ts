@@ -109,7 +109,7 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
       if (!enemy.active) continue;
       this.ticked += 1;
       if (slowPct > 0) enemy.applyFrost({ slowPct, slowDuration, freeze: false });
-      this.damage(enemy, tickDamage);
+      this.damage(enemy, tickDamage, 'tick');
     }
   }
 }

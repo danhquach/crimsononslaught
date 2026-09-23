@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { HIT_STOP_BUDGET_MS, HIT_STOP_MS } from '../config/hitFeedback';
 import { BOSS_START_TIME } from '../config/waves';
 import { RUN_EVENT, RUN_EVENT_NAMES, type RunEvent, type RunEventName } from './runEvents';
 import { isRunStats } from './scenePayloads';
@@ -98,6 +99,59 @@ describe('RunState.tick', () => {
     }
     expect(run.elapsedMs).toBe(0);
     expect(emitter.events).toEqual([]);
+  });
+});
+
+describe('RunState.hitStop', () => {
+  it('freezes the front of the next frame and moves the rest', () => {
+    const { run } = newRun();
+    run.tick(100);
+    run.hitStop(HIT_STOP_MS);
+    expect(run.tick(100)).toEqual({ startMs: 100, deltaMs: 100 - HIT_STOP_MS });
+    expect(run.elapsedMs).toBe(200 - HIT_STOP_MS);
+  });
+
+  it('carries a long freeze across frames, holding the clock but still publishing it', () => {
+    const { run, emitter } = newRun();
+    run.hitStop(HIT_STOP_MS);
+    expect(run.tick(16)).toEqual({ startMs: 0, deltaMs: 0 });
+    expect(simulationSteps(run.tick(16))).toEqual([]);
+    expect(emitter.of('timer').map((e) => e.payload)).toEqual([{ elapsedMs: 0 }, { elapsedMs: 0 }]);
+    expect(run.tick(100).deltaMs).toBeCloseTo(100 - (HIT_STOP_MS - 32));
+  });
+
+  it('freezes in run time, so a scaled run freezes for the same share of itself', () => {
+    const { run } = newRun(10);
+    run.hitStop(HIT_STOP_MS);
+    // One 16 ms frame at scale 10 is 160 ms of run time; the freeze is 45 of it.
+    expect(run.tick(16).deltaMs).toBeCloseTo(160 - HIT_STOP_MS);
+  });
+
+  it('never adds requests up, and never freezes more than the budget', () => {
+    const { run } = newRun();
+    for (let i = 0; i < 100; i += 1) run.hitStop(HIT_STOP_BUDGET_MS * 10);
+    expect(run.tick(10_000).deltaMs).toBe(10_000 - HIT_STOP_BUDGET_MS);
+  });
+
+  it('does nothing once the run is over', () => {
+    const { run } = newRun();
+    run.end();
+    run.hitStop(HIT_STOP_MS);
+    expect(run.tick(100)).toEqual({ startMs: 0, deltaMs: 0 });
+  });
+
+  it('slows a run heavy-hitting twice a second by under a tenth, and hands out only what moved', () => {
+    const plain = newRun().run;
+    const frozen = newRun().run;
+    let frozenWindows = 0;
+    for (let frame = 0; frame < 600; frame += 1) {
+      if (frame % 30 === 0) frozen.hitStop(HIT_STOP_MS);
+      plain.tick(16);
+      frozenWindows += frozen.tick(16).deltaMs;
+    }
+    expect(frozenWindows).toBeCloseTo(frozen.elapsedMs);
+    expect(frozen.elapsedMs).toBeLessThan(plain.elapsedMs);
+    expect(frozen.elapsedMs).toBeGreaterThan(plain.elapsedMs * 0.9);
   });
 });
 
