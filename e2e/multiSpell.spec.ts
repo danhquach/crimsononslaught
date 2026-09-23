@@ -20,8 +20,14 @@ import { cardCenter, collectErrors, readHud, waitForScene } from './game';
 const PICKED: SpellId = 'fire';
 const EXTRA = ['ice', 'lightning'] as const;
 
-/** Run time is 10x wall time, so this window is 150 s of run: past the level 7 slot unlock. */
-const WINDOW_MS = 15_000;
+/**
+ * The window is 150 s of run, past the level 7 slot unlock, read off the HUD's
+ * timer rather than budgeted in wall clock (#187, #190), so a slow runner
+ * covers the same stretch of run as a fast one.
+ */
+const RUN_MS = 150_000;
+/** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
+const WALL_CAP_MS = 40_000;
 
 /**
  * The floor the frame rate must hold at with all three casting. Measured
@@ -32,10 +38,15 @@ const WINDOW_MS = 15_000;
  */
 const MIN_FPS = 20;
 
-/** Answer any level-up overlay with its first card, so the run never sits paused. */
-async function playFor(page: Page, durationMs: number): Promise<void> {
-  const until = Date.now() + durationMs;
-  while (Date.now() < until) {
+/**
+ * Play until the HUD's timer reads `runMs` or the wall clock reaches `until`,
+ * answering any level-up overlay with its first card so the run never sits
+ * paused. Returns the run time reached.
+ */
+async function playUntil(page: Page, runMs: number, until: number): Promise<number> {
+  for (;;) {
+    const reached = (await readHud(page)).elapsedMs;
+    if (reached >= runMs || Date.now() >= until) return reached;
     const paused = await page.evaluate(async (levelUpKey) => {
       const { game } = await import('/src/main.ts');
       return game.scene.isActive(levelUpKey);
@@ -61,7 +72,8 @@ test('three actives cast in one run and the arena still draws', async ({ page })
   }, SCENE.game);
   expect(equipped).toEqual([PICKED, ...EXTRA]);
 
-  await playFor(page, WINDOW_MS);
+  const runMs = await playUntil(page, RUN_MS, Date.now() + WALL_CAP_MS);
+  expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
   const hud = await readHud(page);
   expect(hud.kills).toBeGreaterThan(0);

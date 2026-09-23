@@ -22,8 +22,14 @@ import { cardCenter, collectErrors, readHud, waitForScene } from './game';
 const PICKED: SpellId = 'ice';
 const EXTRA = [...ICE_ROSTER_SPELL_IDS, 'ice_blizzard'] as const;
 
-/** Run time is 10x wall time, so this window is about 100 s of run. */
-const WINDOW_MS = 10_000;
+/**
+ * The window is 100 s of run, read off the HUD's timer rather than budgeted in
+ * wall clock (#187, #190), so a slow runner covers the same stretch of run as a
+ * fast one.
+ */
+const RUN_MS = 100_000;
+/** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
+const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
 
 /** The floor the frame rate must hold at, the same one the other roster suites use. */
@@ -76,15 +82,18 @@ test('Ice Arrow and Frost Nova Bomb land hits on a live crowd and hold their cap
   // Sampled through the run rather than only at the end: a pool that briefly
   // exceeded its cap in between would leave no trace in a final reading.
   const trace: Report[] = [];
-  const until = Date.now() + WINDOW_MS;
-  while (Date.now() < until) {
+  const until = Date.now() + WALL_CAP_MS;
+  let runMs = 0;
+  while (runMs < RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
     if (!current) break;
     trace.push(current);
+    runMs = (await readHud(page)).elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);
+  expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
   for (const [i, report] of trace.entries()) {
     for (const spell of report) {

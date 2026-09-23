@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, waitForScene } from './game';
 
 /**
  * #133 in the browser: a run with a companion on each side of the mechanic — a
@@ -20,8 +20,14 @@ const PICKED: SpellId = 'fire';
 /** One of each flavour; the hook equips across elements, as `multiSpell` does. */
 const EXTRA = ['fire_companion', 'earth_companion'] as const;
 
-/** Run time is 10x wall time, so this window is 150 s of run. */
-const WINDOW_MS = 15_000;
+/**
+ * The window is 150 s of run, read off the HUD's timer rather than budgeted in
+ * wall clock (#187, #190), so a slow runner covers the same stretch of run as a
+ * fast one.
+ */
+const RUN_MS = 150_000;
+/** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
+const WALL_CAP_MS = 40_000;
 
 /**
  * How far past its leash an ally may be found. It is a dead zone, not a spring:
@@ -34,10 +40,15 @@ const LEASH_SLACK = 40;
 /** The floor the frame rate must hold at, as `multiSpell.spec.ts` sets it. */
 const MIN_FPS = 20;
 
-/** Answer any level-up overlay with its first card, so the run never sits paused. */
-async function playFor(page: Page, durationMs: number): Promise<void> {
-  const until = Date.now() + durationMs;
-  while (Date.now() < until) {
+/**
+ * Play until the HUD's timer reads `runMs` or the wall clock reaches `until`,
+ * answering any level-up overlay with its first card so the run never sits
+ * paused. Returns the run time reached.
+ */
+async function playUntil(page: Page, runMs: number, until: number): Promise<number> {
+  for (;;) {
+    const reached = (await readHud(page)).elapsedMs;
+    if (reached >= runMs || Date.now() >= until) return reached;
     const paused = await page.evaluate(async (levelUpKey) => {
       const { game } = await import('/src/main.ts');
       return game.scene.isActive(levelUpKey);
@@ -83,8 +94,10 @@ test('two companions hold their leash and fight for a whole run', async ({ page 
   // Sampled through the run, not only at the end: a companion that came loose
   // and was later pulled back would pass an end-of-run check alone.
   const seen: number[] = [];
+  const until = Date.now() + WALL_CAP_MS;
+  let runMs = 0;
   for (let i = 0; i < 5; i += 1) {
-    await playFor(page, WINDOW_MS / 5);
+    runMs = await playUntil(page, (RUN_MS * (i + 1)) / 5, until);
     const report = await readCompanions(page);
     if (!report) break;
     for (const companion of report) {
@@ -97,6 +110,7 @@ test('two companions hold their leash and fight for a whole run', async ({ page 
   // Neither was dropped on the way: they are not damageable and the run cannot
   // take one off the board.
   expect(seen).toEqual(seen.map(() => 2));
+  expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
   const arena = await page.evaluate(async (scene) => {
     const { game } = await import('/src/main.ts');

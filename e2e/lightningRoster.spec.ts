@@ -24,8 +24,25 @@ import { cardCenter, collectErrors, readHud, waitForScene } from './game';
 const PICKED: SpellId = 'lightning';
 const EXTRA = [...LIGHTNING_ROSTER_SPELL_IDS, 'lightning_companion'] as const;
 
-/** Run time is 10x wall time, so this window is about 100 s of run. */
-const WINDOW_MS = 10_000;
+/**
+ * The window is 180 s of run, read off the HUD's timer rather than budgeted in
+ * wall clock (#187), and it is that long for Lightning Sword and Tornado
+ * (#190). Both only reach enemies near the player, and a player standing still
+ * with this kit sees few: Bolt, Chain Lightning and the companion kill the
+ * early waves at range. Over the 100 s this window used to be, the sword landed
+ * 0-6 cuts, the first about 70 s in, and on CI none at all.
+ *
+ * The crowd reaches them from the 120 s wave on, when tanks join it: slow and
+ * tough enough to survive the ranged spells, they walk in through the ring the
+ * blade sweeps instead of dying short of it. By 180 s the sword had 58-84 cuts
+ * and the tornado 204-289 ticks over nine local runs. Four more, with the
+ * level-ups answered by the cards worst for them, Expanse (a wider ring) or
+ * Haste and Power (ranged spells that thin the crowd more), gave 65-81 and
+ * 250-276.
+ */
+const RUN_MS = 180_000;
+/** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
+const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
 
 /** The floor the frame rate must hold at, the same one the other roster suites use. */
@@ -79,15 +96,18 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
   // Sampled through the run rather than only at the end: a pool that briefly
   // exceeded its cap in between would leave no trace in a final reading.
   const trace: Report[] = [];
-  const until = Date.now() + WINDOW_MS;
-  while (Date.now() < until) {
+  const until = Date.now() + WALL_CAP_MS;
+  let runMs = 0;
+  while (runMs < RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
     if (!current) break;
     trace.push(current);
+    runMs = (await readHud(page)).elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);
+  expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
   for (const [i, report] of trace.entries()) {
     for (const spell of report) {

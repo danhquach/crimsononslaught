@@ -4,7 +4,7 @@ import { MAX_LIVE_AREAS } from '../src/config/fx';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, waitForScene } from './game';
 
 /**
  * #135 in the browser: a run carrying both ground areas, equipped through the
@@ -29,8 +29,14 @@ const EXTRA = AREA_SPELL_IDS;
  */
 const SMALLEST_RADIUS = Math.min(...AREA_SPELL_IDS.map((id) => BASE_AREA_STATS[id].radius));
 
-/** Run time is 10x wall time, so this window is about 100 s of run. */
-const WINDOW_MS = 10_000;
+/**
+ * The window is 100 s of run, read off the HUD's timer rather than budgeted in
+ * wall clock (#187, #190), so a slow runner covers the same stretch of run as a
+ * fast one.
+ */
+const RUN_MS = 100_000;
+/** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
+const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
 
 /**
@@ -81,15 +87,18 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
   // Sampled through the run rather than only at the end: patches that were
   // placed and expired in between would leave no trace in a final reading.
   const trace: Report[] = [];
-  const until = Date.now() + WINDOW_MS;
-  while (Date.now() < until) {
+  const until = Date.now() + WALL_CAP_MS;
+  let runMs = 0;
+  while (runMs < RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
     if (!current) break;
     trace.push(current);
+    runMs = (await readHud(page)).elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);
+  expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
   const last = trace[trace.length - 1];
   // Both spells cast several times over 100 s of run (12 s and 14 s cooldowns).
