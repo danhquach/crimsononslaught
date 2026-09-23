@@ -48,7 +48,7 @@ export class SpawnDirector {
     });
     this.carry = plan.carry;
     for (const request of plan.spawns) {
-      this.pool.spawn(request.type, request.x, request.y);
+      this.pool.spawn(request.type, request.x, request.y, request.scale);
     }
   }
 }

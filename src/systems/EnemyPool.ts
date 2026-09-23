@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MAX_LIVE_ENEMIES, type EnemyType } from '../config/enemies';
-import { canSpawn, type Vec2 } from '../core/enemy';
+import { UNSCALED, canSpawn, type Vec2, type WaveScale } from '../core/enemy';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 
@@ -48,15 +48,23 @@ export class EnemyPool {
     return this.group.countActive(true);
   }
 
-  /** Spawn one enemy, or `null` when the live cap is already reached. */
-  spawn(type: EnemyType, x: number, y: number): Enemy | null {
+  /**
+   * Spawn one enemy, or `null` when the live cap is already reached. `scale` is
+   * the spawning wave's multipliers (#127); the archetype row as written by default.
+   */
+  spawn(
+    type: EnemyType,
+    x: number,
+    y: number,
+    scale: Readonly<WaveScale> = UNSCALED,
+  ): Enemy | null {
     // A boss killed since the last update walk is still a dead member here,
     // and `group.get` hands out the first dead member whatever its class.
     this.releaseDeadBoss();
     if (!canSpawn(this.liveCount)) return null;
     const enemy = this.group.get(x, y) as Enemy | null;
     if (!enemy) return null;
-    enemy.spawn(type, x, y);
+    enemy.spawn(type, x, y, scale);
     return enemy;
   }
 

@@ -12,6 +12,7 @@ import {
   clampTimeScale,
   resolveInvulnerable,
   resolveLoadout,
+  resolveStartAt,
   resolveTimeScale,
   simulationSteps,
 } from './runState';
@@ -352,6 +353,49 @@ describe('resolveTimeScale', () => {
 
   it('clamps to the maximum scale', () => {
     expect(resolveTimeScale(`?timeScale=${MAX_TIME_SCALE * 10}`)).toBe(MAX_TIME_SCALE);
+  });
+});
+
+describe('resolveStartAt (#127)', () => {
+  it('reads seconds into ms', () => {
+    expect(resolveStartAt('?startAt=1190')).toBe(1_190_000);
+    expect(resolveStartAt('?startAt=0.5')).toBe(500);
+  });
+
+  it('reads anything absent, unparseable, negative or not before the boss as 0', () => {
+    for (const search of [
+      '',
+      '?startAt=',
+      '?startAt=abc',
+      '?startAt=-5',
+      `?startAt=${BOSS_START_TIME}`,
+      '?startAt=Infinity',
+    ]) {
+      expect(resolveStartAt(search), search).toBe(0);
+    }
+  });
+});
+
+describe('RunState start time (#127)', () => {
+  it('starts the clock at startMs and counts on from there', () => {
+    const emitter = recordingEmitter();
+    const run = new RunState(emitter, 1, 1_000_000);
+    expect(run.elapsedMs).toBe(1_000_000);
+    run.tick(16);
+    expect(emitter.of('timer')).toEqual([{ name: 'timer', payload: { elapsedMs: 1_000_016 } }]);
+  });
+
+  it('crosses into the boss phase at the same clock time as a full run', () => {
+    const run = new RunState(recordingEmitter(), 1, BOSS_START_MS - 10);
+    run.tick(9);
+    expect(run.phase).toBe('waves');
+    run.tick(1);
+    expect(run.phase).toBe('boss');
+  });
+
+  it('ignores a start time that is not a usable clock value', () => {
+    expect(new RunState(recordingEmitter(), 1, -5).elapsedMs).toBe(0);
+    expect(new RunState(recordingEmitter(), 1, Number.NaN).elapsedMs).toBe(0);
   });
 });
 
