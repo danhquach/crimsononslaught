@@ -255,3 +255,16 @@ function clampUnit(value: unknown, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.min(1, Math.max(0, value));
 }
+
+/** A save's `settings` with the feedback settings written over it; other keys kept. */
+export function writeFeedbackSettings(
+  saved: Readonly<SaveSettings>,
+  feedback: Readonly<FeedbackSettings>,
+): SaveSettings {
+  return {
+    ...saved,
+    [FEEDBACK_SETTING_KEYS.numbers]: feedback.numbers === true,
+    [FEEDBACK_SETTING_KEYS.hitStop]: clampUnit(feedback.hitStop, DEFAULT_FEEDBACK_SETTINGS.hitStop),
+    [FEEDBACK_SETTING_KEYS.shake]: clampUnit(feedback.shake, DEFAULT_FEEDBACK_SETTINGS.shake),
+  };
+}

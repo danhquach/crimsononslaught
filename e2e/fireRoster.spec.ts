@@ -5,7 +5,7 @@ import { MAX_LIVE_COLUMNS } from '../src/core/fireColumn';
 import { MAX_LIVE_DRAGONS } from '../src/core/homing';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #140 in the browser: a run carrying Fire Column and Fire Dragon, equipped
@@ -66,6 +66,7 @@ test('Fire Column and Fire Dragon land hits on a live crowd and hold their caps'
   // Invulnerable, so the window is spent watching the roster rather than
   // possibly ending early on a player standing still in a filling arena.
   await page.goto(`/?seed=1&timeScale=10&invulnerable=1&loadout=${EXTRA.join(',')}`);
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));

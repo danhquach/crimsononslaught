@@ -33,6 +33,7 @@ import {
   rollCrit,
   shownDamage,
   spendHitStop,
+  writeFeedbackSettings,
   type HitStopState,
   type ShakeState,
 } from './hitFeedback';
@@ -336,5 +337,22 @@ describe('readFeedbackSettings', () => {
         [FEEDBACK_SETTING_KEYS.shake]: Number.NaN,
       }),
     ).toEqual(DEFAULT_FEEDBACK_SETTINGS);
+  });
+});
+
+describe('writeFeedbackSettings', () => {
+  it('writes then reads back the same settings and keeps other keys', () => {
+    const feedback = { numbers: false, hitStop: 0, shake: 0.5 };
+    const written = writeFeedbackSettings({ 'audio.muted': true }, feedback);
+    expect(written['audio.muted']).toBe(true);
+    expect(readFeedbackSettings(written)).toEqual(feedback);
+  });
+
+  it('clamps what it writes into range', () => {
+    expect(writeFeedbackSettings({}, { numbers: true, hitStop: 3, shake: Number.NaN })).toEqual({
+      [FEEDBACK_SETTING_KEYS.numbers]: true,
+      [FEEDBACK_SETTING_KEYS.hitStop]: 1,
+      [FEEDBACK_SETTING_KEYS.shake]: DEFAULT_FEEDBACK_SETTINGS.shake,
+    });
   });
 });

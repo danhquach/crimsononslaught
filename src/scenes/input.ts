@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { menuStep, pressedEdges, stickVector, wrapIndex, type MenuInputState } from '../core/input';
+import { isConfirmKey } from '../core/resultModel';
 import { audioOf } from '../render/audio';
 
 /**
@@ -32,9 +33,34 @@ export interface MenuItem {
   confirm(): void;
 }
 
+export interface MenuInputOptions {
+  /**
+   * Arrow keys move the selection and Enter confirms it too (#121). An arrow
+   * wakes the highlight like a pad does, and so does Enter with nothing
+   * highlighted — unless the menu names an `enterDefault`.
+   */
+  keyboard?: boolean;
+  /**
+   * The item Enter confirms while nothing is highlighted, for a menu whose
+   * first item is a safe default (Intro's Start, a lone Back). Left out where
+   * the first item changes something, so a reflex Enter only shows the
+   * highlight.
+   */
+  enterDefault?: number;
+}
+
+/** Selection step per arrow key; up and left go back, as on the pad. */
+const ARROW_STEP: Readonly<Record<string, number>> = {
+  ArrowUp: -1,
+  ArrowLeft: -1,
+  ArrowDown: 1,
+  ArrowRight: 1,
+};
+
 /**
  * Gamepad navigation for menus and overlays (spec §5): D-pad or left stick
- * changes the selection, A confirms it.
+ * changes the selection, A confirms it. With `keyboard`, the arrow keys and
+ * Enter drive the same selection.
  *
  * Mouse and keyboard stay primary — nothing is highlighted until a pad is
  * actually used, and the press that first wakes the pad only reveals the
@@ -44,7 +70,11 @@ export interface MenuItem {
  * Polls on the scene's update event, so scenes need no `update` of their own,
  * and unhooks itself on shutdown.
  */
-export function attachMenuInput(scene: Phaser.Scene, items: readonly MenuItem[]): void {
+export function attachMenuInput(
+  scene: Phaser.Scene,
+  items: readonly MenuItem[],
+  options: MenuInputOptions = {},
+): void {
   if (items.length === 0) return;
 
   let selected = -1;
@@ -87,6 +117,29 @@ export function attachMenuInput(scene: Phaser.Scene, items: readonly MenuItem[])
       else items[selected]?.confirm();
     }
   };
+
+  // The scene's keyboard plugin drops its listeners on shutdown, as every
+  // other menu's `keydown` handler relies on. It also re-walks the frame's
+  // whole event queue on every DOM event and again on the frame update, and
+  // its duplicate check only looks one event back, so a key pressed and
+  // released inside one frame reaches this handler more than once. The other
+  // menus' handlers are idempotent; a selection step is not, so each event is
+  // handled once.
+  if (options.keyboard) {
+    const handled = new WeakSet<KeyboardEvent>();
+    scene.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+      if (handled.has(event)) return;
+      handled.add(event);
+      const step = ARROW_STEP[event.key];
+      if (step !== undefined) {
+        select(selected < 0 ? 0 : wrapIndex(selected, step, items.length));
+      } else if (isConfirmKey(event.key)) {
+        const target = selected >= 0 ? selected : options.enterDefault;
+        if (target === undefined) select(0);
+        else items[target]?.confirm();
+      }
+    });
+  }
 
   scene.events.on(Phaser.Scenes.Events.UPDATE, poll);
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #133 in the browser: a run with a companion on each side of the mechanic — a
@@ -70,6 +70,7 @@ test('two companions hold their leash and fight for a whole run', async ({ page 
   const errors = collectErrors(page);
 
   await page.goto(`/?seed=1&timeScale=10&invulnerable=1&loadout=${EXTRA.join(',')}`);
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));

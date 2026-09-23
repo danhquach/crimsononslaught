@@ -4,7 +4,7 @@ import { BASE_SPELL_STATS, SPELL_IDS, type SpellId } from '../src/config/spells'
 import { formatTimer } from '../src/core/hudModel';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * Spec §8 browser smoke (CO-060): load the page, see SpellSelect, click each
@@ -37,6 +37,7 @@ for (const [index, spellId] of SPELL_IDS.entries()) {
     const errors = collectErrors(page);
 
     await page.goto('/?seed=1&timeScale=10');
+    await startFromIntro(page);
     await waitForScene(page, SCENE.spellSelect);
 
     const { x, y } = cardCenter(index);

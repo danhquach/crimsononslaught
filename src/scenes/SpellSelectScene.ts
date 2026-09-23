@@ -3,7 +3,6 @@ import { SPELL_CARDS, SPELL_IDS, spellIdForKey, type SpellId } from '../config/s
 import { CURRENCY_NAME } from '../config/meta';
 import {
   SAVE_REGISTRY_KEY,
-  SAVE_RESET_REGISTRY_KEY,
   SCENE,
   SEED_REGISTRY_KEY,
   type GamePayload,
@@ -26,8 +25,8 @@ const CARD_FILL_HOVER = 0x2a2a2a;
  * selection and confirm with A, to start Game with a full `GamePayload`.
  *
  * Also the door to the permanent upgrades (CO-101): the balance and an
- * "Upgrades" button (or `U`) sit under the cards, and a save Boot had to reset
- * is announced here, once.
+ * "Upgrades" button (or `U`) sit under the cards. "Menu" (or `Esc`) goes back
+ * to Intro (#121).
  */
 export class SpellSelectScene extends Phaser.Scene {
   private started = false;
@@ -43,14 +42,14 @@ export class SpellSelectScene extends Phaser.Scene {
     this.seed = this.registry.get(SEED_REGISTRY_KEY) as number;
 
     this.add
-      .text(width / 2, 60, 'Crimson Onslaught', {
+      .text(width / 2, 60, 'Choose a spell', {
         fontFamily: 'Georgia, serif',
-        fontSize: '56px',
+        fontSize: '48px',
         color: '#dc143c',
       })
       .setOrigin(0.5);
     this.add
-      .text(width / 2, 112, 'Choose a spell  ·  click a card, press 1–4, or use a gamepad', {
+      .text(width / 2, 112, 'click a card, press 1–4, or use a gamepad', {
         fontFamily: 'Georgia, serif',
         fontSize: '20px',
         color: '#cccccc',
@@ -71,12 +70,21 @@ export class SpellSelectScene extends Phaser.Scene {
       () => this.openUpgrades(),
       { fontSize: '20px', padding: { x: 12, y: 6 } },
     );
-    attachMenuInput(this, [...items, textButtonItem(upgradesButton, () => this.openUpgrades())]);
+    const menuButton = addTextButton(this, 90, 32, 'Menu  (Esc)', () => this.openMenu(), {
+      fontSize: '18px',
+      padding: { x: 10, y: 5 },
+    });
+    attachMenuInput(this, [
+      ...items,
+      textButtonItem(upgradesButton, () => this.openUpgrades()),
+      textButtonItem(menuButton, () => this.openMenu()),
+    ]);
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       const spellId = spellIdForKey(event.key);
       if (spellId) this.startGame(spellId);
       else if (event.key === 'u' || event.key === 'U') this.openUpgrades();
+      else if (event.key === 'Escape') this.openMenu();
     });
 
     const stored: unknown = this.registry.get(SAVE_REGISTRY_KEY);
@@ -86,18 +94,6 @@ export class SpellSelectScene extends Phaser.Scene {
       fontSize: '20px',
       color: '#ffa040',
     });
-
-    // Said once: Boot leaves the flag up until this screen has shown it.
-    if (this.registry.get(SAVE_RESET_REGISTRY_KEY) === true) {
-      this.registry.set(SAVE_RESET_REGISTRY_KEY, false);
-      this.add
-        .text(width / 2, height - 60, 'Saved progress could not be read and was reset.', {
-          fontFamily: 'Georgia, serif',
-          fontSize: '16px',
-          color: '#ff6666',
-        })
-        .setOrigin(0.5);
-    }
 
     this.add
       .text(width / 2, height - 24, `seed ${this.seed}`, {
@@ -179,9 +175,17 @@ export class SpellSelectScene extends Phaser.Scene {
   }
 
   private openUpgrades(): void {
+    this.leave(SCENE.upgrades);
+  }
+
+  private openMenu(): void {
+    this.leave(SCENE.intro);
+  }
+
+  private leave(scene: string): void {
     if (this.started) return;
     this.started = true;
     audioOf(this).play('ui.confirm');
-    this.scene.start(SCENE.upgrades);
+    this.scene.start(scene);
   }
 }

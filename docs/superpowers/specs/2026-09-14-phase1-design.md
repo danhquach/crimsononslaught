@@ -123,8 +123,11 @@ src/
     fx.ts                 FX size per stat block, overlay per status
     overlayPool.ts        status-overlay bookkeeping under a hard cap
   scenes/
-    BootScene.ts          load atlas, generate fallback textures, go to SpellSelect
-    SpellSelectScene.ts   4 cards, click -> start Game with spellId + seed; balance + Upgrades door
+    BootScene.ts          load atlas, generate fallback textures, go to Intro
+    IntroScene.ts         title + Start Game / Settings / Profile (#121)
+    SettingsScene.ts      volume, mute, hit-feedback switches; back to Intro (#121)
+    ProfileScene.ts       lifetime totals from the save; back to Intro (#121)
+    SpellSelectScene.ts   4 cards, click -> start Game with spellId + seed; balance + Upgrades door; Menu -> Intro
     UpgradesScene.ts      permanent upgrade shop, wipe progress; back to SpellSelect (CO-101)
     GameScene.ts          world, player, systems, physics groups
     HudScene.ts           overlay; reads GameScene state via events
@@ -163,7 +166,8 @@ src/
 ```
 
 ### Data flow
-1. `SpellSelectScene` -> `GameScene.init({ spellId, seed })`.
+1. `IntroScene` (Start Game) -> `SpellSelectScene` -> `GameScene.init({ spellId, seed })`.
+   *(#121 put Intro in front; Phase 1 booted straight to SpellSelect.)*
 2. `GameScene.update(dt)`: `RunState.tick` -> `SpawnDirector.update` ->
    `Spellbook.update` (every equipped spell, each on its own cooldown — CO-109;
    Phase 1 ran a single `Spell.update` here) -> entities move ->

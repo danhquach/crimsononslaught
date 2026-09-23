@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   RESULT_HEADLINES,
   isConfirmKey,
+  mostPlayedSpell,
+  profileRows,
   resultRows,
   rewardRows,
   summarizePerks,
 } from './resultModel';
+import { emptySave } from './save';
 import type { RunStats } from './scenePayloads';
 
 /** Value of the row with `label`, or undefined when the row is missing. */
@@ -97,6 +100,46 @@ describe('rewardRows', () => {
     expect(rewardRows({ earned: 0, balance: 0 })).toEqual([
       ['Embers earned', '+0'],
       ['Embers total', '0'],
+    ]);
+  });
+});
+
+describe('mostPlayedSpell', () => {
+  it('is null before any run', () => {
+    expect(mostPlayedSpell({})).toBeNull();
+  });
+
+  it('picks the highest count, a tie going to the spell listed first', () => {
+    expect(mostPlayedSpell({ fire: 1, earth: 3 })).toBe('earth');
+    expect(mostPlayedSpell({ lightning: 2, ice: 2 })).toBe('ice');
+  });
+
+  it('skips ids this build has no card for', () => {
+    expect(mostPlayedSpell({ retired: 9, ice: 1 })).toBe('ice');
+    expect(mostPlayedSpell({ retired: 9 })).toBeNull();
+  });
+});
+
+describe('profileRows', () => {
+  it('is empty before the first run', () => {
+    expect(profileRows(emptySave().profile)).toEqual([]);
+  });
+
+  it('formats the lifetime totals like the result screen formats a run', () => {
+    const profile = {
+      runs: 12,
+      wins: 2,
+      bestTimeMs: 272_400,
+      bestLevel: 14,
+      totalKills: 12_345,
+      spellCounts: { fire: 4, lightning: 8 },
+    };
+    expect(profileRows(profile)).toEqual([
+      ['Runs played', '12'],
+      ['Best time survived', '4:32'],
+      ['Best level', '14'],
+      ['Total kills', '12,345'],
+      ['Most played spell', 'Lightning Bolt'],
     ]);
   });
 });

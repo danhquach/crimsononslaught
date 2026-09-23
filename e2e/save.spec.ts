@@ -5,7 +5,7 @@ import { emptySave, type Save } from '../src/core/save';
 import { SCENE } from '../src/core/scenePayloads';
 import type { UpgradesScene } from '../src/scenes/UpgradesScene';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
-import { cardCenter, collectErrors, readHud, waitForScene } from './game';
+import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * Persistence (CO-101) through the real storage: what Boot does with a corrupt
@@ -44,6 +44,7 @@ function readSave(page: Page): Promise<Save> {
 }
 
 async function openUpgrades(page: Page): Promise<void> {
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
   await page.keyboard.press('u');
   await waitForScene(page, SCENE.upgrades);
@@ -58,6 +59,7 @@ test('a corrupt save is reset with a warning and the game still boots', async ({
   await seedStorage(page, '{"version":1,"profile":');
 
   await page.goto('/?seed=1');
+  await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
   expect(warnings.some((w) => w.startsWith('[save] stored save was unreadable'))).toBe(true);
