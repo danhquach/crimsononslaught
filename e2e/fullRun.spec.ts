@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { BOSS_EMBERS } from '../src/config/pickups';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import type { RunPhase } from '../src/core/runEvents';
 import { BOSS_START_MS, MAX_TIME_SCALE } from '../src/core/runState';
-import { currencyFor, type Save } from '../src/core/save';
+import type { Save } from '../src/core/save';
 import { SCENE, type ResultPayload } from '../src/core/scenePayloads';
 import type { HudScene } from '../src/scenes/HudScene';
 import type { ResultScene } from '../src/scenes/ResultScene';
@@ -164,8 +165,10 @@ for (const spellId of SPELLS) {
     if (!result) return;
 
     // CO-101: the run paid out and was recorded; the record outlives the page.
-    expect(result.earned).toBe(currencyFor(result.stats, result.outcome));
-    expect(result.earned).toBeGreaterThan(0);
+    // #195: what it pays is exactly the Embers it collected, the boss's
+    // included on a win.
+    expect(result.earned).toBe(result.stats.embers);
+    expect(result.earned).toBeGreaterThanOrEqual(result.outcome === 'win' ? BOSS_EMBERS : 1);
     expect(result.balance).toBe(result.earned);
     await page.reload();
     await startFromIntro(page);

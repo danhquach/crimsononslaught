@@ -82,13 +82,18 @@ export interface RunStats {
   spellId: SpellId;
   /** Display names of the perks taken, in pick order; a perk taken at several ranks repeats. */
   perks: readonly string[];
+  /** Embers collected (#195): what the run banks, win or lose. */
+  embers: number;
+  /** Consumables and relics picked up (#195); their effects are later tickets'. */
+  consumables: number;
+  relics: number;
 }
 
 /** `Game -> Result` */
 export interface ResultPayload {
   outcome: Outcome;
   stats: RunStats;
-  /** Currency this run paid out (CO-101), already added to the save. */
+  /** Currency this run paid out (CO-101), already added to the save: its `stats.embers` (#195). */
   earned: number;
   /** The save's balance after `earned` was added. */
   balance: number;
@@ -122,7 +127,10 @@ export function isRunStats(data: unknown): data is RunStats {
     isFiniteNumber(data.kills) &&
     isSpellId(data.spellId) &&
     Array.isArray(data.perks) &&
-    data.perks.every((p) => typeof p === 'string')
+    data.perks.every((p) => typeof p === 'string') &&
+    isFiniteNumber(data.embers) &&
+    isFiniteNumber(data.consumables) &&
+    isFiniteNumber(data.relics)
   );
 }
 

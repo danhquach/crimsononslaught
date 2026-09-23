@@ -106,7 +106,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.moveSpeed;
   }
 
-  /** How far this player pulls XP gems in from; `GemPool` is the only reader. */
+  /** How far this player pulls XP gems, Embers and consumables in from; `GemPool` and `PickupPool` read it. */
   get pickupRadius(): number {
     return this.gemPickupRadius;
   }

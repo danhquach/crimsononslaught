@@ -7,7 +7,16 @@ import {
   type ResultPayload,
 } from './scenePayloads';
 
-const stats = { timeSurvivedMs: 12_345, level: 3, kills: 42, spellId: 'fire', perks: ['a', 'b'] };
+const stats = {
+  timeSurvivedMs: 12_345,
+  level: 3,
+  kills: 42,
+  spellId: 'fire',
+  perks: ['a', 'b'],
+  embers: 17,
+  consumables: 2,
+  relics: 1,
+};
 const result: ResultPayload = {
   outcome: 'win',
   stats: { ...stats, spellId: 'fire' },
@@ -53,6 +62,9 @@ describe('isRunStats', () => {
     expect(isRunStats({ ...stats, spellId: 'water' })).toBe(false);
     expect(isRunStats({ ...stats, perks: [1] })).toBe(false);
     expect(isRunStats({ ...stats, perks: 'a' })).toBe(false);
+    expect(isRunStats({ ...stats, embers: '17' })).toBe(false);
+    expect(isRunStats({ ...stats, consumables: null })).toBe(false);
+    expect(isRunStats({ ...stats, relics: NaN })).toBe(false);
   });
 });
 

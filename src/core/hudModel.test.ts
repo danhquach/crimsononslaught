@@ -69,6 +69,7 @@ describe('applyRunEvent', () => {
       xpToNext: 0,
       level: 1,
       kills: 0,
+      embers: 0,
       phase: 'waves',
       bossHp: 0,
       bossMaxHp: 0,
@@ -103,6 +104,11 @@ describe('applyRunEvent', () => {
   it('kill sets the running kill count', () => {
     const m = applyRunEvent(INITIAL_HUD, { name: 'kill', payload: { kills: 12 } });
     expect(m.kills).toBe(12);
+  });
+
+  it('embers sets the running Embers count (#195)', () => {
+    const m = applyRunEvent(INITIAL_HUD, { name: 'embers', payload: { embers: 42 } });
+    expect(m.embers).toBe(42);
   });
 
   it('phase sets the run phase', () => {

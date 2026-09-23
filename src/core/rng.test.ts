@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRng, resolveSeed } from './rng';
+import { createRng, deriveSeed, resolveSeed } from './rng';
 
 const draw = (seed: number, n: number): number[] => {
   const rng = createRng(seed);
@@ -93,5 +93,33 @@ describe('resolveSeed', () => {
     expect(resolveSeed('?seed=', 999)).toBe(999);
     expect(resolveSeed('?seed=abc', 999)).toBe(999);
     expect(resolveSeed('?seed=1.5', 999)).toBe(999);
+  });
+});
+
+describe('deriveSeed', () => {
+  it('is stable for the same seed and label', () => {
+    expect(deriveSeed(1, 'pickups')).toBe(deriveSeed(1, 'pickups'));
+  });
+
+  it('is a 32-bit unsigned integer', () => {
+    for (const seed of [0, 1, -1, 2 ** 31, Date.UTC(2026, 8, 23)]) {
+      const derived = deriveSeed(seed, 'pickups');
+      expect(Number.isInteger(derived)).toBe(true);
+      expect(derived).toBeGreaterThanOrEqual(0);
+      expect(derived).toBeLessThan(2 ** 32);
+    }
+  });
+
+  it('differs by label and from the seed itself', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const derived = deriveSeed(seed, 'pickups');
+      expect(derived).not.toBe(seed >>> 0);
+      expect(derived).not.toBe(deriveSeed(seed, 'other'));
+    }
+  });
+
+  it('gives neighbouring seeds unrelated streams', () => {
+    expect(draw(deriveSeed(1, 'pickups'), 20)).not.toEqual(draw(deriveSeed(2, 'pickups'), 20));
+    expect(draw(deriveSeed(1, 'pickups'), 20)).not.toEqual(draw(1, 20));
   });
 });

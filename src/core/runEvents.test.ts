@@ -83,7 +83,7 @@ describe('emitRunEvent', () => {
 });
 
 describe('RUN_EVENT', () => {
-  it('covers every channel the run publishes (spec §4, CO-030; shield #134; loadout #144)', () => {
+  it('covers every channel the run publishes (spec §4, CO-030; shield #134; loadout #144; embers #195)', () => {
     expect(RUN_EVENT_NAMES).toEqual([
       'timer',
       'hp',
@@ -93,6 +93,7 @@ describe('RUN_EVENT', () => {
       'bossHp',
       'shield',
       'loadout',
+      'embers',
     ]);
     expect(Object.keys(RUN_EVENT).sort()).toEqual([...RUN_EVENT_NAMES].sort());
   });
