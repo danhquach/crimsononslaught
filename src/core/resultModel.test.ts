@@ -21,6 +21,9 @@ const stats: RunStats = {
   kills: 1234,
   spellId: 'fire',
   perks: ['Power', 'Meteor', 'Power'],
+  embers: 312,
+  consumables: 4,
+  relics: 3,
 };
 
 describe('RESULT_HEADLINES', () => {
@@ -70,7 +73,16 @@ describe('resultRows', () => {
   });
 
   it('renders a fresh run as 0:00, level 1, no kills, no perks', () => {
-    const fresh: RunStats = { timeSurvivedMs: 0, level: 1, kills: 0, spellId: 'earth', perks: [] };
+    const fresh: RunStats = {
+      timeSurvivedMs: 0,
+      level: 1,
+      kills: 0,
+      spellId: 'earth',
+      perks: [],
+      embers: 0,
+      consumables: 0,
+      relics: 0,
+    };
     expect(resultRows(fresh)).toEqual([
       ['Time survived', '0:00'],
       ['Level', '1'],
@@ -89,16 +101,16 @@ describe('resultRows', () => {
 });
 
 describe('rewardRows', () => {
-  it('shows the payout with a plus sign and the new balance', () => {
+  it('shows the Embers collected and the new balance', () => {
     expect(rewardRows({ earned: 1234, balance: 56789 })).toEqual([
-      ['Embers earned', '+1,234'],
+      ['Embers collected', '1,234'],
       ['Embers total', '56,789'],
     ]);
   });
 
-  it('reads 0 for a run that paid nothing', () => {
+  it('reads 0 for a run that collected nothing', () => {
     expect(rewardRows({ earned: 0, balance: 0 })).toEqual([
-      ['Embers earned', '+0'],
+      ['Embers collected', '0'],
       ['Embers total', '0'],
     ]);
   });

@@ -1,4 +1,4 @@
-import { CURRENCY_RATES, upgradeById } from '../config/meta';
+import { upgradeById } from '../config/meta';
 import type { Outcome, RunStats } from './scenePayloads';
 
 /**
@@ -131,24 +131,10 @@ export function serializeSave(save: Save): string {
 }
 
 /**
- * Spec-free formula (CO-101): kills and levels pay flat, time pays per whole
- * minute, a win adds its bonus. Whole numbers, never negative, so a save can
- * never carry a fraction of a coin.
- */
-export function currencyFor(stats: RunStats, outcome: Outcome): number {
-  const minutes = Math.floor(Math.max(0, stats.timeSurvivedMs) / 60_000);
-  const earned =
-    Math.max(0, stats.kills) * CURRENCY_RATES.perKill +
-    Math.max(0, stats.level) * CURRENCY_RATES.perLevel +
-    minutes * CURRENCY_RATES.perMinute +
-    (outcome === 'win' ? CURRENCY_RATES.winBonus : 0);
-  return Math.max(0, Math.floor(earned));
-}
-
-/**
  * Fold one finished run into the save: counters up, bests kept as maxima, the
- * run's spell tallied, and `earned` added to the balance. Returns a new save;
- * the one passed in is untouched.
+ * run's spell tallied, and `earned` — the Embers it collected, `stats.embers`
+ * (#195) — added to the balance. Returns a new save; the one passed in is
+ * untouched.
  */
 export function recordRun(save: Save, stats: RunStats, outcome: Outcome, earned: number): Save {
   const profile = save.profile;

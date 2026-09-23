@@ -5,6 +5,7 @@ import { Player } from '../entities/Player';
 import { CollisionSystem, type SpellHitbox } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
 import { GemPool } from '../systems/GemPool';
+import { PickupPool } from '../systems/PickupPool';
 
 /** Small enough that everything is on screen at once; no camera follow, no scroll. */
 const WORLD_WIDTH = 960;
@@ -19,21 +20,23 @@ const SPELL_SPEED = 400;
 const GEM_DROP_OFFSET = 24;
 
 /** Every pair `CollisionSystem` registers, in the order they are listed on screen. */
-const PAIRS = ['enemy-player', 'gem-player', 'spell-enemy'] as const;
+const PAIRS = ['enemy-player', 'gem-player', 'pickup-player', 'spell-enemy'] as const;
 
 type Pair = (typeof PAIRS)[number];
 
 const PAIR_LABEL: Readonly<Record<Pair, string>> = {
   'enemy-player': 'enemy <-> player',
   'gem-player': 'gem <-> player',
+  'pickup-player': 'pickup <-> player',
   'spell-enemy': 'spell <-> enemy',
 };
 
 /**
  * Dev-only check for CO-032: every pair `CollisionSystem` registers, firing
- * without a hand on the keyboard. A tank walks into the player, gems lie where
- * the player will be pulled into them, and a stand-in spell hitbox is fired at
- * the enemy on a timer — all three counters tick up and turn green.
+ * without a hand on the keyboard. A tank walks into the player, gems and an
+ * Ember lie where the player will be pulled into them, and a stand-in spell
+ * hitbox is fired at the enemy on a timer — every counter ticks up and turns
+ * green.
  *
  * Reached via `?debug=collisions`; never part of the normal scene flow. It is
  * the only other place that builds a `CollisionSystem`, so it exercises the
@@ -43,6 +46,7 @@ export class CollisionDebugScene extends Phaser.Scene {
   private player!: Player;
   private enemies!: EnemyPool;
   private gems!: GemPool;
+  private pickups!: PickupPool;
   private spells!: Phaser.Physics.Arcade.Group;
   private readonly hits = new Map<Pair, number>();
   private statusText!: Phaser.GameObjects.Text;
@@ -59,14 +63,23 @@ export class CollisionDebugScene extends Phaser.Scene {
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     this.enemies = new EnemyPool(this);
     this.gems = new GemPool(this);
+    this.pickups = new PickupPool(this);
     this.spells = this.physics.add.group();
 
-    const collisions = new CollisionSystem(this, this.player, this.enemies, this.gems, {
-      onEnemyContact: (enemy) => this.count('enemy-player', enemy.active),
-      // Collecting the gem is what proves the pickup path, not just the touch:
-      // a gem that stays put would keep re-firing the same overlap.
-      onGemPickup: (gem) => this.count('gem-player', this.gems.collect(gem, this.player) > 0),
-    });
+    const collisions = new CollisionSystem(
+      this,
+      this.player,
+      this.enemies,
+      this.gems,
+      this.pickups,
+      {
+        onEnemyContact: (enemy) => this.count('enemy-player', enemy.active),
+        // Collecting the gem is what proves the pickup path, not just the touch:
+        // a gem that stays put would keep re-firing the same overlap.
+        onGemPickup: (gem) => this.count('gem-player', this.gems.collect(gem, this.player) > 0),
+        onPickup: (pickup) => this.count('pickup-player', this.pickups.collect(pickup) !== null),
+      },
+    );
     collisions.addSpellGroup(this.spells, (enemy, hitbox) => this.onSpellHit(enemy, hitbox));
 
     // A tank: slow enough to watch, and it survives the contact it makes.
@@ -96,6 +109,16 @@ export class CollisionDebugScene extends Phaser.Scene {
       this.gems.spawn(this.player.x + GEM_DROP_OFFSET, this.player.y + GEM_DROP_OFFSET);
     }
     this.gems.update(delta, this.player);
+    // An Ember, dropped the same way, proves the floor pickups' pair (#195).
+    if (this.pickups.liveDrops === 0) {
+      this.pickups.drop(
+        'ember',
+        this.player.x - GEM_DROP_OFFSET,
+        this.player.y + GEM_DROP_OFFSET,
+        1,
+      );
+    }
+    this.pickups.update(this.player);
     this.fireSpell(delta);
     this.cullSpells();
   }

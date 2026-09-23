@@ -56,6 +56,25 @@ export function createRng(seed: number): Rng {
 }
 
 /**
+ * The seed of a named stream of its own, derived from the run's (#195). A rule
+ * that draws from a derived stream never moves a draw on the run's RNG, so
+ * adding one leaves every existing seed's spawns and level-up offers where
+ * they were. The label is hashed (FNV-1a) into the seed and the result mixed
+ * (murmur3's finaliser), so nearby seeds and labels land far apart.
+ */
+export function deriveSeed(seed: number, label: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < label.length; i++) {
+    hash ^= label.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  let x = (seed ^ hash) >>> 0;
+  x = Math.imul(x ^ (x >>> 16), 0x85ebca6b);
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
+  return (x ^ (x >>> 16)) >>> 0;
+}
+
+/**
  * Pick the run seed: an integer `?seed=` query param wins, otherwise `fallback`
  * (callers pass `Date.now()`). Pure so it is unit-testable without a DOM.
  */

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
+import { CURRENCY_NAME } from '../config/meta';
 import {
   INITIAL_HUD,
   applyRunEvent,
@@ -23,6 +24,8 @@ const HP_COLOR = 0xdc143c;
 const SHIELD_COLOR = PLACEHOLDERS.shield_ice.color;
 const XP_COLOR = PLACEHOLDERS.gem.color;
 const BOSS_COLOR = PLACEHOLDERS.boss.color;
+/** The Embers count in the Ember pickup's own amber, so the two read as one thing (#195). */
+const EMBERS_COLOR = `#${PLACEHOLDERS.pickup_ember.color.toString(16).padStart(6, '0')}`;
 /**
  * The outline keeps a label legible over a full arena (#144): nothing sits
  * behind HUD text, so without it a label crossing the gems or the crowd breaks up.
@@ -133,6 +136,7 @@ export class HudScene extends Phaser.Scene {
   private model: HudModel = INITIAL_HUD;
   private timerText!: Phaser.GameObjects.Text;
   private killsText!: Phaser.GameObjects.Text;
+  private embersText!: Phaser.GameObjects.Text;
   private hpBar!: Bar;
   private shieldBar!: Bar;
   private xpBar!: Bar;
@@ -160,10 +164,13 @@ export class HudScene extends Phaser.Scene {
       .text(width / 2, MARGIN - 4, '', { ...LABEL_STYLE, fontSize: '28px' })
       .setOrigin(0.5, 0);
     this.killsText = this.add.text(width - MARGIN, MARGIN, '', LABEL_STYLE).setOrigin(1, 0);
+    this.embersText = this.add
+      .text(width - MARGIN, MARGIN + 20, '', { ...LABEL_STYLE, color: EMBERS_COLOR })
+      .setOrigin(1, 0);
     this.bossBar = new Bar(this, width / 2 - 200, 56, 400, 14, BOSS_COLOR);
     this.slotBoxes = [];
     this.passivesText = this.add
-      .text(width - MARGIN, MARGIN + 22, '', { ...LABEL_STYLE, align: 'right' })
+      .text(width - MARGIN, MARGIN + 44, '', { ...LABEL_STYLE, align: 'right' })
       .setOrigin(1, 0);
     this.render();
 
@@ -189,6 +196,7 @@ export class HudScene extends Phaser.Scene {
     this.shieldBar.set(fraction(m.shield, m.shieldMax), `Shield ${Math.ceil(m.shield)}`);
     this.xpBar.set(fraction(m.xp, m.xpToNext), `Lv ${m.level}`);
     this.killsText.setText(`Kills ${m.kills}`);
+    this.embersText.setText(`${CURRENCY_NAME} ${m.embers}`);
     this.bossBar.setVisible(bossBarVisible(m));
     this.bossBar.set(fraction(m.bossHp, m.bossMaxHp), 'Boss');
     this.renderSlots(slotRows(m));

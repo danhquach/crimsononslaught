@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { Enemy } from '../entities/Enemy';
+import { Pickup } from '../entities/Pickup';
 import { XpGem } from '../entities/XpGem';
 import type { EnemyPool } from './EnemyPool';
 import type { GemPool } from './GemPool';
+import type { PickupPool } from './PickupPool';
 
 /**
  * Anything a spell puts in the world to hurt enemies with: a fireball, a nova
@@ -17,16 +19,19 @@ export interface CollisionHandlers {
   readonly onEnemyContact: (enemy: Enemy) => void;
   /** The player is touching a gem (spec §5: gems are XP on touch). */
   readonly onGemPickup: (gem: XpGem) => void;
+  /** The player is touching an Ember, a consumable or a relic (#195). */
+  readonly onPickup: (pickup: Pickup) => void;
 }
 
 /** A live spell hitbox is touching an enemy; the spell that owns the group resolves it (Epic D). */
 export type SpellHitHandler = (enemy: Enemy, hitbox: SpellHitbox) => void;
 
 /**
- * The one place overlaps are registered (spec §9). Enemy <-> player and
- * gem <-> player are wired on construction; spell <-> enemy is wired per spell
- * group through `addSpellGroup`, because spells create their groups as they are
- * cast (Epic D) rather than at the start of the run.
+ * The one place overlaps are registered (spec §9). Enemy <-> player,
+ * gem <-> player and pickup <-> player (#195) are wired on construction;
+ * spell <-> enemy is wired per spell group through `addSpellGroup`, because
+ * spells create their groups as they are cast (Epic D) rather than at the
+ * start of the run.
  *
  * It only routes: the rules of a hit (cooldowns, damage, drops) live with the
  * handlers in `GameScene`. Colliders are owned by the scene's physics world, so
@@ -45,6 +50,7 @@ export class CollisionSystem {
     player: Phaser.Physics.Arcade.Sprite,
     enemies: EnemyPool,
     gems: GemPool,
+    pickups: PickupPool,
     handlers: CollisionHandlers,
   ) {
     this.scene = scene;
@@ -56,6 +62,9 @@ export class CollisionSystem {
     });
     this.scene.physics.add.overlap(player, gems.group, (_player, gem) => {
       if (gem instanceof XpGem) this.handlers.onGemPickup(gem);
+    });
+    this.scene.physics.add.overlap(player, pickups.group, (_player, pickup) => {
+      if (pickup instanceof Pickup) this.handlers.onPickup(pickup);
     });
   }
 

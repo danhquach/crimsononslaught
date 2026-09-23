@@ -1,27 +1,16 @@
 import type { Passive } from './passives';
 
 /**
- * Meta progression (CO-101): what a run pays out, what that currency buys, and
- * the milestones that gate content. Everything here outlives a run and is read
- * by `core/save.ts` and `core/upgrades.ts`.
+ * Meta progression (CO-101): what the currency buys and the milestones that
+ * gate content. The currency itself is picked up in the run (#195,
+ * `config/pickups.ts`). Everything here outlives a run and is read by
+ * `core/save.ts` and `core/upgrades.ts`.
  *
  * Pure data, no Phaser import.
  */
 
 /** The soft currency's display name. */
 export const CURRENCY_NAME = 'Embers';
-
-/**
- * What one run pays: a flat amount per kill and per level reached, a rate per
- * minute survived, and a bonus for the win. Paid out whether the run was won or
- * lost, so a lost run still moves the player forward.
- */
-export const CURRENCY_RATES = {
-  perKill: 1,
-  perLevel: 10,
-  perMinute: 6,
-  winBonus: 150,
-} as const;
 
 /** Lifetime counters a milestone may test. Mirrors `SaveProfile` in `core/save.ts`. */
 export type MilestoneStat = 'runs' | 'wins' | 'bestLevel' | 'totalKills';

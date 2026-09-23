@@ -58,12 +58,12 @@ export function resultRows(stats: RunStats): StatRow[] {
 }
 
 /**
- * What the run paid and where the balance stands (CO-101), under the stat rows.
- * `earned` is shown with a leading `+` so it reads as a payout, not a total.
+ * What the run banked and where the balance stands (CO-101), under the stat
+ * rows. Since #195 what it banks is exactly the Embers it collected.
  */
 export function rewardRows(payload: Pick<ResultPayload, 'earned' | 'balance'>): StatRow[] {
   return [
-    [`${CURRENCY_NAME} earned`, `+${formatCount(payload.earned)}`],
+    [`${CURRENCY_NAME} collected`, formatCount(payload.earned)],
     [`${CURRENCY_NAME} total`, formatCount(payload.balance)],
   ];
 }

@@ -22,6 +22,7 @@ export const RUN_EVENT = {
   bossHp: 'run:bossHp',
   shield: 'run:shield',
   loadout: 'run:loadout',
+  embers: 'run:embers',
 } as const;
 
 export type RunEventName = keyof typeof RUN_EVENT;
@@ -48,6 +49,8 @@ export interface RunEventPayloads {
    * Sent once a frame, since the cooldowns move every frame.
    */
   loadout: { spells: LoadoutSpellView[]; passives: LoadoutPassiveView[] };
+  /** Embers collected this run (#195), banked at its end win or lose. */
+  embers: { embers: number };
 }
 
 /** One casting spell as the HUD shows it. `progress` is `null` for a spell with no cooldown. */

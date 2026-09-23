@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENCY_RATES } from '../config/meta';
 import {
   SAVE_VERSION,
-  currencyFor,
   emptySave,
   isSave,
   migrate,
@@ -20,6 +18,9 @@ const stats: RunStats = {
   kills: 1234,
   spellId: 'fire',
   perks: ['Power'],
+  embers: 140,
+  consumables: 3,
+  relics: 2,
 };
 
 describe('emptySave', () => {
@@ -153,25 +154,15 @@ describe('migrate', () => {
   });
 });
 
-describe('currencyFor', () => {
-  it('pays kills, levels and whole minutes, plus the win bonus', () => {
-    const minutes = Math.floor(stats.timeSurvivedMs / 60_000);
-    const base =
-      stats.kills * CURRENCY_RATES.perKill +
-      stats.level * CURRENCY_RATES.perLevel +
-      minutes * CURRENCY_RATES.perMinute;
-    expect(currencyFor(stats, 'lose')).toBe(base);
-    expect(currencyFor(stats, 'win')).toBe(base + CURRENCY_RATES.winBonus);
-  });
-
-  it('pays a lost run too, and never a fraction or a negative', () => {
-    expect(currencyFor({ ...stats, kills: 0, level: 0, timeSurvivedMs: 59_999 }, 'lose')).toBe(0);
-    expect(currencyFor({ ...stats, kills: -3, level: -1, timeSurvivedMs: -1 }, 'lose')).toBe(0);
-    expect(Number.isInteger(currencyFor({ ...stats, timeSurvivedMs: 90_500 }, 'lose'))).toBe(true);
-  });
-});
-
 describe('recordRun', () => {
+  it('banks exactly the Embers the run collected, win or lose (#195)', () => {
+    for (const outcome of ['win', 'lose'] as const) {
+      const before = { ...emptySave(), currency: 25 };
+      const after = recordRun(before, stats, outcome, stats.embers);
+      expect(after.currency - before.currency, outcome).toBe(stats.embers);
+    }
+  });
+
   it('folds a run into the counters, bests and spell tally', () => {
     const one = recordRun(emptySave(), stats, 'lose', 100);
     expect(one.profile).toEqual({

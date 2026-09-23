@@ -23,7 +23,8 @@ import {
 } from '../core/levelUp';
 import { levelUpOffer, type ActiveCard } from '../core/levelUpOffer';
 import { PLAYER_EVENT } from '../core/health';
-import { createRng, type Rng } from '../core/rng';
+import { PICKUP_EVENT, placeRelics, planDrop, rollDrops } from '../core/pickups';
+import { createRng, deriveSeed, type Rng } from '../core/rng';
 import { RUN_EVENT, emitRunEvent, type RunEventPayloads } from '../core/runEvents';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
 import { spawnPoint } from '../core/spawnDirector';
@@ -48,7 +49,7 @@ import type {
   TornadoStats,
 } from '../core/spellStats';
 import { buildLoadout } from '../core/loadout';
-import { currencyFor, emptySave, isSave, recordRun, serializeSave, type Save } from '../core/save';
+import { emptySave, isSave, recordRun, serializeSave, type Save } from '../core/save';
 import { upgradeRanks } from '../core/upgrades';
 import { storeSaveJson } from '../storage/localSave';
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
@@ -66,6 +67,8 @@ import {
   isStrikeSpellId,
 } from '../config/strikes';
 import { ARENA_DEPTH } from '../config/fx';
+import type { EnemyType } from '../config/enemies';
+import { BOSS_EMBERS, RELIC_COUNT, type PickupKind } from '../config/pickups';
 import { LARGE_EXPLOSION_SCALE, SHAKES, type ShakeKind } from '../config/hitFeedback';
 import {
   NO_SHAKE,
@@ -119,6 +122,7 @@ import {
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
+import type { Pickup } from '../entities/Pickup';
 import { XpGem } from '../entities/XpGem';
 import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { FireballSpell } from '../spells/FireballSpell';
@@ -143,6 +147,7 @@ import { DamageNumberPool } from '../systems/DamageNumberPool';
 import { EnemyPool } from '../systems/EnemyPool';
 import { FxPool } from '../systems/FxPool';
 import { GemPool } from '../systems/GemPool';
+import { PickupPool } from '../systems/PickupPool';
 import { OverlayPool } from '../systems/OverlayPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
 
@@ -161,6 +166,20 @@ const GRID_CELL = 200;
  * an existing seed the first time a crit build rolled.
  */
 const CRIT_STREAM = 0xc717;
+
+/**
+ * Drop rolls and relic placement draw from a stream of their own (#195), for
+ * the same reason crits do: pickups must not move a seed's spawns or offers.
+ */
+const PICKUP_STREAM = 'pickups';
+
+/**
+ * Where a death's Ember and consumable land, from the death spot, so neither
+ * hides under the gem that lands on the spot itself. Well inside the pickup
+ * radius, so walking over the gem takes them too.
+ */
+const EMBER_OFFSET = { x: 10, y: -8 } as const;
+const CONSUMABLE_OFFSET = { x: -10, y: -8 } as const;
 
 /**
  * The run: a 3000 x 3000 bounded arena with the player at its centre and the
@@ -199,6 +218,8 @@ export class GameScene extends Phaser.Scene {
   private enemies!: EnemyPool;
   private spawns!: SpawnDirector;
   private gems!: GemPool;
+  /** Embers, consumables and relics (#195): everything on the floor but gems. */
+  private pickups!: PickupPool;
   /** Spell effects (CO-082): one-shot bursts, and the status overlays that follow enemies. */
   private fx!: FxPool;
   private overlays!: OverlayPool;
@@ -209,6 +230,8 @@ export class GameScene extends Phaser.Scene {
   private rng!: Rng;
   /** Crit rolls only (#125); see `CRIT_STREAM`. */
   private critRng!: Rng;
+  /** Drop rolls and relic placement only (#195); see `PICKUP_STREAM`. */
+  private pickupRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -393,6 +416,27 @@ export class GameScene extends Phaser.Scene {
    * instantaneous, so always none; boulders are what is still rolling). The
    * browser suite watches a run land hits with both and hold the pool cap.
    */
+  /**
+   * Test hook (#195): what lies on the floor now, by kind, the drops the pool
+   * counts against its cap, and what the run has picked up so far.
+   */
+  get pickupReport(): {
+    live: Record<PickupKind, number>;
+    drops: number;
+    embers: number;
+    consumables: number;
+    relics: number;
+  } {
+    const { embers, consumables, relics } = this.run;
+    return {
+      live: this.pickups.countsByKind(),
+      drops: this.pickups.liveDrops,
+      embers,
+      consumables,
+      relics,
+    };
+  }
+
   get earthReport(): { id: RosterSpellId; hits: number; live: number }[] {
     return this.spells.spells
       .filter(
@@ -420,6 +464,7 @@ export class GameScene extends Phaser.Scene {
     const { spellId, seed } = this.payload;
     this.rng = createRng(seed);
     this.critRng = createRng(seed ^ CRIT_STREAM);
+    this.pickupRng = createRng(deriveSeed(seed, PICKUP_STREAM));
     this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -446,6 +491,8 @@ export class GameScene extends Phaser.Scene {
       height: WORLD_HEIGHT,
     });
     this.gems = new GemPool(this);
+    this.pickups = new PickupPool(this);
+    this.placeRelics();
     this.fx = new FxPool(this);
     this.fx.onBurst = (clip, scale) => {
       if (clip === 'fire.explode' && scale >= LARGE_EXPLOSION_SCALE) this.shakeFor('explosion');
@@ -457,10 +504,18 @@ export class GameScene extends Phaser.Scene {
     // Every overlap in the run is registered here and nowhere else (CO-032).
     // Its colliders belong to the physics world; the scene keeps the system
     // itself only so a spell equipped mid-run can register its group too.
-    this.collisions = new CollisionSystem(this, this.player, this.enemies, this.gems, {
-      onEnemyContact: (enemy) => this.onEnemyContact(enemy),
-      onGemPickup: (gem) => this.onGemPickup(gem),
-    });
+    this.collisions = new CollisionSystem(
+      this,
+      this.player,
+      this.enemies,
+      this.gems,
+      this.pickups,
+      {
+        onEnemyContact: (enemy) => this.onEnemyContact(enemy),
+        onGemPickup: (gem) => this.onGemPickup(gem),
+        onPickup: (pickup) => this.onPickup(pickup),
+      },
+    );
     // The four Phase 1 spell ids are also the four element ids (spec §9.1), so
     // the chosen spell is this run's element and its always-equipped default.
     // The save's permanent upgrades go into the loadout before the first cast
@@ -597,6 +652,7 @@ export class GameScene extends Phaser.Scene {
       this.damageEnemy(enemy, amount, 'dot'),
     );
     this.gems.update(step.deltaMs, this.player);
+    this.pickups.update(this.player);
     this.spells.update(step.deltaMs);
     // After the casts, so a patch placed this step starts its lifetime here
     // rather than a step late, and before the physics step, so the enemies a
@@ -982,6 +1038,63 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * #195: an Ember is banked into the run on touch; a consumable and a relic
+   * are only counted and announced, since their effects are later tickets'.
+   */
+  private onPickup(pickup: Pickup): void {
+    const collected = this.pickups.collect(pickup);
+    if (!collected) return;
+    if (collected.kind === 'ember') {
+      this.run.addEmbers(collected.value);
+    } else if (collected.kind === 'consumable') {
+      this.onConsumable();
+    } else {
+      this.onRelic();
+    }
+  }
+
+  /** #195 stub: #128 gives consumables their kinds and effects. */
+  private onConsumable(): void {
+    this.events.emit(PICKUP_EVENT.consumable, { consumables: this.run.recordConsumable() });
+  }
+
+  /** #195 stub: a later ticket gives relics their effect. */
+  private onRelic(): void {
+    this.events.emit(PICKUP_EVENT.relic, { relics: this.run.recordRelic() });
+  }
+
+  /**
+   * Spec §5 (#195): the run's relics, on seeded spots clear of the player's
+   * start, of the arena edge and of each other.
+   */
+  private placeRelics(): void {
+    const start = { x: this.player.x, y: this.player.y };
+    const world = { width: WORLD_WIDTH, height: WORLD_HEIGHT };
+    for (const spot of placeRelics(this.pickupRng, world, start, RELIC_COUNT)) {
+      this.pickups.placeRelic(spot.x, spot.y);
+    }
+  }
+
+  /**
+   * Spec §4 (#195): a regular death's Ember and consumable, settled against
+   * the drop cap by `planDrop`. An Ember the floor has no room for is credited
+   * to the run instead, and so is one the pool fails to place, so no Ember is
+   * ever lost.
+   */
+  private dropPickups(type: EnemyType, x: number, y: number): void {
+    const plan = planDrop(rollDrops(this.pickupRng, type), this.pickups.liveDrops);
+    let credit = plan.credit;
+    if (plan.ember > 0) {
+      const placed = this.pickups.drop('ember', x + EMBER_OFFSET.x, y + EMBER_OFFSET.y, plan.ember);
+      if (!placed) credit += plan.ember;
+    }
+    if (credit > 0) this.run.addEmbers(credit);
+    if (plan.consumable) {
+      this.pickups.drop('consumable', x + CONSUMABLE_OFFSET.x, y + CONSUMABLE_OFFSET.y);
+    }
+  }
+
+  /**
    * Every point of damage an enemy takes comes through here — spell hits and
    * burn ticks alike — so a death is tallied and drops its gems where the
    * enemy fell (spec §5: 1, or 3 for a tank) whatever killed it.
@@ -1007,9 +1120,16 @@ export class GameScene extends Phaser.Scene {
     this.run.recordKill();
     // The boss's death is the win (spec §5, CO-051), not a gem drop; it lands
     // as `BOSS_EVENT.died` once the boss has finished dying. Its death cue
-    // plays on the killing blow, with the clip, not after it.
+    // plays on the killing blow, with the clip, not after it. Its Embers are
+    // credited on the blow too (#195): the win follows the death clip, so
+    // there is no time to walk to a pile, and `endRun` reads them after.
     this.audio.play(boss ? 'boss.death' : 'enemy.death');
-    if (!boss) this.gems.dropFor(enemyType, x, y);
+    if (boss) {
+      this.run.addEmbers(BOSS_EMBERS);
+      return;
+    }
+    this.gems.dropFor(enemyType, x, y);
+    this.dropPickups(enemyType, x, y);
   }
 
   /**
@@ -1187,7 +1307,8 @@ export class GameScene extends Phaser.Scene {
     // The one write per run (CO-101): fold the stats and the payout into the
     // save, hand the new save to the registry and to storage, and tell Result
     // what it paid. A failed store is logged, never thrown: the run has ended.
-    const earned = currencyFor(stats, outcome);
+    // The payout is exactly the Embers collected, win or lose (#195).
+    const earned = stats.embers;
     const save = recordRun(this.save(), stats, outcome, earned);
     this.registry.set(SAVE_REGISTRY_KEY, save);
     if (!storeSaveJson(serializeSave(save))) console.warn('[save] could not store progress');

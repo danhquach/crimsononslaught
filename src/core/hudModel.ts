@@ -14,6 +14,8 @@ export interface HudModel {
   xpToNext: number;
   level: number;
   kills: number;
+  /** #195: Embers collected this run. */
+  embers: number;
   phase: RunPhase;
   bossHp: number;
   bossMaxHp: number;
@@ -43,6 +45,7 @@ export const INITIAL_HUD: Readonly<HudModel> = {
   xpToNext: 0,
   level: 1,
   kills: 0,
+  embers: 0,
   phase: 'waves',
   bossHp: 0,
   bossMaxHp: 0,
@@ -72,6 +75,8 @@ export function applyRunEvent(model: Readonly<HudModel>, event: RunEvent): HudMo
       return { ...model, shield: event.payload.pool, shieldMax: event.payload.max };
     case 'loadout':
       return { ...model, spells: event.payload.spells, passives: event.payload.passives };
+    case 'embers':
+      return { ...model, embers: event.payload.embers };
   }
 }
 

@@ -22,6 +22,10 @@ const SPEC_KEYS = [
   'fx_telegraph',
   // #140: Fire Column's body.
   'fx_column',
+  // #195: Embers, consumables and relics on the floor.
+  'pickup_ember',
+  'pickup_consumable',
+  'pickup_relic',
 ];
 
 describe('placeholder texture config', () => {

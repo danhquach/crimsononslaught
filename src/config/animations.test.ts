@@ -123,8 +123,15 @@ describe('static texture keys', () => {
     // its placeholder: Blizzard and Earthquake share it, so a single frame
     // would draw one spell's patch for the other, and Earthquake's sheet was
     // not accepted anyway. It needs a texture per area spell, not a frame here.
+    // The floor pickups (#195) have no art yet either.
     const withoutArt = TEXTURE_KEYS.filter((key) => STATIC_FRAMES[key] === undefined);
-    expect(withoutArt).toEqual(['companion', 'fx_area']);
+    expect(withoutArt).toEqual([
+      'companion',
+      'fx_area',
+      'pickup_ember',
+      'pickup_consumable',
+      'pickup_relic',
+    ]);
   });
 
   it('resolves every mapped key to a real atlas frame', () => {

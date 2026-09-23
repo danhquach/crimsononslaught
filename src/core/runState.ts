@@ -8,7 +8,8 @@ import { applyXpGain, xpToNext } from './xp';
 
 /**
  * The run itself (spec §4 step 2, §5): the clock, the phase it drives, and the
- * tallies the HUD and the result screen read — kills, level, xp, perks taken.
+ * tallies the HUD and the result screen read — kills, level, xp, perks taken,
+ * and the Embers, consumables and relics picked up (#195).
  *
  * Every change is published on the Game scene's emitter through the `run:*`
  * contract in `core/runEvents.ts`, so nothing polls this object. The two
@@ -96,6 +97,9 @@ export class RunState {
   private levelValue = 1;
   private xpValue = 0;
   private readonly perksTaken: string[] = [];
+  private embersValue = 0;
+  private consumableCount = 0;
+  private relicCount = 0;
   private freeze: HitStopState = NO_HIT_STOP;
 
   /**
@@ -122,6 +126,20 @@ export class RunState {
 
   get kills(): number {
     return this.killCount;
+  }
+
+  /** Embers collected this run (#195). */
+  get embers(): number {
+    return this.embersValue;
+  }
+
+  /** Consumables and relics picked up this run (#195). */
+  get consumables(): number {
+    return this.consumableCount;
+  }
+
+  get relics(): number {
+    return this.relicCount;
   }
 
   get level(): number {
@@ -218,6 +236,28 @@ export class RunState {
     return gain.levelsGained;
   }
 
+  /**
+   * Embers collected (#195): an Ember pickup's worth, a boss kill's pay, or a
+   * drop the full pool could not place. Published as the new total.
+   */
+  addEmbers(amount: number): void {
+    if (!(amount > 0) || !Number.isFinite(amount)) return;
+    this.embersValue += amount;
+    emitRunEvent(this.emitter, 'embers', { embers: this.embersValue });
+  }
+
+  /** A consumable picked up (#195); returns the run's total. */
+  recordConsumable(): number {
+    this.consumableCount += 1;
+    return this.consumableCount;
+  }
+
+  /** A relic picked up (#195); returns the run's total. */
+  recordRelic(): number {
+    this.relicCount += 1;
+    return this.relicCount;
+  }
+
   /** One level-up pick, by display name (a passive rank or a newly equipped spell). */
   recordPerk(displayName: string): void {
     this.perksTaken.push(displayName);
@@ -231,6 +271,9 @@ export class RunState {
       kills: this.killCount,
       spellId,
       perks: this.perks,
+      embers: this.embersValue,
+      consumables: this.consumableCount,
+      relics: this.relicCount,
     };
   }
 

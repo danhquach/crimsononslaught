@@ -297,6 +297,10 @@ describe('RunState.stats', () => {
     run.recordKill();
     run.addXp(15);
     run.recordPerk('Quick Cast');
+    run.addEmbers(3);
+    run.recordConsumable();
+    run.recordRelic();
+    run.recordRelic();
 
     const stats = run.stats('fire');
     expect(isRunStats(stats)).toBe(true);
@@ -306,7 +310,48 @@ describe('RunState.stats', () => {
       kills: 1,
       spellId: 'fire',
       perks: ['Quick Cast'],
+      embers: 3,
+      consumables: 1,
+      relics: 2,
     });
+  });
+
+  it('starts every pickup tally at 0', () => {
+    const { run } = newRun();
+    expect(run.stats('ice')).toMatchObject({ embers: 0, consumables: 0, relics: 0 });
+  });
+});
+
+describe('RunState.addEmbers (#195)', () => {
+  it('emits the running total, not the delta', () => {
+    const { emitter, run } = newRun();
+    run.addEmbers(1);
+    run.addEmbers(3);
+    run.addEmbers(100);
+    expect(run.embers).toBe(104);
+    expect(emitter.of('embers')).toEqual([
+      { name: 'embers', payload: { embers: 1 } },
+      { name: 'embers', payload: { embers: 4 } },
+      { name: 'embers', payload: { embers: 104 } },
+    ]);
+  });
+
+  it('ignores nothing collected: no change, no event', () => {
+    const { emitter, run } = newRun();
+    for (const amount of [0, -3, Number.NaN, Infinity]) run.addEmbers(amount);
+    expect(run.embers).toBe(0);
+    expect(emitter.of('embers')).toEqual([]);
+  });
+});
+
+describe('RunState pickup counts (#195)', () => {
+  it('returns each running total', () => {
+    const { run } = newRun();
+    expect(run.recordConsumable()).toBe(1);
+    expect(run.recordConsumable()).toBe(2);
+    expect(run.recordRelic()).toBe(1);
+    expect(run.consumables).toBe(2);
+    expect(run.relics).toBe(1);
   });
 });
 
