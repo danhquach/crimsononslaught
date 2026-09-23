@@ -41,6 +41,15 @@ const EXTRA = [...LIGHTNING_ROSTER_SPELL_IDS, 'lightning_companion'] as const;
  * 250-276.
  */
 const RUN_MS = 180_000;
+
+/**
+ * Run time the window starts at, in seconds (#127). The 20-minute schedule
+ * brings tanks in at 4:00 rather than 2:00, so the window starts at 3:00 to
+ * face the crowd those close-range spells need; it is measured from here.
+ * Over 3:00-6:00 the sword had 138-167 cuts and the tornado 571-630 ticks
+ * over four local runs.
+ */
+const START_AT_S = 180;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
@@ -80,7 +89,9 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
 
   // Invulnerable, so the window is spent watching the roster rather than
   // possibly ending early on a player standing still in a filling arena.
-  await page.goto(`/?seed=1&timeScale=10&invulnerable=1&loadout=${EXTRA.join(',')}`);
+  await page.goto(
+    `/?seed=1&timeScale=10&invulnerable=1&startAt=${START_AT_S}&loadout=${EXTRA.join(',')}`,
+  );
   await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
@@ -104,7 +115,7 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
     const current = await sample(page);
     if (!current) break;
     trace.push(current);
-    runMs = (await readHud(page)).elapsedMs;
+    runMs = (await readHud(page)).elapsedMs - START_AT_S * 1000;
     await page.waitForTimeout(SAMPLE_MS);
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);
