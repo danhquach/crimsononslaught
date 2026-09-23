@@ -49,7 +49,7 @@ export interface SpawnBudget {
  *
  * A frame that straddles a wave boundary is split at that boundary and each
  * slice is paid at its own rate, so the schedule is exact regardless of frame
- * length — in particular no spawn leaks past the boss boundary at 300 s.
+ * length — in particular no spawn leaks past the boss boundary.
  */
 export function spawnBudget(t: number, dt: number, carry = 0): SpawnBudget {
   const end = t + dt;

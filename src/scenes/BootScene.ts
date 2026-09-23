@@ -1,6 +1,11 @@
 import Phaser from 'phaser';
 import { resolveSeed } from '../core/rng';
-import { resolveInvulnerable, resolveLoadout, resolveTimeScale } from '../core/runState';
+import {
+  resolveInvulnerable,
+  resolveLoadout,
+  resolveStartAt,
+  resolveTimeScale,
+} from '../core/runState';
 import {
   INVULNERABLE_REGISTRY_KEY,
   LOADOUT_REGISTRY_KEY,
@@ -8,6 +13,7 @@ import {
   SAVE_RESET_REGISTRY_KEY,
   SCENE,
   SEED_REGISTRY_KEY,
+  START_AT_REGISTRY_KEY,
   TIME_SCALE_REGISTRY_KEY,
 } from '../core/scenePayloads';
 import { validateLoadoutConfig } from '../core/loadout';
@@ -85,6 +91,12 @@ export class BootScene extends Phaser.Scene {
     const timeScale = resolveTimeScale(location.search);
     this.registry.set(TIME_SCALE_REGISTRY_KEY, timeScale);
     if (timeScale !== 1) console.info(`[run] timeScale=${timeScale}`);
+
+    // `?startAt=<s>` starts the run clock late (#127) so a hands-off browser run
+    // reaches the boss without climbing all 20 minutes.
+    const startAt = resolveStartAt(location.search);
+    this.registry.set(START_AT_REGISTRY_KEY, startAt);
+    if (startAt > 0) console.info(`[run] startAt=${startAt / 1000}`);
 
     // `?invulnerable=1` lets a hands-off browser run reach the boss (CO-061).
     const invulnerable = resolveInvulnerable(location.search);

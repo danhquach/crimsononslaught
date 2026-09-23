@@ -133,9 +133,9 @@ describe('planSpawns', () => {
 
   it('spawns the incoming wave on a frame that straddles an ordinary boundary', () => {
     const rng = createRng(1);
-    // Wave two (from 60 s) adds 'fast'; wave one before it is 'swarm' only.
+    // Wave two adds 'fast'; wave one before it is 'swarm' only.
     const plan = planSpawns({
-      t: 59.5,
+      t: WAVES[1]!.startTime - 0.5,
       dt: 1,
       carry: 0,
       rng,
@@ -145,6 +145,23 @@ describe('planSpawns', () => {
     });
     expect(plan.spawns.length).toBeGreaterThan(0);
     for (const { type } of plan.spawns) expect(['swarm', 'fast']).toContain(type);
+  });
+
+  it('stamps every spawn with the multipliers of the wave that planned it (#127)', () => {
+    const wave = WAVES[3]!;
+    const plan = planSpawns({
+      t: wave.startTime,
+      dt: 2,
+      carry: 0,
+      rng: createRng(1),
+      view: VIEW,
+      center: CENTER,
+      world: WORLD,
+    });
+    expect(plan.spawns.length).toBeGreaterThan(0);
+    for (const { scale } of plan.spawns) {
+      expect(scale).toEqual({ hpMul: wave.hpMul, damageMul: wave.damageMul });
+    }
   });
 
   it('carries a fraction of a spawn into the next frame', () => {

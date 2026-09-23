@@ -20,7 +20,7 @@ import { applyXpGain, xpToNext } from './xp';
  * `RunEventEmitter` structurally, and the tests drive it with a fake.
  */
 
-/** Spec §5: the boss phase starts at 5:00. Milliseconds, since the clock is in ms. */
+/** The boss phase starts at 20:00 (#127). Milliseconds, since the clock is in ms. */
 export const BOSS_START_MS = BOSS_START_TIME * 1000;
 
 /**
@@ -102,10 +102,14 @@ export class RunState {
    * `timeScale` multiplies every frame delta (spec §8's smoke tests run at 10).
    * It is read from the URL by `resolveTimeScale`, and clamped here too so no
    * caller can hand the run a clock that never advances.
+   *
+   * `startMs` starts the clock late (`?startAt=`, #127): a test hook, so the
+   * run is otherwise a fresh one. Anything unusable is a run from 0:00.
    */
-  constructor(emitter: Pick<RunEventEmitter, 'emit'>, timeScale = 1) {
+  constructor(emitter: Pick<RunEventEmitter, 'emit'>, timeScale = 1, startMs = 0) {
     this.emitter = emitter;
     this.timeScale = clampTimeScale(timeScale);
+    this.elapsed = Number.isFinite(startMs) && startMs > 0 ? startMs : 0;
   }
 
   get elapsedMs(): number {
@@ -256,6 +260,21 @@ export function resolveTimeScale(search: string, fallback = 1): number {
   const raw = new URLSearchParams(search).get('timeScale');
   if (raw === null || raw.trim() === '') return fallback;
   return clampTimeScale(Number(raw), fallback);
+}
+
+/**
+ * `?startAt=<seconds>` starts the run clock late (#127): a 20-minute run is too
+ * long for a Playwright check to climb, so the full run starts just short of
+ * the boss. A test hook like `?timeScale=`; the build is still a fresh one.
+ * Returns ms. Anything absent, unparseable, negative or not before the boss
+ * reads as 0.
+ */
+export function resolveStartAt(search: string): number {
+  const raw = new URLSearchParams(search).get('startAt');
+  if (raw === null || raw.trim() === '') return 0;
+  const seconds = Number(raw);
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds >= BOSS_START_TIME) return 0;
+  return seconds * 1000;
 }
 
 /**

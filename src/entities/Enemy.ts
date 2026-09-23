@@ -12,11 +12,14 @@ import {
   type Facing,
 } from '../core/animation';
 import {
+  UNSCALED,
   chaseVelocity,
   damageEnemy,
+  scaleArchetype,
   tickContactCooldown,
   tryContact,
   type Vec2,
+  type WaveScale,
 } from '../core/enemy';
 import { applyStun, stunSpeedFactor, tickStun } from '../core/chainLightning';
 import { NO_BURN, applyBurn, hasBurn, tickBurn, type BurnState } from '../core/fireball';
@@ -83,6 +86,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   // `type` is taken by Phaser.GameObject, so the archetype key is `kind`.
   private kind: EnemyType = 'swarm';
   private hp = 0;
+  /** Contact damage as the spawning wave scaled it (#127); the boss has its own. */
+  private contact = ENEMY_ARCHETYPES.swarm.contactDamage;
   private contactCooldownMs = 0;
   private burn: BurnState = { ...NO_BURN };
   private bleed: BleedState = { ...NO_BLEED };
@@ -113,7 +118,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   get contactDamage(): number {
-    return ENEMY_ARCHETYPES[this.kind].contactDamage;
+    return this.contact;
   }
 
   /** Spec §5 Ice: moving slower than the archetype says, frozen included — what Shatter checks. */
@@ -161,10 +166,15 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return this.facing;
   }
 
-  /** Take this pooled object out of the pool as `type`, alive and at (x, y). */
-  spawn(type: EnemyType, x: number, y: number): void {
+  /**
+   * Take this pooled object out of the pool as `type`, alive and at (x, y),
+   * with hp and contact damage scaled by the wave that spawned it (#127).
+   */
+  spawn(type: EnemyType, x: number, y: number, scale: Readonly<WaveScale> = UNSCALED): void {
     this.kind = type;
-    this.arise(ENEMY_ARCHETYPES[type], x, y);
+    const stats = scaleArchetype(ENEMY_ARCHETYPES[type], scale);
+    this.contact = stats.contactDamage;
+    this.arise(stats, x, y);
   }
 
   /**

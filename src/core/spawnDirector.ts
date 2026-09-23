@@ -1,5 +1,6 @@
 import type { EnemyType } from '../config/enemies';
 import { SPAWN_RING_MARGIN } from '../config/waves';
+import type { WaveScale } from './enemy';
 import type { Vec2 } from './input';
 import type { Rng } from './rng';
 import { activeWave, spawnBudget } from './waveSchedule';
@@ -25,6 +26,8 @@ export interface SpawnRequest {
   readonly type: EnemyType;
   readonly x: number;
   readonly y: number;
+  /** The planning wave's multipliers (#127), applied to the archetype on spawn. */
+  readonly scale: WaveScale;
 }
 
 export interface SpawnPlan {
@@ -82,9 +85,9 @@ export interface SpawnPlanInput {
  * The spawns earned over one frame, placed. Types come from the wave that owns
  * the end of the frame, so a frame straddling a boundary spawns the crowd the
  * player is about to face. A frame that straddles the boss boundary therefore
- * spawns nothing at all, including the budget it earned before 300 s: spec §5
- * is "no new spawns" from 5:00, and a hitched frame is no licence to drop a
- * crowd on the player as the boss walks in.
+ * spawns nothing at all, including the budget it earned before the boss: spec
+ * §5 is "no new spawns" once the boss arrives, and a hitched frame is no
+ * licence to drop a crowd on the player as the boss walks in.
  *
  * Two RNG draws per spawn (type, then angle) and none otherwise, so the same
  * seed and the same spawn count always give the same enemies — whatever the
@@ -93,16 +96,17 @@ export interface SpawnPlanInput {
 export function planSpawns(input: SpawnPlanInput): SpawnPlan {
   const { t, dt, carry, rng, view, center, world } = input;
   const budget = spawnBudget(t, dt, carry);
-  const { types } = activeWave(t + dt);
+  const { types, hpMul, damageMul } = activeWave(t + dt);
   // Boss phase (spec §5): no new spawns, and no budget saved up for after it.
   if (types.length === 0) return { spawns: [], carry: 0 };
+  const scale: WaveScale = { hpMul, damageMul };
 
   const spawns: SpawnRequest[] = [];
   for (let i = 0; i < budget.spawns; i += 1) {
     const type = rng.pick(types);
     const angle = rng.next() * Math.PI * 2;
     const { x, y } = spawnPoint(center, view, world, angle);
-    spawns.push({ type, x, y });
+    spawns.push({ type, x, y, scale });
   }
   return { spawns, carry: budget.carry };
 }

@@ -1,4 +1,8 @@
-import { CONTACT_DAMAGE_INTERVAL_MS, MAX_LIVE_ENEMIES } from '../config/enemies';
+import {
+  CONTACT_DAMAGE_INTERVAL_MS,
+  MAX_LIVE_ENEMIES,
+  type EnemyArchetype,
+} from '../config/enemies';
 import type { Vec2 } from './input';
 
 export type { Vec2 };
@@ -54,4 +58,29 @@ export function damageEnemy(hp: number, amount: number): { hp: number; died: boo
   if (hp <= 0 || !(amount > 0)) return { hp: Math.max(0, hp), died: false };
   const next = Math.max(0, hp - amount);
   return { hp: next, died: next === 0 };
+}
+
+/** What a wave does to the archetype rows it spawns (#127). */
+export interface WaveScale {
+  readonly hpMul: number;
+  readonly damageMul: number;
+}
+
+/** The table as written in `config/enemies.ts`. */
+export const UNSCALED: WaveScale = { hpMul: 1, damageMul: 1 };
+
+/**
+ * An archetype row as a wave spawns it (#127): hp and contact damage multiplied
+ * and rounded to whole numbers, never below 1. Speed, radius and texture are
+ * the row's own.
+ */
+export function scaleArchetype(
+  archetype: Readonly<EnemyArchetype>,
+  scale: Readonly<WaveScale>,
+): EnemyArchetype {
+  return {
+    ...archetype,
+    hp: Math.max(1, Math.round(archetype.hp * scale.hpMul)),
+    contactDamage: Math.max(1, Math.round(archetype.contactDamage * scale.damageMul)),
+  };
 }

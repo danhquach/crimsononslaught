@@ -16,8 +16,16 @@ import { cardCenter, collectErrors, forceFrameLength, waitForScene } from './gam
  * through the waves, and every level-up overlay is answered with its first
  * card. Either outcome is fine; balance is CO-062's job.
  *
- * Observed at seed 1: fire wins at about 5:30 of run time, earth at about 8:00.
+ * The run is 20 minutes (#127), too long to climb here, so the check starts
+ * the clock just short of the boss with `?startAt=` and the fresh build it
+ * has at 0:00 fights the boss.
+ *
+ * Observed at seed 1: fire wins at about 24:45 of run time, earth at about
+ * 24:20 — each about 22 s of the 90 s budget on a desktop.
  */
+
+/** Run time the check starts at, in seconds: 10 s of waves before the boss at 20:00. */
+const START_AT_S = 1190;
 
 /**
  * `MAX_TIME_SCALE` itself, so this check is also the guard on that ceiling
@@ -41,9 +49,8 @@ const FRAME_MS = 100;
 /**
  * The ticket's ceiling per run: each check, boot included, must fit in CI's 90 s.
  *
- * The waves are what spends it — the boss dies seconds after it arrives, so the
- * cost is the clock's climb to 5:00. Under a 32x CPU throttle that took 50 s
- * and the run ended at 57 s, against 14 s unthrottled.
+ * The boss fight is what spends it: the check starts 10 s short of the boss
+ * (`START_AT_S`), so the cost is the fresh build wearing the boss down.
  */
 const TEST_BUDGET_MS = 90_000;
 
@@ -133,7 +140,7 @@ for (const spellId of SPELLS) {
     const deadline = Date.now() + TEST_BUDGET_MS - RUN_TAIL_MS;
     const errors = collectErrors(page);
 
-    await page.goto(`/?seed=1&timeScale=${TIME_SCALE}&invulnerable=1`);
+    await page.goto(`/?seed=1&timeScale=${TIME_SCALE}&invulnerable=1&startAt=${START_AT_S}`);
     await waitForScene(page, SCENE.spellSelect);
     await forceFrameLength(page, FRAME_MS);
 

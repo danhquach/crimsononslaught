@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { CONTACT_DAMAGE_INTERVAL_MS, MAX_LIVE_ENEMIES } from '../config/enemies';
-import { canSpawn, chaseVelocity, damageEnemy, tickContactCooldown, tryContact } from './enemy';
+import { CONTACT_DAMAGE_INTERVAL_MS, ENEMY_ARCHETYPES, MAX_LIVE_ENEMIES } from '../config/enemies';
+import {
+  UNSCALED,
+  canSpawn,
+  chaseVelocity,
+  damageEnemy,
+  scaleArchetype,
+  tickContactCooldown,
+  tryContact,
+} from './enemy';
 
 describe('chaseVelocity', () => {
   it('moves straight at the target at the given speed', () => {
@@ -100,5 +108,22 @@ describe('damageEnemy', () => {
     expect(damageEnemy(10, 0)).toEqual({ hp: 10, died: false });
     expect(damageEnemy(10, -5)).toEqual({ hp: 10, died: false });
     expect(damageEnemy(10, Number.NaN)).toEqual({ hp: 10, died: false });
+  });
+});
+
+describe('scaleArchetype (#127)', () => {
+  it('leaves the row alone at 1x', () => {
+    expect(scaleArchetype(ENEMY_ARCHETYPES.tank, UNSCALED)).toEqual(ENEMY_ARCHETYPES.tank);
+  });
+
+  it('scales hp and contact damage, rounded to whole numbers, and nothing else', () => {
+    const scaled = scaleArchetype(ENEMY_ARCHETYPES.tank, { hpMul: 2.8, damageMul: 1.9 });
+    expect(scaled).toEqual({ ...ENEMY_ARCHETYPES.tank, hp: 168, contactDamage: 29 });
+  });
+
+  it('never scales a stat below 1', () => {
+    const scaled = scaleArchetype(ENEMY_ARCHETYPES.fast, { hpMul: 0.01, damageMul: 0.01 });
+    expect(scaled.hp).toBe(1);
+    expect(scaled.contactDamage).toBe(1);
   });
 });

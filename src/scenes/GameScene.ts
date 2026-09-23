@@ -4,6 +4,7 @@ import {
   LOADOUT_REGISTRY_KEY,
   SAVE_REGISTRY_KEY,
   SCENE,
+  START_AT_REGISTRY_KEY,
   TIME_SCALE_REGISTRY_KEY,
   isGamePayload,
   type GamePayload,
@@ -182,7 +183,7 @@ const CRIT_STREAM = 0xc717;
  * (Epic D) are what kill enemies: Fire (CO-044), Ice (CO-045), Lightning
  * (CO-046) and Earth (CO-047), each on its own cooldown in the run's
  * `Spellbook` (CO-109). The boss (CO-050) is an enemy in the same pool;
- * the boss phase (CO-051) spawns it off-camera at 5:00, the wave table has
+ * the boss phase (CO-051) spawns it off-camera at 20:00 (#127), the wave table has
  * stopped regular spawns by then, and its death is the win (spec §4 step 4).
  * `RunState` (CO-030) owns the clock, the phase and the tallies behind those
  * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
@@ -419,7 +420,7 @@ export class GameScene extends Phaser.Scene {
     const { spellId, seed } = this.payload;
     this.rng = createRng(seed);
     this.critRng = createRng(seed ^ CRIT_STREAM);
-    this.run = new RunState(this.events, this.timeScale());
+    this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
     // length (`simulate`), so a scaled run is the same steps, more of them a
@@ -910,6 +911,12 @@ export class GameScene extends Phaser.Scene {
   /** `?timeScale=` is resolved once in Boot; a Game started without it runs real time. */
   private timeScale(): number {
     return clampTimeScale(this.registry.get(TIME_SCALE_REGISTRY_KEY));
+  }
+
+  /** `?startAt=` (#127) is resolved once in Boot; a Game started without it starts at 0:00. */
+  private startAt(): number {
+    const ms: unknown = this.registry.get(START_AT_REGISTRY_KEY);
+    return typeof ms === 'number' ? ms : 0;
   }
 
   /**

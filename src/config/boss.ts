@@ -28,7 +28,8 @@ export interface BossConfig {
 }
 
 export const BOSS: Readonly<BossConfig> = {
-  hp: 2400,
+  // #127: sized for a 20-minute build; a starting value, tuned later.
+  hp: 7200,
   speed: 70,
   contactDamage: 30,
   radius: 40,
