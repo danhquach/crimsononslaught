@@ -282,14 +282,15 @@ export class GameScene extends Phaser.Scene {
   /**
    * Test hook (#138): the strikes in the air right now — how long each has left
    * to fall and how far it will reach — plus what the spells casting them have
-   * committed, landed and hit. The browser suite watches a telegraph appear,
-   * hold, and land on the crowd.
+   * committed, landed and hit, and the most one landing hit (#187). The
+   * browser suite watches a telegraph appear, hold, and land on the crowd.
    */
   get strikeReport(): {
     live: { radius: number; remainingS: number }[];
     committed: number;
     landed: number;
     hits: number;
+    widest: number;
   } {
     const spells = this.spells.spells.filter(
       (spell): spell is MeteorSpell => spell instanceof MeteorSpell,
@@ -299,6 +300,7 @@ export class GameScene extends Phaser.Scene {
       committed: spells.reduce((total, spell) => total + spell.committed, 0),
       landed: spells.reduce((total, spell) => total + spell.landed, 0),
       hits: spells.reduce((total, spell) => total + spell.hits, 0),
+      widest: spells.reduce((most, spell) => Math.max(most, spell.widest), 0),
     };
   }
 

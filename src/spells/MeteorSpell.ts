@@ -40,6 +40,8 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
   private landings = 0;
   /** Test hook (#138): enemies its landings have hit, across every cast. */
   private struck = 0;
+  /** Test hook (#187): the most enemies one landing has hit. */
+  private widestLanding = 0;
 
   constructor(
     id: StrikeSpellId,
@@ -73,6 +75,11 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
   /** Enemies hit by landings so far: one per enemy per strike. */
   get hits(): number {
     return this.struck;
+  }
+
+  /** The most enemies a single landing has hit so far. */
+  get widest(): number {
+    return this.widestLanding;
   }
 
   /** The live block, as the strike stats this id resolves to. */
@@ -114,7 +121,9 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
     this.fx.burst('fire.explode', telegraph.x, telegraph.y, {
       scale: explosionScale(telegraph.radius),
     });
-    for (const enemy of strikeTargets(telegraph, this.enemies.live, telegraph.radius)) {
+    const targets = strikeTargets(telegraph, this.enemies.live, telegraph.radius);
+    this.widestLanding = Math.max(this.widestLanding, targets.length);
+    for (const enemy of targets) {
       this.struck += 1;
       this.damage(enemy, blast);
     }
