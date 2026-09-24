@@ -9,8 +9,8 @@ export type { Facing };
 
 /**
  * Which animation each entity shows, decided without an engine (CO-081):
- * facing from a movement vector, the clip name for a hero / enemy / boss / gem
- * state, and where a sprite's circle body sits so that changing frame never
+ * facing from a movement vector, the clip name for a hero / companion / enemy /
+ * boss / gem state, and where a sprite's circle body sits so that changing frame never
  * moves the hitbox.
  *
  * `entities/*.ts` are the Phaser side and only play what these return.
@@ -53,6 +53,39 @@ export function heroAnimation(pose: Readonly<HeroPose>): string {
   if (pose.dead) return 'hero.death';
   if (pose.hurt) return `hero.hurt.${pose.facing}`;
   return `hero.${pose.moving ? 'walk' : 'idle'}.${pose.facing}`;
+}
+
+export interface CompanionPose {
+  /** The companion's sheet prefix (`config/companions.ts`'s `COMPANION_FX`). */
+  readonly sprite: string;
+  readonly facing: Facing;
+  readonly moving: boolean;
+  /** Inside the attack clip's run-clock window after a shot or a landed swing. */
+  readonly attacking: boolean;
+}
+
+/** An attack plays out over walking, which outranks idling (#184). */
+export function companionAnimation(pose: Readonly<CompanionPose>): string {
+  const state = pose.attacking ? 'attack' : pose.moving ? 'move' : 'idle';
+  return `${pose.sprite}.${state}.${pose.facing}`;
+}
+
+/**
+ * Which way a companion faces this frame (#184): at its target when an attack
+ * starts, held while that attack plays so a swing never turns mid-blow, and
+ * along its walk otherwise. Standing still keeps the last facing.
+ */
+export function companionFacing(
+  step: {
+    readonly velocity: Readonly<Vec2>;
+    readonly aim?: Readonly<Vec2>;
+    readonly attacking: boolean;
+  },
+  previous: Facing,
+): Facing {
+  if (step.aim) return facingFromVector(step.aim, previous);
+  if (step.attacking) return previous;
+  return facingFromVector(step.velocity, previous);
 }
 
 /** What a regular enemy is doing, in the order the sheet names them. */

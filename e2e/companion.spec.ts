@@ -1,24 +1,30 @@
 import { expect, test, type Page } from '@playwright/test';
+import { COMPANION_FX, isCompanionSpellId } from '../src/config/companions';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
- * #133 in the browser: a run with a companion on each side of the mechanic — a
- * ranged ally that hovers and shoots, a melee one that charges and swings —
- * equipped through the `?loadout=` test hook.
+ * #133 in the browser: a run with all four companions — two ranged allies that
+ * hover and shoot, two melee ones that charge and swing — equipped through the
+ * `?loadout=` test hook, each drawn from its own sheet (#184).
  *
  * What the leash, the targeting and the reach do exactly is checked in
  * `core/companion.test.ts`. What only a real run can show is that the ally
  * stays on its leash across a whole run rather than drifting off over
- * thousands of frames, that it is really fighting, and that two of them in a
- * full arena still draw.
+ * thousands of frames, that it is really fighting and animating from its
+ * own clips, and that four of them in a full arena still draw.
  */
 
 const PICKED: SpellId = 'fire';
-/** One of each flavour; the hook equips across elements, as `multiSpell` does. */
-const EXTRA = ['fire_companion', 'earth_companion'] as const;
+/** All four; the hook equips across elements, as `multiSpell` does. */
+const EXTRA = [
+  'fire_companion',
+  'ice_companion',
+  'lightning_companion',
+  'earth_companion',
+] as const;
 
 /**
  * The window is 150 s of run, read off the HUD's timer rather than budgeted in
@@ -43,18 +49,25 @@ const MIN_FPS = 20;
 /**
  * Play until the HUD's timer reads `runMs` or the wall clock reaches `until`,
  * answering any level-up overlay with its first card so the run never sits
- * paused. Returns the run time reached.
+ * paused. The hero paces left and right, so a ranged ally — which only moves to
+ * keep up — has to walk as well as idle (#184). Returns the run time reached.
  */
 async function playUntil(page: Page, runMs: number, until: number): Promise<number> {
-  for (;;) {
+  for (let step = 0; ; step += 1) {
     const reached = (await readHud(page)).elapsedMs;
     if (reached >= runMs || Date.now() >= until) return reached;
     const paused = await page.evaluate(async (levelUpKey) => {
       const { game } = await import('/src/main.ts');
       return game.scene.isActive(levelUpKey);
     }, SCENE.levelUp);
-    if (paused) await page.keyboard.press('1');
-    else await page.waitForTimeout(100);
+    if (paused) {
+      await page.keyboard.press('1');
+      continue;
+    }
+    const key = step % 2 === 0 ? 'ArrowLeft' : 'ArrowRight';
+    await page.keyboard.down(key);
+    await page.waitForTimeout(100);
+    await page.keyboard.up(key);
   }
 }
 
@@ -66,7 +79,7 @@ function readCompanions(page: Page): Promise<GameScene['companionReport'] | null
   }, SCENE.game);
 }
 
-test('two companions hold their leash and fight for a whole run', async ({ page }) => {
+test('four companions hold their leash, fight and animate for a whole run', async ({ page }) => {
   const errors = collectErrors(page);
 
   await page.goto(`/?seed=1&timeScale=10&invulnerable=1&loadout=${EXTRA.join(',')}`);
@@ -110,7 +123,7 @@ test('two companions hold their leash and fight for a whole run', async ({ page 
   }
   // Neither was dropped on the way: they are not damageable and the run cannot
   // take one off the board.
-  expect(seen).toEqual(seen.map(() => 2));
+  expect(seen).toEqual(seen.map(() => EXTRA.length));
   expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
   const arena = await page.evaluate(async (scene) => {
@@ -131,6 +144,22 @@ test('two companions hold their leash and fight for a whole run', async ({ page 
   expect(arena.enemies).toBeGreaterThan(0);
   for (const companion of arena.companions) {
     expect(companion.hits, `${companion.id} landed attacks`).toBeGreaterThan(0);
+    // Its own sheet and nobody else's (#184): the clip keys, never pixels,
+    // since each atlas page is quantised to its own palette.
+    if (!isCompanionSpellId(companion.id)) throw new Error(`${companion.id} is no companion`);
+    const sprite = COMPANION_FX[companion.id].sprite;
+    const shown = companion.clipsShown;
+    for (const clip of shown) expect(clip, companion.id).toMatch(new RegExp(`^${sprite}\\.`));
+    expect(
+      shown.some((clip) => clip.startsWith(`${sprite}.move.`)),
+      `${companion.id} moved`,
+    ).toBe(true);
+    expect(
+      shown.some((clip) => clip.startsWith(`${sprite}.attack.`)),
+      `${companion.id} attacked`,
+    ).toBe(true);
+    expect(companion.attacksShown, `${companion.id} attack clips`).toBeGreaterThan(0);
+    expect(companion.clip, `${companion.id} on screen`).toMatch(new RegExp(`^${sprite}\\.`));
   }
   expect(arena.fps, `fps with ${arena.enemies} enemies alive`).toBeGreaterThan(MIN_FPS);
   expect(errors).toEqual([]);

@@ -120,6 +120,12 @@ export const BASE_COMPANION_STATS: Readonly<Record<CompanionSpellId, Readonly<Co
  * a clip the atlas does not carry, so a missing one costs nothing.
  */
 export interface CompanionLook {
+  /**
+   * The clip prefix of its own character sheet (#184): it plays
+   * `<sprite>.<idle|move|attack>.<facing>` from it, so a fifth companion brings
+   * its creature by naming one here.
+   */
+  readonly sprite: CompanionSprite;
   readonly muzzle?: string;
   readonly hit: string;
   readonly hitScale?: number;
@@ -131,18 +137,32 @@ export interface CompanionLook {
   readonly shot?: { readonly texture: TextureKey; readonly clip?: string };
 }
 
+/** Each companion's character sheet in the atlas (CO-124). */
+export type CompanionSprite =
+  'companionFire' | 'companionIce' | 'companionLightning' | 'companionEarth';
+
+/**
+ * The scale every companion is drawn at (#184), chosen rather than inherited
+ * from the placeholder. The cut sized each sheet so the idle art stands about
+ * as tall as the 24 px disc it replaces, so native size is the size the disc
+ * held; `companions.test.ts` pins the idle art to 24 ± 4 px. Fixed rather than
+ * fitted to a frame, so a frame gaining margin (#150) never resizes the ally.
+ */
+export const COMPANION_DRAW_SCALE = 1;
+
 export const COMPANION_FX: Readonly<Record<CompanionSpellId, CompanionLook>> = {
   // The blast clip stands in for a bolt that has no area, so it is drawn small.
   fire_companion: {
+    sprite: 'companionFire',
     muzzle: 'fire.spawn',
     hit: 'fire.explode',
     hitScale: 0.5,
     shot: { texture: 'proj_fire', clip: 'fire.fly' },
   },
   // No ice flight art yet (#145), so the bolt flies as its placeholder.
-  ice_companion: { hit: 'ice.shatter', shot: { texture: 'proj_ice' } },
-  lightning_companion: { hit: 'lightning.impact' },
-  earth_companion: { hit: 'earth.impact' },
+  ice_companion: { sprite: 'companionIce', hit: 'ice.shatter', shot: { texture: 'proj_ice' } },
+  lightning_companion: { sprite: 'companionLightning', hit: 'lightning.impact' },
+  earth_companion: { sprite: 'companionEarth', hit: 'earth.impact' },
 };
 
 /** What a level-up card says about each companion (spec §7.1, cards per #132). */

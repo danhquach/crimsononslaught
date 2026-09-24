@@ -17,6 +17,8 @@ import {
   headingRotation,
   pickupAnimation,
   heroAnimation,
+  companionAnimation,
+  companionFacing,
   type EnemyPhase,
 } from './animation';
 
@@ -257,5 +259,44 @@ describe('body placement (CO-081)', () => {
         expect(FRAMES[frame], `${anim.name} ${frame}`).toEqual(first);
       }
     }
+  });
+});
+
+describe('companionAnimation (#184)', () => {
+  const sprite = 'companionFire';
+
+  it('idles, moves and attacks per facing from its own sheet', () => {
+    for (const facing of FACINGS) {
+      const idle = companionAnimation({ sprite, facing, moving: false, attacking: false });
+      const move = companionAnimation({ sprite, facing, moving: true, attacking: false });
+      expect(idle).toBe(`companionFire.idle.${facing}`);
+      expect(move).toBe(`companionFire.move.${facing}`);
+      expectClip(idle);
+      expectClip(move);
+    }
+  });
+
+  it('plays an attack over walking', () => {
+    const clip = companionAnimation({ sprite, facing: 'left', moving: true, attacking: true });
+    expect(clip).toBe('companionFire.attack.left');
+    expectClip(clip);
+  });
+});
+
+describe('companionFacing (#184)', () => {
+  const still = { x: 0, y: 0 };
+
+  it('walks in the facing it moves in and keeps it standing still', () => {
+    expect(companionFacing({ velocity: { x: -5, y: 1 }, attacking: false }, 'down')).toBe('left');
+    expect(companionFacing({ velocity: still, attacking: false }, 'up')).toBe('up');
+  });
+
+  it('turns to its target when an attack starts, whichever way it walks', () => {
+    const step = { velocity: { x: 5, y: 0 }, aim: { x: 0, y: -9 }, attacking: false };
+    expect(companionFacing(step, 'right')).toBe('up');
+  });
+
+  it('holds the attack facing while the swing plays', () => {
+    expect(companionFacing({ velocity: { x: 5, y: 0 }, attacking: true }, 'up')).toBe('up');
   });
 });

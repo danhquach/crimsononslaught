@@ -119,7 +119,8 @@ describe('static texture keys', () => {
   });
 
   it('covers every key whose art has landed', () => {
-    // The companion's sheets are #146. `fx_area` stays unmapped on purpose: it
+    // `companion` is the fallback disc; each ally draws its own sheet by clip
+    // prefix instead (#184, `COMPANION_FX`). `fx_area` stays unmapped on purpose: it
     // is the ring every ground area is drawn with, the outline over a spell's
     // own clip (`AREA_LOOKS`, #179) and the whole look for one without.
     const withoutArt = TEXTURE_KEYS.filter((key) => STATIC_FRAMES[key] === undefined);

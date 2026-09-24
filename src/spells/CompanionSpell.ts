@@ -16,6 +16,12 @@ import {
   stepPosition,
 } from '../core/companion';
 import { BURN_DURATION } from '../config/spells';
+import {
+  DEFAULT_FACING,
+  companionAnimation,
+  companionFacing,
+  type Facing,
+} from '../core/animation';
 import { dustFlip } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
@@ -27,6 +33,7 @@ import { Projectile } from '../entities/Projectile';
 import type { CollisionSystem, SpellHitbox } from '../systems/CollisionSystem';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
+import { clipDurationMs } from '../render/animate';
 import type { DamageSink } from './DamageSink';
 
 /**
@@ -72,6 +79,15 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   private target: Enemy | undefined;
   /** Test hook (#133): attacks that landed on an enemy, shots and swings alike. */
   private landed = 0;
+  /** This frame's walk, which the move clip and the facing are read from. */
+  private velocity: Vec2 = { x: 0, y: 0 };
+  private facing: Facing = DEFAULT_FACING;
+  /** From the ally to what it attacked this frame; unset on a frame with no attack. */
+  private aim: Vec2 | undefined;
+  /** Run-clock time left on the attack clip (#184), so a paused Game holds it. */
+  private attackMs = 0;
+  /** Test hook (#184): attack clips started, shots and landed swings alike. */
+  private attacksStarted = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -122,16 +138,28 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     return this.landed;
   }
 
+  /** Attack clips this ally has played — what the browser suite reads to see it swing. */
+  get attacksShown(): number {
+    return this.attacksStarted;
+  }
+
+  /** The clip on screen now and every clip it has shown, for the browser suite. */
+  get clips(): { current: string | null; shown: string[] } {
+    return { current: this.companion.clip, shown: [...this.companion.clipsShown] };
+  }
+
   /** The live block, as the companion stats every one of these ids resolves to. */
   get companionStats(): Readonly<CompanionStats> {
     return this.stats;
   }
 
   protected override tick(deltaS: number): void {
+    this.attackMs = Math.max(0, this.attackMs - deltaS * 1000);
     this.target = this.pickTarget();
     this.walk(deltaS);
     // After the walk, so an attack leaves from where the ally now stands.
     super.tick(deltaS);
+    this.animate();
     if (!this.shots) return;
     for (const child of this.shots.getChildren()) {
       if (child instanceof Projectile && child.active && child.spent) child.despawn();
@@ -181,8 +209,41 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     const velocity = this.ranged
       ? followVelocity(this.position, this.caster, leashRadius, chaseSpeed)
       : lungeVelocity(this.position, this.target, this.caster, leashRadius, chaseSpeed);
+    this.velocity = velocity;
     this.position = stepPosition(this.position, velocity, deltaS, this.scene.physics.world.bounds);
     this.companion.setPosition(this.position.x, this.position.y);
+  }
+
+  /**
+   * The clip for this frame (#184): an attack started this frame plays from its
+   * first frame facing the target, and holds for its run-clock length; after
+   * it the ally walks or idles in the facing it moves in.
+   */
+  private animate(): void {
+    const aim = this.aim;
+    this.aim = undefined;
+    const { sprite } = COMPANION_FX[this.id];
+    const attacking = this.attackMs > 0;
+    this.facing = companionFacing({ velocity: this.velocity, aim, attacking }, this.facing);
+    if (aim) {
+      const clip = companionAnimation({
+        sprite,
+        facing: this.facing,
+        moving: false,
+        attacking: true,
+      });
+      this.attackMs = clipDurationMs(this.scene, clip);
+      if (this.attackMs > 0) this.attacksStarted += 1;
+      this.companion.show(clip, true);
+      return;
+    }
+    const moving = this.velocity.x !== 0 || this.velocity.y !== 0;
+    this.companion.show(companionAnimation({ sprite, facing: this.facing, moving, attacking }));
+  }
+
+  /** Face `target` and play the attack this frame. */
+  private startAttack(target: Readonly<Vec2>): void {
+    this.aim = { x: target.x - this.position.x, y: target.y - this.position.y };
   }
 
   /** Ranged: `projectiles` shots leave the ally at the target it picked. */
@@ -199,6 +260,7 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
       shot.fire(x, y, target, speed, targetRange, COMPANION_FX[this.id].shot);
       fired += 1;
     }
+    if (fired > 0) this.startAttack(target);
     const muzzle = COMPANION_FX[this.id].muzzle;
     if (fired > 0 && muzzle) this.fx.burst(muzzle, x, y);
   }
@@ -210,6 +272,7 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
    */
   private strike(target: Enemy): void {
     if (!inReach(this.position, target, target.bodyRadius, COMPANION_REACH)) return;
+    this.startAttack(target);
     this.onCompanionHit(target);
   }
 

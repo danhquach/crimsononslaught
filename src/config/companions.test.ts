@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { SPELLS_BY_ELEMENT, isRosterSpellId, elementOf } from './loadout';
 import { validateSpellFields } from '../core/playerProfile';
-import { ANIMATIONS } from './animations';
+import { ANIMATIONS, FACINGS } from './animations';
+import { ART_BOXES } from './frames';
+import { PLACEHOLDERS } from './colors';
 import { TEXTURE_KEYS } from './colors';
 import {
   BASE_COMPANION_STATS,
   COMPANION_CARDS,
+  COMPANION_DRAW_SCALE,
   COMPANION_FX,
   COMPANION_KINDS,
   COMPANION_REACH,
@@ -136,6 +139,47 @@ describe('companion tunables', () => {
       const { targetRange, speed = 1, attackCooldown } = BASE_COMPANION_STATS[id];
       const inFlight = targetRange / speed / attackCooldown;
       expect(MAX_COMPANION_SHOTS, id).toBeGreaterThanOrEqual(inFlight * 4);
+    }
+  });
+});
+
+describe('companion sheets (#184)', () => {
+  const sprites = COMPANION_SPELL_IDS.map((id) => COMPANION_FX[id].sprite);
+
+  it('gives every companion a sheet of its own', () => {
+    expect(new Set(sprites).size).toBe(COMPANION_SPELL_IDS.length);
+  });
+
+  it('carries idle, move and attack in every facing for each sheet', () => {
+    for (const sprite of sprites) {
+      for (const state of ['idle', 'move', 'attack']) {
+        for (const facing of FACINGS) {
+          expect(CLIP_NAMES, sprite).toContain(`${sprite}.${state}.${facing}`);
+        }
+      }
+    }
+  });
+
+  it('loops idle and move and plays attack once', () => {
+    for (const anim of ANIMATIONS) {
+      if (!sprites.some((sprite) => anim.name.startsWith(`${sprite}.`))) continue;
+      expect(anim.repeat, anim.name).toBe(anim.name.includes('.attack.') ? 0 : -1);
+    }
+  });
+
+  it('draws the idle art about the height of the disc it replaces', () => {
+    // Chosen, not inherited: native size, which the cut made ~24 px tall.
+    expect(COMPANION_DRAW_SCALE).toBe(1);
+    const disc = PLACEHOLDERS.companion.height;
+    for (const sprite of sprites) {
+      for (const facing of FACINGS) {
+        const box = ART_BOXES[`${sprite}.idle.${facing}` as keyof typeof ART_BOXES];
+        expect(box, `${sprite} ${facing}`).toBeDefined();
+        const height = box.h * COMPANION_DRAW_SCALE;
+        expect(Math.abs(height - disc), `${sprite} ${facing} is ${height} px`).toBeLessThanOrEqual(
+          4,
+        );
+      }
     }
   });
 });
