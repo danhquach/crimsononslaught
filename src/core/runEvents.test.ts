@@ -36,7 +36,7 @@ describe('onRunEvents', () => {
     emitRunEvent(emitter, 'bossHp', { hp: 7, maxHp: 8 });
     emitRunEvent(emitter, 'shield', { pool: 9, max: 10 });
     const loadout = {
-      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff0000, progress: 0.5 }],
+      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff0000, progress: 0.5, secondsLeft: 1 }],
       passives: [{ name: 'Haste', rank: 2 }],
     };
     emitRunEvent(emitter, 'loadout', loadout);

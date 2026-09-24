@@ -680,6 +680,7 @@ export class GameScene extends Phaser.Scene {
         name: card?.name ?? spell.id,
         color: card?.color ?? 0xffffff,
         progress: spell.castProgress,
+        secondsLeft: Number.isFinite(spell.timeToNextCast) ? spell.timeToNextCast : null,
       };
     });
     const passives = [...this.spells.loadout.passives].map(([id, rank]) => ({

@@ -27,11 +27,31 @@ export interface HudModel {
   passives: readonly LoadoutPassiveView[];
 }
 
-/** One slot box on the HUD: a spell casting in it, or why it is empty (spec §10). */
+/**
+ * One slot icon on the HUD (#213): a spell casting in it, or why it is empty
+ * (spec §10). A spell's `waiting` is the share of its cooldown still to run —
+ * the dark wedge over the icon, 1 right after a cast and 0 when ready — and
+ * `badge` the whole seconds left, `null` when ready or under a second. A spell
+ * with no cooldown (an orbit, a shield) is always ready.
+ */
 export type SlotRow =
-  | { kind: 'spell'; name: string; color: number; progress: number | null }
+  | {
+      kind: 'spell';
+      name: string;
+      /** The name cut to fit under the icon. */
+      label: string;
+      /** Stands in for icon art until it exists: the name's initials. */
+      glyph: string;
+      color: number;
+      ready: boolean;
+      waiting: number;
+      badge: string | null;
+    }
   | { kind: 'open' }
   | { kind: 'locked'; unlockLevel: number };
+
+/** The longest label that fits under a slot icon, in characters. */
+export const SLOT_LABEL_MAX = 10;
 
 /**
  * Run-start values (spec §5). `xpToNext` starts at 0 so the XP bar is empty
@@ -81,19 +101,26 @@ export function applyRunEvent(model: Readonly<HudModel>, event: RunEvent): HudMo
 }
 
 /**
- * The slot boxes, top to bottom: every spell casting, then the slots still
+ * The slot icons, in slot order: every spell casting, then the slots still
  * empty — locked with the level that opens them, or open. Built from what is
  * casting rather than from the slots, so a `?loadout=` run, which casts its
  * extras without spending a slot, still shows them; a run past three spells
- * gets a box for each.
+ * gets an icon for each.
  */
 export function slotRows(model: Readonly<HudModel>): SlotRow[] {
-  const rows: SlotRow[] = model.spells.map(({ name, color, progress }) => ({
-    kind: 'spell',
-    name,
-    color,
-    progress,
-  }));
+  const rows: SlotRow[] = model.spells.map(({ name, color, progress, secondsLeft }) => {
+    const waiting = progress === null ? 0 : 1 - fraction(progress, 1);
+    return {
+      kind: 'spell',
+      name,
+      label: shortSpellName(name),
+      glyph: spellGlyph(name),
+      color,
+      ready: waiting === 0,
+      waiting,
+      badge: waiting > 0 ? cooldownBadge(secondsLeft) : null,
+    };
+  });
   // Row 0 is the default spell's, which is always equipped; it is only empty
   // before the first loadout event lands.
   for (const unlockLevel of [1, ...SLOT_UNLOCK_LEVELS].slice(rows.length)) {
@@ -102,11 +129,41 @@ export function slotRows(model: Readonly<HudModel>): SlotRow[] {
   return rows;
 }
 
-/** What a slot box says. */
+/** What a slot says under its icon. */
 export function slotLabel(row: Readonly<SlotRow>): string {
-  if (row.kind === 'spell') return row.name;
+  if (row.kind === 'spell') return row.label;
   if (row.kind === 'open') return 'Open';
-  return `Locked · Lv ${row.unlockLevel}`;
+  return `Lv ${row.unlockLevel}`;
+}
+
+/**
+ * A name short enough to sit under its icon: whole if it fits, else its last
+ * word ("Fire Column" → "Column"), which is still unique within one element's
+ * roster, cut with an ellipsis only if even that is too long.
+ */
+export function shortSpellName(name: string): string {
+  if (name.length <= SLOT_LABEL_MAX) return name;
+  const last = name.trim().split(/\s+/).pop() ?? name;
+  return last.length <= SLOT_LABEL_MAX ? last : `${last.slice(0, SLOT_LABEL_MAX - 1)}…`;
+}
+
+/** The icon's placeholder glyph: the first letters of the name's first two words. */
+export function spellGlyph(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('');
+}
+
+/**
+ * The seconds-left badge: whole seconds, floored, so it counts 2, 1 and then
+ * disappears for the last second rather than flickering on fast spells.
+ */
+export function cooldownBadge(secondsLeft: number | null): string | null {
+  if (secondsLeft === null || !Number.isFinite(secondsLeft) || secondsLeft < 1) return null;
+  return String(Math.floor(secondsLeft));
 }
 
 /** One line per passive, in the order taken, each with its rank (spec §10). */
