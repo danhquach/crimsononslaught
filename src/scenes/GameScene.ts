@@ -152,6 +152,7 @@ import { Player } from '../entities/Player';
 import type { Pickup } from '../entities/Pickup';
 import { XpGem } from '../entities/XpGem';
 import { ChainLightningSpell } from '../spells/ChainLightningSpell';
+import { LightningBoltSpell } from '../spells/LightningBoltSpell';
 import { FireballSpell } from '../spells/FireballSpell';
 import { FireColumnSpell } from '../spells/FireColumnSpell';
 import { FireDragonSpell } from '../spells/FireDragonSpell';
@@ -430,14 +431,17 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Test hook (#142): the Lightning roster, whichever of it is equipped — hits
-   * each spell has landed and what each has out right now (bolt strips, live
-   * tornadoes, blades on the ring). The browser suite watches a run land hits
-   * with every one and hold their pool caps.
+   * each spell has landed and what each has out right now (bolts in the air,
+   * chain strips, live tornadoes, blades on the ring). The browser suite
+   * watches a run land hits with every one and hold their pool caps.
    */
   get lightningReport(): { id: RosterSpellId; hits: number; live: number }[] {
     return this.spells.spells
       .filter(
-        (spell): spell is ChainLightningSpell | LightningSwordSpell | TornadoSpell =>
+        (
+          spell,
+        ): spell is LightningBoltSpell | ChainLightningSpell | LightningSwordSpell | TornadoSpell =>
+          spell instanceof LightningBoltSpell ||
           spell instanceof ChainLightningSpell ||
           spell instanceof LightningSwordSpell ||
           spell instanceof TornadoSpell,
@@ -798,13 +802,21 @@ export class GameScene extends Phaser.Scene {
           this.fx,
         );
       case 'lightning':
+        return new LightningBoltSpell(
+          this,
+          this.player,
+          this.enemies,
+          stats as Readonly<LightningStats>,
+          damage,
+          this.rng,
+          this.fx,
+        );
       case 'lightning_chain':
         return new ChainLightningSpell(
           this,
-          spellId,
           this.player,
           this.enemies,
-          stats as Readonly<LightningStats | ChainLightningStats>,
+          stats as Readonly<ChainLightningStats>,
           damage,
           this.rng,
           this.fx,

@@ -1156,6 +1156,26 @@
       ]
     },
     {
+      "key": "lightning",
+      "ticket": "CO-137",
+      "file": "CO-137/lightning_bolt.png",
+      "page": 4,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [
+          {
+            "anim": "bolt",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
       "key": "earth",
       "ticket": "CO-123",
       "file": "CO-123/earth_spike.jpg",

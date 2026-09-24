@@ -2,17 +2,15 @@ import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
 import { CHAIN_CLIP, FX_DEPTH } from '../config/fx';
 import { FRAMES } from '../config/frames';
-import { resolveCast, rollStun, type BoltStats } from '../core/chainLightning';
+import { resolveCast, rollStun } from '../core/chainLightning';
 import { chainFrame, chainSegmentPose } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import type { Rng } from '../core/rng';
 import { Spell } from '../core/spell';
+import type { ChainLightningStats } from '../core/spellStats';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
-
-/** The two spells this class casts: Lightning Bolt (the default) and Chain Lightning. */
-export type BoltSpellId = 'lightning' | 'lightning_chain';
 
 /**
  * Chain segments that may be up at once. A cast draws `strikes * (chains + 1)`
@@ -29,13 +27,13 @@ interface Segment {
 }
 
 /**
- * Lightning Bolt and Chain Lightning (#142, Phase 2 spec §9.4): every
- * `cooldown` s, `strikes` bolts leave the caster. Each hits the nearest enemy
- * within `targetRange` for `damage`, staggers it for `staggerDuration` and, on
- * a `stunChance` roll, stuns it for `stunDuration`. Chain Lightning's bolts go
- * on to chain up to `chains` times to the nearest unhit enemy within
- * `chainRange` for `damage * chainFalloff`; Lightning Bolt's block has no chain
- * fields, so its bolts stop at the first target.
+ * Chain Lightning (#142, Phase 2 spec §9.4): every `cooldown` s, `strikes`
+ * bolts leave the caster. Each hits the nearest enemy within `targetRange` for
+ * `damage`, staggers it for `staggerDuration` and, on a `stunChance` roll,
+ * stuns it for `stunDuration`, then chains up to `chains` times to the nearest
+ * unhit enemy within `chainRange` for `damage * chainFalloff`. Lightning Bolt
+ * resolves its targets by the same rule but flies as a shot, so it is
+ * `LightningBoltSpell`'s (#202).
  *
  * The rules — where a bolt starts, who it jumps to, what each hit pays, whether
  * it stuns — live in `core/chainLightning.ts`. A cast is instantaneous and
@@ -52,7 +50,7 @@ interface Segment {
  * is the `fx_bolt` placeholder. The sparks on a stunned or staggered enemy are
  * the overlay pool's, driven from its status.
  */
-export class ChainLightningSpell extends Spell<BoltSpellId> {
+export class ChainLightningSpell extends Spell<'lightning_chain'> {
   private readonly scene: Phaser.Scene;
   private readonly caster: Readonly<Vec2>;
   private readonly enemies: EnemyPool;
@@ -66,15 +64,14 @@ export class ChainLightningSpell extends Spell<BoltSpellId> {
 
   constructor(
     scene: Phaser.Scene,
-    id: BoltSpellId,
     caster: Readonly<Vec2>,
     enemies: EnemyPool,
-    stats: BoltStats,
+    stats: Readonly<ChainLightningStats>,
     damage: DamageSink,
     rng: Rng,
     fx: FxPool,
   ) {
-    super(id, stats);
+    super('lightning_chain', stats);
     this.scene = scene;
     this.caster = caster;
     this.enemies = enemies;
@@ -116,7 +113,7 @@ export class ChainLightningSpell extends Spell<BoltSpellId> {
    * the caster stands this frame.
    */
   protected cast(): void {
-    const stats: BoltStats = this.stats;
+    const { stats } = this;
     const bolts = resolveCast(this.caster, this.enemies.live, stats);
     if (bolts.length === 0) return;
 

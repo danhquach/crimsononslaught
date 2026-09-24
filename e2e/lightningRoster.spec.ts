@@ -5,6 +5,7 @@ import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { MAX_BOULDERS } from '../src/core/orbitingBoulders';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
+import { MAX_LIVE_BOLTS } from '../src/core/lightningBolt';
 import { MAX_SEGMENTS } from '../src/spells/ChainLightningSpell';
 import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
@@ -59,7 +60,7 @@ const MIN_FPS = 20;
 
 /** What `live` counts for each spell, and the cap it may never pass. */
 const CAPS: Readonly<Record<string, number>> = {
-  lightning: MAX_SEGMENTS,
+  lightning: MAX_LIVE_BOLTS,
   lightning_chain: MAX_SEGMENTS,
   lightning_tornado: MAX_LIVE_AREAS,
   lightning_sword: MAX_BOULDERS,

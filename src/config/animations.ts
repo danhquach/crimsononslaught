@@ -119,6 +119,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('lightning.impact', 4, 20, ONCE),
   spec('lightning.chain', 4, 20, LOOP),
   spec('lightning.stun', 4, 10, LOOP),
+  // Lightning Bolt in flight (CO-137, #202): its own shot, not the chain strip.
+  spec('lightning.bolt', 4, 20, LOOP),
 
   // Earth spell (CO-079).
   spec('earth.spin', 6, 12, LOOP),
@@ -243,6 +245,8 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   // The chain segment, not the strike: this is the piece the engine stretches
   // between two enemies.
   fx_bolt: 'lightning.chain.0',
+  // #202: Lightning Bolt's shot, the head-and-tail bolt drawn flying right.
+  proj_bolt: 'lightning.bolt.0',
   boulder: 'earth.spin.0',
   // #145. The ice bolt's flight art, the ice shield's layer, the strike
   // telegraph and Fire Column's body; each cut to the size of the placeholder

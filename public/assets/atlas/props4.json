@@ -420,6 +420,86 @@
         "h": 160
       }
     },
+    "lightning.bolt.0": {
+      "frame": {
+        "x": 1306,
+        "y": 164,
+        "w": 41,
+        "h": 13
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 13
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 13
+      }
+    },
+    "lightning.bolt.1": {
+      "frame": {
+        "x": 1348,
+        "y": 164,
+        "w": 41,
+        "h": 13
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 13
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 13
+      }
+    },
+    "lightning.bolt.2": {
+      "frame": {
+        "x": 1390,
+        "y": 164,
+        "w": 41,
+        "h": 13
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 13
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 13
+      }
+    },
+    "lightning.bolt.3": {
+      "frame": {
+        "x": 1432,
+        "y": 164,
+        "w": 41,
+        "h": 13
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 13
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 13
+      }
+    },
     "lightning.sword.0": {
       "frame": {
         "x": 862,

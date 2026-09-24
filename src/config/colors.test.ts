@@ -12,6 +12,8 @@ const SPEC_KEYS = [
   'proj_fire',
   'fx_nova',
   'fx_bolt',
+  // #202: Lightning Bolt's own shot, apart from Chain Lightning's strip.
+  'proj_bolt',
   'boulder',
   // Phase 2 §10: every new spell registers a texture key and a placeholder
   // colour on day one; the companions' own sheets land with #146.
