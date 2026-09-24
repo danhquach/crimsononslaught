@@ -11,8 +11,9 @@ import type { Vec2 } from './input';
 
 /**
  * Flight speed in px/s. A tuning constant, not a spec §9.4 stat: fast enough
- * that the 400 px `targetRange` is crossed in 0.4 s and a bolt still reads as
- * lightning, slow enough to be seen travelling.
+ * that even a 400 px `targetRange` (the 150 px base, grown by Expanse) is
+ * crossed in 0.4 s and a bolt still reads as lightning, slow enough to be seen
+ * travelling.
  */
 export const BOLT_SPEED = 1000;
 

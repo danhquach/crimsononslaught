@@ -2,7 +2,7 @@ import type { AreaSpellId } from '../config/areas';
 import { createArea, densestSpot, membersOf, type GroundArea } from '../core/groundArea';
 import type { Vec2 } from '../core/input';
 import type { Rng } from '../core/rng';
-import { Spell } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { GroundAreaStats } from '../core/spellStats';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { AreaPool } from '../systems/AreaPool';
@@ -71,9 +71,15 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     return this.stats;
   }
 
+  /** Nothing within targetRange → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.areaStats.targetRange);
+  }
+
   /**
-   * One cast: a patch on the densest cluster within `targetRange`, or on the
-   * player when the arena around them is empty (`densestSpot`).
+   * One cast: a patch on the densest cluster within `targetRange`
+   * (`densestSpot`). With nothing in range the cast never comes here: it waits
+   * (#212), so a patch is never dropped on the player's feet.
    *
    * A pool at its cap drops the patch, so the cast is spent — a backlog of
    * areas waiting for room would land them all at once, long after the moment

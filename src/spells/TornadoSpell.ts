@@ -1,6 +1,6 @@
 import { createArea, membersOf, type GroundArea } from '../core/groundArea';
 import type { Vec2 } from '../core/input';
-import { Spell } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { TornadoStats } from '../core/spellStats';
 import { driftArea, tornadoHeading, tornadoPulls } from '../core/tornado';
 import type { AreaPool } from '../systems/AreaPool';
@@ -63,6 +63,11 @@ export class TornadoSpell extends Spell<'lightning_tornado'> {
   /** This spell's tornadoes live right now — its own, not every patch the arena's pool holds. */
   get liveCount(): number {
     return this.out;
+  }
+
+  /** Nothing within targetRange → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.targetRange);
   }
 
   /**

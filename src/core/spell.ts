@@ -65,6 +65,15 @@ export class CastScheduler {
     return this.charge;
   }
 
+  /**
+   * Stay ready: charge pinned at one full `cooldown`, so the next frame pays out
+   * exactly one cast. For a cast that came due with nothing to aim at (#212) —
+   * the wait is not a backlog, and it must not become a burst later.
+   */
+  holdReady(cooldown: number): void {
+    this.charge = cooldown;
+  }
+
   /** Back to a full cooldown from now — for a spell that stops and restarts. */
   reset(): void {
     this.charge = 0;
@@ -99,6 +108,24 @@ export function nearestEnemies<T extends Vec2>(
   // in the order the caller listed them.
   inRange.sort((a, b) => a.distSq - b.distSq);
   return inRange.slice(0, Math.floor(count)).map((entry) => entry.target);
+}
+
+/**
+ * Whether any candidate stands within `range` of `origin`, the range itself
+ * counting as in — `nearestEnemies`' rule, without sorting a crowd to learn it.
+ */
+export function anyWithin(
+  origin: Readonly<Vec2>,
+  candidates: readonly Readonly<Vec2>[],
+  range: number,
+): boolean {
+  const rangeSq = range * range;
+  for (const target of candidates) {
+    const dx = target.x - origin.x;
+    const dy = target.y - origin.y;
+    if (dx * dx + dy * dy <= rangeSq) return true;
+  }
+  return false;
 }
 
 /**
@@ -165,10 +192,18 @@ export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
   /**
    * The frame, in seconds. The default drives `cast()` off the cooldown; a
    * spell without one overrides this and never sees the scheduler.
+   *
+   * A cast that comes due with nothing in range is held, not spent (#212): no
+   * cast, no cue, and the spell stays ready until the first frame a target
+   * steps into range.
    */
   protected tick(deltaS: number): void {
     const casts = this.scheduler.due(deltaS, this.cooldown);
     for (let i = 0; i < casts; i += 1) {
+      if (!this.hasTarget()) {
+        this.scheduler.holdReady(this.cooldown);
+        return;
+      }
       this.cast();
       this.onCast?.();
     }
@@ -181,6 +216,15 @@ export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
   protected get cooldown(): number {
     const cooldown = (this.currentStats as { cooldown?: number }).cooldown;
     return cooldown === undefined ? Infinity : cooldown;
+  }
+
+  /**
+   * Whether a cast now would have something to aim at. The default, for a spell
+   * with no targeting rule, is always; a spell that aims overrides it with the
+   * same range its `cast()` looks within.
+   */
+  protected hasTarget(): boolean {
+    return true;
   }
 
   /** One volley / pulse / strike. Called once per cast the scheduler pays out. */

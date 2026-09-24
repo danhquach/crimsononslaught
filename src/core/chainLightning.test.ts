@@ -20,6 +20,8 @@ const base: ChainLightningStats = { ...BASE_CHAIN_LIGHTNING_STATS };
 /** Lightning Bolt's block: no chain fields at all (#142). */
 const bolt: LightningStats = { ...BASE_SPELL_STATS.lightning };
 const origin = { x: 0, y: 0 };
+/** A reach past every `row` below, for the rules that are about strike order, not range. */
+const wideReach = { targetRange: 1000 };
 
 /** Enemies on a line, each `gap` px further along x from the origin. */
 function row(count: number, gap = 100): { x: number; y: number }[] {
@@ -148,7 +150,7 @@ describe('resolveCast (CO-046)', () => {
     expect(resolveCast(origin, enemies, bolt)).toEqual([
       [{ target: enemies[0], damage: bolt.damage }],
     ]);
-    const two = resolveCast(origin, enemies, { ...bolt, strikes: 2 });
+    const two = resolveCast(origin, enemies, { ...bolt, ...wideReach, strikes: 2 });
     expect(two.map((arc) => arc.map((hit) => hit.target))).toEqual([[enemies[0]], [enemies[1]]]);
   });
 
@@ -163,7 +165,7 @@ describe('resolveCast (CO-046)', () => {
 
   it('a second strike starts at the nearest enemy the first did not touch', () => {
     const enemies = row(6);
-    const bolts = resolveCast(origin, enemies, { ...base, strikes: 2 });
+    const bolts = resolveCast(origin, enemies, { ...base, ...wideReach, strikes: 2 });
     expect(bolts.map((bolt) => bolt.map((hit) => hit.target))).toEqual([
       enemies.slice(0, 3),
       enemies.slice(3, 6),
@@ -172,7 +174,7 @@ describe('resolveCast (CO-046)', () => {
 
   it('strikes never hit the same enemy twice while another is unhit', () => {
     const enemies = row(4);
-    const bolts = resolveCast(origin, enemies, { ...base, strikes: 3 });
+    const bolts = resolveCast(origin, enemies, { ...base, ...wideReach, strikes: 3 });
     const struck = bolts.flat().map((hit) => hit.target);
     expect(struck.slice(0, 4)).toEqual(enemies);
     expect(new Set(struck.slice(0, 4)).size).toBe(4);

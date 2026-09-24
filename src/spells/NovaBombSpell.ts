@@ -3,7 +3,7 @@ import { MAX_LIVE_BOMBS, bombFrost, bombTarget, pulseTargets } from '../core/fro
 import { novaScale } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import type { Rng } from '../core/rng';
-import { Spell } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { NovaBombStats } from '../core/spellStats';
 import type { Enemy } from '../entities/Enemy';
 import { Projectile, type ProjectileLook } from '../entities/Projectile';
@@ -93,6 +93,11 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
     for (const child of this.group.getChildren()) {
       if (child instanceof Projectile && child.active && child.spent) this.detonate(child);
     }
+  }
+
+  /** Nothing within range → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.range);
   }
 
   /** One throw. With no enemy in range nothing leaves the caster and the cast is spent. */

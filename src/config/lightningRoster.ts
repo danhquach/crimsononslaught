@@ -43,7 +43,7 @@ export const BASE_CHAIN_LIGHTNING_STATS: Readonly<ChainLightningStats> = {
   chains: 2,
   chainRange: 120,
   chainFalloff: 0.8,
-  targetRange: 400,
+  targetRange: 150,
   staggerDuration: 0.5,
   stunChance: 0.08,
   stunDuration: 2,
@@ -58,7 +58,7 @@ export const BASE_TORNADO_STATS: Readonly<TornadoStats> = {
   pullRadius: 150,
   pullForce: 90,
   speed: 60,
-  targetRange: 360,
+  targetRange: 162,
   duration: 5,
 };
 

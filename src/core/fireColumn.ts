@@ -19,8 +19,8 @@ import { nearestEnemies } from './spell';
 
 /**
  * Columns in flight the pool may ever hold. Base `projectiles` is 1 against a
- * 3 s cooldown, and a column takes about 4 s to travel its 500 px `range`, so
- * one or two are normally in the air at a time; the cap leaves room for a
+ * 2.2 s cooldown, and a column takes about 1.5 s to travel its 180 px `range`,
+ * so at most one is in the air at a time; the cap leaves room for a
  * Haste build.
  */
 export const MAX_LIVE_COLUMNS = 8;

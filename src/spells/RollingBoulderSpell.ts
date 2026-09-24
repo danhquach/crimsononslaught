@@ -5,7 +5,7 @@ import { dustFlip } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
 import { MAX_LIVE_BOULDERS, rollSpent, rollTarget } from '../core/rollingBoulder';
-import { Spell } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { BoulderStats } from '../core/spellStats';
 import type { Enemy } from '../entities/Enemy';
 import { Projectile, type ProjectileLook } from '../entities/Projectile';
@@ -88,6 +88,11 @@ export class RollingBoulderSpell extends Spell<'earth_boulder'> {
     for (const child of this.group.getChildren()) {
       if (child instanceof Projectile && child.active && child.spent) this.despawn(child);
     }
+  }
+
+  /** Nothing within range → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.range);
   }
 
   /**

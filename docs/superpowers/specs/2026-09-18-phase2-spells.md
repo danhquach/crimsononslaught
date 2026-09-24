@@ -402,6 +402,16 @@ type-specific damage.
   real.
 - **Needs** names the mechanic ticket a spell cannot ship without.
 - Units: seconds, pixels, px/s, rad/s. `tickRate` is seconds between ticks.
+- Every player spell's `range` and `targetRange` was cut to about ×0.45 by
+  [#212](https://github.com/danhquach/crimsononslaught/issues/212), so a new
+  run reaches only what is on screen and Expanse earns more reach. Fire Bolt,
+  Lightning Bolt and Chain Lightning are 150 and Fire Column 180, set by hand.
+  Companion ranges, `chainRange` and every radius are unchanged.
+- A spell casts only with an enemy in its `range` or `targetRange`, and a
+  companion attacks only with a target (#212). A cast that comes due with
+  nothing in range is held, not spent: no cast, no cue, and the spell fires on
+  the first frame something steps into range, then waits a full cooldown. The
+  wait is never paid back as a burst.
 
 ### 9.2 Fire
 
@@ -423,8 +433,8 @@ type-specific damage.
 | `radius` | — | — | 55 | — | — |
 | `projectiles` | 1 | 1 | 1 | 1 | 1 |
 | `speed` | 350 | — | 120 | 320 | 260 |
-| `range` | 400 | — | 500 | — | — |
-| `targetRange` | — | 420 | — | 260 | 420 |
+| `range` | 150 | — | 180 | — | — |
+| `targetRange` | — | 189 | — | 260 | 189 |
 | `fallDelay` | — | 1.0 | — | — | — |
 | `homingTurnRate` | — | — | — | — | 4.0 rad/s |
 | `duration` | — | — | — | — | 3.0 |
@@ -453,8 +463,8 @@ the same spot. A telegraph ring the size of `aoeRadius` holds on that point for
 `fallDelay` on the run clock — a paused run holds it mid-fall — and the strike
 then lands on the point, not on the enemy: everything within `aoeRadius` of it
 takes `damage × aoeDamageFactor`, whether the enemy it aimed at is still alive,
-still standing there or long gone. With nothing in `targetRange` the cast is
-spent on nothing rather than dropped at the player's feet. The telegraph is drawn
+still standing there or long gone. With nothing in `targetRange` the cast
+waits (#212) rather than dropping at the player's feet. The telegraph is drawn
 above the crowd, not on the floor with the ground areas, because a warning the
 enemy cap can bury is not a warning.
 
@@ -477,8 +487,8 @@ enemy cap can bury is not a warning.
 | `tickRate` | — | — | — | — | 0.5 |
 | `radius` | — | 110 | — | — | 180 |
 | `speed` | 380 | 220 | — | 320 | — |
-| `range` | 420 | 300 | — | — | — |
-| `targetRange` | — | — | — | 260 | 400 |
+| `range` | 189 | 135 | — | — | — |
+| `targetRange` | — | — | — | 260 | 180 |
 | `leashRadius` | — | — | — | 60 | — |
 | `duration` | — | — | — | — | 6.0 |
 | `slowPct` | 0.2 | 0.4 | 0.4 | 0.25 | 0.5 |
@@ -533,7 +543,7 @@ asked for.
 | `chains` | — | 2 | — | — | — |
 | `chainRange` | — | 120 | — | — | — |
 | `chainFalloff` | — | 0.8 | — | — | — |
-| `targetRange` | 400 | 400 | 360 | 200 | — |
+| `targetRange` | 150 | 150 | 162 | 200 | — |
 | `radius` | — | — | 110 | — | — |
 | `pullRadius` | — | — | 150 | — | — |
 | `pullForce` | — | — | 90 | — | — |
@@ -575,8 +585,8 @@ stagger refreshes the timer.
 | `radius` | 55 | 36 | — | 180 | — |
 | `speed` | — | 280 | — | — | — |
 | `chaseSpeed` | — | — | — | — | 200 |
-| `range` | — | 460 | — | — | — |
-| `targetRange` | 320 | — | — | 360 | 200 |
+| `range` | — | 207 | — | — | — |
+| `targetRange` | 144 | — | — | 162 | 200 |
 | `leashRadius` | — | — | — | — | 200 |
 | `pierce` | — | 5 | — | — | — |
 | `count` | — | — | 3 | — | — |

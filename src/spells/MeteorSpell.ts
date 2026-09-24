@@ -3,7 +3,7 @@ import { explosionScale } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import type { Rng } from '../core/rng';
 import { createTelegraph, pickImpactPoint, strikeTargets, type Telegraph } from '../core/skyStrike';
-import { Spell, nearestEnemies } from '../core/spell';
+import { Spell, anyWithin, nearestEnemies } from '../core/spell';
 import type { MeteorStats } from '../core/spellStats';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
@@ -85,6 +85,11 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
   /** The live block, as the strike stats this id resolves to. */
   get strikeStats(): Readonly<MeteorStats> {
     return this.stats;
+  }
+
+  /** Nothing within targetRange → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.targetRange);
   }
 
   /**

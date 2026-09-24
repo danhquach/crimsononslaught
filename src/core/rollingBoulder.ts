@@ -20,9 +20,9 @@ import { nearestEnemies } from './spell';
 
 /**
  * Boulders in the air the pool may ever hold. Base `cooldown` is 2 s against a
- * 460 px `range` at 280 px/s — about 1.6 s of flight, so roughly one is rolling
- * at a time — and a stacked Haste at the profile's 0.35 floor brings that to
- * two or three; the cap is several times either and exists to bound the pool
+ * 207 px `range` at 280 px/s — under 0.8 s of flight, so at most one is
+ * rolling — and a stacked Haste at the profile's 0.35 floor brings that to
+ * one or two; the cap is several times either and exists to bound the pool
  * rather than to shape play.
  */
 export const MAX_LIVE_BOULDERS = 8;

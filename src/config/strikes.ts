@@ -34,7 +34,7 @@ export const BASE_METEOR_STATS: Readonly<MeteorStats> = {
   aoeRadius: 130,
   aoeDamageFactor: 1,
   projectiles: 1,
-  targetRange: 420,
+  targetRange: 189,
   fallDelay: 1,
 };
 

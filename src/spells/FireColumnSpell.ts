@@ -3,7 +3,7 @@ import { PLACEHOLDERS } from '../config/colors';
 import { MAX_LIVE_COLUMNS, columnTarget, tickHitCooldown, tryHit } from '../core/fireColumn';
 import { explosionScale } from '../core/fx';
 import type { Vec2 } from '../core/input';
-import { Spell } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { FireColumnStats } from '../core/spellStats';
 import type { Enemy } from '../entities/Enemy';
 import { Projectile, type ProjectileLook } from '../entities/Projectile';
@@ -87,6 +87,11 @@ export class FireColumnSpell extends Spell<'fire_column'> {
     for (const child of this.group.getChildren()) {
       if (child instanceof Projectile && child.active && child.spent) this.despawnColumn(child);
     }
+  }
+
+  /** Nothing within range → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.range);
   }
 
   /**

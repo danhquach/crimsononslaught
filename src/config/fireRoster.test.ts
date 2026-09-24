@@ -37,7 +37,7 @@ describe('fire roster stat blocks', () => {
       radius: 55,
       projectiles: 1,
       speed: 120,
-      range: 500,
+      range: 180,
       hitCooldown: 0.5,
       burn: 8,
       burnDuration: 3,
@@ -53,7 +53,7 @@ describe('fire roster stat blocks', () => {
       aoeDamageFactor: 0.4,
       projectiles: 1,
       speed: 260,
-      targetRange: 420,
+      targetRange: 189,
       homingTurnRate: 4,
       duration: 3,
     });

@@ -28,7 +28,7 @@ export const BASE_FIRE_COLUMN_STATS: Readonly<FireColumnStats> = {
   radius: 55,
   projectiles: 1,
   speed: 120,
-  range: 500,
+  range: 180,
   hitCooldown: 0.5,
   burn: 8,
   burnDuration: 3,
@@ -42,7 +42,7 @@ export const BASE_FIRE_DRAGON_STATS: Readonly<FireDragonStats> = {
   aoeDamageFactor: 0.4,
   projectiles: 1,
   speed: 260,
-  targetRange: 420,
+  targetRange: 189,
   homingTurnRate: 4,
   duration: 3,
 };
@@ -64,7 +64,7 @@ export const FIRE_ROSTER_CARDS: Readonly<Record<FireRosterSpellId, SpellCard>> =
       ['Cooldown', '2.2 s'],
       ['Damage', '18'],
       ['Burn', '8 dps for 3.0 s'],
-      ['Range', '500'],
+      ['Range', '180'],
     ],
   },
   fire_dragon: {
@@ -75,7 +75,7 @@ export const FIRE_ROSTER_CARDS: Readonly<Record<FireRosterSpellId, SpellCard>> =
       ['Cooldown', '2.5 s'],
       ['Damage', '45'],
       ['Blast radius', '30'],
-      ['Target range', '420'],
+      ['Target range', '189'],
     ],
   },
 };
