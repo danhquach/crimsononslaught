@@ -16,14 +16,14 @@ Supersedes:
   **consumable**:
   - Embers collected in the run are banked at the end, win or lose, and spent
     in the existing pre-run Upgrades store.
-  - The consumable is a placeholder whose effects #128 designs.
+  - The consumable's kinds and effects are #128's (§4.2).
 - **Strong pickups are scattered around the map** at run start for the player
   to go and collect. Their effects are placeholders, designed in a later
   ticket.
 
 Out of scope:
 - difficulty tiers, endless mode, stages and an in-run shop;
-- any real consumable or map-pickup effect.
+- any real map-pickup effect. (Consumable effects landed later, with #128.)
 
 ## 2. The 20-minute run (#127)
 
@@ -136,9 +136,9 @@ Rolled once per regular enemy death, next to `gems.dropFor` in
 
 | Source | Embers | Consumable |
 |---|---|---|
-| swarm | 20% chance of 1 | 3% |
-| fast | 20% chance of 1 | 3% |
-| tank | always 3 | 3% |
+| swarm | 20% chance of 1 | 0.3% (was 3%, cut by #128) |
+| fast | 20% chance of 1 | 0.3% |
+| tank | always 3 | 0.3% |
 | boss | 100, credited directly on the kill | — |
 
 - An Ember pickup carries a value (tank = one pickup worth 3).
@@ -160,12 +160,31 @@ Rolled once per regular enemy death, next to `gems.dropFor` in
   payout.
 - The Upgrades store (`UpgradesScene`, `config/meta.ts` upgrades) is unchanged.
 
-### 4.2 Consumable stub
+### 4.2 Consumables (#128)
 
-- Picking one up calls `onConsumable()`, which only emits
-  `pickup:consumable` and counts it into `RunStats.consumables`.
-- #128 replaces that stub with health, magnet, bomb and chest. It will add a
-  `consumableKind` then; it is not designed here.
+#195 shipped a stub; #128 gives each consumable a `consumableKind`, and cuts
+the drop chance from 3% to 0.3% so a consumable stays a rare find: about a
+dozen in a full run of ~4,000 kills, where 3% dropped over a hundred. The
+tunables are in `config/pickups.ts`, the rules in `core/pickups.ts`.
+
+| Kind | Dropped by | Effect on pickup |
+|---|---|---|
+| health | a regular death: 45% of the 0.3% roll | +30 HP, capped at max |
+| magnet | a regular death: 35% of the 0.3% roll | every gem on the map drifts in for 11 s of run time |
+| bomb | a regular death: 20% of the 0.3% roll | 200 damage to every regular enemy on screen; the boss is spared |
+| chest | an elite (#126): always | +25 Embers |
+
+- The kind is read off the same draw as the 0.3% roll, so a roll is still two
+  draws on the pickups stream and a seed's Embers do not move.
+- Elites are #126's. Until they land, every death rolls as a regular one, so
+  no chest drops. The boss drops no chest: its 100 Embers are credited on the
+  kill (above).
+- A chest pays Embers rather than a level-up, whose offer would draw from the
+  run's RNG and move every later offer of the seed.
+- A bomb hits through `damageEnemy` as an un-crittable `tick`, so its kills
+  drop gems and Embers like any other and draw nothing from the crit stream.
+- Picking one up still emits `pickup:consumable`, now `{ kind, consumables }`,
+  and counts it into `RunStats.consumables`.
 
 ## 5. Map pickups ("relics", new ticket)
 

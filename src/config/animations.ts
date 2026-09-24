@@ -181,6 +181,23 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...facings('companionEarth.idle', 2, 4, LOOP),
   ...facings('companionEarth.move', 4, 8, LOOP),
   ...facings('companionEarth.attack', 4, 10, ONCE),
+
+  // Floor pickups (CO-106, #128). The gem's pacing: an idle that loops while
+  // the pickup lies there or drifts in, and a burst where it was taken. The
+  // Ember's burst is three frames: its fourth cell was faint sparks that the
+  // alpha threshold clears.
+  spec('pickupHealth.idle', 4, 6, LOOP),
+  spec('pickupHealth.pickup', 4, 15, ONCE),
+  spec('pickupMagnet.idle', 4, 6, LOOP),
+  spec('pickupMagnet.pickup', 4, 15, ONCE),
+  spec('pickupBomb.idle', 4, 6, LOOP),
+  spec('pickupBomb.pickup', 4, 15, ONCE),
+  spec('pickupChest.idle', 4, 6, LOOP),
+  spec('pickupChest.pickup', 4, 15, ONCE),
+  spec('pickupEmber.idle', 4, 6, LOOP),
+  spec('pickupEmber.pickup', 3, 15, ONCE),
+  spec('pickupRelic.idle', 4, 6, LOOP),
+  spec('pickupRelic.pickup', 4, 15, ONCE),
 ];
 
 /**
@@ -219,4 +236,11 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   shield_ice: 'ice.shield.0',
   fx_telegraph: 'fire.meteorMark.0',
   fx_column: 'fire.column.0',
+  // CO-106: the floor pickups, each cut to its placeholder's size.
+  pickup_ember: 'pickupEmber.idle.0',
+  pickup_relic: 'pickupRelic.idle.0',
+  pickup_health: 'pickupHealth.idle.0',
+  pickup_magnet: 'pickupMagnet.idle.0',
+  pickup_bomb: 'pickupBomb.idle.0',
+  pickup_chest: 'pickupChest.idle.0',
 };

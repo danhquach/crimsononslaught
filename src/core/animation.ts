@@ -1,6 +1,7 @@
 import { ANIMATIONS, type Facing } from '../config/animations';
 import type { EnemyType } from '../config/enemies';
 import type { FrameInfo } from '../config/frames';
+import type { ConsumableKind, PickupKind } from '../config/pickups';
 import type { BossPhase } from './boss';
 import type { Vec2 } from './input';
 
@@ -115,6 +116,34 @@ export interface GemPose {
 export function gemAnimation(pose: Readonly<GemPose>): string {
   if (pose.collected) return 'gem.pickup';
   return pose.drifting ? 'gem.drift' : 'gem.idle';
+}
+
+/** Each floor pickup's clip prefix in the atlas (CO-106): a consumable's is its kind's. */
+const PICKUP_CLIPS: Readonly<Record<Exclude<PickupKind, 'consumable'> | ConsumableKind, string>> = {
+  ember: 'pickupEmber',
+  relic: 'pickupRelic',
+  health: 'pickupHealth',
+  magnet: 'pickupMagnet',
+  bomb: 'pickupBomb',
+  chest: 'pickupChest',
+};
+
+export interface PickupPose {
+  readonly kind: PickupKind;
+  /** Which consumable it is; read only when `kind` is `consumable`. */
+  readonly consumable: ConsumableKind;
+  /** Taken by the player; bursting before it leaves the pool. */
+  readonly collected: boolean;
+}
+
+/**
+ * A floor pickup's clip (CO-106): its idle while it lies there or drifts in —
+ * a pickup has no drift clip of its own, unlike the gem — and its burst once
+ * taken.
+ */
+export function pickupAnimation(pose: Readonly<PickupPose>): string {
+  const clip = PICKUP_CLIPS[pose.kind === 'consumable' ? pose.consumable : pose.kind];
+  return `${clip}.${pose.collected ? 'pickup' : 'idle'}`;
 }
 
 const DURATIONS_MS = new Map(

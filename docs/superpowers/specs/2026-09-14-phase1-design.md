@@ -39,7 +39,8 @@ browser smoke).
 - Vitest unit tests, Playwright smoke test, GitHub Actions CI, gh-pages deploy.
 
 ### Out (phase 2+)
-Gold / meta shop, additional characters, spell evolutions, chests, sound and
+Gold / meta shop, additional characters, spell evolutions, chests (since added
+by #128, see the 20-minute run spec §4.2), sound and
 music, real art, mobile / touch controls (gamepad IS in scope), saves, multiple arenas, ranged or
 elite enemies, settings menu.
 

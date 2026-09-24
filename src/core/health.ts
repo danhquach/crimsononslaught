@@ -85,6 +85,15 @@ export function regenHealth(
   return { ...state, hp: Math.min(state.maxHp, state.hp + (hpPerSecond * deltaMs) / 1000) };
 }
 
+/**
+ * Restore `amount` HP at once (#128, a health pickup), capped at `maxHp`. A
+ * dead player is not healed back out of death.
+ */
+export function heal(state: Readonly<HealthState>, amount: number): HealthState {
+  if (!(amount > 0) || isDead(state) || state.hp >= state.maxHp) return state as HealthState;
+  return { ...state, hp: Math.min(state.maxHp, state.hp + amount) };
+}
+
 /** Drain the invulnerability window by one frame's delta. */
 export function tickHealth(state: Readonly<HealthState>, deltaMs: number): HealthState {
   if (state.invulnMs === 0) return state as HealthState;

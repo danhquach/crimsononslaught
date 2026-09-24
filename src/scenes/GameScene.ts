@@ -23,7 +23,14 @@ import {
 } from '../core/levelUp';
 import { levelUpOffer, type ActiveCard } from '../core/levelUpOffer';
 import { PLAYER_EVENT } from '../core/health';
-import { PICKUP_EVENT, placeRelics, planDrop, rollDrops } from '../core/pickups';
+import {
+  PICKUP_EVENT,
+  bombTargets,
+  placeRelics,
+  planDrop,
+  rollDrops,
+  tickMagnet,
+} from '../core/pickups';
 import { createRng, deriveSeed, type Rng } from '../core/rng';
 import { RUN_EVENT, emitRunEvent, type RunEventPayloads } from '../core/runEvents';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
@@ -68,7 +75,16 @@ import {
 } from '../config/strikes';
 import { ARENA_DEPTH } from '../config/fx';
 import type { EnemyType } from '../config/enemies';
-import { BOSS_EMBERS, RELIC_COUNT, type PickupKind } from '../config/pickups';
+import {
+  BOMB_DAMAGE,
+  BOSS_EMBERS,
+  CHEST_EMBERS,
+  HEAL_AMOUNT,
+  MAGNET_DURATION_MS,
+  RELIC_COUNT,
+  type ConsumableKind,
+  type PickupKind,
+} from '../config/pickups';
 import { LARGE_EXPLOSION_SCALE, SHAKES, type ShakeKind } from '../config/hitFeedback';
 import {
   NO_SHAKE,
@@ -251,6 +267,8 @@ export class GameScene extends Phaser.Scene {
   private numbers!: DamageNumberPool;
   private feedback = readFeedbackSettings({});
   private shake: ShakeState = NO_SHAKE;
+  /** Run time left on a magnet pickup (#128); while above 0 every gem on the map drifts in. */
+  private magnetMsLeft = 0;
 
   constructor() {
     super(SCENE.game);
@@ -418,23 +436,48 @@ export class GameScene extends Phaser.Scene {
    */
   /**
    * Test hook (#195): what lies on the floor now, by kind, the drops the pool
-   * counts against its cap, and what the run has picked up so far.
+   * counts against its cap, and what the run has picked up so far. #128 adds
+   * the consumables on the floor by kind, the magnet's time left, the gems
+   * lying in the arena, the regular enemies a bomb would hit now, and the
+   * kills and HP its effects move.
    */
   get pickupReport(): {
     live: Record<PickupKind, number>;
+    consumablesLive: Record<ConsumableKind, number>;
     drops: number;
     embers: number;
     consumables: number;
     relics: number;
+    magnetMsLeft: number;
+    gems: number;
+    onScreen: number;
+    kills: number;
+    hp: number;
   } {
-    const { embers, consumables, relics } = this.run;
+    const { embers, consumables, relics, kills } = this.run;
     return {
       live: this.pickups.countsByKind(),
+      consumablesLive: this.pickups.consumablesByKind(),
       drops: this.pickups.liveDrops,
       embers,
       consumables,
       relics,
+      magnetMsLeft: this.magnetMsLeft,
+      gems: this.gems.liveCount,
+      onScreen: this.bombTargets().length,
+      kills,
+      hp: this.player.hp,
     };
+  }
+
+  /**
+   * Test hook (#128): drop a `kind` consumable `offset` px right of the
+   * player, through the pool like a death's drop, so the browser suite can
+   * check each effect without waiting on a 0.3 % roll. Returns false when the
+   * drop cap is full.
+   */
+  dropConsumable(kind: ConsumableKind, offset = 0): boolean {
+    return this.pickups.dropConsumable(kind, this.player.x + offset, this.player.y);
   }
 
   get earthReport(): { id: RosterSpellId; hits: number; live: number }[] {
@@ -475,6 +518,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.disableUpdate();
     this.physics.world.fixedStep = false;
     this.pendingLevelUps = 0;
+    this.magnetMsLeft = 0;
     this.offer = [];
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
     this.audio = audioOf(this);
@@ -651,8 +695,16 @@ export class GameScene extends Phaser.Scene {
     this.enemies.update(step.deltaMs, this.player, (enemy, amount) =>
       this.damageEnemy(enemy, amount, 'dot'),
     );
-    this.gems.update(step.deltaMs, this.player);
-    this.pickups.update(this.player);
+    // #128: a live magnet reaches every gem on the map; Embers and consumables
+    // keep to the player's own radius.
+    const player = this.player;
+    const magnet = this.magnetMsLeft > 0;
+    this.gems.update(
+      step.deltaMs,
+      magnet ? { x: player.x, y: player.y, pickupRadius: Infinity } : player,
+    );
+    this.magnetMsLeft = tickMagnet(this.magnetMsLeft, step.deltaMs);
+    this.pickups.update(step.deltaMs, player);
     this.spells.update(step.deltaMs);
     // After the casts, so a patch placed this step starts its lifetime here
     // rather than a step late, and before the physics step, so the enemies a
@@ -1038,8 +1090,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * #195: an Ember is banked into the run on touch; a consumable and a relic
-   * are only counted and announced, since their effects are later tickets'.
+   * #195: an Ember is banked into the run on touch, and a relic is only
+   * counted and announced, since its effect is a later ticket's. A consumable
+   * takes effect (#128).
    */
   private onPickup(pickup: Pickup): void {
     const collected = this.pickups.collect(pickup);
@@ -1047,15 +1100,52 @@ export class GameScene extends Phaser.Scene {
     if (collected.kind === 'ember') {
       this.run.addEmbers(collected.value);
     } else if (collected.kind === 'consumable') {
-      this.onConsumable();
+      this.onConsumable(collected.consumable);
     } else {
       this.onRelic();
     }
   }
 
-  /** #195 stub: #128 gives consumables their kinds and effects. */
-  private onConsumable(): void {
-    this.events.emit(PICKUP_EVENT.consumable, { consumables: this.run.recordConsumable() });
+  /**
+   * #128: a consumable's effect, then the count and the announcement #195 set
+   * up. Nothing here draws from the run's RNG: a chest pays Embers rather than
+   * a level-up, whose offer would move every later one of the seed.
+   */
+  private onConsumable(kind: ConsumableKind): void {
+    switch (kind) {
+      case 'health':
+        this.player.heal(HEAL_AMOUNT);
+        break;
+      case 'magnet':
+        this.magnetMsLeft = MAGNET_DURATION_MS;
+        break;
+      case 'bomb':
+        this.detonateBomb();
+        break;
+      case 'chest':
+        this.run.addEmbers(CHEST_EMBERS);
+        break;
+    }
+    this.events.emit(PICKUP_EVENT.consumable, {
+      kind,
+      consumables: this.run.recordConsumable(),
+    });
+  }
+
+  /**
+   * #128: every regular enemy on screen takes `BOMB_DAMAGE` through
+   * `damageEnemy`, so its kill, gems and Embers land as any other. A `tick`
+   * never crits, so a bomb draws nothing from the crit stream, and the boss is
+   * spared: a screen clear is not a boss kill.
+   */
+  private detonateBomb(): void {
+    for (const enemy of this.bombTargets()) this.damageEnemy(enemy, BOMB_DAMAGE, 'tick');
+    this.shakeFor('explosion');
+  }
+
+  /** The regular enemies a bomb would hit right now (`core/pickups.ts#bombTargets`). */
+  private bombTargets(): Enemy[] {
+    return bombTargets(this.enemies.live, this.cameras.main.worldView, (e) => e instanceof Boss);
   }
 
   /** #195 stub: a later ticket gives relics their effect. */
@@ -1082,15 +1172,20 @@ export class GameScene extends Phaser.Scene {
    * ever lost.
    */
   private dropPickups(type: EnemyType, x: number, y: number): void {
-    const plan = planDrop(rollDrops(this.pickupRng, type), this.pickups.liveDrops);
+    // Elites are #126's; until they land no death rolls for a chest.
+    const plan = planDrop(rollDrops(this.pickupRng, type, false), this.pickups.liveDrops);
     let credit = plan.credit;
     if (plan.ember > 0) {
-      const placed = this.pickups.drop('ember', x + EMBER_OFFSET.x, y + EMBER_OFFSET.y, plan.ember);
+      const placed = this.pickups.dropEmber(x + EMBER_OFFSET.x, y + EMBER_OFFSET.y, plan.ember);
       if (!placed) credit += plan.ember;
     }
     if (credit > 0) this.run.addEmbers(credit);
     if (plan.consumable) {
-      this.pickups.drop('consumable', x + CONSUMABLE_OFFSET.x, y + CONSUMABLE_OFFSET.y);
+      this.pickups.dropConsumable(
+        plan.consumable,
+        x + CONSUMABLE_OFFSET.x,
+        y + CONSUMABLE_OFFSET.y,
+      );
     }
   }
 

@@ -7,6 +7,7 @@ import {
   createHealth,
   flickerAlpha,
   grantMaxHp,
+  heal,
   isInvulnerable,
   regenHealth,
   takeDamage,
@@ -169,6 +170,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
    */
   grantMaxHp(bonus: number, heal = false): void {
     this.setHealth(grantMaxHp(this.health, bonus, heal));
+    emitRunEvent(this.scene.events, 'hp', { hp: this.health.hp, maxHp: this.health.maxHp });
+  }
+
+  /** Restore `amount` HP at once (#128, a health pickup), capped at the maximum. */
+  heal(amount: number): void {
+    this.setHealth(heal(this.health, amount));
     emitRunEvent(this.scene.events, 'hp', { hp: this.health.hp, maxHp: this.health.maxHp });
   }
 
