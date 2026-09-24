@@ -1197,6 +1197,58 @@
       ]
     },
     {
+      "key": "earth",
+      "ticket": "CO-123",
+      "file": "CO-123/earth_shield_break.png",
+      "page": 4,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 456,
+      "rowSpecs": [
+        [
+          {
+            "anim": "shieldBreak",
+            "cols": [
+              1,
+              4
+            ],
+            "centred": true
+          }
+        ]
+      ]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-123",
+      "file": "CO-123/earth_quake_area.png",
+      "page": 4,
+      "cols": 2,
+      "rows": 2,
+      "sheetCell": 768,
+      "rowSpecs": [
+        [
+          {
+            "anim": "quake",
+            "cols": [
+              1,
+              2
+            ],
+            "centred": true
+          }
+        ],
+        [
+          {
+            "anim": "quake",
+            "cols": [
+              1,
+              2
+            ],
+            "centred": true
+          }
+        ]
+      ]
+    },
+    {
       "key": "status",
       "ticket": "CO-123",
       "file": "CO-123/status_stagger.jpg",
@@ -1208,6 +1260,26 @@
         [
           {
             "anim": "stagger",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "status",
+      "ticket": "CO-123",
+      "file": "CO-123/status_bleed.png",
+      "page": 4,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 176,
+      "rowSpecs": [
+        [
+          {
+            "anim": "bleed",
             "cols": [
               1,
               4
