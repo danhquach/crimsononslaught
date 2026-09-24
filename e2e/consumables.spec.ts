@@ -9,6 +9,8 @@ import { PLAYER_MAX_HP } from '../src/config/player';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { Player } from '../src/entities/Player';
+import type { EnemyPool } from '../src/systems/EnemyPool';
+import type { GemPool } from '../src/systems/GemPool';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
 import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
@@ -20,6 +22,12 @@ import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game'
  * 0.3 % roll is no way to reach one here.
  *
  * Every run is invulnerable, so nothing but the test moves the player's HP.
+ *
+ * The bomb and the magnet stage what they act on — a crowd in view, gems far
+ * off — in the same `evaluate` that drops them, rather than waiting for the run
+ * to pile them up: how crowded the screen gets depends on the level-up offers,
+ * and those differ between machines, so a wait for 15 enemies on screen held
+ * locally and timed out at 12 on CI.
  */
 
 const PICKED: SpellId = 'fire';
@@ -53,22 +61,46 @@ async function sample(page: Page): Promise<Sample> {
   }, SCENE);
 }
 
+/** What to set up in the arena, in the same instant, before a drop. */
+interface Stage {
+  /** HP taken straight off the player, round the invulnerability hook. */
+  hurt?: number;
+  /** Tanks placed on a grid inside the camera's view. */
+  crowd?: number;
+  /** Gems placed on a ring 400–1300 px out, far outside the pickup radius. */
+  farGems?: number;
+}
+
 /**
- * Drop `kind` at the player's feet and return the report from the same
- * instant, before the overlap can have taken it. `hurt` first takes that
- * much HP straight off the player, round the invulnerability hook.
+ * Stage the arena, drop `kind` at the player's feet, and return the report
+ * from the same instant, before the overlap can have taken it.
  */
-async function drop(page: Page, kind: ConsumableKind, hurt = 0): Promise<Report> {
+async function drop(page: Page, kind: ConsumableKind, stage: Stage = {}): Promise<Report> {
   return page.evaluate(
-    async ({ key, kind, hurt }) => {
+    async ({ key, kind, stage }) => {
       const { game } = await import('/src/main.ts');
       const scene = game.scene.getScene(key) as GameScene;
-      if (hurt > 0) (scene as unknown as { player: Player }).player.takeDamage(hurt);
+      const inner = scene as unknown as { player: Player; enemies: EnemyPool; gems: GemPool };
+      const { player } = inner;
+      if (stage.hurt) player.takeDamage(stage.hurt);
+      const view = scene.cameras.main.worldView;
+      for (let i = 0; i < (stage.crowd ?? 0); i++) {
+        // Six across, inset from the edges and clear of the player.
+        const x = view.x + 120 + (i % 6) * ((view.width - 240) / 5);
+        const y = view.y + 90 + (Math.floor(i / 6) % 4) * ((view.height - 180) / 3);
+        if (Math.hypot(x - player.x, y - player.y) < 100) continue;
+        inner.enemies.spawn('tank', x, y);
+      }
+      for (let i = 0; i < (stage.farGems ?? 0); i++) {
+        const angle = (i / (stage.farGems ?? 1)) * Math.PI * 2;
+        const r = 400 + (i % 10) * 100;
+        inner.gems.spawn(player.x + Math.cos(angle) * r, player.y + Math.sin(angle) * r);
+      }
       const report = scene.pickupReport;
       if (!scene.dropConsumable(kind)) throw new Error(`no room to drop ${kind}`);
       return report;
     },
-    { key: SCENE.game, kind, hurt },
+    { key: SCENE.game, kind, stage },
   );
 }
 
@@ -102,7 +134,7 @@ test('a health pickup heals, capped at the maximum, and a chest pays Embers', as
   await startRun(page, 'timeScale=1');
 
   const hurt = 50;
-  const before = await drop(page, 'health', hurt);
+  const before = await drop(page, 'health', { hurt });
   expect(before.hp, 'HP after the test’s hit').toBe(PLAYER_MAX_HP - hurt);
   const healed = await waitForPickups(page, 1);
   expect(healed.report.hp).toBe(PLAYER_MAX_HP - hurt + HEAL_AMOUNT);
@@ -127,23 +159,13 @@ test('a health pickup heals, capped at the maximum, and a chest pays Embers', as
 
 test('a magnet pulls in the gems lying round the arena', async ({ page }) => {
   const errors = collectErrors(page);
-  // 4:00, the crowd thick enough that Fire leaves gems lying outside the
-  // pickup radius; nobody steers, so they stay there.
-  await startRun(page, 'timeScale=4&startAt=240');
-  await expect
-    .poll(
-      async () => {
-        await answerLevelUp(page);
-        return (await sample(page)).report.gems;
-      },
-      { message: 'gems lying in the arena', timeout: 30_000 },
-    )
-    .toBeGreaterThanOrEqual(15);
-
-  const before = await drop(page, 'magnet');
+  await startRun(page, 'timeScale=4');
+  const before = await drop(page, 'magnet', { farGems: 40 });
+  expect(before.gems, 'gems lying far off at the drop').toBeGreaterThanOrEqual(40);
   await waitForPickups(page, 1);
   const trace: Sample[] = [];
-  const until = Date.now() + 10_000;
+  // 11 s of run time; a runner drawing 10 fps covers it in well under 30 s.
+  const until = Date.now() + 30_000;
   let magnetSeen = false;
   while (Date.now() < until) {
     await answerLevelUp(page);
@@ -168,18 +190,9 @@ test('a magnet pulls in the gems lying round the arena', async ({ page }) => {
 
 test('a bomb kills every regular enemy on screen', async ({ page }) => {
   const errors = collectErrors(page);
-  await startRun(page, 'timeScale=4&startAt=240');
-  await expect
-    .poll(
-      async () => {
-        await answerLevelUp(page);
-        return (await sample(page)).report.onScreen;
-      },
-      { message: 'enemies on screen', timeout: 30_000 },
-    )
-    .toBeGreaterThanOrEqual(15);
-
-  const before = await drop(page, 'bomb');
+  await startRun(page, 'timeScale=1');
+  const before = await drop(page, 'bomb', { crowd: 24 });
+  expect(before.onScreen, 'enemies on screen at the drop').toBeGreaterThanOrEqual(15);
   const after = await waitForPickups(page, 1);
   // The bomb lands a step after the drop; spells kill on top of it, and an
   // enemy may walk off the edge in that step, so allow a little either way.
