@@ -127,6 +127,13 @@ atlas page, plus the generated `src/config/frames.ts`. The run is
 deterministic: the same sheets always produce byte-identical output, so a
 re-run with nothing changed leaves a clean working tree.
 
+Every frame keeps one native px of clear space on all four sides, so no art is
+shaved flat against its own boundary. The margin is added after the
+downscale, and the run fails, naming the frame, if any frame on a written page
+still has art touching its edge; `npm test` checks the shipped pages the same
+way. Size or tile anything from its art with the clip's `ART_BOXES` entry in
+`src/config/frames.ts`, not the frame's `w`/`h`, which include the margin.
+
 The manifest's grid (`cols`, `rows`, `sheetCell`) is authoritative, not the
 canvas size a prompt asked for: sheets rarely come back at the asked size, and
 each prompt doc records what was actually delivered. Before cutting, the run

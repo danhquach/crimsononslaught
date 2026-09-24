@@ -17,6 +17,7 @@ import {
   nextPowerOfTwo,
   opaqueBounds,
   opaqueCell,
+  padImage,
   packFrames,
   quantize,
   softAlpha,
@@ -433,6 +434,26 @@ describe('downscaleNearest', () => {
     const img = image(8, 1, (x) => (x < 4 ? [0, 0, 0, 255] : [255, 255, 255, 255]));
     const small = downscaleNearest(img, 2, 1);
     for (const v of small.data) expect([0, 255]).toContain(v);
+  });
+});
+
+describe('padImage', () => {
+  it('rings a flush frame with clear pixels and keeps its art as it was (CO-127)', () => {
+    const art = image(3, 2, () => [200, 10, 10, 255]);
+    const padded = padImage(art, 1);
+    expect([padded.width, padded.height]).toEqual([5, 4]);
+    for (let y = 0; y < 4; y += 1) {
+      for (let x = 0; x < 5; x += 1) {
+        const ring = x === 0 || y === 0 || x === 4 || y === 3;
+        expect(padded.data[(y * 5 + x) * 4 + 3], `${x},${y}`).toBe(ring ? 0 : 255);
+      }
+    }
+    expect(opaqueBounds(padded)).toEqual({ x: 1, y: 1, w: 3, h: 2 });
+  });
+
+  it('is the frame itself at a zero margin', () => {
+    const art = image(2, 2, () => [1, 2, 3, 255]);
+    expect(padImage(art, 0)).toEqual(art);
   });
 });
 

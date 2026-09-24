@@ -2,942 +2,942 @@
   "frames": {
     "pickupBomb.idle.0": {
       "frame": {
-        "x": 633,
+        "x": 681,
         "y": 1,
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       },
       "sourceSize": {
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       }
     },
     "pickupBomb.idle.1": {
       "frame": {
-        "x": 648,
+        "x": 698,
         "y": 1,
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       },
       "sourceSize": {
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       }
     },
     "pickupBomb.idle.2": {
       "frame": {
-        "x": 663,
+        "x": 715,
         "y": 1,
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       },
       "sourceSize": {
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       }
     },
     "pickupBomb.idle.3": {
       "frame": {
-        "x": 678,
+        "x": 732,
         "y": 1,
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       },
       "sourceSize": {
-        "w": 14,
-        "h": 21
+        "w": 16,
+        "h": 23
       }
     },
     "pickupBomb.pickup.0": {
       "frame": {
-        "x": 759,
+        "x": 821,
         "y": 1,
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       },
       "sourceSize": {
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       }
     },
     "pickupBomb.pickup.1": {
       "frame": {
-        "x": 774,
+        "x": 838,
         "y": 1,
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       },
       "sourceSize": {
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       }
     },
     "pickupBomb.pickup.2": {
       "frame": {
-        "x": 789,
+        "x": 855,
         "y": 1,
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       },
       "sourceSize": {
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       }
     },
     "pickupBomb.pickup.3": {
       "frame": {
-        "x": 804,
+        "x": 872,
         "y": 1,
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       },
       "sourceSize": {
-        "w": 14,
-        "h": 20
+        "w": 16,
+        "h": 22
       }
     },
     "pickupChest.idle.0": {
       "frame": {
-        "x": 819,
+        "x": 889,
         "y": 1,
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       },
       "sourceSize": {
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       }
     },
     "pickupChest.idle.1": {
       "frame": {
-        "x": 840,
+        "x": 912,
         "y": 1,
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       },
       "sourceSize": {
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       }
     },
     "pickupChest.idle.2": {
       "frame": {
-        "x": 861,
+        "x": 935,
         "y": 1,
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       },
       "sourceSize": {
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       }
     },
     "pickupChest.idle.3": {
       "frame": {
-        "x": 882,
+        "x": 958,
         "y": 1,
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       },
       "sourceSize": {
-        "w": 20,
-        "h": 15
+        "w": 22,
+        "h": 17
       }
     },
     "pickupChest.pickup.0": {
       "frame": {
-        "x": 309,
+        "x": 325,
         "y": 1,
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       },
       "sourceSize": {
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       }
     },
     "pickupChest.pickup.1": {
       "frame": {
-        "x": 330,
+        "x": 348,
         "y": 1,
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       },
       "sourceSize": {
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       }
     },
     "pickupChest.pickup.2": {
       "frame": {
-        "x": 351,
+        "x": 371,
         "y": 1,
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       },
       "sourceSize": {
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       }
     },
     "pickupChest.pickup.3": {
       "frame": {
-        "x": 372,
+        "x": 394,
         "y": 1,
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       },
       "sourceSize": {
-        "w": 20,
-        "h": 27
+        "w": 22,
+        "h": 29
       }
     },
     "pickupEmber.idle.0": {
       "frame": {
-        "x": 505,
+        "x": 537,
         "y": 1,
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       },
       "sourceSize": {
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       }
     },
     "pickupEmber.idle.1": {
       "frame": {
-        "x": 517,
+        "x": 551,
         "y": 1,
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       },
       "sourceSize": {
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       }
     },
     "pickupEmber.idle.2": {
       "frame": {
-        "x": 529,
+        "x": 565,
         "y": 1,
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       },
       "sourceSize": {
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       }
     },
     "pickupEmber.idle.3": {
       "frame": {
-        "x": 541,
+        "x": 579,
         "y": 1,
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       },
       "sourceSize": {
-        "w": 11,
-        "h": 24
+        "w": 13,
+        "h": 26
       }
     },
     "pickupEmber.pickup.0": {
       "frame": {
-        "x": 693,
+        "x": 749,
         "y": 1,
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       },
       "sourceSize": {
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       }
     },
     "pickupEmber.pickup.1": {
       "frame": {
-        "x": 715,
+        "x": 773,
         "y": 1,
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       },
       "sourceSize": {
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       }
     },
     "pickupEmber.pickup.2": {
       "frame": {
-        "x": 737,
+        "x": 797,
         "y": 1,
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       },
       "sourceSize": {
-        "w": 21,
-        "h": 21
+        "w": 23,
+        "h": 23
       }
     },
     "pickupHealth.idle.0": {
       "frame": {
-        "x": 903,
+        "x": 981,
         "y": 1,
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       },
       "sourceSize": {
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       }
     },
     "pickupHealth.idle.1": {
       "frame": {
-        "x": 916,
+        "x": 996,
         "y": 1,
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       },
       "sourceSize": {
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       }
     },
     "pickupHealth.idle.2": {
       "frame": {
-        "x": 929,
+        "x": 1011,
         "y": 1,
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       },
       "sourceSize": {
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       }
     },
     "pickupHealth.idle.3": {
       "frame": {
-        "x": 942,
+        "x": 1026,
         "y": 1,
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       },
       "sourceSize": {
-        "w": 12,
-        "h": 15
+        "w": 14,
+        "h": 17
       }
     },
     "pickupHealth.pickup.0": {
       "frame": {
-        "x": 955,
+        "x": 1041,
         "y": 1,
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       },
       "sourceSize": {
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       }
     },
     "pickupHealth.pickup.1": {
       "frame": {
-        "x": 970,
+        "x": 1058,
         "y": 1,
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       },
       "sourceSize": {
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       }
     },
     "pickupHealth.pickup.2": {
       "frame": {
-        "x": 985,
+        "x": 1075,
         "y": 1,
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       },
       "sourceSize": {
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       }
     },
     "pickupHealth.pickup.3": {
       "frame": {
-        "x": 1000,
+        "x": 1092,
         "y": 1,
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       },
       "sourceSize": {
-        "w": 14,
-        "h": 15
+        "w": 16,
+        "h": 17
       }
     },
     "pickupMagnet.idle.0": {
       "frame": {
-        "x": 553,
+        "x": 593,
         "y": 1,
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       },
       "sourceSize": {
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       }
     },
     "pickupMagnet.idle.1": {
       "frame": {
-        "x": 573,
+        "x": 615,
         "y": 1,
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       },
       "sourceSize": {
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       }
     },
     "pickupMagnet.idle.2": {
       "frame": {
-        "x": 593,
+        "x": 637,
         "y": 1,
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       },
       "sourceSize": {
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       }
     },
     "pickupMagnet.idle.3": {
       "frame": {
-        "x": 613,
+        "x": 659,
         "y": 1,
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       },
       "sourceSize": {
-        "w": 19,
-        "h": 23
+        "w": 21,
+        "h": 25
       }
     },
     "pickupMagnet.pickup.0": {
       "frame": {
-        "x": 393,
+        "x": 417,
         "y": 1,
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       },
       "sourceSize": {
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       }
     },
     "pickupMagnet.pickup.1": {
       "frame": {
-        "x": 421,
+        "x": 447,
         "y": 1,
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       },
       "sourceSize": {
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       }
     },
     "pickupMagnet.pickup.2": {
       "frame": {
-        "x": 449,
+        "x": 477,
         "y": 1,
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       },
       "sourceSize": {
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       }
     },
     "pickupMagnet.pickup.3": {
       "frame": {
-        "x": 477,
+        "x": 507,
         "y": 1,
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       },
       "sourceSize": {
-        "w": 27,
-        "h": 26
+        "w": 29,
+        "h": 28
       }
     },
     "pickupRelic.idle.0": {
       "frame": {
-        "x": 157,
+        "x": 165,
         "y": 1,
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       },
       "sourceSize": {
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       }
     },
     "pickupRelic.idle.1": {
       "frame": {
-        "x": 195,
+        "x": 205,
         "y": 1,
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       },
       "sourceSize": {
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       }
     },
     "pickupRelic.idle.2": {
       "frame": {
-        "x": 233,
+        "x": 245,
         "y": 1,
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       },
       "sourceSize": {
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       }
     },
     "pickupRelic.idle.3": {
       "frame": {
-        "x": 271,
+        "x": 285,
         "y": 1,
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       },
       "sourceSize": {
-        "w": 37,
-        "h": 32
+        "w": 39,
+        "h": 34
       }
     },
     "pickupRelic.pickup.0": {
       "frame": {
         "x": 1,
         "y": 1,
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       },
       "sourceSize": {
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       }
     },
     "pickupRelic.pickup.1": {
       "frame": {
-        "x": 40,
+        "x": 42,
         "y": 1,
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       },
       "sourceSize": {
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       }
     },
     "pickupRelic.pickup.2": {
       "frame": {
-        "x": 79,
+        "x": 83,
         "y": 1,
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       },
       "sourceSize": {
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       }
     },
     "pickupRelic.pickup.3": {
       "frame": {
-        "x": 118,
+        "x": 124,
         "y": 1,
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       },
       "sourceSize": {
-        "w": 38,
-        "h": 44
+        "w": 40,
+        "h": 46
       }
     }
   },
@@ -945,7 +945,7 @@
     "app": "scripts/cut-sheets.mjs",
     "format": "RGBA8888",
     "size": {
-      "w": 1024,
+      "w": 2048,
       "h": 64
     },
     "scale": "1"
