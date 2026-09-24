@@ -99,9 +99,15 @@ export const NUMBER_DEPTH = 7;
 
 /**
  * Ground areas are on the ground: below the enemies standing in them and the
- * effects that play over them, above the arena floor (`ARENA_DEPTH`).
+ * effects that play over them, above the arena's props (`PROP_DEPTH`).
  */
 export const AREA_DEPTH = -1;
+
+/**
+ * The arena's scatter props (#120) lie on the floor and under everything the
+ * run puts there, ground areas included, so decoration never hides play.
+ */
+export const PROP_DEPTH = -1.5;
 
 /** The arena floor, under everything the run puts on it. */
 export const ARENA_DEPTH = -2;

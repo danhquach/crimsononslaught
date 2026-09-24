@@ -273,6 +273,30 @@ export function alphaCell(img, rect, threshold = 0) {
 }
 
 /**
+ * Take one cell out of an opaque sheet — a ground or edge tile that fills its
+ * cell edge to edge (#120) — with every pixel kept and made fully opaque.
+ *
+ * Neither keying route fits such art. `keyCell` would sample the tile's own
+ * colour at the cell corner and cut the ground away as background, and a sheet
+ * with no clear pixels is never `isPreKeyed`. There is no background to find:
+ * the whole cell is the frame.
+ */
+export function opaqueCell(img, rect) {
+  const data = new Uint8ClampedArray(rect.w * rect.h * 4);
+  for (let y = 0; y < rect.h; y += 1) {
+    for (let x = 0; x < rect.w; x += 1) {
+      const px = pixelAt(img, rect.x + x, rect.y + y);
+      const o = (y * rect.w + x) * 4;
+      data[o] = px[0];
+      data[o + 1] = px[1];
+      data[o + 2] = px[2];
+      data[o + 3] = 255;
+    }
+  }
+  return { width: rect.w, height: rect.h, data };
+}
+
+/**
  * Bounding box of the art, or null if the cell holds none.
  *
  * A pixel only counts if at least two of its four neighbours are also above

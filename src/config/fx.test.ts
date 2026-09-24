@@ -16,6 +16,7 @@ import {
   MAX_LIVE_OVERLAYS,
   MAX_LIVE_TELEGRAPHS,
   NOVA_SCALE_RADIUS,
+  PROP_DEPTH,
   SPIN_BASE_ORBIT_SPEED,
   TELEGRAPH_SCALE_RADIUS,
 } from './fx';
@@ -66,6 +67,9 @@ describe('fx config (CO-082)', () => {
 
   it('lays a ground area on the arena floor and under the crowd', () => {
     expect(ARENA_DEPTH).toBeLessThan(AREA_DEPTH);
+    // #120: props lie on the floor, under ground areas and all the rest.
+    expect(ARENA_DEPTH).toBeLessThan(PROP_DEPTH);
+    expect(PROP_DEPTH).toBeLessThan(AREA_DEPTH);
     // Entities are drawn at the default depth 0; effects sit above them.
     expect(AREA_DEPTH).toBeLessThan(0);
     expect(FX_DEPTH).toBeGreaterThan(0);
