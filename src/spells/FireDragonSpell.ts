@@ -3,7 +3,7 @@ import { splashTargets } from '../core/fireball';
 import { explosionScale } from '../core/fx';
 import { MAX_LIVE_DRAGONS } from '../core/homing';
 import type { Vec2 } from '../core/input';
-import { Spell, nearestEnemies } from '../core/spell';
+import { Spell, anyWithin, nearestEnemies } from '../core/spell';
 import type { FireDragonStats } from '../core/spellStats';
 import type { Enemy } from '../entities/Enemy';
 import { HomingProjectile } from '../entities/HomingProjectile';
@@ -83,6 +83,11 @@ export class FireDragonSpell extends Spell<'fire_dragon'> {
       child.steer(deltaS, this.enemies.live);
       if (child.spent) child.despawn();
     }
+  }
+
+  /** Nothing within targetRange → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.targetRange);
   }
 
   /** One cast: a dragon at the nearest enemy within `targetRange`. */

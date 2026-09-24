@@ -146,6 +146,11 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     return this.companionStats.attackCooldown;
   }
 
+  /** No target this frame → the attack waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return this.target?.active === true;
+  }
+
   /** One attack: a shot for a ranged companion, a swing for a melee one. */
   protected cast(): void {
     const target = this.target;

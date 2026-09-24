@@ -62,7 +62,7 @@ describe('spell card stats match spec §5 base values', () => {
     expect(SPELL_CARDS.ice.stats).toEqual([
       ['Cooldown', '0.8 s'],
       ['Damage', '10'],
-      ['Range', '420'],
+      ['Range', '189'],
       ['Slow', '20% for 1.0 s'],
     ]);
   });
@@ -123,7 +123,7 @@ describe('base stat blocks', () => {
       aoeDamageFactor: 0.5,
       projectiles: 1,
       speed: 350,
-      range: 400,
+      range: 150,
     });
     // Ice's block is Ice Arrow's (Phase 2 spec §9.3); Frost Nova is `ice_nova_bomb` now.
     expect(BASE_SPELL_STATS.ice).toEqual({
@@ -131,7 +131,7 @@ describe('base stat blocks', () => {
       damage: 10,
       projectiles: 1,
       speed: 380,
-      range: 420,
+      range: 189,
       slowPct: 0.2,
       slowDuration: 1,
     });
@@ -140,7 +140,7 @@ describe('base stat blocks', () => {
       cooldown: 0.9,
       damage: 14,
       strikes: 1,
-      targetRange: 400,
+      targetRange: 150,
       staggerDuration: 0.5,
       stunChance: 0.08,
       stunDuration: 2,
@@ -151,7 +151,7 @@ describe('base stat blocks', () => {
       cooldown: 1.1,
       damage: 16,
       radius: 55,
-      targetRange: 320,
+      targetRange: 144,
       knockback: 70,
       bleed: 4,
       bleedDuration: 3,

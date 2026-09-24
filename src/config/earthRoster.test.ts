@@ -40,7 +40,7 @@ describe('earth roster stat blocks', () => {
       damage: 40,
       radius: 36,
       speed: 280,
-      range: 460,
+      range: 207,
       pierce: 5,
       knockback: 120,
     });

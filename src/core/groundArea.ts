@@ -138,7 +138,8 @@ export function membersOf<T extends Vec2>(
  * Where to drop a patch of `radius` (spec §9.3): on the densest cluster within
  * `targetRange` of `origin` — the candidate enemy that has the most company
  * inside a patch centred on it — and on `origin` itself when the caster is
- * alone, so a cast is never wasted off in empty arena.
+ * alone. `GroundAreaSpell` holds its cast until something is in range (#212),
+ * so that fallback only answers a caller that asks with nobody near.
  *
  * Centring on an enemy rather than searching the plane keeps the choice cheap
  * and always lands the patch on at least one target. Ties are broken through

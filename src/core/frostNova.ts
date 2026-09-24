@@ -19,7 +19,7 @@ import type { NovaBombStats } from './spellStats';
 
 /**
  * Bombs in flight the pool may ever hold. One leaves every 2.2 s and flies its
- * 300 px `range` in under 1.5 s, so one is normally in the air; the cap leaves
+ * 135 px `range` in about 0.6 s, so one is normally in the air; the cap leaves
  * room for a Haste build and a long-range one together.
  */
 export const MAX_LIVE_BOMBS = 8;

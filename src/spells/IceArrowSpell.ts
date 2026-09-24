@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { volleyTargets } from '../core/fireball';
 import { MAX_LIVE_ARROWS, arrowFrost } from '../core/iceArrow';
 import type { Vec2 } from '../core/input';
-import { Spell } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { IceStats } from '../core/spellStats';
 import type { Enemy } from '../entities/Enemy';
 import { Projectile, type ProjectileLook } from '../entities/Projectile';
@@ -78,6 +78,11 @@ export class IceArrowSpell extends Spell<'ice'> {
     for (const child of this.group.getChildren()) {
       if (child instanceof Projectile && child.active && child.spent) child.despawn();
     }
+  }
+
+  /** Nothing within range → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.range);
   }
 
   /** One volley. With no enemy in range nothing leaves the caster and the cast is spent. */

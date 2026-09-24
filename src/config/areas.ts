@@ -37,7 +37,7 @@ export const BASE_BLIZZARD_STATS: Readonly<GroundAreaStats> = {
   tickRate: 0.5,
   radius: 180,
   duration: 6,
-  targetRange: 400,
+  targetRange: 180,
   slowPct: 0.5,
   slowDuration: 1,
 };
@@ -49,7 +49,7 @@ export const BASE_QUAKE_STATS: Readonly<GroundAreaStats> = {
   tickRate: 0.5,
   radius: 180,
   duration: 8,
-  targetRange: 360,
+  targetRange: 162,
   slowPct: 0.3,
   slowDuration: 1,
 };

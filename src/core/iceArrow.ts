@@ -16,8 +16,8 @@ import type { IceStats } from './spellStats';
 
 /**
  * Arrows in flight the pool may ever hold. Base `projectiles` is 1 against a
- * 0.8 s cooldown and an arrow flies its 420 px `range` in about 1.1 s, so one
- * or two are normally in the air; the cap leaves room for a Haste build with
+ * 0.8 s cooldown and an arrow flies its 189 px `range` in about 0.5 s, so one
+ * is normally in the air; the cap leaves room for a Haste build with
  * extra arrows. `iceArrow.test.ts` holds the margin.
  */
 export const MAX_LIVE_ARROWS = 32;

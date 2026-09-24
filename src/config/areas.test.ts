@@ -39,7 +39,7 @@ describe('area stat blocks', () => {
       tickRate: 0.5,
       radius: 180,
       duration: 6,
-      targetRange: 400,
+      targetRange: 180,
       slowPct: 0.5,
       slowDuration: 1,
     });
@@ -52,7 +52,7 @@ describe('area stat blocks', () => {
       tickDamage: 8,
       tickRate: 0.5,
       radius: 180,
-      targetRange: 360,
+      targetRange: 162,
     });
   });
 
@@ -72,14 +72,14 @@ describe('area stat blocks', () => {
     }
   });
 
-  it('keeps every patch inside the reach it may be placed at', () => {
-    // A patch centred at the far edge of `targetRange` must still be something
-    // the player can see coming; a radius past the range would place ticks
-    // behind them.
+  it('gives every patch a radius and a reach', () => {
+    // No radius-under-range rule: since #212 the base reach (180, 162) is no
+    // wider than the 180 px patch, so a patch dropped at the edge of its reach
+    // still covers the hero. Areas hurt only enemies, so that costs nothing.
     for (const id of AREA_SPELL_IDS) {
       const { radius, targetRange } = BASE_AREA_STATS[id];
       expect(radius, id).toBeGreaterThan(0);
-      expect(radius, id).toBeLessThan(targetRange);
+      expect(targetRange, id).toBeGreaterThan(0);
     }
   });
 

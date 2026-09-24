@@ -35,7 +35,7 @@ describe('ice roster stat blocks', () => {
       damage: 24,
       radius: 110,
       speed: 220,
-      range: 300,
+      range: 135,
       slowPct: 0.4,
       slowDuration: 2,
       freezeChance: 0.15,

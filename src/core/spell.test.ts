@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { RunState } from './runState';
-import { CastScheduler, MAX_CASTS_PER_FRAME, Spell, nearestEnemies } from './spell';
+import { CastScheduler, MAX_CASTS_PER_FRAME, Spell, anyWithin, nearestEnemies } from './spell';
 import type { FireStats } from './spellStats';
 
 /** A fresh copy of Fire's base block, as the `Spellbook` hands one out. */
@@ -26,6 +26,15 @@ class StubSpell extends Spell<'fire'> {
   protected cast(): void {
     this.casts += 1;
     this.castTimes.push(this.elapsed);
+  }
+}
+
+/** A stub that only fires with something to fire at (#212). */
+class AimedStub extends StubSpell {
+  inRange = false;
+
+  protected override hasTarget(): boolean {
+    return this.inRange;
   }
 }
 
@@ -228,5 +237,55 @@ describe('Spell', () => {
     spell.setStats({ ...spell.stats, cooldown: cooldown * 0.92 ** 3 });
     spell.update(0);
     expect(spell.casts).toBe(1);
+  });
+
+  it('holds a ready cast while nothing is in range, cue and all (#212)', () => {
+    const spell = new AimedStub();
+    const { cooldown } = spell.stats;
+    let cues = 0;
+    spell.onCast = () => (cues += 1);
+    spell.update(cooldown * 1000 * 5);
+    expect(spell.casts).toBe(0);
+    expect(cues).toBe(0);
+    // Held ready, not recharging: the HUD shows it full and it waits on nothing.
+    expect(spell.castProgress).toBe(1);
+    expect(spell.timeToNextCast).toBe(0);
+  });
+
+  it('fires on the first frame a target is in range, once, then waits a full cooldown (#212)', () => {
+    const spell = new AimedStub();
+    const { cooldown } = spell.stats;
+    spell.update(cooldown * 1000 * 5);
+    spell.inRange = true;
+    spell.update(FRAME_MS);
+    // Five cooldowns spent waiting are not a backlog paid out at once.
+    expect(spell.casts).toBe(1);
+    spell.update(cooldown * 1000 * 0.5);
+    expect(spell.casts).toBe(1);
+    spell.update(cooldown * 1000 * 0.5);
+    expect(spell.casts).toBe(2);
+  });
+
+  it('a spell with no targeting rule casts on cooldown as before', () => {
+    const spell = new StubSpell();
+    spell.update(spell.stats.cooldown * 1000);
+    expect(spell.casts).toBe(1);
+  });
+});
+
+describe('anyWithin (#212)', () => {
+  const origin = { x: 0, y: 0 };
+
+  it('counts the range itself as in, and one past it as out', () => {
+    expect(anyWithin(origin, [{ x: 150, y: 0 }], 150)).toBe(true);
+    expect(anyWithin(origin, [{ x: 151, y: 0 }], 150)).toBe(false);
+  });
+
+  it('measures true distance, not per-axis', () => {
+    expect(anyWithin(origin, [{ x: 110, y: 110 }], 150)).toBe(false);
+  });
+
+  it('is false with no candidates', () => {
+    expect(anyWithin(origin, [], 150)).toBe(false);
   });
 });

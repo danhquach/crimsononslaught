@@ -32,7 +32,7 @@ export const BASE_BOULDER_STATS: Readonly<BoulderStats> = {
   damage: 40,
   radius: 36,
   speed: 280,
-  range: 460,
+  range: 207,
   pierce: 5,
   knockback: 120,
 };

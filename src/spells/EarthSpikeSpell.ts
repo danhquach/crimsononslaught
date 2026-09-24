@@ -2,7 +2,7 @@ import { spikeCaught, spikeHit, spikeTarget } from '../core/earthSpike';
 import { dustFlip } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
-import { Spell } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { EarthStats } from '../core/spellStats';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
@@ -58,6 +58,11 @@ export class EarthSpikeSpell extends Spell<'earth'> {
   /** Enemies caught so far — what the browser suite watches. */
   get hits(): number {
     return this.landed;
+  }
+
+  /** Nothing within targetRange → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.targetRange);
   }
 
   /**

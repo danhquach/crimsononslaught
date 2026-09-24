@@ -5,7 +5,7 @@ import { flightRotation } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { BOLT_SPEED, MAX_LIVE_BOLTS, boltStep } from '../core/lightningBolt';
 import type { Rng } from '../core/rng';
-import { Spell } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { Enemy } from '../entities/Enemy';
 import { showEffect } from '../render/animate';
 import type { EnemyPool } from '../systems/EnemyPool';
@@ -107,6 +107,11 @@ export class LightningBoltSpell extends Spell<'lightning'> {
       this.spare.push(sprite);
       if (flight.live) this.strike(flight.target);
     }
+  }
+
+  /** Nothing within targetRange → the cast waits rather than being spent (#212). */
+  protected override hasTarget(): boolean {
+    return anyWithin(this.caster, this.enemies.live, this.stats.targetRange);
   }
 
   /** One cast: a bolt leaves the caster for each target, aimed where it stands now. */
