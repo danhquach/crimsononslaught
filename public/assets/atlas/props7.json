@@ -2,202 +2,202 @@
   "frames": {
     "arena.bones.0": {
       "frame": {
-        "x": 641,
+        "x": 657,
         "y": 1,
-        "w": 48,
-        "h": 27
+        "w": 50,
+        "h": 29
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 48,
-        "h": 27
+        "w": 50,
+        "h": 29
       },
       "sourceSize": {
-        "w": 48,
-        "h": 27
+        "w": 50,
+        "h": 29
       }
     },
     "arena.bush.0": {
       "frame": {
-        "x": 474,
+        "x": 482,
         "y": 1,
-        "w": 47,
-        "h": 34
+        "w": 49,
+        "h": 36
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 47,
-        "h": 34
+        "w": 49,
+        "h": 36
       },
       "sourceSize": {
-        "w": 47,
-        "h": 34
+        "w": 49,
+        "h": 36
       }
     },
     "arena.column.0": {
       "frame": {
-        "x": 522,
+        "x": 532,
         "y": 1,
-        "w": 36,
-        "h": 34
+        "w": 38,
+        "h": 36
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 36,
-        "h": 34
+        "w": 38,
+        "h": 36
       },
       "sourceSize": {
-        "w": 36,
-        "h": 34
+        "w": 38,
+        "h": 36
       }
     },
     "arena.edge.0": {
       "frame": {
-        "x": 258,
+        "x": 260,
         "y": 1,
-        "w": 128,
-        "h": 128
+        "w": 130,
+        "h": 130
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 128,
-        "h": 128
+        "w": 130,
+        "h": 130
       },
       "sourceSize": {
-        "w": 128,
-        "h": 128
+        "w": 130,
+        "h": 130
       }
     },
     "arena.gravestone.0": {
       "frame": {
-        "x": 435,
+        "x": 441,
         "y": 1,
-        "w": 38,
-        "h": 36
+        "w": 40,
+        "h": 38
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 38,
-        "h": 36
+        "w": 40,
+        "h": 38
       },
       "sourceSize": {
-        "w": 38,
-        "h": 36
+        "w": 40,
+        "h": 38
       }
     },
     "arena.ground.0": {
       "frame": {
         "x": 1,
         "y": 1,
-        "w": 256,
-        "h": 256
+        "w": 258,
+        "h": 258
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 256,
-        "h": 256
+        "w": 258,
+        "h": 258
       },
       "sourceSize": {
-        "w": 256,
-        "h": 256
+        "w": 258,
+        "h": 258
       }
     },
     "arena.pillar.0": {
       "frame": {
-        "x": 598,
+        "x": 612,
         "y": 1,
-        "w": 42,
-        "h": 29
+        "w": 44,
+        "h": 31
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 42,
-        "h": 29
+        "w": 44,
+        "h": 31
       },
       "sourceSize": {
-        "w": 42,
-        "h": 29
+        "w": 44,
+        "h": 31
       }
     },
     "arena.rocks.0": {
       "frame": {
-        "x": 559,
+        "x": 571,
         "y": 1,
-        "w": 38,
-        "h": 34
+        "w": 40,
+        "h": 36
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 38,
-        "h": 34
+        "w": 40,
+        "h": 36
       },
       "sourceSize": {
-        "w": 38,
-        "h": 34
+        "w": 40,
+        "h": 36
       }
     },
     "arena.rubble.0": {
       "frame": {
-        "x": 690,
+        "x": 708,
         "y": 1,
-        "w": 46,
-        "h": 24
+        "w": 48,
+        "h": 26
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 46,
-        "h": 24
+        "w": 48,
+        "h": 26
       },
       "sourceSize": {
-        "w": 46,
-        "h": 24
+        "w": 48,
+        "h": 26
       }
     },
     "arena.tree.0": {
       "frame": {
-        "x": 387,
+        "x": 391,
         "y": 1,
-        "w": 47,
-        "h": 45
+        "w": 49,
+        "h": 47
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 47,
-        "h": 45
+        "w": 49,
+        "h": 47
       },
       "sourceSize": {
-        "w": 47,
-        "h": 45
+        "w": 49,
+        "h": 47
       }
     }
   },

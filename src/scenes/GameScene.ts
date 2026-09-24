@@ -12,6 +12,7 @@ import {
   type Outcome,
   type ResultPayload,
 } from '../core/scenePayloads';
+import { artFrame } from '../core/animation';
 import { BOSS_EVENT, type BossPhasePayload } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor } from '../config/sounds';
 import { audioOf, type Audio } from '../render/audio';
@@ -1338,9 +1339,11 @@ export class GameScene extends Phaser.Scene {
     const cy = WORLD_HEIGHT / 2;
     const page = FRAMES[ARENA_GROUND_FRAME].page;
     if (this.textures.exists(page)) {
-      // One TileSprite each: a single quad however far the tile repeats.
+      // One TileSprite each: a single quad however far the tile repeats. Each
+      // repeats its tile's art alone, never the frame's margin, which would
+      // otherwise show as a grid of seams (CO-127).
       this.add
-        .tileSprite(cx, cy, WORLD_WIDTH, WORLD_HEIGHT, page, ARENA_GROUND_FRAME)
+        .tileSprite(cx, cy, WORLD_WIDTH, WORLD_HEIGHT, page, artFrame(ARENA_GROUND_FRAME))
         .setDepth(ARENA_DEPTH);
       const band = ARENA_EDGE_BAND;
       const edges: readonly [number, number, number, number][] = [
@@ -1350,7 +1353,7 @@ export class GameScene extends Phaser.Scene {
         [WORLD_WIDTH - band / 2, cy, band, WORLD_HEIGHT],
       ];
       for (const [x, y, w, h] of edges) {
-        this.add.tileSprite(x, y, w, h, page, ARENA_EDGE_FRAME).setDepth(ARENA_DEPTH);
+        this.add.tileSprite(x, y, w, h, page, artFrame(ARENA_EDGE_FRAME)).setDepth(ARENA_DEPTH);
       }
       return;
     }

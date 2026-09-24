@@ -466,6 +466,19 @@ export function downscaleNearest(img, width, height) {
 }
 
 /**
+ * `img` set `margin` px in from every side of a transparent frame that much
+ * larger. Done after the downscale, in native px, so the margin cannot round
+ * away the way it would padding the sheet crop at a non-integer scale (CO-127).
+ */
+export function padImage(img, margin) {
+  const width = img.width + margin * 2;
+  const height = img.height + margin * 2;
+  const out = { width, height, data: new Uint8ClampedArray(width * height * 4) };
+  blit(out, img, margin, margin);
+  return out;
+}
+
+/**
  * Shelf-pack frames into a square-ish atlas.
  *
  * Frames are placed tallest first and, at equal height, in name order, so the

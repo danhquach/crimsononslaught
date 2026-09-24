@@ -214,24 +214,27 @@ describe('art boxes (CO-126)', () => {
     }
   });
 
-  it('fills the whole frame wherever the cut left the box on the art', () => {
-    // Only a centred row holds its frame off the art, so every other clip's
-    // art box is its frame, and sizing from it moves nothing on screen.
+  it("keeps every clip's art one px in from each frame edge (CO-127)", () => {
+    for (const anim of ANIMATIONS) {
+      const art = boxes[anim.name];
+      const f = FRAMES[anim.frames[0] as keyof typeof FRAMES];
+      if (!art) continue;
+      expect(art.x, anim.name).toBeGreaterThanOrEqual(1);
+      expect(art.y, anim.name).toBeGreaterThanOrEqual(1);
+      expect(f.w - art.x - art.w, anim.name).toBeGreaterThanOrEqual(1);
+      expect(f.h - art.y - art.h, anim.name).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('pads a clip the cut left on its art by exactly the margin', () => {
+    // Only a centred row holds its box off the art before the pad, so every
+    // other clip's art box is its frame less one px all round: the art is the
+    // size it was, and sizing from it moves nothing on screen.
     const centred = centredClips();
     expect(centred.size).toBeGreaterThan(0);
     for (const anim of ANIMATIONS.filter((a) => !centred.has(a.name))) {
       const f = FRAMES[anim.frames[0] as keyof typeof FRAMES];
-      expect(boxes[anim.name], anim.name).toEqual({ x: 0, y: 0, w: f.w, h: f.h });
-    }
-  });
-
-  it("holds a centred clip's frame off its art on at least one side", () => {
-    for (const clip of centredClips()) {
-      const art = boxes[clip];
-      const f = FRAMES[`${clip}.0` as keyof typeof FRAMES];
-      expect(art, clip).toBeDefined();
-      if (!art) continue;
-      expect(art.w < f.w || art.h < f.h, clip).toBe(true);
+      expect(boxes[anim.name], anim.name).toEqual({ x: 1, y: 1, w: f.w - 2, h: f.h - 2 });
     }
   });
 });

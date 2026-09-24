@@ -37,6 +37,7 @@ import {
   opaqueBounds,
   opaqueCell,
   packFrames,
+  padImage,
   quantize,
   trimBorderLines,
   unionBounds,
@@ -60,7 +61,10 @@ const TOL_KEYED = 60;
 const TOL_SOLID = 130;
 /** Art is downscaled by this factor: the sheets are drawn at 4x native size. */
 const SCALE = 4;
-/** Clear space a `centred` animation keeps between its art and its frame edge, in native px. */
+/**
+ * Clear space every frame keeps between its art and its edge, in native px, so
+ * no art is ever shaved flat against its own boundary (CO-127).
+ */
 const FRAME_MARGIN = 1;
 /** Byte budget each page carries on its own (CO-130). */
 const PAGE_BUDGET = 400 * 1024;
@@ -192,31 +196,38 @@ function cutSheet(sheet) {
       continue;
     }
 
-    // Where the art itself sits inside the frame, in native px: the same for
-    // every frame of the animation, and the whole frame unless the box was
-    // held off the art. Whatever the game sizes from an animation (the
-    // boulder's disc, the chain's tile) reads this, never the frame, so a
-    // frame can gain transparent margin without the art on screen moving
-    // (CO-126).
+    // Where the art itself sits inside the frame, in native px, before the
+    // margin below is added: the same for every frame of the animation, and
+    // the whole frame unless the box was held off the art. Whatever the game
+    // sizes from an animation (the boulder's disc, the chain's tile) reads
+    // this, never the frame, so the margin moves no art on screen (CO-126).
     const artX = Math.min(width - 1, Math.max(0, Math.round((tight.x - box.x) / scale)));
     const artY = Math.min(height - 1, Math.max(0, Math.round((tight.y - box.y) / scale)));
     const artW = Math.min(width - artX, Math.max(1, Math.round(tight.w / scale)));
     const artH = Math.min(height - artY, Math.max(1, Math.round(tight.h / scale)));
 
+    // Every frame gets its margin here, round the downscaled frame, so its
+    // art pixels are the ones the crop gave and the anchor and art box shift
+    // with them. Padding the crop in sheet px instead could round the margin
+    // away at a non-integer scale. A centred row's box is already held off
+    // its art; the pad keeps it clear of what quantising lifts from its glow.
+    const pad = FRAME_MARGIN;
+
     for (const c of group) {
+      const image = padImage(downscaleNearest(crop(c.keyed, box), width, height), pad);
       out.push({
         name: c.name,
         anim: c.anim,
         index: c.index,
-        image: downscaleNearest(crop(c.keyed, box), width, height),
-        width,
-        height,
+        image,
+        width: image.width,
+        height: image.height,
         // Where the cell's centre sits inside the frame, in native px, so the
         // game can place a sprite without it drifting between frames.
-        anchorX,
-        anchorY,
-        artX,
-        artY,
+        anchorX: anchorX + pad,
+        anchorY: anchorY + pad,
+        artX: artX + pad,
+        artY: artY + pad,
         artW,
         artH,
       });
@@ -249,6 +260,19 @@ function writePage(page, frames) {
   const atlas = { width, height, data: new Uint8ClampedArray(width * height * 4) };
   for (const p of placements) blit(atlas, p.image, p.x, p.y);
   const { palette, indices } = quantize(atlas, 256);
+
+  // Measured on the page as it ships, the way a cell is measured: quantising
+  // can lift a faint glow pixel over the art threshold, so a frame clear
+  // before it is not necessarily clear after (CO-127).
+  const shipped = { width, height, data: new Uint8ClampedArray(width * height * 4) };
+  indices.forEach((i, px) => shipped.data.set(palette[i], px * 4));
+  for (const p of placements) {
+    const bounds = opaqueBounds(crop(shipped, { x: p.x, y: p.y, w: p.width, h: p.height }));
+    const flush = bounds ? edgesTouched(bounds, { x: 0, y: 0, w: p.width, h: p.height }) : [];
+    if (flush.length > 0) {
+      fail(`page ${key}: ${p.name} art is flush against its ${flush.join(' and ')} frame edge`);
+    }
+  }
 
   // Frame data in name order, so the JSON is stable whatever the packer did.
   const byName = [...placements].sort((a, b) => (a.name < b.name ? -1 : 1));
@@ -337,17 +361,15 @@ function main() {
     ),
   );
 
-  // Every page is written before any budget is enforced, so a run that busts
-  // the cap still leaves the art on disk to look at and names every page over.
-  const over = written.filter((w) => w.bytes > PAGE_BUDGET);
-  if (over.length > 0) {
-    for (const w of over) {
-      console.error(
-        `art:cut failed: page ${w.key} is ${(w.bytes / 1024).toFixed(1)} KB, over the ${PAGE_BUDGET / 1024} KB budget`,
-      );
-    }
-    process.exit(1);
+  // Every page is written before any budget or margin is enforced, so a run
+  // that fails still leaves the art on disk to look at, and names every page
+  // over the cap and every frame flush against its edge together.
+  for (const w of written.filter((w) => w.bytes > PAGE_BUDGET)) {
+    fail(
+      `page ${w.key} is ${(w.bytes / 1024).toFixed(1)} KB, over the ${PAGE_BUDGET / 1024} KB budget`,
+    );
   }
+  exitOnFailures();
 }
 
 function renderFramesTs(placements, pageKeys) {
@@ -417,9 +439,11 @@ export interface ArtBox {
 }
 
 /**
- * Where the art sits inside each frame of an animation, keyed by clip name: the whole frame unless the cut held the frame off the art. Size
- * anything from the art (the boulder's disc, the chain's tile) from this, not
- * from a frame's \`w\`/\`h\`, which take in any transparent margin (CO-126).
+ * Where the art sits inside each frame of an animation, keyed by clip name:
+ * one px in from every edge, or further for a centred clip (CO-127). Size or
+ * tile anything from the art (the boulder's disc, the chain's tile, the arena
+ * tiles) from this, not from a frame's \`w\`/\`h\`, which take in the
+ * transparent margin (CO-126).
  */
 export const ART_BOXES = {
 ${art.join('\n')}

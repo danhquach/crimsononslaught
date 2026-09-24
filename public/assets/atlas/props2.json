@@ -2,882 +2,882 @@
   "frames": {
     "boss.charge.down.0": {
       "frame": {
-        "x": 761,
+        "x": 777,
         "y": 1,
-        "w": 91,
-        "h": 92
+        "w": 93,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 91,
-        "h": 92
+        "w": 93,
+        "h": 94
       },
       "sourceSize": {
-        "w": 91,
-        "h": 92
+        "w": 93,
+        "h": 94
       }
     },
     "boss.charge.down.1": {
       "frame": {
-        "x": 853,
+        "x": 871,
         "y": 1,
-        "w": 91,
-        "h": 92
+        "w": 93,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 91,
-        "h": 92
+        "w": 93,
+        "h": 94
       },
       "sourceSize": {
-        "w": 91,
-        "h": 92
+        "w": 93,
+        "h": 94
       }
     },
     "boss.charge.left.0": {
       "frame": {
-        "x": 945,
+        "x": 965,
         "y": 1,
-        "w": 80,
-        "h": 92
+        "w": 82,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 80,
-        "h": 92
+        "w": 82,
+        "h": 94
       },
       "sourceSize": {
-        "w": 80,
-        "h": 92
+        "w": 82,
+        "h": 94
       }
     },
     "boss.charge.left.1": {
       "frame": {
-        "x": 1026,
+        "x": 1048,
         "y": 1,
-        "w": 80,
-        "h": 92
+        "w": 82,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 80,
-        "h": 92
+        "w": 82,
+        "h": 94
       },
       "sourceSize": {
-        "w": 80,
-        "h": 92
+        "w": 82,
+        "h": 94
       }
     },
     "boss.charge.right.0": {
       "frame": {
-        "x": 1107,
+        "x": 1131,
         "y": 1,
-        "w": 83,
-        "h": 92
+        "w": 85,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 83,
-        "h": 92
+        "w": 85,
+        "h": 94
       },
       "sourceSize": {
-        "w": 83,
-        "h": 92
+        "w": 85,
+        "h": 94
       }
     },
     "boss.charge.right.1": {
       "frame": {
-        "x": 1191,
+        "x": 1217,
         "y": 1,
-        "w": 83,
-        "h": 92
+        "w": 85,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 83,
-        "h": 92
+        "w": 85,
+        "h": 94
       },
       "sourceSize": {
-        "w": 83,
-        "h": 92
+        "w": 85,
+        "h": 94
       }
     },
     "boss.charge.up.0": {
       "frame": {
-        "x": 1183,
-        "y": 98,
-        "w": 93,
-        "h": 89
+        "x": 1211,
+        "y": 100,
+        "w": 95,
+        "h": 91
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       },
       "sourceSize": {
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       }
     },
     "boss.charge.up.1": {
       "frame": {
-        "x": 1277,
-        "y": 98,
-        "w": 93,
-        "h": 89
+        "x": 1307,
+        "y": 100,
+        "w": 95,
+        "h": 91
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       },
       "sourceSize": {
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       }
     },
     "boss.death.0": {
       "frame": {
         "x": 1,
         "y": 1,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "sourceSize": {
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       }
     },
     "boss.death.1": {
       "frame": {
-        "x": 96,
+        "x": 98,
         "y": 1,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "sourceSize": {
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       }
     },
     "boss.death.2": {
       "frame": {
-        "x": 191,
+        "x": 195,
         "y": 1,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "sourceSize": {
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       }
     },
     "boss.death.3": {
       "frame": {
-        "x": 286,
+        "x": 292,
         "y": 1,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "sourceSize": {
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       }
     },
     "boss.death.4": {
       "frame": {
-        "x": 381,
+        "x": 389,
         "y": 1,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "sourceSize": {
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       }
     },
     "boss.death.5": {
       "frame": {
-        "x": 476,
+        "x": 486,
         "y": 1,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "sourceSize": {
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       }
     },
     "boss.death.6": {
       "frame": {
-        "x": 571,
+        "x": 583,
         "y": 1,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "sourceSize": {
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       }
     },
     "boss.death.7": {
       "frame": {
-        "x": 666,
+        "x": 680,
         "y": 1,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       },
       "sourceSize": {
-        "w": 94,
-        "h": 96
+        "w": 96,
+        "h": 98
       }
     },
     "boss.hurt.down.0": {
       "frame": {
-        "x": 489,
-        "y": 98,
-        "w": 93,
-        "h": 91
+        "x": 501,
+        "y": 100,
+        "w": 95,
+        "h": 93
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 91
+        "w": 95,
+        "h": 93
       },
       "sourceSize": {
-        "w": 93,
-        "h": 91
+        "w": 95,
+        "h": 93
       }
     },
     "boss.hurt.left.0": {
       "frame": {
-        "x": 583,
-        "y": 98,
-        "w": 80,
-        "h": 91
+        "x": 597,
+        "y": 100,
+        "w": 82,
+        "h": 93
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 80,
-        "h": 91
+        "w": 82,
+        "h": 93
       },
       "sourceSize": {
-        "w": 80,
-        "h": 91
+        "w": 82,
+        "h": 93
       }
     },
     "boss.hurt.right.0": {
       "frame": {
-        "x": 664,
-        "y": 98,
-        "w": 80,
-        "h": 91
+        "x": 680,
+        "y": 100,
+        "w": 82,
+        "h": 93
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 80,
-        "h": 91
+        "w": 82,
+        "h": 93
       },
       "sourceSize": {
-        "w": 80,
-        "h": 91
+        "w": 82,
+        "h": 93
       }
     },
     "boss.hurt.up.0": {
       "frame": {
-        "x": 745,
-        "y": 98,
-        "w": 93,
-        "h": 91
+        "x": 763,
+        "y": 100,
+        "w": 95,
+        "h": 93
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 91
+        "w": 95,
+        "h": 93
       },
       "sourceSize": {
-        "w": 93,
-        "h": 91
+        "w": 95,
+        "h": 93
       }
     },
     "boss.telegraph.down.0": {
       "frame": {
-        "x": 995,
-        "y": 98,
-        "w": 93,
-        "h": 90
+        "x": 1019,
+        "y": 100,
+        "w": 95,
+        "h": 92
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 90
+        "w": 95,
+        "h": 92
       },
       "sourceSize": {
-        "w": 93,
-        "h": 90
+        "w": 95,
+        "h": 92
       }
     },
     "boss.telegraph.down.1": {
       "frame": {
-        "x": 1089,
-        "y": 98,
-        "w": 93,
-        "h": 90
+        "x": 1115,
+        "y": 100,
+        "w": 95,
+        "h": 92
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 90
+        "w": 95,
+        "h": 92
       },
       "sourceSize": {
-        "w": 93,
-        "h": 90
+        "w": 95,
+        "h": 92
       }
     },
     "boss.telegraph.left.0": {
       "frame": {
-        "x": 839,
-        "y": 98,
-        "w": 77,
-        "h": 91
+        "x": 859,
+        "y": 100,
+        "w": 79,
+        "h": 93
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 77,
-        "h": 91
+        "w": 79,
+        "h": 93
       },
       "sourceSize": {
-        "w": 77,
-        "h": 91
+        "w": 79,
+        "h": 93
       }
     },
     "boss.telegraph.left.1": {
       "frame": {
-        "x": 917,
-        "y": 98,
-        "w": 77,
-        "h": 91
+        "x": 939,
+        "y": 100,
+        "w": 79,
+        "h": 93
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 77,
-        "h": 91
+        "w": 79,
+        "h": 93
       },
       "sourceSize": {
-        "w": 77,
-        "h": 91
+        "w": 79,
+        "h": 93
       }
     },
     "boss.telegraph.right.0": {
       "frame": {
-        "x": 1275,
+        "x": 1303,
         "y": 1,
-        "w": 78,
-        "h": 92
+        "w": 80,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 78,
-        "h": 92
+        "w": 80,
+        "h": 94
       },
       "sourceSize": {
-        "w": 78,
-        "h": 92
+        "w": 80,
+        "h": 94
       }
     },
     "boss.telegraph.right.1": {
       "frame": {
-        "x": 1354,
+        "x": 1384,
         "y": 1,
-        "w": 78,
-        "h": 92
+        "w": 80,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 78,
-        "h": 92
+        "w": 80,
+        "h": 94
       },
       "sourceSize": {
-        "w": 78,
-        "h": 92
+        "w": 80,
+        "h": 94
       }
     },
     "boss.telegraph.up.0": {
       "frame": {
-        "x": 1747,
-        "y": 98,
-        "w": 93,
-        "h": 86
+        "x": 1787,
+        "y": 100,
+        "w": 95,
+        "h": 88
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 86
+        "w": 95,
+        "h": 88
       },
       "sourceSize": {
-        "w": 93,
-        "h": 86
+        "w": 95,
+        "h": 88
       }
     },
     "boss.telegraph.up.1": {
       "frame": {
-        "x": 1841,
-        "y": 98,
-        "w": 93,
-        "h": 86
+        "x": 1883,
+        "y": 100,
+        "w": 95,
+        "h": 88
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 86
+        "w": 95,
+        "h": 88
       },
       "sourceSize": {
-        "w": 93,
-        "h": 86
+        "w": 95,
+        "h": 88
       }
     },
     "boss.walk.down.0": {
       "frame": {
-        "x": 1433,
+        "x": 1465,
         "y": 1,
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       },
       "sourceSize": {
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       }
     },
     "boss.walk.down.1": {
       "frame": {
-        "x": 1527,
+        "x": 1561,
         "y": 1,
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       },
       "sourceSize": {
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       }
     },
     "boss.walk.down.2": {
       "frame": {
-        "x": 1621,
+        "x": 1657,
         "y": 1,
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       },
       "sourceSize": {
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       }
     },
     "boss.walk.down.3": {
       "frame": {
-        "x": 1715,
+        "x": 1753,
         "y": 1,
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       },
       "sourceSize": {
-        "w": 93,
-        "h": 92
+        "w": 95,
+        "h": 94
       }
     },
     "boss.walk.left.0": {
       "frame": {
-        "x": 1809,
+        "x": 1849,
         "y": 1,
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       },
       "sourceSize": {
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       }
     },
     "boss.walk.left.1": {
       "frame": {
-        "x": 1889,
+        "x": 1931,
         "y": 1,
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       },
       "sourceSize": {
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       }
     },
     "boss.walk.left.2": {
       "frame": {
         "x": 1,
-        "y": 98,
-        "w": 79,
-        "h": 92
+        "y": 100,
+        "w": 81,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       },
       "sourceSize": {
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       }
     },
     "boss.walk.left.3": {
       "frame": {
-        "x": 81,
-        "y": 98,
-        "w": 79,
-        "h": 92
+        "x": 83,
+        "y": 100,
+        "w": 81,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       },
       "sourceSize": {
-        "w": 79,
-        "h": 92
+        "w": 81,
+        "h": 94
       }
     },
     "boss.walk.right.0": {
       "frame": {
-        "x": 161,
-        "y": 98,
-        "w": 81,
-        "h": 92
+        "x": 165,
+        "y": 100,
+        "w": 83,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 81,
-        "h": 92
+        "w": 83,
+        "h": 94
       },
       "sourceSize": {
-        "w": 81,
-        "h": 92
+        "w": 83,
+        "h": 94
       }
     },
     "boss.walk.right.1": {
       "frame": {
-        "x": 243,
-        "y": 98,
-        "w": 81,
-        "h": 92
+        "x": 249,
+        "y": 100,
+        "w": 83,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 81,
-        "h": 92
+        "w": 83,
+        "h": 94
       },
       "sourceSize": {
-        "w": 81,
-        "h": 92
+        "w": 83,
+        "h": 94
       }
     },
     "boss.walk.right.2": {
       "frame": {
-        "x": 325,
-        "y": 98,
-        "w": 81,
-        "h": 92
+        "x": 333,
+        "y": 100,
+        "w": 83,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 81,
-        "h": 92
+        "w": 83,
+        "h": 94
       },
       "sourceSize": {
-        "w": 81,
-        "h": 92
+        "w": 83,
+        "h": 94
       }
     },
     "boss.walk.right.3": {
       "frame": {
-        "x": 407,
-        "y": 98,
-        "w": 81,
-        "h": 92
+        "x": 417,
+        "y": 100,
+        "w": 83,
+        "h": 94
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 81,
-        "h": 92
+        "w": 83,
+        "h": 94
       },
       "sourceSize": {
-        "w": 81,
-        "h": 92
+        "w": 83,
+        "h": 94
       }
     },
     "boss.walk.up.0": {
       "frame": {
-        "x": 1371,
-        "y": 98,
-        "w": 93,
-        "h": 89
+        "x": 1403,
+        "y": 100,
+        "w": 95,
+        "h": 91
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       },
       "sourceSize": {
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       }
     },
     "boss.walk.up.1": {
       "frame": {
-        "x": 1465,
-        "y": 98,
-        "w": 93,
-        "h": 89
+        "x": 1499,
+        "y": 100,
+        "w": 95,
+        "h": 91
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       },
       "sourceSize": {
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       }
     },
     "boss.walk.up.2": {
       "frame": {
-        "x": 1559,
-        "y": 98,
-        "w": 93,
-        "h": 89
+        "x": 1595,
+        "y": 100,
+        "w": 95,
+        "h": 91
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       },
       "sourceSize": {
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       }
     },
     "boss.walk.up.3": {
       "frame": {
-        "x": 1653,
-        "y": 98,
-        "w": 93,
-        "h": 89
+        "x": 1691,
+        "y": 100,
+        "w": 95,
+        "h": 91
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       },
       "sourceSize": {
-        "w": 93,
-        "h": 89
+        "w": 95,
+        "h": 91
       }
     }
   },
