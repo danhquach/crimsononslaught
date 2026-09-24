@@ -96,7 +96,7 @@ export abstract class OrbitingBodySpell<S extends StattedSpellId> extends Spell<
 
   /**
    * How a body is turned at `angle` on the ring, every frame: a boulder is a
-   * disc that only rolls; a blade lies along the orbit.
+   * disc that only rolls; a blade points out along the radius.
    */
   protected abstract orient(body: Boulder, angle: number): void;
 

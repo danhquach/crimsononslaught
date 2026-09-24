@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { SWORD_TEXTURE } from '../config/lightningRoster';
+import { SWORD_CLIP, SWORD_TEXTURE } from '../config/lightningRoster';
 import { tickHitCooldown, tryHit } from '../core/fireColumn';
 import type { Vec2 } from '../core/input';
 import { bladeRotation, swordCut } from '../core/lightningSword';
@@ -24,8 +24,8 @@ import { OrbitingBodySpell } from './OrbitingBodySpell';
  * kept here per enemy because the spec gives the sword its own `hitCooldown`
  * where Earth's ring shares one constant through the `Enemy`.
  *
- * FX: `lightning.impact` plays on every cut. The blade's own art is #145; it
- * rides the ring as the bolt placeholder bar until then.
+ * FX: `lightning.impact` plays on every cut. The blade plays `lightning.sword`
+ * when the atlas carries it, and is the bolt placeholder bar when it does not.
  */
 export class LightningSwordSpell extends OrbitingBodySpell<'lightning_sword'> {
   private readonly damage: DamageSink;
@@ -43,7 +43,10 @@ export class LightningSwordSpell extends OrbitingBodySpell<'lightning_sword'> {
     damage: DamageSink,
     fx: FxPool,
   ) {
-    super(scene, 'lightning_sword', caster, collisions, stats, { texture: SWORD_TEXTURE });
+    super(scene, 'lightning_sword', caster, collisions, stats, {
+      texture: SWORD_TEXTURE,
+      clip: SWORD_CLIP,
+    });
     this.damage = damage;
     this.fx = fx;
   }
@@ -64,7 +67,7 @@ export class LightningSwordSpell extends OrbitingBodySpell<'lightning_sword'> {
     }
   }
 
-  /** A blade lies along the orbit, not across it. */
+  /** A blade points out from the caster: hilt in, tip out (#172). */
   protected override orient(body: Boulder, angle: number): void {
     body.setRotation(bladeRotation(angle));
   }

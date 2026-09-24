@@ -82,11 +82,12 @@ export const BASE_LIGHTNING_ROSTER_STATS = {
 >;
 
 /**
- * The look a blade wears on the ring. Its own art is #145; until it lands the
- * blade is the bolt placeholder bar, laid along the orbit so it reads as a
- * sword rather than a spoke.
+ * The look a blade wears on the ring: the `lightning.sword` clip when the atlas
+ * carries it, else the bolt placeholder bar. Either way it points out along the
+ * radius, hilt toward the caster (#172).
  */
 export const SWORD_TEXTURE = 'fx_bolt' satisfies keyof typeof PLACEHOLDERS;
+export const SWORD_CLIP = 'lightning.sword';
 
 /** What a level-up card says about each spell (spec §7.1, cards per #132). */
 export const LIGHTNING_ROSTER_CARDS: Readonly<Record<LightningRosterSpellId, SpellCard>> = {
