@@ -61,10 +61,10 @@ export function insetRect(rect, fraction) {
 /**
  * Shrink a cell past the grid lines drawn on its border.
  *
- * Seven of the eighteen sheets came back with a line ruled along every cell
- * boundary and the rest came back with none, so a fixed inset is wrong either
- * way: 3 % leaves the line on a thick-ruled sheet and eats into the boss, whose
- * wings reach to within a pixel of the cell. Measuring instead of assuming
+ * Some sheets came back with a line ruled along their cell boundaries and the
+ * rest came back with none, so a fixed inset is wrong either way: 3 % leaves
+ * the line on a thick-ruled sheet and eats into the boss, whose wings reach to
+ * within a pixel of the cell. Measuring instead of assuming
  * works because the two cases are nothing alike — a ruled line covers its whole
  * edge, while the fullest art on any sheet covers 15 % of one.
  *

@@ -11,6 +11,8 @@ Object: the Tank enemy. In-game 32 x 32 px, drawn at 4x (about 128 px) inside 19
 
 ## Sheet 1 — `enemy_tank_walk.png` (CELL 192, COLS 4, ROWS 4)
 
+Delivered as: PNG 1024x1024 px (asked 768x768, 4x4 of 192 px); ruled grid band: yes, 8 of 16 cells.
+
 ```text
 Create ONE pixel-art animation sheet for the TANK ENEMY of a top-down 2D
 game. Creature: heavy squat armored brute, dark blood-red (#8E1B1B) skin,
@@ -57,11 +59,13 @@ GRID RULES (strict — frames are cut out by script, by grid position)
   copy or mirror another row's pose.
 
 DELIVER
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. State the exact pixel dimensions of each PNG.
 ```
 
 ## Sheet 2 — `enemy_tank_states.png` (CELL 192, COLS 6, ROWS 3)
+
+Delivered as: JPEG 1456x720 px (asked 1152x576, 6x3 of 192 px); ruled grid band: yes, every cell.
 
 ```text
 Create ONE pixel-art animation sheet for the TANK ENEMY of a top-down 2D
@@ -110,7 +114,7 @@ GRID RULES (strict — frames are cut out by script, by grid position)
   copy or mirror another row's pose.
 
 DELIVER
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. State the exact pixel dimensions of each PNG.
 ```
 

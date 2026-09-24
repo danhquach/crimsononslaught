@@ -2,7 +2,7 @@
 /**
  * Cut the authored sprite sheets into a Phaser atlas (CO-080). `npm run art:cut`.
  *
- *   in   docs/art/sheets/manifest.json + the 18 sheets it names (not shipped)
+ *   in   docs/art/sheets/manifest.json + every sheet it names (not shipped)
  *   out  public/assets/atlas/props.png    page 1, the packed atlas
  *        public/assets/atlas/props.json   page 1 Phaser JSON-hash frame data
  *        public/assets/atlas/propsN.png   one more pair per further page
@@ -42,6 +42,7 @@ import {
   unionBounds,
 } from './lib/spriteCut.mjs';
 import { encodeIndexedPng } from './lib/indexedPng.mjs';
+import { checkSheetFiles } from './lib/sheetFiles.mjs';
 
 const require = createRequire(import.meta.url);
 const { PNG } = require('pngjs');
@@ -67,6 +68,13 @@ const PAGE_BUDGET = 400 * 1024;
 const failures = [];
 function fail(message) {
   failures.push(message);
+}
+
+function exitOnFailures() {
+  if (failures.length === 0) return;
+  console.error(`art:cut failed with ${failures.length} problem(s):`);
+  for (const f of failures) console.error(`  - ${f}`);
+  process.exit(1);
 }
 
 function loadImage(file) {
@@ -262,6 +270,9 @@ function writePage(page, frames) {
 
 function main() {
   const manifest = JSON.parse(readFileSync(join(SHEET_DIR, 'manifest.json'), 'utf8'));
+  // A missing or mislabelled file would otherwise crash mid-cut, inside a decoder.
+  for (const problem of checkSheetFiles(manifest.sheets, SHEET_DIR)) fail(problem);
+  exitOnFailures();
 
   const frames = [];
   const seen = new Set();
@@ -278,11 +289,7 @@ function main() {
     }
   }
 
-  if (failures.length > 0) {
-    console.error(`art:cut failed with ${failures.length} problem(s):`);
-    for (const f of failures) console.error(`  - ${f}`);
-    process.exit(1);
-  }
+  exitOnFailures();
 
   mkdirSync(ATLAS_DIR, { recursive: true });
   const pages = [...new Set(frames.map((f) => f.page))].sort((a, b) => a - b);

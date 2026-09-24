@@ -11,6 +11,8 @@ Object: the Fast enemy. In-game 20 x 20 px, drawn at 4x (about 80 px) inside 128
 
 ## Sheet — `enemy_fast.png` — to do
 
+Delivered as: JPEG 1264x848 px (asked 768x512, 6x4 of 128 px); ruled grid band: no.
+
 ```text
 Create one pixel-art animation sheet for a fast enemy in a top-down 2D game.
 The creature is a lean, pointed, dart-shaped flyer, amber (#FFB300) with a
@@ -64,7 +66,7 @@ positions
   pixels, no grid lines, no borders, no watermark.
 
 Delivery
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. Report the exact pixel dimensions.
 ```
 

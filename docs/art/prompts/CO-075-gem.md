@@ -11,6 +11,8 @@ Object: the XP gem. In-game 12 x 16 px, drawn at 4x (about 48 x 64 px) inside 96
 
 ## Sheet — `gem.png` (CELL 96, COLS 6, ROWS 3)
 
+Delivered as: JPEG 1456x720 px (asked 576x288, 6x3 of 96 px); ruled grid band: yes, every cell.
+
 ```text
 Create ONE pixel-art animation sheet for the XP GEM of a top-down 2D game.
 Object: small faceted crystal, taller than wide, mint green (#69F0AE) with a
@@ -58,7 +60,7 @@ GRID RULES (strict — frames are cut out by script, by grid position)
   copy or mirror another row's pose.
 
 DELIVER
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. State the exact pixel dimensions of each PNG.
 ```
 

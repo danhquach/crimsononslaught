@@ -11,6 +11,8 @@ Object: the Boss. In-game 80 x 80 px, drawn at 4x (about 320 px) inside 384 px c
 
 ## Sheet 1 — `boss_walk.png` — to do
 
+Delivered as: JPEG 1024x1024 px (asked 1536x1536, 4x4 of 384 px); ruled grid band: no.
+
 ```text
 Create one pixel-art animation sheet for the boss of a top-down 2D game.
 The creature is a huge horned demon lord with violet (#9C27B0) skin, crimson
@@ -61,11 +63,13 @@ positions
   pixels, no grid lines, no borders, no watermark.
 
 Delivery
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. Report the exact pixel dimensions.
 ```
 
 ## Sheet 2 — `boss_charge.png` — to do
+
+Delivered as: JPEG 1024x1024 px (asked 1536x1536, 4x4 of 384 px); ruled grid band: no.
 
 ```text
 Create one pixel-art animation sheet for the boss of a top-down 2D game.
@@ -119,20 +123,22 @@ positions
   pixels, no grid lines, no borders, no watermark.
 
 Delivery
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. Report the exact pixel dimensions.
 ```
 
 ## Sheet 3 — `boss_states.png` — to do
 
+Delivered as: PNG 1344x1008 px (asked 1728x1296, 4x3 of 432 px); ruled grid band: no.
+
 ```text
 Create one pixel-art animation sheet for the boss of a top-down 2D game.
 The creature is a huge horned demon lord with violet (#9C27B0) skin, crimson
 and black wing membranes and armour, pale horns and claws, seen from a
-three-quarter top-down camera, about 320 px tall inside a 384 px cell, the
+three-quarter top-down camera, about 320 px tall inside a 432 px cell, the
 same creature as on the reference sheet.
 
-Cells are 384 px square, 4 across and 3 down, so the image is 1536 x 1152 px.
+Cells are 432 px square, 4 across and 3 down, so the image is 1728 x 1296 px.
 Row 1 shows the boss recoiling from a hit, head thrown back and wings
 flared with a brief pale flash: the first cell facing down, the second
 facing up, the third facing left, the fourth facing right.
@@ -177,7 +183,7 @@ positions
   pixels, no grid lines, no borders, no watermark.
 
 Delivery
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. Report the exact pixel dimensions.
 ```
 

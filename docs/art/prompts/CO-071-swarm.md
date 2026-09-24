@@ -11,6 +11,8 @@ Object: the Swarm enemy. In-game 16 x 16 px, drawn at 4x (about 64 px) inside 12
 
 ## Sheet — `enemy_swarm.png` (CELL 128, COLS 6, ROWS 4)
 
+Delivered as: JPEG 1264x848 px (asked 768x512, 6x4 of 128 px); ruled grid band: yes, every cell.
+
 ```text
 Create ONE pixel-art animation sheet for the SWARM ENEMY of a top-down 2D
 game. Creature: small round mindless imp/blob, bright red (#FF5252) body,
@@ -58,7 +60,7 @@ GRID RULES (strict — frames are cut out by script, by grid position)
   copy or mirror another row's pose.
 
 DELIVER
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. State the exact pixel dimensions of each PNG.
 ```
 

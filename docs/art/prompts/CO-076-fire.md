@@ -11,7 +11,11 @@ Object: all visuals of the Fire spell. The projectile flies at the nearest enemy
 
 ## Sheet 1 — `fire_projectile.png` (CELL 128, COLS 4, ROWS 2) — done, attached
 
+Delivered as: JPEG 1456x720 px (asked 512x256, 4x2 of 128 px); ruled grid band: yes, every cell.
+
 ## Sheet 2 — `fire_explosion.png` — to do
+
+Delivered as: PNG 2592x809 px (asked 2304x384, 6x1 of 384 px); ruled grid band: no.
 
 ```text
 Create one pixel-art animation sheet of a fireball explosion for a
@@ -62,11 +66,13 @@ positions
   pixels, no grid lines, no borders, no watermark.
 
 Delivery
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. Report the exact pixel dimensions.
 ```
 
 ## Sheet 3 — `fire_burn_overlay.png` (CELL 128, COLS 4, ROWS 2) — done, attached
+
+Delivered as: JPEG 1456x720 px (asked 512x256, 4x2 of 128 px); ruled grid band: yes, every cell.
 
 ## Done when
 Every sheet marked "to do" is attached at the stated grid. Engine integration is a separate ticket that depends on this one.

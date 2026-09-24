@@ -121,11 +121,18 @@ how a strip lies are `src/core/fx.ts`; the tunables are `src/config/fx.ts`.
 npm run art:cut
 ```
 
-Reads the 18 authored sheets under `docs/art/sheets/` (source of truth, not
-shipped) and writes one `public/assets/atlas/props*.png` + `.json` pair per
+Reads every authored sheet `docs/art/sheets/manifest.json` names (source of
+truth, not shipped) and writes one `public/assets/atlas/props*.png` + `.json` pair per
 atlas page, plus the generated `src/config/frames.ts`. The run is
 deterministic: the same sheets always produce byte-identical output, so a
 re-run with nothing changed leaves a clean working tree.
+
+The manifest's grid (`cols`, `rows`, `sheetCell`) is authoritative, not the
+canvas size a prompt asked for: sheets rarely come back at the asked size, and
+each prompt doc records what was actually delivered. Before cutting, the run
+checks that every file the manifest names exists, that its PNG or JPEG
+signature matches its extension, and that no same-named file in another format
+sits beside it; `npm test` runs the same check.
 
 A sheet's `page` in the manifest says which page its frames are packed into
 (1 by default), and each page is packed, quantised and held under 400 KB on

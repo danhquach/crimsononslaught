@@ -11,6 +11,8 @@ Object: the player hero. In-game size 28 x 28 px, drawn here at 4x (about 112 px
 
 ## Sheet 1 — `hero_locomotion.png` (CELL 192, COLS 6, ROWS 4)
 
+Delivered as: JPEG 1264x848 px (asked 1152x768, 6x4 of 192 px); ruled grid band: no.
+
 ```text
 Create ONE pixel-art animation sheet for the PLAYER HERO of a top-down 2D game.
 Character: lone mage/warrior in a white hooded cloak (#F5F5F5) with crimson
@@ -60,11 +62,13 @@ GRID RULES (strict — frames are cut out by script, by grid position)
   copy or mirror another row's pose.
 
 DELIVER
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. State the exact pixel dimensions of each PNG.
 ```
 
 ## Sheet 2 — `hero_states.png` (CELL 192, COLS 6, ROWS 2)
+
+Delivered as: JPEG 1792x592 px (asked 1152x384, 6x2 of 192 px); ruled grid band: yes, every cell.
 
 ```text
 Create ONE pixel-art animation sheet for the PLAYER HERO of a top-down 2D game.
@@ -114,7 +118,7 @@ GRID RULES (strict — frames are cut out by script, by grid position)
   copy or mirror another row's pose.
 
 DELIVER
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. State the exact pixel dimensions of each PNG.
 ```
 

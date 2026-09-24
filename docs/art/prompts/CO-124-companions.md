@@ -119,6 +119,10 @@ The attack sheets also arrive at 1254 × 1254 rather than 1024 × 1024. Harmless
 the grid shape is what matters and the cutter divides by `cols × rows` — but it
 is why the delivery rule now says "never larger".
 
+**Accepted, as committed:** all eight are PNG with a real alpha channel. The
+four locomotion sheets are 1536 × 1024 (asked 1536 × 1024) and the four attack
+sheets are 1254 × 1254 (asked 1024 × 1024).
+
 ## Where the finished sheets go
 
 ```

@@ -40,7 +40,7 @@ Then save the result as **PNG** under the filename the heading gives, and keep t
 docs/art/sheets/CO-123/<filename>.png
 ```
 
-The folder already exists in this branch. Filenames are the ones in the table below, exactly — `docs/art/sheets/manifest.json` will point at `CO-123/<filename>.png`, and the cutter reads only the manifest. PNG, not JPEG: every JPEG sheet so far came back with ~130k unique colours and a halo on every hard edge.
+The folder already exists in this branch. Filenames are the ones in the table below, exactly — `docs/art/sheets/manifest.json` will point at `CO-123/<filename>.png`, and the cutter reads only the manifest. PNG is preferred: every JPEG sheet so far came back with ~130k unique colours and a halo on every hard edge. A JPEG on flat magenta is still accepted; the cutter keys it with a tolerance.
 
 Drop them in as they come; they do not have to arrive together. Tell me which ones landed and I will measure them, add the manifest entries and run `npm run art:cut`.
 
@@ -76,6 +76,32 @@ the form sheet 19 uses, which is the one late delivery that came back with a
 usable layout — and each carries a rule aimed at the way its own first attempt
 failed. Nothing else in this file changed; the sixteen accepted blocks are as
 they were.
+
+### Delivered, per sheet
+
+What is in `docs/art/sheets/CO-123/` now, measured on the committed files. The three redrawn sheets landed under CO-136. `Asked` is the canvas from the table below; the manifest's `cols`, `rows` and `sheetCell` are what the cutter uses. `Ruled band` is how many cells the cutter's `trimBorderLines` trims a drawn line from.
+
+| File | Asked | Delivered | Format | Ruled band |
+|---|---|---|---|---|
+| `fire_meteor_telegraph.png` | 1536 × 1536 | 1254 × 1254 | PNG, pre-keyed alpha | — |
+| `fire_meteor_body.png` | 2048 × 512 | 1774 × 887 | PNG, pre-keyed alpha | — |
+| `fire_column_body.png` | 2048 × 512 | 1774 × 887 | PNG, flat magenta | no |
+| `fire_column_impact.png` | 2048 × 512 | 1774 × 887 | PNG, pre-keyed alpha | — |
+| `fire_dragon_body.jpg` | 2048 × 512 | 2064 × 512 | JPEG, flat magenta | every cell |
+| `ice_arrow_body.jpg` | 1024 × 256 | 2064 × 512 | JPEG, flat magenta | every cell |
+| `ice_arrow_impact.jpg` | 1024 × 256 | 2064 × 512 | JPEG, flat magenta | every cell |
+| `ice_bomb_body.jpg` | 1024 × 256 | 2064 × 512 | JPEG, flat magenta | every cell |
+| `ice_shield_body.jpg` | 1536 × 384 | 2064 × 512 | JPEG, flat magenta | no |
+| `ice_shield_break.jpg` | 2048 × 512 | 2064 × 512 | JPEG, flat magenta | no |
+| `ice_blizzard_area.jpg` | 1536 × 1536 | 1024 × 1024 | JPEG, flat magenta | every cell |
+| `lightning_tornado.jpg` | 1536 × 1536 | 1024 × 1024 | JPEG, flat magenta | no |
+| `lightning_sword.jpg` | 1024 × 256 | 2064 × 512 | JPEG, flat magenta | no |
+| `earth_spike.jpg` | 2560 × 512 | 2320 × 464 | JPEG, flat magenta | every cell |
+| `earth_shield_stone.jpg` | 1024 × 256 | 2064 × 512 | JPEG, flat magenta | every cell |
+| `earth_shield_break.png` | 2048 × 512 | 1536 × 512 | PNG, flat magenta | no |
+| `earth_quake_area.png` | 1536 × 1536 | 1536 × 1536 | PNG, flat magenta | no |
+| `status_stagger.jpg` | 640 × 160 | 2064 × 512 | JPEG, flat magenta | no |
+| `status_bleed.png` | 640 × 160 | 1408 × 480 | PNG, flat magenta | no |
 
 ## The sheets
 
@@ -124,7 +150,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 2. `fire_meteor_body.png` — the meteor itself, falling
@@ -144,7 +170,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 3. `fire_column_body.png` — the travelling column of fire
@@ -164,7 +190,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 4. `fire_column_impact.png` — what the column does to what it touches
@@ -184,7 +210,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 5. `fire_dragon_body.png` — the homing fire dragon
@@ -204,7 +230,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 6. `ice_arrow_body.png` — the ice arrow in flight
@@ -224,7 +250,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 7. `ice_arrow_impact.png` — the arrow landing
@@ -244,7 +270,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 8. `ice_bomb_body.png` — the frost bomb in flight
@@ -264,7 +290,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 9. `ice_shield_body.png` — the ice bubble around the player
@@ -286,7 +312,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 10. `ice_shield_break.png` — the bubble bursting
@@ -306,7 +332,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 11. `ice_blizzard_area.png` — the blizzard on the ground
@@ -332,7 +358,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 12. `lightning_tornado.png` — the drifting vortex
@@ -352,7 +378,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 13. `lightning_sword.png` — the orbiting blade, one facing only
@@ -374,7 +400,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 14. `earth_spike.png` — the spike erupting
@@ -394,7 +420,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 15. `earth_shield_stone.png` — one orbiting stone
@@ -414,7 +440,7 @@ Style, the same for every sheet in this project: chunky pixel art, crisp hard ed
 Background: the file is one sheet of flat magenta #FF00FF with the drawings sitting straight on it. Magenta runs unbroken from one edge of the canvas to the other, behind and between every drawing alike, fully opaque, with no transparency or alpha channel and no texture, noise or vignette.
 The cells are a measurement, not something to draw: nothing whatever marks where one ends and the next begins — no tile, panel, square of colour, line, border, divider or frame — and the magenta behind a drawing is the same magenta as beside it. No text anywhere either: one letter, number, label or watermark ruins the sheet.
 Every drawing stays inside its own cell at the margin given above and never touches an edge; draw it smaller rather than let it spill, because the margin is measured on the delivered file. Keep the effect's centre and its size the same in every cell unless told otherwise, and give every cell visible art: a fading last frame never goes empty.
-Deliver one lossless PNG, not JPEG, at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas size given above, or the whole canvas scaled down proportionally but never below half of it, and report the exact pixel size.
 ```
 
 ## 16. `earth_shield_break.png` — the stones breaking
@@ -436,7 +462,7 @@ The rock is grey-brown, hex #8D6E63, with pale break faces and brown-grey dust. 
 
 The four groups are one burst played once, in order. First: three chunky stone slabs in a ring about 200 pixels across, with white-hot cracks flashing across them. Second: the slabs split into halves, the ring about 250 pixels across, with the first puff of dust between them. Third: ten to fourteen rock chips fly outward through a thick ring of brown-grey dust, the whole spread no more than 300 pixels across. Fourth: the chips are near the outer edge of that spread, small and tumbling, with the dust thinning around them, still clearly visible and never fully gone. Every group has visible art in it; none is empty.
 
-Deliver one lossless PNG, not JPEG, exactly 2048 by 512 pixels, and report the pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), exactly 2048 by 512 pixels, and report the pixel size.
 ```
 
 ---
@@ -464,7 +490,7 @@ A group is a broken ring of upheaved grey-brown rock, hex #8D6E63, about 20 pixe
 
 The four groups are one rumble that repeats. The cracks widen and narrow and throw off a few short new splinters in different places, the amber patches grow and shrink by a few pixels, the loose stones hop a pixel or two as the ground shakes, and dust puffs rise in a different part of the circle each time. The ring and the circle it marks do not move: the same diameter and the same centre in all four groups, because that edge is what tells a player where the ground is dangerous. The shaking is in the cracks, the stones and the dust, never in the outline. Every group has visible art in it; none is empty.
 
-Deliver one lossless PNG, not JPEG, exactly 1536 by 1536 pixels, and report the pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), exactly 1536 by 1536 pixels, and report the pixel size.
 ```
 
 ---
@@ -490,7 +516,7 @@ A group is four or five deep crimson droplets, hex #B71C1C, each with a darker c
 
 The four groups are one four-step loop: the droplets fall a little further in each group, the lowest one breaking into specks as it lands, and a new droplet forms at the top, so the fourth group leads back into the first. Every group has visible droplets in it; none is empty, including the first.
 
-Deliver one lossless PNG, not JPEG, exactly 640 by 160 pixels, and report the pixel size.
+Deliver one PNG (preferred; a JPEG on flat magenta is accepted), exactly 640 by 160 pixels, and report the pixel size.
 ```
 
 ---

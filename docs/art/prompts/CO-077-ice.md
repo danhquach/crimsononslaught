@@ -11,6 +11,8 @@ Object: all visuals of the Ice spell. A ring of frost pulses outward from the pl
 
 ## Sheet 1 — `ice_nova.png` — to do
 
+Delivered as: PNG 3264x544 px (asked 3264x544, 6x1 of 544 px); ruled grid band: no.
+
 ```text
 Create one pixel-art animation sheet of an expanding frost ring for a
 top-down 2D game: a flat ring of ice on the ground that starts as a point
@@ -18,7 +20,7 @@ and grows outward, seen from above. Colours are icy cyan (#40C4FF) with
 white highlights and a pale blue inner mist. The centre of the ring is open
 in every frame.
 
-Cells are 448 px square, 6 across and 1 down, so the image is 2688 x 448 px.
+Cells are 544 px square, 6 across and 1 down, so the image is 3264 x 544 px.
 The single row is a six-frame expansion, each frame centred in its cell, in
 order: a small bright burst about 60 px wide; a thick ring about 140 px
 across with a band about 40 px wide; a ring about 240 px across with a band
@@ -62,11 +64,13 @@ positions
   pixels, no grid lines, no borders, no watermark.
 
 Delivery
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. Report the exact pixel dimensions.
 ```
 
 ## Sheet 2 — `ice_status.png` — to do
+
+Delivered as: PNG 1456x720 px (asked 960x480, 6x3 of 160 px); ruled grid band: yes, 15 of 18 cells.
 
 ```text
 Create one pixel-art animation sheet of ice status effects for a top-down
@@ -121,7 +125,7 @@ positions
   pixels, no grid lines, no borders, no watermark.
 
 Delivery
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. Report the exact pixel dimensions.
 ```
 
