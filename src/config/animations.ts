@@ -150,13 +150,16 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
 
   spec('earth.spike', 5, 15, ONCE),
   spec('earth.shield', 4, 6, LOOP),
+  spec('earth.shieldBreak', 4, 15, ONCE),
+  spec('earth.quake', 4, 8, LOOP),
 
   // Cross-element status overlays (#139): bleed and stagger are applied by
   // spells of any element, so they hang off `status` rather than off the
   // element that happened to land the hit. Stagger plays at `lightning.stun`'s
-  // rate, the overlay it replaces. Bleed's sheet is not accepted yet, so bleed
-  // still borrows `fire.burn` (`core/fx.ts`).
+  // rate, the overlay it replaces. Bleed plays at `fire.burn`'s rate, the
+  // overlay it used to borrow.
   spec('status.stagger', 4, 10, LOOP),
+  spec('status.bleed', 4, 8, LOOP),
 
   // Companions (CO-124). Four elemental creatures on the hero's own sheet
   // layout, so `facings` applies unchanged. Move runs at the hero's walk rate

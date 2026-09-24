@@ -125,17 +125,16 @@ describe('statusOverlay', () => {
     expect(statusOverlay({ ...idle, slowed: true, stunned: true })).toBe('lightning.stun');
   });
 
-  // #139: the new statuses rank under their nearest kin. Stagger has its own
-  // clip since #145; bleed still borrows the burn flames, its sheet being the
-  // one CO-123 did not accept.
+  // #139: the new statuses rank under their nearest kin. Stagger and bleed
+  // each have their own clip, and bleed has one size for every body.
   it('ranks a stagger as a stop — over a slow and a bleed — and a bleed under everything', () => {
     expect(statusOverlay({ ...idle, staggered: true })).toBe('status.stagger');
     expect(statusOverlay({ ...idle, staggered: true, slowed: true })).toBe('status.stagger');
     expect(statusOverlay({ ...idle, staggered: true, bleeding: true })).toBe('status.stagger');
     expect(statusOverlay({ ...idle, staggered: true, frozen: true })).toBe('ice.freeze');
-    expect(statusOverlay({ ...idle, bleeding: true })).toBe('fire.burn');
+    expect(statusOverlay({ ...idle, bleeding: true })).toBe('status.bleed');
     expect(statusOverlay({ ...idle, bleeding: true, radius: ENEMY_ARCHETYPES.tank.radius })).toBe(
-      'fire.burnBig',
+      'status.bleed',
     );
     expect(statusOverlay({ ...idle, bleeding: true, slowed: true })).toBe('ice.slow');
     expect(statusOverlay({ ...idle, bleeding: true, burning: true })).toBe('fire.burn');
