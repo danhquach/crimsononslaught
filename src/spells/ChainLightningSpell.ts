@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
 import { CHAIN_CLIP, FX_DEPTH } from '../config/fx';
-import { FRAMES } from '../config/frames';
+import { ART_BOXES, FRAMES } from '../config/frames';
+import { artFrame } from '../core/animation';
 import { resolveCast, rollStun } from '../core/chainLightning';
 import { chainFrame, chainSegmentPose } from '../core/fx';
 import type { Vec2 } from '../core/input';
@@ -102,7 +103,7 @@ export class ChainLightningSpell extends Spell<'lightning_chain'> {
         segment.strip.setVisible(false);
         this.spare.push(segment.strip);
       } else if (this.hasAtlas) {
-        segment.strip.setFrame(`${CHAIN_CLIP}.${frame}`);
+        segment.strip.setFrame(artFrame(`${CHAIN_CLIP}.${frame}`));
       }
     }
   }
@@ -157,19 +158,21 @@ export class ChainLightningSpell extends Spell<'lightning_chain'> {
     const strip = this.spare.pop() ?? this.makeStrip();
     strip.setPosition(pose.x, pose.y).setRotation(pose.rotation).setVisible(true);
     strip.setSize(pose.length, strip.height);
-    if (this.hasAtlas) strip.setFrame(`${CHAIN_CLIP}.0`);
+    if (this.hasAtlas) strip.setFrame(artFrame(`${CHAIN_CLIP}.0`));
     this.live.push({ strip, elapsedMs: 0 });
   }
 
   /**
    * A strip anchored at its left-middle, so `setPosition` puts that end on the
    * start point and the rotation swings the rest onto the target. The atlas
-   * strip tiles the chain art; the placeholder tiles the `fx_bolt` bar.
+   * strip tiles the chain's art alone, never its frame's margin (CO-126); the
+   * placeholder tiles the `fx_bolt` bar.
    */
   private makeStrip(): Phaser.GameObjects.TileSprite {
     const first = FRAMES[`${CHAIN_CLIP}.0`];
+    const art = ART_BOXES[CHAIN_CLIP];
     const strip = this.hasAtlas
-      ? this.scene.add.tileSprite(0, 0, first.w, first.h, first.page, `${CHAIN_CLIP}.0`)
+      ? this.scene.add.tileSprite(0, 0, art.w, art.h, first.page, artFrame(`${CHAIN_CLIP}.0`))
       : this.scene.add.tileSprite(
           0,
           0,

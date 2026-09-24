@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS, type TextureKey } from '../config/colors';
-import { FRAMES, type FrameInfo } from '../config/frames';
+import { ART_BOXES, type ArtBox } from '../config/frames';
 import { spinTimeScale } from '../core/fx';
 import { clearClip, showClip } from '../render/animate';
 
@@ -31,12 +31,12 @@ export const BOULDER_LOOK: BodyLook = { texture: 'boulder', clip: SPIN_CLIP };
  * nothing until the count perk brings it back.
  *
  * It plays `earth.spin` at a rate that follows the orbit speed (CO-082). The
- * drawn disc — the atlas frame, or the placeholder — is scaled to `size`, and
+ * drawn disc — the clip's art, or the placeholder — is scaled to `size`, and
  * Arcade scales the body with it, so the hitbox is the disc either way.
  */
 export class Boulder extends Phaser.Physics.Arcade.Sprite {
   private radius = 0;
-  /** Unscaled width of what is drawn: the spin frame, or the placeholder disc. */
+  /** Unscaled width of what is drawn: the spin clip's art, or the placeholder disc. */
   private drawnWidth = PLACEHOLDERS.boulder.width;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
@@ -56,12 +56,17 @@ export class Boulder extends Phaser.Physics.Arcade.Sprite {
     // The body is a circle filling the unscaled disc; `resize` scales the
     // sprite, and Arcade scales the body with it, so the hitbox stays the disc
     // whatever size this pooled body was last time. `showClip` re-centres the
-    // same circle on the clip's first frame when the atlas carries it.
-    const first = look.clip
-      ? (FRAMES as Readonly<Record<string, FrameInfo | undefined>>)[`${look.clip}.0`]
+    // same circle on the clip's anchor when the atlas carries it. The disc is
+    // the clip's art, not its frame, so a transparent margin round the frame
+    // neither shrinks the stone on screen nor leaves its hitbox wider than the
+    // stone (CO-126). The circle stays on the anchor rather than the art's
+    // centre: the anchor is the sprite's position, which is where the orbit
+    // maths puts the body, and the two sit within half a pixel.
+    const art = look.clip
+      ? (ART_BOXES as Readonly<Record<string, ArtBox | undefined>>)[look.clip]
       : undefined;
-    const shown = look.clip && first ? showClip(this, look.clip, first.w / 2) : false;
-    this.drawnWidth = shown && first ? first.w : PLACEHOLDERS[look.texture].width;
+    const shown = look.clip && art ? showClip(this, look.clip, art.w / 2) : false;
+    this.drawnWidth = shown && art ? art.w : PLACEHOLDERS[look.texture].width;
     if (!shown) {
       const body = this.body as Phaser.Physics.Arcade.Body;
       // Centred on the sprite, so a bar as wide as it is short still hits as a

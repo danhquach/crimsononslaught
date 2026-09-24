@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { ANIMATIONS, STATIC_FRAMES } from '../config/animations';
 import { TEXTURE_KEYS } from '../config/colors';
-import { ATLAS_PAGES, FRAMES } from '../config/frames';
+import { ART_BOXES, ATLAS_PAGES, FRAMES, FRAME_NAMES } from '../config/frames';
+import { artFrame } from '../core/animation';
 
 /**
  * Load and install the sprite atlas cut by `npm run art:cut` (CO-080).
@@ -49,6 +50,21 @@ export function installAtlas(scene: Phaser.Scene): string[] {
   // alone rather than globally, to leave the placeholder shapes as they were.
   for (const page of ATLAS_PAGES) {
     scene.textures.get(page.key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
+
+  for (const frame of FRAME_NAMES) {
+    const page = scene.textures.get(FRAMES[frame].page);
+    if (page.has(artFrame(frame))) continue;
+    const whole = page.get(frame);
+    const art = ART_BOXES[frame.slice(0, frame.lastIndexOf('.')) as keyof typeof ART_BOXES];
+    page.add(
+      artFrame(frame),
+      whole.sourceIndex,
+      whole.cutX + art.x,
+      whole.cutY + art.y,
+      art.w,
+      art.h,
+    );
   }
 
   const aliased: string[] = [];

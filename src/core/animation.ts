@@ -169,6 +169,15 @@ export function frameOrigin(info: Readonly<FrameInfo>): Vec2 {
 }
 
 /**
+ * The texture frame holding only `frame`'s art, less any transparent margin
+ * round it (CO-126): what a tiled strip repeats, so the margin never shows as
+ * a gap between tiles. `render/atlas.ts` registers one for every frame.
+ */
+export function artFrame(frame: string): string {
+  return `${frame}.art`;
+}
+
+/**
  * Top-left of a circle body of `radius` inside the frame, so the body's centre
  * is the frame's anchor: the hitbox stays on the sprite's position when the
  * frame changes size (CO-081), and its radius is the config's, not the art's.
