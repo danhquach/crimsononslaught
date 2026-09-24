@@ -35,6 +35,7 @@ import {
   isPreKeyed,
   keyCell,
   opaqueBounds,
+  opaqueCell,
   packFrames,
   quantize,
   trimBorderLines,
@@ -89,6 +90,9 @@ function cutSheet(sheet) {
   // A sheet that arrived with its background already cut away is taken as it
   // is; only a flattened one is keyed by colour (CO-123).
   const preKeyed = isPreKeyed(img);
+  // An opaque sheet (a ground or edge tile, #120) is its cells whole: nothing
+  // to key, and art that runs off every edge on purpose.
+  const opaque = sheet.opaque === true;
   const cut = [];
   // Frame numbering continues across rows, so the boss death can span two.
   let counters = {};
@@ -105,9 +109,10 @@ function cutSheet(sheet) {
     // ruled line cannot poison it.
     const cellOf = (col) => {
       const cell = cells[row * sheet.cols + col];
+      const whole = { x: 0, y: 0, w: cell.w, h: cell.h };
+      if (opaque) return { cell, keyed: opaqueCell(img, cell), local: whole };
       if (preKeyed) {
-        const local = { x: 0, y: 0, w: cell.w, h: cell.h };
-        return { cell, keyed: alphaCell(img, cell, sheet.alphaThreshold ?? 0), local };
+        return { cell, keyed: alphaCell(img, cell, sheet.alphaThreshold ?? 0), local: whole };
       }
       const key = cornerKey(img, insetRect(cell, KEY_INSET));
       const kept = trimBorderLines(img, cell, key, TOL_KEYED, TOL_SOLID);
@@ -133,7 +138,9 @@ function cutSheet(sheet) {
         fail(`${where(f.col)}: declared frame ${f.name} but the cell is empty`);
         continue;
       }
-      const touched = edgesTouched(bounds, local).filter((s) => !f.allowEdge.includes(s));
+      const touched = opaque
+        ? []
+        : edgesTouched(bounds, local).filter((s) => !f.allowEdge.includes(s));
       if (touched.length > 0) {
         fail(`${where(f.col)}: ${f.name} runs off the ${touched.join(' and ')} cell edge`);
       }

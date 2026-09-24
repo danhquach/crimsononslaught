@@ -16,6 +16,7 @@ import {
   keyCell,
   nextPowerOfTwo,
   opaqueBounds,
+  opaqueCell,
   packFrames,
   quantize,
   softAlpha,
@@ -299,6 +300,39 @@ describe('isPreKeyed / alphaCell', () => {
       const haloOnly = image(20, 20, () => [255, 238, 88, 90]);
       expect(opaqueBounds(alphaCell(haloOnly, rect, 240))).toBeNull();
     });
+  });
+});
+
+describe('opaqueCell', () => {
+  // A ground tile: full-bleed art whose corner colour is the art itself.
+  const tile = image(20, 20, (x, y) => ((x + y) % 2 === 0 ? [30, 28, 32, 255] : [58, 22, 32, 255]));
+
+  it('keeps the whole cell, where colour-keying from the corner would erase it', () => {
+    const rect = { x: 0, y: 0, w: 20, h: 20 };
+    const key = cornerKey(tile, insetRect(rect, 0.06));
+    const keyed = opaqueBounds(keyCell(tile, rect, key, 60, 130));
+    expect(keyed).toBeNull();
+    expect(opaqueBounds(opaqueCell(tile, rect))).toEqual(rect);
+  });
+
+  it('copies every pixel, magenta included, and makes it fully opaque', () => {
+    const soft = image(4, 4, (x) => (x === 0 ? [...MAGENTA, 0] : [10, 20, 30, 128]));
+    const cell = opaqueCell(soft, { x: 0, y: 0, w: 4, h: 4 });
+    expect([...cell.data.slice(0, 4)]).toEqual([...MAGENTA, 255]);
+    expect([...cell.data.slice(4, 8)]).toEqual([10, 20, 30, 255]);
+  });
+
+  it('takes the cell it is given out of a larger sheet', () => {
+    const cell = opaqueCell(tile, { x: 1, y: 0, w: 3, h: 2 });
+    expect(cell.width).toBe(3);
+    expect(cell.height).toBe(2);
+    expect([...cell.data.slice(0, 4)]).toEqual([58, 22, 32, 255]);
+  });
+
+  it('touches every edge of its cell, so the cutter skips the overrun check for it', () => {
+    const rect = { x: 0, y: 0, w: 20, h: 20 };
+    const touched = edgesTouched(opaqueBounds(opaqueCell(tile, rect)), rect);
+    expect(touched.sort()).toEqual(['bottom', 'left', 'right', 'top']);
   });
 });
 

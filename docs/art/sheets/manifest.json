@@ -45,7 +45,15 @@
     "            glow reaches into the next cell and the bounds of both are",
     "            wrong. 240 is the settled value there. Raise it until the cut",
     "            passes rather than reaching for allowEdge, which only silences",
-    "            the check and leaves the neighbour's halo in the frame."
+    "            the check and leaves the neighbour's halo in the frame.",
+    "",
+    "opaque      true for a sheet whose art fills every cell edge to edge: the",
+    "            arena's ground and edge tiles (#120). Each cell is taken whole",
+    "            and fully opaque, with no colour key (the tile's own colour sits",
+    "            at the cell corner) and no edge-overrun check (the art runs off",
+    "            every edge on purpose). Keep sheetCell a multiple of 4 so the",
+    "            downscale lands on whole source pixels and the tile stays",
+    "            seamless."
   ],
   "sheets": [
     {
@@ -1539,6 +1547,51 @@
       "rowSpecs": [
         [{ "anim": "idle", "cols": [1, 4] }],
         [{ "anim": "pickup", "cols": [1, 4] }]
+      ]
+    },
+    {
+      "key": "arena",
+      "ticket": "CO-098",
+      "file": "CO-098/arena_ground.jpg",
+      "page": 7,
+      "cols": 1,
+      "rows": 1,
+      "sheetCell": 1024,
+      "opaque": true,
+      "rowSpecs": [[{ "anim": "ground", "cols": [1, 1] }]]
+    },
+    {
+      "key": "arena",
+      "ticket": "CO-098",
+      "file": "CO-098/arena_edge.jpg",
+      "page": 7,
+      "cols": 1,
+      "rows": 1,
+      "sheetCell": 512,
+      "opaque": true,
+      "rowSpecs": [[{ "anim": "edge", "cols": [1, 1] }]]
+    },
+    {
+      "key": "arena",
+      "ticket": "CO-098",
+      "file": "CO-098/arena_props.png",
+      "page": 7,
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [
+          { "anim": "rocks", "cols": [1, 1] },
+          { "anim": "rubble", "cols": [2, 2] },
+          { "anim": "bones", "cols": [3, 3] },
+          { "anim": "tree", "cols": [4, 4] }
+        ],
+        [
+          { "anim": "pillar", "cols": [1, 1] },
+          { "anim": "column", "cols": [2, 2] },
+          { "anim": "gravestone", "cols": [3, 3] },
+          { "anim": "bush", "cols": [4, 4] }
+        ]
       ]
     }
   ]

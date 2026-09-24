@@ -201,6 +201,19 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('pickupEmber.pickup', 3, 15, ONCE),
   spec('pickupRelic.idle', 4, 6, LOOP),
   spec('pickupRelic.pickup', 4, 15, ONCE),
+
+  // Arena dressing (CO-098, #120). Still frames, never played: each is a
+  // one-frame clip so the atlas ships no frame outside an animation.
+  spec('arena.ground', 1, 1, ONCE),
+  spec('arena.edge', 1, 1, ONCE),
+  spec('arena.rocks', 1, 1, ONCE),
+  spec('arena.rubble', 1, 1, ONCE),
+  spec('arena.bones', 1, 1, ONCE),
+  spec('arena.tree', 1, 1, ONCE),
+  spec('arena.pillar', 1, 1, ONCE),
+  spec('arena.column', 1, 1, ONCE),
+  spec('arena.gravestone', 1, 1, ONCE),
+  spec('arena.bush', 1, 1, ONCE),
 ];
 
 /**

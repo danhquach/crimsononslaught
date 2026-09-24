@@ -20,6 +20,7 @@ export const ATLAS_PAGES = [
   { key: 'props4', texture: 'assets/atlas/props4.png', data: 'assets/atlas/props4.json' },
   { key: 'props5', texture: 'assets/atlas/props5.png', data: 'assets/atlas/props5.json' },
   { key: 'props6', texture: 'assets/atlas/props6.png', data: 'assets/atlas/props6.json' },
+  { key: 'props7', texture: 'assets/atlas/props7.png', data: 'assets/atlas/props7.json' },
 ] as const satisfies readonly AtlasPage[];
 
 /** Texture key of an atlas page. */
@@ -40,6 +41,16 @@ export interface FrameInfo {
 }
 
 export const FRAMES = {
+  'arena.bones.0': { w: 48, h: 27, anchorX: 27, anchorY: 7, page: 'props7' },
+  'arena.bush.0': { w: 47, h: 34, anchorX: 29, anchorY: 20, page: 'props7' },
+  'arena.column.0': { w: 36, h: 34, anchorX: 18, anchorY: 20, page: 'props7' },
+  'arena.edge.0': { w: 128, h: 128, anchorX: 64, anchorY: 64, page: 'props7' },
+  'arena.gravestone.0': { w: 38, h: 36, anchorX: 21, anchorY: 22, page: 'props7' },
+  'arena.ground.0': { w: 256, h: 256, anchorX: 128, anchorY: 128, page: 'props7' },
+  'arena.pillar.0': { w: 42, h: 29, anchorX: 20, anchorY: 17, page: 'props7' },
+  'arena.rocks.0': { w: 38, h: 34, anchorX: 17, anchorY: 13, page: 'props7' },
+  'arena.rubble.0': { w: 46, h: 24, anchorX: 24, anchorY: 3, page: 'props7' },
+  'arena.tree.0': { w: 47, h: 45, anchorX: 29, anchorY: 20, page: 'props7' },
   'boss.charge.down.0': { w: 91, h: 92, anchorX: 47, anchorY: 47, page: 'props2' },
   'boss.charge.down.1': { w: 91, h: 92, anchorX: 47, anchorY: 47, page: 'props2' },
   'boss.charge.left.0': { w: 80, h: 92, anchorX: 33, anchorY: 45, page: 'props2' },

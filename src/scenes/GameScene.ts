@@ -31,6 +31,8 @@ import {
   rollDrops,
   tickMagnet,
 } from '../core/pickups';
+import { planProps } from '../core/arenaDressing';
+import type { Vec2 } from '../core/input';
 import { createRng, deriveSeed, type Rng } from '../core/rng';
 import { RUN_EVENT, emitRunEvent, type RunEventPayloads } from '../core/runEvents';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
@@ -73,7 +75,16 @@ import {
   STRIKE_SPELL_IDS,
   isStrikeSpellId,
 } from '../config/strikes';
-import { ARENA_DEPTH } from '../config/fx';
+import {
+  ARENA_EDGE_BAND,
+  ARENA_EDGE_FRAME,
+  ARENA_GROUND_FRAME,
+  ARENA_PROP_COUNT,
+  ARENA_PROP_FRAMES,
+  ARENA_PROP_PLACEMENT,
+} from '../config/arena';
+import { FRAMES } from '../config/frames';
+import { ARENA_DEPTH, PROP_DEPTH } from '../config/fx';
 import type { EnemyType } from '../config/enemies';
 import {
   BOMB_DAMAGE,
@@ -188,6 +199,12 @@ const CRIT_STREAM = 0xc717;
  * the same reason crits do: pickups must not move a seed's spawns or offers.
  */
 const PICKUP_STREAM = 'pickups';
+
+/**
+ * The arena's prop scatter draws from a stream of its own (#120), so dressing
+ * the floor never moves a seed's spawns, offers or drops.
+ */
+const ARENA_STREAM = 'arena';
 
 /**
  * Where a death's Ember and consumable land, from the death spot, so neither
@@ -536,7 +553,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.gems = new GemPool(this);
     this.pickups = new PickupPool(this);
-    this.placeRelics();
+    this.scatterProps(seed, this.placeRelics());
     this.fx = new FxPool(this);
     this.fx.onBurst = (clip, scale) => {
       if (clip === 'fire.explode' && scale >= LARGE_EXPLOSION_SCALE) this.shakeFor('explosion');
@@ -1155,13 +1172,40 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Spec §5 (#195): the run's relics, on seeded spots clear of the player's
-   * start, of the arena edge and of each other.
+   * start, of the arena edge and of each other. Returns the spots, which the
+   * arena's props keep clear of.
    */
-  private placeRelics(): void {
+  private placeRelics(): Vec2[] {
     const start = { x: this.player.x, y: this.player.y };
     const world = { width: WORLD_WIDTH, height: WORLD_HEIGHT };
-    for (const spot of placeRelics(this.pickupRng, world, start, RELIC_COUNT)) {
-      this.pickups.placeRelic(spot.x, spot.y);
+    const spots = placeRelics(this.pickupRng, world, start, RELIC_COUNT);
+    for (const spot of spots) this.pickups.placeRelic(spot.x, spot.y);
+    return spots;
+  }
+
+  /**
+   * #120: the arena's scatter props, on seeded spots clear of the player's
+   * start and of every relic. Decoration only — no body, no collider — drawn
+   * as one Blitter, a single draw call with no per-frame update, under
+   * everything else on the floor. The placeholder arena has none.
+   */
+  private scatterProps(seed: number, relics: readonly Vec2[]): void {
+    const page = FRAMES[ARENA_PROP_FRAMES[0]].page;
+    if (!this.textures.exists(page)) return;
+    const props = planProps(
+      createRng(deriveSeed(seed, ARENA_STREAM)),
+      { width: WORLD_WIDTH, height: WORLD_HEIGHT },
+      ARENA_PROP_COUNT,
+      ARENA_PROP_FRAMES,
+      [{ x: this.player.x, y: this.player.y }, ...relics],
+      ARENA_PROP_PLACEMENT,
+    );
+    const blitter = this.add.blitter(0, 0, page).setDepth(PROP_DEPTH);
+    for (const { frame, x, y } of props) {
+      const { w, h } = FRAMES[frame];
+      // Centred on the spot by the art's own box: a still prop has no feet
+      // line to hold, which is all the cut's anchor is for.
+      blitter.create(Math.round(x - w / 2), Math.round(y - h / 2), frame);
     }
   }
 
@@ -1271,13 +1315,33 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Bounded world: Arcade bounds stop the player at the edge, camera bounds stop
-   * the view there. The grid gives the empty plane enough texture to read motion.
+   * the view there. With the atlas (#120) the floor is the ground tile repeated
+   * edge to edge, walled by a band of the rubble tile along each edge; without
+   * it, the grid gives the empty plane enough texture to read motion.
    */
   private buildArena(): void {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     const cx = WORLD_WIDTH / 2;
     const cy = WORLD_HEIGHT / 2;
+    const page = FRAMES[ARENA_GROUND_FRAME].page;
+    if (this.textures.exists(page)) {
+      // One TileSprite each: a single quad however far the tile repeats.
+      this.add
+        .tileSprite(cx, cy, WORLD_WIDTH, WORLD_HEIGHT, page, ARENA_GROUND_FRAME)
+        .setDepth(ARENA_DEPTH);
+      const band = ARENA_EDGE_BAND;
+      const edges: readonly [number, number, number, number][] = [
+        [cx, band / 2, WORLD_WIDTH, band],
+        [cx, WORLD_HEIGHT - band / 2, WORLD_WIDTH, band],
+        [band / 2, cy, band, WORLD_HEIGHT],
+        [WORLD_WIDTH - band / 2, cy, band, WORLD_HEIGHT],
+      ];
+      for (const [x, y, w, h] of edges) {
+        this.add.tileSprite(x, y, w, h, page, ARENA_EDGE_FRAME).setDepth(ARENA_DEPTH);
+      }
+      return;
+    }
     // Under everything the run puts on the floor, so a ground area (#135) lies
     // on the arena rather than beneath it.
     this.add
