@@ -3,6 +3,7 @@ import { ANIMATIONS, FACINGS } from '../config/animations';
 import { BOSS } from '../config/boss';
 import { ENEMY_ARCHETYPES, ENEMY_TYPES } from '../config/enemies';
 import { FRAMES, FRAME_NAMES, type FrameName } from '../config/frames';
+import { CONSUMABLE_KINDS, PICKUP_KINDS } from '../config/pickups';
 import {
   DEFAULT_FACING,
   animationDurationMs,
@@ -14,6 +15,7 @@ import {
   frameOrigin,
   gemAnimation,
   headingRotation,
+  pickupAnimation,
   heroAnimation,
   type EnemyPhase,
 } from './animation';
@@ -169,6 +171,36 @@ describe('gemAnimation', () => {
     expect(gemAnimation({ drifting: true, collected: false })).toBe('gem.drift');
     expect(gemAnimation({ drifting: true, collected: true })).toBe('gem.pickup');
     for (const name of ['gem.idle', 'gem.drift', 'gem.pickup']) expectClip(name);
+  });
+});
+
+describe('pickupAnimation', () => {
+  it('idles on the floor and bursts when collected, by kind', () => {
+    expect(pickupAnimation({ kind: 'ember', consumable: 'health', collected: false })).toBe(
+      'pickupEmber.idle',
+    );
+    expect(pickupAnimation({ kind: 'relic', consumable: 'health', collected: true })).toBe(
+      'pickupRelic.pickup',
+    );
+  });
+
+  it('draws a consumable as its own kind, never as another', () => {
+    for (const consumable of CONSUMABLE_KINDS) {
+      const idle = pickupAnimation({ kind: 'consumable', consumable, collected: false });
+      expect(idle).toMatch(
+        new RegExp(`^pickup${consumable[0]?.toUpperCase()}${consumable.slice(1)}\\.idle$`),
+      );
+    }
+  });
+
+  it('names only clips the atlas has, for every kind and state', () => {
+    for (const kind of PICKUP_KINDS) {
+      for (const consumable of CONSUMABLE_KINDS) {
+        for (const collected of [false, true]) {
+          expectClip(pickupAnimation({ kind, consumable, collected }));
+        }
+      }
+    }
   });
 });
 

@@ -25,8 +25,11 @@ export const TEXTURE_KEYS = [
   'fx_telegraph',
   'fx_column',
   'pickup_ember',
-  'pickup_consumable',
   'pickup_relic',
+  'pickup_health',
+  'pickup_magnet',
+  'pickup_bomb',
+  'pickup_chest',
 ] as const;
 
 export type TextureKey = (typeof TEXTURE_KEYS)[number];
@@ -79,9 +82,15 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   fx_column: { shape: 'circle', color: 0xdd2c00, width: 80, height: 80 },
   // #195: the floor pickups, placeholders until their art lands. None is a
   // diamond, so nothing on the floor reads as a gem. An Ember is a small amber
-  // point, a consumable a pink square, and a relic a large gold ring — the
-  // biggest thing on the floor, since the player walks across the arena for it.
+  // point and a relic a large gold ring — the biggest thing on the floor, since
+  // the player walks across the arena for it.
   pickup_ember: { shape: 'triangle', color: 0xffab40, width: 12, height: 14 },
-  pickup_consumable: { shape: 'rect', color: 0xf50057, width: 14, height: 14 },
   pickup_relic: { shape: 'ring', color: 0xffd740, width: 36, height: 36, thickness: 7 },
+  // #128: a consumable per kind, so the player can tell at a glance which one
+  // is worth the walk. Health a pink square, the magnet a blue ring, the bomb
+  // a violet disc, and a chest a wide amber block.
+  pickup_health: { shape: 'rect', color: 0xf50057, width: 14, height: 14 },
+  pickup_magnet: { shape: 'ring', color: 0x448aff, width: 20, height: 20, thickness: 4 },
+  pickup_bomb: { shape: 'circle', color: 0xd500f9, width: 14, height: 14 },
+  pickup_chest: { shape: 'rect', color: 0xffc400, width: 20, height: 14 },
 };

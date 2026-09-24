@@ -6,6 +6,7 @@ import {
   createHealth,
   flickerAlpha,
   grantMaxHp,
+  heal,
   regenHealth,
   takeDamage,
   tickHealth,
@@ -162,6 +163,30 @@ describe('regenHealth', () => {
   it('never heals a dead player back out of death', () => {
     const dead = takeDamage(createHealth(), 999).state;
     expect(regenHealth(dead, 5, 1000)).toEqual(dead);
+  });
+});
+
+describe('heal', () => {
+  const hurt = { hp: 40, maxHp: 100, invulnMs: 0 };
+
+  it('restores the amount at once', () => {
+    expect(heal(hurt, 30)).toEqual({ hp: 70, maxHp: 100, invulnMs: 0 });
+  });
+
+  it('stops at the maximum', () => {
+    expect(heal({ ...hurt, hp: 90 }, 30).hp).toBe(100);
+    expect(heal({ ...hurt, hp: 100 }, 30).hp).toBe(100);
+  });
+
+  it('never heals a dead player, and ignores a non-positive amount', () => {
+    expect(heal({ ...hurt, hp: 0 }, 30).hp).toBe(0);
+    expect(heal(hurt, 0)).toEqual(hurt);
+    expect(heal(hurt, -5)).toEqual(hurt);
+    expect(heal(hurt, Number.NaN)).toEqual(hurt);
+  });
+
+  it('leaves the invulnerability window alone', () => {
+    expect(heal({ ...hurt, invulnMs: 300 }, 10).invulnMs).toBe(300);
   });
 });
 

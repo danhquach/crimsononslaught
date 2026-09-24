@@ -111,14 +111,9 @@ export class CollisionDebugScene extends Phaser.Scene {
     this.gems.update(delta, this.player);
     // An Ember, dropped the same way, proves the floor pickups' pair (#195).
     if (this.pickups.liveDrops === 0) {
-      this.pickups.drop(
-        'ember',
-        this.player.x - GEM_DROP_OFFSET,
-        this.player.y + GEM_DROP_OFFSET,
-        1,
-      );
+      this.pickups.dropEmber(this.player.x - GEM_DROP_OFFSET, this.player.y + GEM_DROP_OFFSET, 1);
     }
-    this.pickups.update(this.player);
+    this.pickups.update(delta, this.player);
     this.fireSpell(delta);
     this.cullSpells();
   }

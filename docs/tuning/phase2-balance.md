@@ -335,3 +335,52 @@ the tests that pinned the old numbers were updated with them.
   a 90 s budget — but boss HP at 2400 spends more of that budget on the boss
   phase than 1500 did, so the guard has less room on the hosted runner than
   before. It still needs the CO-091-class fix it has been waiting for.
+
+---
+
+# Consumables and survival (#128, 2026-09-23)
+
+Ticket: [#128](https://github.com/danhquach/crimsononslaught/issues/128) · Spec: `docs/superpowers/specs/2026-09-23-twenty-minute-run-design.md` §4.2
+
+**Question.** #128 adds a health pickup, and every survival number above
+assumed nothing on the floor healed. Does it move survival for the two weakest
+elements, Fire and Ice?
+
+**Answer: no, at the shipped drop rate.** The owner cut the consumable chance
+from 3% to 0.3% before this sweep, so a consumable is a rare find. In ten runs
+on the branch the bot picked up two consumables in all, none of them in a Fire
+run. Healing had almost no chance to act, and no config was changed.
+
+**Method.** Not comparable to the rounds above. The run is 20 minutes since
+#127, and the bot is a new scratch Playwright bot built for this check: it
+steers by overriding the player's keyboard read, is pushed away from nearby
+enemies weighted by distance, sidesteps round the crowd at 65° unless hurt,
+keeps off the walls, walks to consumables within 350 px (a health pickup within
+700 px when under 70% HP), and to gems when nothing is close. Level-ups always
+take the first card. Seeds 1–5, `timeScale=4`, mortal. `main` (337ee57) and
+the branch ran side by side on their own ports, two runs at a time. On `main`
+a consumable is #195's stub: 3% of deaths, no effect when picked up.
+
+| Kit | Build | Survived (seeds 1–5) | Mean | Consumables picked up |
+|---|---|---|---|---|
+| Fire | main | 9:20 · 9:39 · 12:52 · 3:28 · 4:25 | 7:57 | 13 · 19 · 8 · 4 · 8 (no effect) |
+| Fire | branch | 7:07 · 4:31 · 3:04 · 8:55 · 7:22 | 6:12 | 0 · 0 · 0 · 0 · 0 |
+| Ice | main | 3:26 · 3:13 · 4:34 · 4:23 · 4:31 | 4:01 | 0 · 2 · 1 · 3 · 2 (no effect) |
+| Ice | branch | 4:24 · 6:10 · 4:31 · 3:19 · 4:33 | 4:36 | 1 · 1 · 0 · 0 · 0 |
+
+No run reached the 20:00 boss.
+
+What the runs say:
+
+- **The gaps are noise, not the pickups.** Fire's branch mean is 1:45 lower and
+  Ice's 0:35 higher, but the Fire branch runs took no consumable at all, so
+  nothing #128 added acted in them. One seed on `main` alone spans 3:28 to
+  12:52. The two builds also walk different paths: `main`'s bot detours to ten
+  times as many (inert) stubs.
+- **At 3% it would have mattered.** One smoke run of the bot on the branch,
+  before the cut, used Fire seed 1 at 3%. It picked up 42 consumables and
+  survived the full 20:00 at level 42, where the same seed lasts 7:07 at 0.3%.
+  One sample, but it points the same way as the owner's call: at 3% a
+  consumable is a given, not a relief.
+- **No tuning change.** If the drop rate is ever raised, re-run this sweep
+  first; health and the bomb together are then enough to carry a run.

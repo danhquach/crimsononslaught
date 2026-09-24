@@ -37,8 +37,58 @@ export const EMBER_DROPS: Readonly<Record<EnemyType, EmberDrop>> = {
 /** Spec §4: the boss pays this on the killing blow, credited to the run rather than dropped. */
 export const BOSS_EMBERS = 100;
 
-/** Spec §4: every regular death's chance of dropping a consumable. Its effects are #128's. */
-export const CONSUMABLE_CHANCE = 0.03;
+/**
+ * Every regular death's chance of dropping a consumable. #128 cut spec §4's 3 %
+ * to 0.3 %: a consumable is a rare find, about a dozen in a full 20-minute run
+ * of ~4,000 kills, not one every few seconds.
+ */
+export const CONSUMABLE_CHANCE = 0.003;
+
+/**
+ * What a consumable does on pickup (#128): heal, pull every gem in, blast the
+ * screen, or pay Embers. A chest is an elite's drop only; the other three are
+ * what a regular death's consumable roll lands on.
+ */
+export const CONSUMABLE_KINDS = ['health', 'magnet', 'bomb', 'chest'] as const;
+
+export type ConsumableKind = (typeof CONSUMABLE_KINDS)[number];
+
+/** The kinds a regular death can drop. */
+export type RegularConsumableKind = Exclude<ConsumableKind, 'chest'>;
+
+/**
+ * #128: which kind a regular death's consumable is, by relative weight inside
+ * the `CONSUMABLE_CHANCE` roll. Health is the heaviest so a player in trouble
+ * has something to reach for, and the bomb the lightest, since it clears the
+ * screen. A draw walks them in `CONSUMABLE_KINDS` order.
+ */
+export const CONSUMABLE_WEIGHTS: Readonly<Record<RegularConsumableKind, number>> = {
+  health: 0.45,
+  magnet: 0.35,
+  bomb: 0.2,
+};
+
+/** #128: an elite's chance of dropping a chest, in place of the regular consumable roll. */
+export const ELITE_CHEST_CHANCE = 1;
+
+/** #128: HP a health pickup restores, capped at the player's maximum. */
+export const HEAL_AMOUNT = 30;
+
+/**
+ * #128: how long a magnet pulls every gem on the map, in run time. Long enough
+ * for a gem in the far corner of the 3000 px arena to reach a player standing
+ * in the other at `GEM_DRIFT_SPEED`.
+ */
+export const MAGNET_DURATION_MS = 11_000;
+
+/**
+ * #128: what a bomb deals every regular enemy on screen, as one un-crittable
+ * hit. It clears the screen: more than a tank has at the last wave's `hpMul`.
+ */
+export const BOMB_DAMAGE = 200;
+
+/** #128: Embers a chest pays on pickup. */
+export const CHEST_EMBERS = 25;
 
 /**
  * Spec §4: live Ember and consumable drops at once. Past it an Ember is
@@ -67,8 +117,15 @@ export const RELIC_PLACEMENT = {
 } as const;
 
 /** Each kind's placeholder look (`config/colors.ts`); real art comes later. */
-export const PICKUP_TEXTURES: Readonly<Record<PickupKind, TextureKey>> = {
+export const PICKUP_TEXTURES: Readonly<Record<Exclude<PickupKind, 'consumable'>, TextureKey>> = {
   ember: 'pickup_ember',
-  consumable: 'pickup_consumable',
   relic: 'pickup_relic',
+};
+
+/** #128: a consumable looks like what it does, so each kind has a placeholder of its own. */
+export const CONSUMABLE_TEXTURES: Readonly<Record<ConsumableKind, TextureKey>> = {
+  health: 'pickup_health',
+  magnet: 'pickup_magnet',
+  bomb: 'pickup_bomb',
+  chest: 'pickup_chest',
 };
