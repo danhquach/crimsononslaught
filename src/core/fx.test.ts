@@ -4,9 +4,12 @@ import { ENEMY_ARCHETYPES } from '../config/enemies';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { BASE_EARTH_SHIELD_STATS } from '../config/shields';
 import { BASE_AREA_STATS } from '../config/areas';
+import { ART_BOXES } from '../config/frames';
+import { BASE_TORNADO_STATS } from '../config/lightningRoster';
 import { BASE_METEOR_STATS } from '../config/strikes';
 import {
   CHAIN_CYCLE_MS,
+  areaArtScale,
   areaScale,
   chainFrame,
   chainSegmentPose,
@@ -48,6 +51,25 @@ describe('effect scales (CO-082)', () => {
     expect(areaScale(BASE_AREA_STATS.ice_blizzard.radius)).toBeCloseTo(1.8);
     // A block with no radius draws nothing rather than a mirrored ring.
     expect(areaScale(-50)).toBe(0);
+  });
+
+  it("draws a patch's own art so its art box spans the patch (#179)", () => {
+    const blizzard = ART_BOXES['ice.blizzard'];
+    const tornado = ART_BOXES['lightning.tornado'];
+    // Sized by the art, not the frame: the frame's margin must not shrink the patch.
+    expect(areaArtScale(180, blizzard.w)).toBeCloseTo(360 / blizzard.w);
+    for (const [radius, box] of [
+      [BASE_AREA_STATS.ice_blizzard.radius, blizzard],
+      [BASE_TORNADO_STATS.radius, tornado],
+      [252, blizzard],
+    ] as const) {
+      expect((box.w * areaArtScale(radius, box.w)) / 2, `${radius}`).toBeCloseTo(radius);
+    }
+    // Tornado is fitted by width, so the taller funnel rises past its ring.
+    const tall = tornado.h * areaArtScale(BASE_TORNADO_STATS.radius, tornado.w);
+    expect(tall).toBeGreaterThan(BASE_TORNADO_STATS.radius * 2);
+    expect(areaArtScale(-50, blizzard.w)).toBe(0);
+    expect(areaArtScale(180, 0)).toBe(0);
   });
 
   it('draws a telegraph at radius / 100, so the ring is the blast to come', () => {

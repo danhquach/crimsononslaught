@@ -1,3 +1,4 @@
+import { TORNADO_LOOK } from '../config/lightningRoster';
 import { createArea, membersOf, type GroundArea } from '../core/groundArea';
 import type { Vec2 } from '../core/input';
 import { Spell, anyWithin } from '../core/spell';
@@ -83,12 +84,17 @@ export class TornadoSpell extends Spell<'lightning_tornado'> {
     const heading = tornadoHeading(this.caster, this.enemies.live, targetRange);
     if (!heading) return;
     const area = createArea(this.caster, { radius, durationS: duration, tickEveryS: tickRate });
-    const placed = this.areas.place(area, (live) => this.applyTick(live, tickDamage), {
-      onStep: (live, deltaS) => this.step(live, heading, speed, pullRadius, pullForce, deltaS),
-      onExpire: () => {
-        this.out -= 1;
+    const placed = this.areas.place(
+      area,
+      (live) => this.applyTick(live, tickDamage),
+      {
+        onStep: (live, deltaS) => this.step(live, heading, speed, pullRadius, pullForce, deltaS),
+        onExpire: () => {
+          this.out -= 1;
+        },
       },
-    });
+      TORNADO_LOOK,
+    );
     if (!placed) return;
     this.sent += 1;
     this.out += 1;

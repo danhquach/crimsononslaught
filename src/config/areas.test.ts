@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { validateSpellFields } from '../core/playerProfile';
+import { ANIMATIONS } from './animations';
 import {
   AREA_CARDS,
+  AREA_LOOKS,
   AREA_SPELL_IDS,
   AREA_TEXTURE,
   BASE_AREA_STATS,
@@ -10,6 +12,8 @@ import {
   isAreaSpellId,
 } from './areas';
 import { PLACEHOLDERS } from './colors';
+import { ART_BOXES } from './frames';
+import { TORNADO_LOOK } from './lightningRoster';
 import { elementOf, isRosterSpellId, SPELLS_BY_ELEMENT } from './loadout';
 
 /** #135: the area rows are the spec's §9.3 and §9.5 tables, and both are castable. */
@@ -99,5 +103,32 @@ describe('area presentation', () => {
 
   it('draws both patches with a texture the game generates', () => {
     expect(PLACEHOLDERS[AREA_TEXTURE]).toBeDefined();
+  });
+});
+
+describe('area looks (#179)', () => {
+  const looks = { ...AREA_LOOKS, lightning_tornado: TORNADO_LOOK };
+  const boxes: Readonly<Record<string, (typeof ART_BOXES)[keyof typeof ART_BOXES] | undefined>> =
+    ART_BOXES;
+
+  it('gives every spell that places patches a look of its own', () => {
+    expect(Object.keys(AREA_LOOKS).sort()).toEqual([...AREA_SPELL_IDS].sort());
+  });
+
+  it('names only clips the atlas plays and sizes by their art box', () => {
+    for (const [id, look] of Object.entries(looks)) {
+      if (!look.clip) continue;
+      expect(
+        ANIMATIONS.map((anim) => anim.name),
+        id,
+      ).toContain(look.clip);
+      expect(boxes[look.clip], id).toBeDefined();
+    }
+  });
+
+  it('draws Blizzard and Tornado with their art and Earthquake with the ring until its art lands', () => {
+    expect(AREA_LOOKS.ice_blizzard.clip).toBe('ice.blizzard');
+    expect(TORNADO_LOOK.clip).toBe('lightning.tornado');
+    expect(AREA_LOOKS.earth_quake.clip).toBeUndefined();
   });
 });

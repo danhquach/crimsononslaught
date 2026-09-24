@@ -68,7 +68,9 @@ export const MAX_LIVE_AREAS = 16;
 /**
  * A ground area is drawn at `radius / AREA_SCALE_RADIUS`, so the ring covers
  * exactly the patch that ticks: scale 1 at the 100 px half-width of the
- * `fx_area` placeholder (`config/colors.ts`, held to it by `fx.test.ts`).
+ * `fx_area` placeholder (`config/colors.ts`, held to it by `fx.test.ts`). A
+ * spell's own art under the ring is sized from its art box instead
+ * (`areaArtScale`, #179).
  */
 export const AREA_SCALE_RADIUS = 100;
 
@@ -102,6 +104,12 @@ export const NUMBER_DEPTH = 7;
  * effects that play over them, above the arena's props (`PROP_DEPTH`).
  */
 export const AREA_DEPTH = -1;
+
+/**
+ * A patch's own art (#179) lies just under its ring, so the outline of the
+ * ground that ticks is never hidden by the art, and over the arena's props.
+ */
+export const AREA_ART_DEPTH = -1.25;
 
 /**
  * The arena's scatter props (#120) lie on the floor and under everything the

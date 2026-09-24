@@ -1,4 +1,5 @@
 import type { ChainLightningStats, SwordStats, TornadoStats } from '../core/spellStats';
+import type { AreaLook } from './areas';
 import { PLACEHOLDERS } from './colors';
 import type { SpellCard } from './spells';
 
@@ -48,6 +49,13 @@ export const BASE_CHAIN_LIGHTNING_STATS: Readonly<ChainLightningStats> = {
   stunChance: 0.08,
   stunDuration: 2,
 };
+
+/**
+ * Tornado draws its funnel over the ring it ticks inside (#179), as wide as the
+ * patch and centred on it: the side-on art stands taller than it is wide, so it
+ * rises past the ring rather than being squeezed into it.
+ */
+export const TORNADO_LOOK: AreaLook = { clip: 'lightning.tornado' };
 
 /** Spec §9.4 base block. */
 export const BASE_TORNADO_STATS: Readonly<TornadoStats> = {

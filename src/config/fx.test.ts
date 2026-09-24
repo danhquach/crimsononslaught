@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ANIMATIONS } from './animations';
 import { ENEMY_ARCHETYPES, MAX_LIVE_ENEMIES } from './enemies';
 import {
+  AREA_ART_DEPTH,
   AREA_DEPTH,
   AREA_SCALE_RADIUS,
   ARENA_DEPTH,
@@ -70,6 +71,9 @@ describe('fx config (CO-082)', () => {
     // #120: props lie on the floor, under ground areas and all the rest.
     expect(ARENA_DEPTH).toBeLessThan(PROP_DEPTH);
     expect(PROP_DEPTH).toBeLessThan(AREA_DEPTH);
+    // #179: a patch's own art lies over the props and under its ring.
+    expect(PROP_DEPTH).toBeLessThan(AREA_ART_DEPTH);
+    expect(AREA_ART_DEPTH).toBeLessThan(AREA_DEPTH);
     // Entities are drawn at the default depth 0; effects sit above them.
     expect(AREA_DEPTH).toBeLessThan(0);
     expect(FX_DEPTH).toBeGreaterThan(0);

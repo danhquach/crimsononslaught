@@ -1,4 +1,4 @@
-import type { AreaSpellId } from '../config/areas';
+import { AREA_LOOKS, type AreaSpellId } from '../config/areas';
 import { createArea, densestSpot, membersOf, type GroundArea } from '../core/groundArea';
 import type { Vec2 } from '../core/input';
 import type { Rng } from '../core/rng';
@@ -90,8 +90,11 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
       this.areaStats;
     const at = densestSpot(this.caster, this.enemies.live, radius, targetRange, this.rng);
     const area = createArea(at, { radius, durationS: duration, tickEveryS: tickRate });
-    const placed = this.areas.place(area, (live) =>
-      this.applyTick(live, tickDamage, slowPct, slowDuration),
+    const placed = this.areas.place(
+      area,
+      (live) => this.applyTick(live, tickDamage, slowPct, slowDuration),
+      {},
+      AREA_LOOKS[this.id],
     );
     if (placed) this.patches += 1;
   }

@@ -124,8 +124,20 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
       // A patch is only ever reported while it still has lifetime left; one at
       // 0 would be a patch the pool failed to take off the ground.
       expect(area.remainingS, `lifetime at sample ${i}`).toBeGreaterThan(0);
+      // #179: the ring, and the art under it when there is some, is drawn at
+      // exactly the radius that ticks, whatever the art's frame measures.
+      expect(Math.abs(area.drawnRadius - area.radius), `ring at sample ${i}`).toBeLessThan(1);
+      if (area.artRadius !== null) {
+        expect(Math.abs(area.artRadius - area.radius), `art at sample ${i}`).toBeLessThan(1);
+        expect(area.artOffset, `art on its ring at sample ${i}`).toBeLessThan(1);
+      }
     }
   }
+
+  // Blizzard draws its own art and Earthquake, whose sheet has not landed,
+  // draws the ring alone (#179). Both cast several times over the window.
+  const clips = new Set(trace.flatMap((report) => report.live.map((area) => area.clip)));
+  expect([...clips].sort(), 'art the patches were drawn with').toEqual(['ice.blizzard', null]);
 
   // Spec §11: the patches tick against a full arena and the run still draws.
   const arena = await page.evaluate(async (scene) => {

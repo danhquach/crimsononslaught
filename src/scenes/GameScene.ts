@@ -169,7 +169,7 @@ import { LightningSwordSpell } from '../spells/LightningSwordSpell';
 import { RollingBoulderSpell } from '../spells/RollingBoulderSpell';
 import { TornadoSpell } from '../spells/TornadoSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
-import { AreaPool } from '../systems/AreaPool';
+import { AreaPool, type AreaView } from '../systems/AreaPool';
 import { TelegraphPool } from '../systems/TelegraphPool';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { DamageNumberPool } from '../systems/DamageNumberPool';
@@ -360,10 +360,11 @@ export class GameScene extends Phaser.Scene {
    * Test hook (#135): the ground areas live right now — how much of their
    * lifetime is left and how far each reaches — plus what the spells casting
    * them have placed and paid out. The browser suite watches a patch appear,
-   * tick a crowd and expire.
+   * tick a crowd and expire, and each one drawn at the radius it ticks, with
+   * its spell's art when the atlas has it (#179).
    */
   get areaReport(): {
-    live: { radius: number; remainingS: number }[];
+    live: AreaView[];
     placed: number;
     hits: number;
   } {
@@ -371,7 +372,7 @@ export class GameScene extends Phaser.Scene {
       (spell): spell is GroundAreaSpell => spell instanceof GroundAreaSpell,
     );
     return {
-      live: this.areas.areas.map((area) => ({ radius: area.radius, remainingS: area.remainingS })),
+      live: [...this.areas.views],
       placed: spells.reduce((total, spell) => total + spell.placed, 0),
       hits: spells.reduce((total, spell) => total + spell.hits, 0),
     };

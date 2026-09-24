@@ -60,14 +60,31 @@ export const BASE_AREA_STATS = {
 } as const satisfies Readonly<Record<AreaSpellId, Readonly<GroundAreaStats>>>;
 
 /**
- * How a patch reads on screen: the texture it is drawn with, scaled to the
- * radius it actually covers, so the ground says exactly where the ticks land.
- *
- * Both use the one `fx_area` placeholder, the way all four companions share a
- * disc (#133): their own art is #145, and a ring that outlines the patch is
- * what the mechanic needs read correctly until then.
+ * The ring every patch is drawn with, scaled to the radius it actually covers,
+ * so the ground says exactly where the ticks land. It is the outline over a
+ * spell's own art and the whole look for a spell whose art has not landed, or
+ * a run without the atlas (#179).
  */
 export const AREA_TEXTURE = 'fx_area' satisfies keyof typeof PLACEHOLDERS;
+
+/**
+ * What a patch is drawn with besides the ring (#179): the looping clip of its
+ * own art, sized so the art spans the patch. A look without a clip is the ring
+ * alone. Each spell that places patches passes its own look to the pool, so a
+ * new area spell brings its art without the pool changing.
+ */
+export interface AreaLook {
+  readonly clip?: string;
+}
+
+/**
+ * Blizzard's art is #145's cut. Earthquake's sheet is still being redrawn
+ * (#145), so it draws the ring until its clip lands here.
+ */
+export const AREA_LOOKS: Readonly<Record<AreaSpellId, AreaLook>> = {
+  ice_blizzard: { clip: 'ice.blizzard' },
+  earth_quake: {},
+};
 
 /** What a level-up card says about each area (spec §7.1, cards per #132). */
 export const AREA_CARDS: Readonly<Record<AreaSpellId, SpellCard>> = {

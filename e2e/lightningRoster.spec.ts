@@ -67,6 +67,16 @@ const CAPS: Readonly<Record<string, number>> = {
 };
 
 type Report = GameScene['lightningReport'];
+type AreaViews = GameScene['areaReport']['live'];
+
+/** The patches on the ground, every one a tornado here: the only area spell equipped. */
+function sampleAreas(page: Page): Promise<AreaViews> {
+  return page.evaluate(async (scene) => {
+    const { game } = await import('/src/main.ts');
+    if (!game.scene.isActive(scene.game) && !game.scene.isPaused(scene.game)) return [];
+    return (game.scene.getScene(scene.game) as GameScene).areaReport.live;
+  }, SCENE);
+}
 
 async function sample(page: Page): Promise<Report | null> {
   return page.evaluate(async (scene) => {
@@ -109,6 +119,7 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
   // Sampled through the run rather than only at the end: a pool that briefly
   // exceeded its cap in between would leave no trace in a final reading.
   const trace: Report[] = [];
+  const areaTrace: AreaViews[] = [];
   const until = Date.now() + WALL_CAP_MS;
   let runMs = 0;
   while (runMs < RUN_MS && Date.now() < until) {
@@ -116,6 +127,7 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
     const current = await sample(page);
     if (!current) break;
     trace.push(current);
+    areaTrace.push(await sampleAreas(page));
     runMs = (await readHud(page)).elapsedMs - START_AT_S * 1000;
     await page.waitForTimeout(SAMPLE_MS);
   }
@@ -128,6 +140,17 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
         CAPS[spell.id] ?? 0,
       );
     }
+  }
+
+  // #179: every tornado wears its own art, sized to the radius it ticks and
+  // following the patch as it drifts, with the ring still outlining it.
+  const tornadoes = areaTrace.flat();
+  expect(tornadoes.length, 'tornado samples').toBeGreaterThan(0);
+  for (const [i, area] of tornadoes.entries()) {
+    expect(area.clip, `tornado art ${i}`).toBe('lightning.tornado');
+    expect(Math.abs(area.drawnRadius - area.radius), `tornado ring ${i}`).toBeLessThan(1);
+    expect(Math.abs((area.artRadius ?? 0) - area.radius), `tornado art size ${i}`).toBeLessThan(1);
+    expect(area.artOffset, `tornado art on its ring ${i}`).toBeLessThan(1);
   }
 
   // The sword is always out: one blade on the ring from the first frame (spec §9.4 `count` 1).
