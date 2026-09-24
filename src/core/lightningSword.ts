@@ -14,13 +14,14 @@
  */
 
 /**
- * The blade's facing for a body at `orbitAngle` on the ring: along the orbit,
- * a quarter turn on from the radius, so the bar reads as a sword sweeping round
- * rather than a spoke. Wrapped into [0, 2π).
+ * The blade's facing for a body at `orbitAngle` on the ring: along the radius,
+ * hilt toward the caster and tip outward (#172). The art points +x, Phaser's
+ * rotation 0, and the body sits at `(cos θ, sin θ)·r`, so the facing is the
+ * orbit angle itself. Wrapped into [0, 2π).
  */
 export function bladeRotation(orbitAngle: number): number {
   const TAU = Math.PI * 2;
-  const turned = (orbitAngle + Math.PI / 2) % TAU;
+  const turned = orbitAngle % TAU;
   return turned < 0 ? turned + TAU : turned;
 }
 

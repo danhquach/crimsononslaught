@@ -10,7 +10,7 @@ const SPIN_CLIP = 'earth.spin';
 /**
  * What a body on the ring is drawn as: a placeholder texture and, when the
  * atlas carries it, the clip it plays. Earth's boulders are the default; a
- * Lightning Sword (#142) rides the same ring as the bolt bar.
+ * Lightning Sword (#142) rides the same ring wearing its own clip.
  */
 export interface BodyLook {
   readonly texture: TextureKey;
