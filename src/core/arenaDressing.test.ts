@@ -29,31 +29,34 @@ function dress(seed: number) {
 describe('planProps', () => {
   it('keeps every rule for many seeds, and fills the arena', () => {
     const { clearRadius, spacing, edgeMargin } = ARENA_PROP_PLACEMENT;
+    const inside = (v: number, size: number) => v >= edgeMargin && v <= size - edgeMargin;
     for (let seed = 0; seed < 100; seed++) {
       const { props, keepClear } = dress(seed);
       // A 3000 px arena holds the whole count at this spacing with room over.
       expect(props, `seed ${seed}`).toHaveLength(ARENA_PROP_COUNT);
+      // Broken rules are collected and asserted once per seed: an expect per
+      // pair is half a million calls, which times out on a CI runner.
+      const broken: string[] = [];
       props.forEach((prop, i) => {
-        expect(ARENA_PROP_FRAMES).toContain(prop.frame);
-        expect(prop.x).toBeGreaterThanOrEqual(edgeMargin);
-        expect(prop.y).toBeGreaterThanOrEqual(edgeMargin);
-        expect(prop.x).toBeLessThanOrEqual(WORLD.width - edgeMargin);
-        expect(prop.y).toBeLessThanOrEqual(WORLD.height - edgeMargin);
-        for (const point of keepClear) {
-          expect(distance(prop, point)).toBeGreaterThanOrEqual(clearRadius);
-        }
-        for (const other of props.slice(i + 1)) {
-          expect(distance(prop, other)).toBeGreaterThanOrEqual(spacing);
+        const at = `seed ${seed} prop ${i}`;
+        if (!(ARENA_PROP_FRAMES as readonly string[]).includes(prop.frame))
+          broken.push(`${at} frame`);
+        if (!inside(prop.x, WORLD.width) || !inside(prop.y, WORLD.height))
+          broken.push(`${at} edge`);
+        if (keepClear.some((point) => distance(prop, point) < clearRadius))
+          broken.push(`${at} clear`);
+        if (props.slice(i + 1).some((other) => distance(prop, other) < spacing)) {
+          broken.push(`${at} spacing`);
         }
       });
+      expect(broken).toEqual([]);
     }
   });
 
   it('never puts a prop on the hero at the arena centre', () => {
     for (let seed = 0; seed < 100; seed++) {
-      for (const prop of dress(seed).props) {
-        expect(distance(prop, START)).toBeGreaterThanOrEqual(ARENA_PROP_PLACEMENT.clearRadius);
-      }
+      const nearest = Math.min(...dress(seed).props.map((prop) => distance(prop, START)));
+      expect(nearest, `seed ${seed}`).toBeGreaterThanOrEqual(ARENA_PROP_PLACEMENT.clearRadius);
     }
   });
 
