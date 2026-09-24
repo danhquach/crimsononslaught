@@ -11,7 +11,11 @@ Object: all visuals of the Lightning spell. A bolt strikes the nearest enemy, th
 
 ## Sheet 1 — `lightning_strike.png` (CELL 256, COLS 4, ROWS 2) — done, attached
 
+Delivered as: JPEG 1456x720 px (asked 1024x512, 4x2 of 256 px); ruled grid band: yes, every cell.
+
 ## Sheet 2 — `lightning_chain.png` — to do
+
+Delivered as: PNG 1774x887 px (asked 1024x512, 4x2 of 256 px); ruled grid band: no.
 
 ```text
 Create one pixel-art animation sheet of chain lightning pieces for a
@@ -63,7 +67,7 @@ positions
   pixels, no grid lines, no borders, no watermark.
 
 Delivery
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. Report the exact pixel dimensions.
 ```
 

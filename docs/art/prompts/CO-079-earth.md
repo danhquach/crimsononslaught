@@ -11,6 +11,8 @@ Object: all visuals of the Earth spell (Orbiting Boulders). Boulders ORBIT the p
 
 ## Sheet — `earth_boulder.png` (CELL 128, COLS 6, ROWS 3)
 
+Delivered as: JPEG 1456x720 px (asked 768x384, 6x3 of 128 px); ruled grid band: yes, every cell.
+
 ```text
 Create ONE pixel-art animation sheet for the ORBITING BOULDER of a
 top-down 2D game. Object: rough round rock, earthy brown (#8D6E63), a few
@@ -61,7 +63,7 @@ GRID RULES (strict — frames are cut out by script, by grid position)
   copy or mirror another row's pose.
 
 DELIVER
-- One PNG file per sheet (PNG, not JPEG), lossless, at the largest size
+- One file per sheet (PNG preferred; JPEG accepted on flat magenta), at the largest size
   available. State the exact pixel dimensions of each PNG.
 ```
 
