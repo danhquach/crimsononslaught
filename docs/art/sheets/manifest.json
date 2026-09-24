@@ -281,7 +281,7 @@
     {
       "key": "tank",
       "ticket": "CO-073",
-      "file": "CO-073/enemy_tank_walk.jpg",
+      "file": "CO-073/enemy_tank_walk.png",
       "cols": 4,
       "rows": 4,
       "sheetCell": 192,
@@ -313,9 +313,6 @@
             "cols": [
               1,
               4
-            ],
-            "allowEdge": [
-              "bottom"
             ]
           }
         ],
@@ -326,9 +323,6 @@
             "cols": [
               1,
               4
-            ],
-            "allowEdge": [
-              "bottom"
             ]
           }
         ]
@@ -728,7 +722,7 @@
     {
       "key": "ice",
       "ticket": "CO-077",
-      "file": "CO-077/ice_status.jpg",
+      "file": "CO-077/ice_status.png",
       "cols": 6,
       "rows": 3,
       "sheetCell": 160,
@@ -757,9 +751,6 @@
             "cols": [
               1,
               5
-            ],
-            "allowEdge": [
-              "bottom"
             ]
           }
         ]
