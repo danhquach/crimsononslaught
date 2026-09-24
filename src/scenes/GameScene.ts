@@ -320,13 +320,17 @@ export class GameScene extends Phaser.Scene {
   /**
    * Test hook (#133): each companion out right now — how far it has strayed
    * from the player, the leash it is held on, and how many attacks it has
-   * landed. The browser suite checks the leash holds over a whole run.
+   * landed, and the clips it has drawn with (#184). The browser suite checks
+   * the leash holds over a whole run and each ally animates from its own sheet.
    */
   get companionReport(): {
     id: RosterSpellId;
     distance: number;
     leashRadius: number;
     hits: number;
+    clip: string | null;
+    clipsShown: string[];
+    attacksShown: number;
   }[] {
     return this.spells.spells
       .filter((spell): spell is CompanionSpell => spell instanceof CompanionSpell)
@@ -340,6 +344,9 @@ export class GameScene extends Phaser.Scene {
         ),
         leashRadius: spell.companionStats.leashRadius,
         hits: spell.hits,
+        clip: spell.clips.current,
+        clipsShown: spell.clips.shown,
+        attacksShown: spell.attacksShown,
       }));
   }
 

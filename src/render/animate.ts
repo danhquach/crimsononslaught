@@ -68,3 +68,24 @@ export function showEffect(sprite: Phaser.GameObjects.Sprite, name: string): boo
   sprite.play(name);
   return true;
 }
+
+/**
+ * `showClip` for a plain sprite with no body (#184, the companion): origin moved
+ * onto the clip's first-frame anchor, and a clip already showing left alone so
+ * a loop is not restarted every step — unless `restart`, which replays a
+ * one-shot that has already finished on its last frame. Returns false, touching
+ * nothing, when the atlas did not supply the clip, so the placeholder stays.
+ */
+export function showSpriteClip(
+  sprite: Phaser.GameObjects.Sprite,
+  name: string,
+  restart = false,
+): boolean {
+  const first = FIRST_FRAME.get(name);
+  if (!first || !sprite.scene.anims.exists(name)) return false;
+  if (!restart && sprite.anims.currentAnim?.key === name) return true;
+  sprite.play(name);
+  const origin = frameOrigin(FRAMES[first]);
+  sprite.setOrigin(origin.x, origin.y);
+  return true;
+}

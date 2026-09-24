@@ -60,8 +60,9 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // still reads as a shot and never as Chain Lightning's `fx_bolt` strip.
   proj_bolt: { shape: 'diamond', color: 0xfff59d, width: 24, height: 10 },
   boulder: { shape: 'circle', color: 0x8d6e63, width: 20, height: 20 },
-  // #133: one disc stands in for all four companions until their character
-  // sheets land (#146). Green so an ally never reads as an enemy at a glance.
+  // #133: one disc stands in for all four companions when there is no atlas;
+  // with one, each plays its own sheet (#184). Green so an ally never reads as
+  // an enemy at a glance.
   companion: { shape: 'circle', color: 0x64dd17, width: 24, height: 24 },
   // #133: the Ice Companion's bolt. Fire's shot is the only one with flight art
   // today, so the second element to shoot needs a look of its own or its bolts

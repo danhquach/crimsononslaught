@@ -229,9 +229,9 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
  * placeholder colour on the day it lands, and the sheet follows in its own art
  * ticket. A key missing here keeps the generated placeholder, so the entity
  * draws either way and nothing has to wait on art. `companion` is missing on
- * purpose even though its frames are now in the atlas (CO-124): one key covers
- * all four companions, so mapping it would draw one element's creature for
- * every element. Giving each companion its own key is #184.
+ * purpose: it is only the disc a companion falls back to without an atlas.
+ * With one, each companion plays its own sheet's clips by prefix (#184,
+ * `COMPANION_FX`), which one shared key could not do.
  */
 export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   player: 'hero.idle.down.0',
