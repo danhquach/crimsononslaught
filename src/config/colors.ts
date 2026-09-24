@@ -17,6 +17,7 @@ export const TEXTURE_KEYS = [
   'proj_fire',
   'fx_nova',
   'fx_bolt',
+  'proj_bolt',
   'boulder',
   'companion',
   'proj_ice',
@@ -55,6 +56,9 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   proj_fire: { shape: 'circle', color: 0xff6d00, width: 12, height: 12 },
   fx_nova: { shape: 'ring', color: 0x40c4ff, width: 96, height: 96, thickness: 4 },
   fx_bolt: { shape: 'rect', color: 0xffee58, width: 48, height: 4 },
+  // #202: Lightning Bolt in flight — a short diamond, so without the atlas it
+  // still reads as a shot and never as Chain Lightning's `fx_bolt` strip.
+  proj_bolt: { shape: 'diamond', color: 0xfff59d, width: 24, height: 10 },
   boulder: { shape: 'circle', color: 0x8d6e63, width: 20, height: 20 },
   // #133: one disc stands in for all four companions until their character
   // sheets land (#146). Green so an ally never reads as an enemy at a glance.

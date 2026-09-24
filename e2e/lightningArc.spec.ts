@@ -38,22 +38,28 @@ const WATCH_MS = 8_000;
  */
 const DRAWN_YELLOW = { r: 0xff, g: 0xee, b: 0x00 };
 
-/** The clips whose art carries that yellow, and so where it is read from. */
-const BOLT_CLIPS = ['lightning.strike', 'lightning.chain'];
+/**
+ * The clips whose art carries that yellow, and so where it is read from. A
+ * Lightning Bolt run draws no chain strip since #202 — the bolt flies as its
+ * own `lightning.bolt` shot — but the chain clip stays in the list: it is the
+ * one that fixes the colour, and the strike and the flying bolt share it.
+ */
+const BOLT_CLIPS = ['lightning.strike', 'lightning.chain', 'lightning.bolt'];
 
 /**
- * Frames that must carry the bolt. Each cast shows for one pass of the chain
- * clip plus the strike, so a run this long owes far more than this; the floor
+ * Frames that must carry the bolt. Each cast shows the bolt's flight plus the
+ * strike, so a run this long owes far more than this; the floor
  * is low enough that a slow runner drawing few frames still passes while an
  * invisible bolt cannot.
  */
 const MIN_BOLT_FRAMES = 3;
 
 /**
- * Pixels of bolt yellow in the best frame. One strike frame alone carries about
- * 70 of them and each 47 px chain tile about 90, so a cast with its two base
- * chains draws several hundred; this is the shortest bolt that could be called
- * visible, and a stray speck cannot reach it.
+ * Pixels of bolt yellow in the best frame. This run is Lightning Bolt, which
+ * since #202 draws no chain strip: the flying bolt and the strike and impact
+ * bursts it lands peaked at 229 in each of five local runs (2026-09-24). This
+ * is the shortest bolt that could be called visible, and a stray speck cannot
+ * reach it.
  */
 const MIN_PEAK_PIXELS = 100;
 

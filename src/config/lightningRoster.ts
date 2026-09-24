@@ -8,8 +8,10 @@ import type { SpellCard } from './spells';
  * keeps the `lightning` id in `config/spells.ts`; Lightning Companion is one of
  * the four allies in `config/companions.ts`.
  *
- * Chain Lightning is Lightning Bolt with jumps, so the two share
- * `spells/ChainLightningSpell.ts`. Tornado is a ground area that drifts and
+ * Chain Lightning is Lightning Bolt with jumps, so the two share their rules
+ * (`core/chainLightning.ts`); Lightning Bolt flies as a shot
+ * (`spells/LightningBoltSpell.ts`, #202) and Chain Lightning lays its strips
+ * instantly (`spells/ChainLightningSpell.ts`). Tornado is a ground area that drifts and
  * pulls (`spells/TornadoSpell.ts`); Lightning Sword is Earth's orbiting ring
  * with a blade on it (`spells/LightningSwordSpell.ts` over
  * `spells/OrbitingBodySpell.ts`).

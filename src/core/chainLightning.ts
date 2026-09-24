@@ -10,7 +10,8 @@ import type { ChainLightningStats, LightningStats } from './spellStats';
  *
  * The two spells are one rule: a bolt with no chain fields is Lightning Bolt
  * (`lightning`), and one with them is Chain Lightning (`lightning_chain`).
- * `spells/ChainLightningSpell.ts` is the Phaser side of both; everything
+ * `spells/ChainLightningSpell.ts` and `spells/LightningBoltSpell.ts` are the
+ * Phaser side (#202: the bolt flies, the chain is instant); everything
  * decidable without Phaser lives here so it is Vitest-covered.
  *
  * Pure TS, no Phaser import.
