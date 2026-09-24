@@ -34,6 +34,16 @@ export function areaScale(radius: number): number {
   return Math.max(0, radius) / AREA_SCALE_RADIUS;
 }
 
+/**
+ * #179: a patch's own art is drawn so its art box (`ART_BOXES`, not the frame,
+ * which takes in a transparent margin) spans the patch: `artWidth` across is
+ * `2 * radius` on screen.
+ */
+export function areaArtScale(radius: number, artWidth: number): number {
+  if (!(artWidth > 0)) return 0;
+  return (Math.max(0, radius) * 2) / artWidth;
+}
+
 /** #138: a strike telegraph is drawn at `radius / 100`, so the ring is the blast to come. */
 export function telegraphScale(radius: number): number {
   return Math.max(0, radius) / TELEGRAPH_SCALE_RADIUS;
