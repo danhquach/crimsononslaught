@@ -3,7 +3,8 @@ import { MAX_LIVE_PICKUPS, RELIC_COUNT } from '../src/config/pickups';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import type { HudScene } from '../src/scenes/HudScene';
+import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
 
 /**
  * #195 in the browser: the relics are on the floor when the run starts, and
@@ -30,11 +31,24 @@ const SAMPLE_MS = 200;
 
 type Report = GameScene['pickupReport'];
 
-async function sample(page: Page): Promise<Report | null> {
+interface Sample {
+  report: Report;
+  hudEmbers: number;
+  elapsedMs: number;
+}
+
+/**
+ * The run's report and the HUD, read in one `evaluate` so they are the same
+ * instant. Read in two, the run moves between them, and on CI the HUD was
+ * already 3 Embers ahead of the report it was checked against.
+ */
+async function sample(page: Page): Promise<Sample | null> {
   return page.evaluate(async (scene) => {
     const { game } = await import('/src/main.ts');
     if (!game.scene.isActive(scene.game) && !game.scene.isPaused(scene.game)) return null;
-    return (game.scene.getScene(scene.game) as GameScene).pickupReport;
+    const report = (game.scene.getScene(scene.game) as GameScene).pickupReport;
+    const hud = (game.scene.getScene(scene.hud) as HudScene).view;
+    return { report, hudEmbers: hud.embers, elapsedMs: hud.elapsedMs };
   }, SCENE);
 }
 
@@ -61,19 +75,18 @@ test('relics lie in the arena at start and collected Embers count up on the HUD'
   await waitForScene(page, SCENE.game);
 
   const first = await sample(page);
-  expect(first?.live.relic, 'relics on the floor at start').toBe(RELIC_COUNT);
-  expect(first?.relics, 'relics picked up at start').toBe(0);
+  expect(first?.report.live.relic, 'relics on the floor at start').toBe(RELIC_COUNT);
+  expect(first?.report.relics, 'relics picked up at start').toBe(0);
 
-  const trace: { report: Report; hudEmbers: number }[] = [];
+  const trace: Sample[] = [];
   const until = Date.now() + WALL_CAP_MS;
   let runMs = 0;
   while (runMs < START_AT_S * 1000 + RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
-    const report = await sample(page);
-    if (!report) break;
-    const hud = await readHud(page);
-    trace.push({ report, hudEmbers: hud.embers });
-    runMs = hud.elapsedMs;
+    const current = await sample(page);
+    if (!current) break;
+    trace.push(current);
+    runMs = current.elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);
