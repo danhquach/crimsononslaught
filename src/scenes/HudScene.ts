@@ -100,102 +100,116 @@ class Bar {
 }
 
 /**
+ * The sweep is quantised to this many steps per turn and each step baked once
+ * into its own small texture (#213), so a cooling icon costs one quad a frame
+ * rather than a Graphics path rebuilt every frame — the arena's fps floors are
+ * tight on a slow runner. Six degrees a step is under two pixels of rim.
+ */
+const SLOT_WEDGE_STEPS = 60;
+const SLOT_LOCKED_KEY = 'hud_slot_locked';
+
+function wedgeKey(step: number): string {
+  return `hud_slot_wedge_${step}`;
+}
+
+/** Bake the wedge steps and the locked ring once per game; a restarted HUD reuses them. */
+function ensureSlotTextures(scene: Phaser.Scene): void {
+  if (scene.textures.exists(SLOT_LOCKED_KEY)) return;
+  const size = SLOT_RADIUS * 2 + 4;
+  const c = size / 2;
+  const g = scene.make.graphics({}, false);
+  for (let step = 1; step <= SLOT_WEDGE_STEPS; step++) {
+    // The clear part grows clockwise from 12 o'clock; the wedge is the rest.
+    const start = -Math.PI / 2 + (1 - step / SLOT_WEDGE_STEPS) * Math.PI * 2;
+    g.clear().fillStyle(0x000000, 1);
+    if (step === SLOT_WEDGE_STEPS) g.fillCircle(c, c, SLOT_RADIUS);
+    else g.slice(c, c, SLOT_RADIUS, start, Math.PI * 1.5, false).fillPath();
+    g.generateTexture(wedgeKey(step), size, size);
+  }
+  // Locked: a dashed ring and a padlock.
+  g.clear().lineStyle(2, SLOT_EMPTY_COLOR, 1);
+  const dashes = 12;
+  for (let i = 0; i < dashes; i++) {
+    const a = (i / dashes) * Math.PI * 2;
+    g.beginPath()
+      .arc(c, c, SLOT_RADIUS, a, a + Math.PI / dashes)
+      .strokePath();
+  }
+  g.fillStyle(0x888888, 1)
+    .fillRect(c - 6, c - 1, 12, 9)
+    .lineStyle(2, 0x888888, 1)
+    .beginPath()
+    .arc(c, c - 1, 4, Math.PI, 0)
+    .strokePath();
+  g.generateTexture(SLOT_LOCKED_KEY, size, size);
+  g.destroy();
+}
+
+/**
  * One slot icon (#213): the spell's icon in a circle — until icon art exists,
  * its colour and its initials — with the cooldown still to run drawn as a dark
  * wedge that shrinks clockwise from 12 o'clock, the whole seconds left in a
  * badge on the rim, and a short name underneath. Ready brightens the ring. An
  * open slot is an empty circle; a locked one is dashed, with a lock and the
- * level that opens it.
+ * level that opens it. Every part is a shape or an image whose properties
+ * change; nothing is redrawn.
  */
 class SlotIcon {
-  private readonly disc: Phaser.GameObjects.Graphics;
+  private readonly disc: Phaser.GameObjects.Arc;
+  private readonly wedge: Phaser.GameObjects.Image;
+  private readonly locked: Phaser.GameObjects.Image;
   private readonly glyph: Phaser.GameObjects.Text;
-  private readonly overlay: Phaser.GameObjects.Graphics;
+  private readonly badgeDisc: Phaser.GameObjects.Arc;
   private readonly badge: Phaser.GameObjects.Text;
   private readonly label: Phaser.GameObjects.Text;
-  private x = 0;
-  private y = 0;
-  /** What was last drawn, so a slot that has not changed is not redrawn every frame. */
-  private drawn = '';
 
   constructor(scene: Phaser.Scene) {
-    this.disc = scene.add.graphics();
+    ensureSlotTextures(scene);
+    this.disc = scene.add.circle(0, 0, SLOT_RADIUS, 0x000000);
+    // Under the glyph: it darkens the disc but not the glyph, so the icon stays readable.
+    this.wedge = scene.add.image(0, 0, wedgeKey(1)).setAlpha(SLOT_WEDGE_ALPHA);
+    this.locked = scene.add.image(0, 0, SLOT_LOCKED_KEY);
     this.glyph = scene.add.text(0, 0, '', SLOT_GLYPH_STYLE).setOrigin(0.5);
-    this.overlay = scene.add.graphics();
+    this.badgeDisc = scene.add
+      .circle(0, 0, SLOT_BADGE_RADIUS, 0x111111)
+      .setStrokeStyle(1, 0xaaaaaa);
     this.badge = scene.add.text(0, 0, '', SLOT_BADGE_STYLE).setOrigin(0.5);
     this.label = scene.add.text(0, 0, '', SLOT_LABEL_STYLE).setOrigin(0.5, 0);
   }
 
   /** Centre of the circle. */
   setPosition(x: number, y: number): void {
-    this.x = x;
-    this.y = y;
-    this.drawn = '';
+    this.disc.setPosition(x, y);
+    this.wedge.setPosition(x, y);
+    this.locked.setPosition(x, y);
     this.glyph.setPosition(x, y);
+    this.badgeDisc.setPosition(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET);
     this.badge.setPosition(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET);
     this.label.setPosition(x, y + SLOT_RADIUS + 3);
   }
 
   set(row: Readonly<SlotRow>): void {
-    // A sweep step finer than a thousandth of a turn is under a pixel of rim.
-    const key =
-      row.kind === 'spell'
-        ? `${row.name}|${row.color}|${row.ready}|${row.badge}|${Math.round(row.waiting * 1000)}`
-        : `${row.kind}|${row.kind === 'locked' ? row.unlockLevel : ''}`;
-    if (key === this.drawn) return;
-    this.drawn = key;
-    const { disc, overlay, x, y } = this;
-    disc.clear();
-    overlay.clear();
+    const spell = row.kind === 'spell' ? row : null;
     this.label.setText(slotLabel(row));
-    this.glyph.setText(row.kind === 'spell' ? row.glyph : '');
-    this.badge.setText(row.kind === 'spell' && row.badge !== null ? row.badge : '');
+    this.glyph.setText(spell?.glyph ?? '');
+    this.badge.setText(spell?.badge ?? '');
+    this.badgeDisc.setVisible(spell?.badge != null);
+    this.locked.setVisible(row.kind === 'locked');
 
-    if (row.kind === 'spell') {
-      disc.fillStyle(row.color, 1).fillCircle(x, y, SLOT_RADIUS);
-      if (row.waiting > 0) {
-        // The clear part grows clockwise from 12 o'clock; the wedge is the rest.
-        // It darkens the disc but not the glyph, so the icon stays readable.
-        const start = -Math.PI / 2 + (1 - row.waiting) * Math.PI * 2;
-        disc
-          .fillStyle(0x000000, SLOT_WEDGE_ALPHA)
-          .slice(x, y, SLOT_RADIUS, start, Math.PI * 1.5, false)
-          .fillPath();
-      }
-      overlay
-        .lineStyle(row.ready ? 3 : 2, row.ready ? 0xffffff : 0x777777, 1)
-        .strokeCircle(x, y, SLOT_RADIUS);
-      if (row.badge !== null) {
-        overlay
-          .fillStyle(0x111111, 1)
-          .fillCircle(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET, SLOT_BADGE_RADIUS)
-          .lineStyle(1, 0xaaaaaa, 1)
-          .strokeCircle(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET, SLOT_BADGE_RADIUS);
-      }
-      return;
+    // Any time still to run shows at least one step, so a spell reads ready only when it is.
+    const step = spell ? Math.ceil(spell.waiting * SLOT_WEDGE_STEPS) : 0;
+    this.wedge.setVisible(step > 0);
+    if (step > 0) this.wedge.setTexture(wedgeKey(step));
+
+    if (spell) {
+      this.disc.setFillStyle(spell.color, 1);
+      this.disc.setStrokeStyle(spell.ready ? 3 : 2, spell.ready ? 0xffffff : 0x777777);
+    } else {
+      this.disc.setFillStyle(0x000000, 0.35);
+      // A locked slot's ring is the dashed one in its texture.
+      if (row.kind === 'open') this.disc.setStrokeStyle(2, SLOT_EMPTY_COLOR);
+      else this.disc.setStrokeStyle();
     }
-    disc.fillStyle(0x000000, 0.35).fillCircle(x, y, SLOT_RADIUS);
-    if (row.kind === 'open') {
-      overlay.lineStyle(2, SLOT_EMPTY_COLOR, 1).strokeCircle(x, y, SLOT_RADIUS);
-      return;
-    }
-    // Locked: a dashed ring and a padlock.
-    overlay.lineStyle(2, SLOT_EMPTY_COLOR, 1);
-    const dashes = 12;
-    for (let i = 0; i < dashes; i++) {
-      const a = (i / dashes) * Math.PI * 2;
-      overlay
-        .beginPath()
-        .arc(x, y, SLOT_RADIUS, a, a + Math.PI / dashes)
-        .strokePath();
-    }
-    overlay
-      .fillStyle(0x888888, 1)
-      .fillRect(x - 6, y - 1, 12, 9)
-      .lineStyle(2, 0x888888, 1)
-      .beginPath()
-      .arc(x, y - 1, 4, Math.PI, 0)
-      .strokePath();
   }
 }
 
