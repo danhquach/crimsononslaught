@@ -192,6 +192,17 @@ function cutSheet(sheet) {
       continue;
     }
 
+    // Where the art itself sits inside the frame, in native px: the same for
+    // every frame of the animation, and the whole frame unless the box was
+    // held off the art. Whatever the game sizes from an animation (the
+    // boulder's disc, the chain's tile) reads this, never the frame, so a
+    // frame can gain transparent margin without the art on screen moving
+    // (CO-126).
+    const artX = Math.min(width - 1, Math.max(0, Math.round((tight.x - box.x) / scale)));
+    const artY = Math.min(height - 1, Math.max(0, Math.round((tight.y - box.y) / scale)));
+    const artW = Math.min(width - artX, Math.max(1, Math.round(tight.w / scale)));
+    const artH = Math.min(height - artY, Math.max(1, Math.round(tight.h / scale)));
+
     for (const c of group) {
       out.push({
         name: c.name,
@@ -204,6 +215,10 @@ function cutSheet(sheet) {
         // game can place a sprite without it drifting between frames.
         anchorX,
         anchorY,
+        artX,
+        artY,
+        artW,
+        artH,
       });
     }
   }
@@ -340,6 +355,13 @@ function renderFramesTs(placements, pageKeys) {
     (p) =>
       `  '${p.name}': { w: ${p.width}, h: ${p.height}, anchorX: ${p.anchorX}, anchorY: ${p.anchorY}, page: '${p.page}' },`,
   );
+  // One art box per animation, since every frame of one shares it.
+  // Keyed by the clip a frame belongs to, which is its name less the index.
+  const boxes = new Map(placements.map((p) => [p.name.slice(0, p.name.lastIndexOf('.')), p]));
+  const art = [...boxes.keys()].sort().map((clip) => {
+    const p = boxes.get(clip);
+    return `  '${clip}': { x: ${p.artX}, y: ${p.artY}, w: ${p.artW}, h: ${p.artH} },`;
+  });
   const pages = pageKeys.map(
     (key) =>
       `  { key: '${key}', texture: 'assets/atlas/${key}.png', data: 'assets/atlas/${key}.json' },`,
@@ -385,6 +407,23 @@ ${lines.join('\n')}
 } as const satisfies Record<string, FrameInfo>;
 
 export type FrameName = keyof typeof FRAMES;
+
+export interface ArtBox {
+  /** The art's box inside each frame, in px from the frame's top-left corner. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Where the art sits inside each frame of an animation, keyed by clip name: the whole frame unless the cut held the frame off the art. Size
+ * anything from the art (the boulder's disc, the chain's tile) from this, not
+ * from a frame's \`w\`/\`h\`, which take in any transparent margin (CO-126).
+ */
+export const ART_BOXES = {
+${art.join('\n')}
+} as const satisfies Record<string, ArtBox>;
 
 export const FRAME_NAMES = Object.keys(FRAMES) as FrameName[];
 `;

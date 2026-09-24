@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ANIMATIONS, STATIC_FRAMES } from './animations';
 import { TEXTURE_KEYS } from './colors';
-import { ATLAS_PAGES, FRAMES, FRAME_NAMES } from './frames';
+import { ART_BOXES, ATLAS_PAGES, FRAMES, FRAME_NAMES } from './frames';
 
 /**
  * The manifest and the atlas are generated artefacts; these tests are the tie
@@ -16,7 +16,7 @@ import sheetManifest from '../../docs/art/sheets/manifest.json';
 const manifest = sheetManifest as unknown as {
   sheets: {
     key: string;
-    rowSpecs: { anim: string; facing?: string; cols: [number, number] }[][];
+    rowSpecs: { anim: string; facing?: string; cols: [number, number]; centred?: boolean }[][];
   }[];
 };
 
@@ -179,6 +179,59 @@ describe('generated frame data', () => {
     for (const anim of ANIMATIONS) {
       const anchors = new Set(anim.frames.map((f) => `${FRAMES[f].anchorX},${FRAMES[f].anchorY}`));
       expect(anchors.size, anim.name).toBe(1);
+    }
+  });
+});
+
+/** Every clip cut from a `centred` row, read straight off the sheet manifest. */
+function centredClips(): Set<string> {
+  const clips = new Set<string>();
+  for (const sheet of manifest.sheets) {
+    for (const row of sheet.rowSpecs) {
+      for (const seg of row) {
+        if (seg.centred) clips.add(`${sheet.key}.${seg.anim}${seg.facing ? `.${seg.facing}` : ''}`);
+      }
+    }
+  }
+  return clips;
+}
+
+describe('art boxes (CO-126)', () => {
+  const boxes: Readonly<Record<string, (typeof ART_BOXES)[keyof typeof ART_BOXES] | undefined>> =
+    ART_BOXES;
+
+  it('gives every animation an art box that fits inside each of its frames', () => {
+    for (const anim of ANIMATIONS) {
+      const art = boxes[anim.name];
+      expect(art, anim.name).toBeDefined();
+      if (!art) continue;
+      for (const frame of anim.frames) {
+        const f = FRAMES[frame];
+        expect(art.w > 0 && art.h > 0, frame).toBe(true);
+        expect(art.x >= 0 && art.x + art.w <= f.w, `${frame} x`).toBe(true);
+        expect(art.y >= 0 && art.y + art.h <= f.h, `${frame} y`).toBe(true);
+      }
+    }
+  });
+
+  it('fills the whole frame wherever the cut left the box on the art', () => {
+    // Only a centred row holds its frame off the art, so every other clip's
+    // art box is its frame, and sizing from it moves nothing on screen.
+    const centred = centredClips();
+    expect(centred.size).toBeGreaterThan(0);
+    for (const anim of ANIMATIONS.filter((a) => !centred.has(a.name))) {
+      const f = FRAMES[anim.frames[0] as keyof typeof FRAMES];
+      expect(boxes[anim.name], anim.name).toEqual({ x: 0, y: 0, w: f.w, h: f.h });
+    }
+  });
+
+  it("holds a centred clip's frame off its art on at least one side", () => {
+    for (const clip of centredClips()) {
+      const art = boxes[clip];
+      const f = FRAMES[`${clip}.0` as keyof typeof FRAMES];
+      expect(art, clip).toBeDefined();
+      if (!art) continue;
+      expect(art.w < f.w || art.h < f.h, clip).toBe(true);
     }
   });
 });
