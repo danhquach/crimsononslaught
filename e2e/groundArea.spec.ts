@@ -134,10 +134,48 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
     }
   }
 
-  // Blizzard draws its own art and Earthquake, whose sheet has not landed,
-  // draws the ring alone (#179). Both cast several times over the window.
+  // Neither draws a single clip under the ring: Ice Storm is layered (#219)
+  // and Earthquake, whose sheet has not landed, is the ring alone (#179).
   const clips = new Set(trace.flatMap((report) => report.live.map((area) => area.clip)));
-  expect([...clips].sort(), 'art the patches were drawn with').toEqual(['ice.blizzard', null]);
+  expect([...clips], 'art the patches were drawn with').toEqual([null]);
+
+  // #219: Ice Storm is drawn as sleet over the crowd with no ring and no
+  // drawn edge: every piece that can be seen is inside the radius that ticks,
+  // the sleet is thick while the storm rages, and shards burst a few at a time.
+  const storms = trace.flatMap((report) => report.live.filter((area) => area.storm !== null));
+  expect(storms.length, 'storm samples').toBeGreaterThan(0);
+  for (const { storm, radius, ringShown } of storms) {
+    expect(ringShown, 'a storm hides the ring').toBe(false);
+    expect(storm?.reach ?? 0, 'sleet seen inside the storm only').toBeLessThanOrEqual(radius);
+    expect(storm?.brightest ?? 0).toBeLessThanOrEqual(1);
+    expect(storm?.shards ?? 0, 'shards bursting at once').toBeLessThanOrEqual(3);
+  }
+  expect(
+    Math.max(...storms.map((area) => area.storm?.sleet ?? 0)),
+    'sleet in the air',
+  ).toBeGreaterThan(10);
+  expect(
+    Math.max(...storms.map((area) => area.storm?.brightest ?? 0)),
+    'sleet seen',
+  ).toBeGreaterThan(0.5);
+  expect(Math.max(...storms.map((area) => area.storm?.shards ?? 0)), 'shards seen').toBeGreaterThan(
+    0,
+  );
+
+  // #219: a slowed enemy keeps its own colours under a light tint, whichever
+  // spell slowed it; only a freeze paints it solid. The hit flash and a stun
+  // fill it for their own reasons, so those samples are left out. Ice Arrow
+  // and both areas slow, so a run holds many of these; the storm's own, at
+  // radius 80, are only a few, so every one is checked but none is required.
+  const chilled = trace.flatMap((report) =>
+    report.tints.filter((e) => e.slowed && !e.frozen && !e.stunned && !e.flashing),
+  );
+  expect(chilled.length, 'slowed enemies sampled').toBeGreaterThan(0);
+  for (const enemy of chilled) {
+    const where = enemy.inStorm ? 'in a storm' : 'outside a storm';
+    expect(enemy.tinted, `a slowed enemy ${where} is tinted`).toBe(true);
+    expect(enemy.tintFill, `a slowed enemy ${where} is not filled solid`).toBe(false);
+  }
 
   // Spec §11: the patches tick against a full arena and the run still draws.
   const arena = await page.evaluate(async (scene) => {

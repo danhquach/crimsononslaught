@@ -79,7 +79,7 @@ describe('levelUpOffer — actives while a slot is open (spec §7.1)', () => {
   it('never offers another element’s spell', () => {
     const catalog: ActiveCard[] = [
       ...FIRE_CATALOG,
-      { id: 'ice_blizzard', name: 'Blizzard', description: 'Cold.' },
+      { id: 'ice_blizzard', name: 'Ice Storm', description: 'Cold.' },
     ];
     for (let seed = 1; seed <= 50; seed++) {
       expect(idsOf(buildLoadout('fire'), SLOT_2_LEVEL, seed, catalog)).not.toContain(

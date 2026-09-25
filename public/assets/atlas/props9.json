@@ -1,0 +1,173 @@
+{
+  "frames": {
+    "ice.stormShard.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 48,
+        "h": 62
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 62
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 62
+      }
+    },
+    "ice.stormShard.1": {
+      "frame": {
+        "x": 50,
+        "y": 1,
+        "w": 48,
+        "h": 62
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 62
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 62
+      }
+    },
+    "ice.stormShard.2": {
+      "frame": {
+        "x": 99,
+        "y": 1,
+        "w": 48,
+        "h": 62
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 62
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 62
+      }
+    },
+    "ice.stormShard.3": {
+      "frame": {
+        "x": 148,
+        "y": 1,
+        "w": 48,
+        "h": 62
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 62
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 62
+      }
+    },
+    "ice.stormSleet.0": {
+      "frame": {
+        "x": 197,
+        "y": 1,
+        "w": 54,
+        "h": 12
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 54,
+        "h": 12
+      },
+      "sourceSize": {
+        "w": 54,
+        "h": 12
+      }
+    },
+    "ice.stormSleet.1": {
+      "frame": {
+        "x": 252,
+        "y": 1,
+        "w": 54,
+        "h": 12
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 54,
+        "h": 12
+      },
+      "sourceSize": {
+        "w": 54,
+        "h": 12
+      }
+    },
+    "ice.stormSleet.2": {
+      "frame": {
+        "x": 307,
+        "y": 1,
+        "w": 54,
+        "h": 12
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 54,
+        "h": 12
+      },
+      "sourceSize": {
+        "w": 54,
+        "h": 12
+      }
+    },
+    "ice.stormSleet.3": {
+      "frame": {
+        "x": 362,
+        "y": 1,
+        "w": 54,
+        "h": 12
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 54,
+        "h": 12
+      },
+      "sourceSize": {
+        "w": 54,
+        "h": 12
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 512,
+      "h": 64
+    },
+    "scale": "1"
+  }
+}

@@ -71,9 +71,10 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // than a disc so the hero is still visible through it; its own art is #145.
   shield_ice: { shape: 'ring', color: 0xb3e5fc, width: 44, height: 44, thickness: 3 },
   // #135: a persistent ground area, drawn at `areaScale` of this size so the
-  // ring outlines exactly the patch that ticks. Every area spell keeps it as
-  // the outline over its own art (#179), and one whose art has not landed draws
-  // it alone. A ring, so the crowd inside stays visible.
+  // ring outlines exactly the patch that ticks. An area spell keeps it as the
+  // outline over its own art (#179), one whose art has not landed draws it
+  // alone, and Ice Storm hides it for its sleet while the atlas is loaded
+  // (#219). A ring, so the crowd inside stays visible.
   fx_area: { shape: 'ring', color: 0x90a4ae, width: 200, height: 200, thickness: 3 },
   // #138: where a sky strike will land, drawn at `telegraphScale` of this size
   // so the ring outlines exactly the blast that is coming. Fire's orange and a

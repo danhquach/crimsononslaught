@@ -9,7 +9,7 @@ import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from
 
 /**
  * #141 in the browser: an Ice run — Ice Arrow as the default, Frost Nova Bomb
- * and Blizzard through the `?loadout=` test hook, so three actives cast at once
+ * and Ice Storm through the `?loadout=` test hook, so three actives cast at once
  * the way a full loadout does — in a filling arena so every one of them has a
  * crowd to hit.
  *

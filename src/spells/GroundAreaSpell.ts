@@ -9,7 +9,7 @@ import type { AreaPool } from '../systems/AreaPool';
 import type { DamageSink } from './DamageSink';
 
 /**
- * A persistent ground area (#135, Phase 2 spec §9): Blizzard and Earthquake.
+ * A persistent ground area (#135, Phase 2 spec §9): Ice Storm and Earthquake.
  * One cast drops a patch on the crowd, and the patch keeps damaging and slowing
  * whatever stands in it until its duration runs out.
  *
@@ -24,8 +24,8 @@ import type { DamageSink } from './DamageSink';
  * patch has no body, so `CollisionSystem` never learns it exists.
  *
  * Spec §6.2: a patch has a finite lifetime, so every number it will ever use is
- * read once at the cast and closed over — a Haste or an Expanse taken while a
- * Blizzard lies on the ground grows the next one, never the one the player is
+ * read once at the cast and closed over — a Haste or an Expanse taken while an
+ * Ice Storm lies on the ground grows the next one, never the one the player is
  * already standing next to.
  */
 export class GroundAreaSpell extends Spell<AreaSpellId> {

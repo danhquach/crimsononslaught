@@ -1627,6 +1627,26 @@
       "rows": 1,
       "sheetCell": 768,
       "rowSpecs": [[{ "anim": "wave", "cols": [1, 4] }]]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-144",
+      "file": "CO-144/ice_storm_sleet.png",
+      "page": 9,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 280,
+      "rowSpecs": [[{ "anim": "stormSleet", "cols": [1, 4], "centred": true }]]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-144",
+      "file": "CO-144/ice_storm_shard.png",
+      "page": 9,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 320,
+      "rowSpecs": [[{ "anim": "stormShard", "cols": [1, 4], "centred": true }]]
     }
   ]
 }

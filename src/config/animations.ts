@@ -152,6 +152,12 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('ice.shield', 4, 6, LOOP),
   spec('ice.shieldBreak', 4, 15, ONCE),
   spec('ice.blizzard', 4, 8, LOOP),
+  // Ice Storm (CO-144, #219): four sleet pieces, each drawn flying right and
+  // turned along its fall, picked at random rather than played in order; and
+  // a shard falling and shattering, the splash where the ice hits the ground.
+  // `ice.blizzard` above is no longer drawn by the spell and is kept for later.
+  spec('ice.stormSleet', 4, 1, LOOP),
+  spec('ice.stormShard', 4, 12, ONCE),
 
   spec('lightning.tornado', 4, 10, LOOP),
   spec('lightning.sword', 4, 12, LOOP),

@@ -10,7 +10,7 @@ import {
 } from './groundArea';
 import { createRng } from './rng';
 
-/** Blizzard's block (spec §9.3): 180 px for 6 s, ticking twice a second. */
+/** A §9.3-shaped block (Ice Storm's before #219 cut its radius): 180 px for 6 s, ticking twice a second. */
 const BLIZZARD: AreaRule = { radius: 180, durationS: 6, tickEveryS: 0.5 };
 
 const CENTRE = { x: 100, y: 100 };

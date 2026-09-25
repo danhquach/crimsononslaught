@@ -251,7 +251,7 @@ Pure, in `core/`, called where the value is used — not stored on the loadout:
   already running.
 - **Anything with a finite lifetime snapshots at spawn** — a projectile in
   flight, a meteor falling, a ground area ticking down — and keeps those numbers
-  until it expires; the next one cast gets the new ones. This keeps a Blizzard
+  until it expires; the next one cast gets the new ones. This keeps an Ice Storm
   from growing under the player's feet mid-duration.
 - **Anything that lives as long as it is equipped reads live** — companions,
   orbiting bodies and shields. A shield's `rechargeDelay`, `breakDamage` and
@@ -484,7 +484,7 @@ enemy cap can bury is not a warning.
 | Frost Nova Bomb | `ice_nova_bomb` | Slow bomb detonates into a frost nova, slows the group | — |
 | Ice Shield | `ice_shield` | Absorbing layer on the player; recharges; hurts and slows nearby enemies when it breaks | #134 |
 | Ice Companion | `ice_companion` | Ranged ally, light slow on hit | #133 |
-| Blizzard | `ice_blizzard` | Wide ground area, heavy slow, the element's crowd control | #135 |
+| Ice Storm | `ice_blizzard` | Ground area, heavy slow, the element's crowd control (renamed from Blizzard, #219) | #135 |
 
 | Field | `ice` | `ice_nova_bomb` | `ice_shield` | `ice_companion` | `ice_blizzard` |
 |---|---|---|---|---|---|
@@ -493,7 +493,7 @@ enemy cap can bury is not a warning.
 | `damage` | 10 | 24 | — | 7 | — |
 | `tickDamage` | — | — | — | — | 6 |
 | `tickRate` | — | — | — | — | 0.5 |
-| `radius` | — | 110 | — | — | 180 |
+| `radius` | — | 110 | — | — | 80 |
 | `speed` | 380 | 220 | — | 320 | — |
 | `range` | 189 | 135 | — | — | — |
 | `targetRange` | — | — | — | 260 | 180 |
@@ -510,11 +510,11 @@ enemy cap can bury is not a warning.
 
 Ice Shield recharges at `shieldHp / rechargeDelay` per second once
 `rechargeDelay` seconds have passed with no damage taken, and absorbs player
-damage before `damageReduction` applies. Blizzard's area is placed on the
+damage before `damageReduction` applies. Ice Storm's area is placed on the
 densest cluster within `targetRange`, chosen through the seeded RNG when two
 clusters tie.
 
-Ground areas — Blizzard here, Earthquake in §9.5, Tornado in §9.4 — share one
+Ground areas — Ice Storm here, Earthquake in §9.5, Tornado in §9.4 — share one
 rule for standing in more than one at a time (#135): **they do not merge.** Each
 patch keeps its own clock and ticks against its own members, so an enemy inside
 two of them takes both lots of damage, while the slows they apply resolve to the
@@ -526,9 +526,23 @@ caught by the next tick and never by the one before it, and one that walks out
 is not hit again.
 
 Phase 1's balance pass recorded Ice dying in waves two to three. The element's
-answer here is Frost Nova Bomb's freeze chance plus Blizzard's 50% area slow —
+answer here is Frost Nova Bomb's freeze chance plus Ice Storm's 50% area slow —
 gating Fast rather than out-damaging it — which is the kit-side fix that pass
 asked for.
+
+Ice Storm (#219) is drawn as freezing sleet, not an outline: ice needles,
+pellets and snowflakes streak steeply down across the patch like heavy rain
+slanted a little by the wind, and ice bursts on the stones where it lands. It
+has no drawn border: the sleet thins out over the outer quarter of the radius
+and is never seen past the edge that ticks. The sleet falls over the crowd but
+is thin enough to keep it readable. The whole storm fades in when it lands and
+out as it runs down. Its radius is 80 (#219): at 180 a patch covered two
+thirds of the view's height.
+
+Slowed and frozen look different, for every spell (#219). A slowed enemy keeps
+its own colours under a light blue tint, plus the small frost overlay; only a
+freeze (Frost Nova Bomb's `freezeChance`) fills it solid ice-blue under the ice
+block, and a stun still fills it yellow. Ice Storm is a slow and never freezes.
 
 ### 9.4 Lightning
 

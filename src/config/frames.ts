@@ -22,6 +22,7 @@ export const ATLAS_PAGES = [
   { key: 'props6', texture: 'assets/atlas/props6.png', data: 'assets/atlas/props6.json' },
   { key: 'props7', texture: 'assets/atlas/props7.png', data: 'assets/atlas/props7.json' },
   { key: 'props8', texture: 'assets/atlas/props8.png', data: 'assets/atlas/props8.json' },
+  { key: 'props9', texture: 'assets/atlas/props9.png', data: 'assets/atlas/props9.json' },
 ] as const satisfies readonly AtlasPage[];
 
 /** Texture key of an atlas page. */
@@ -434,6 +435,14 @@ export const FRAMES = {
   'ice.slow.1': { w: 38, h: 36, anchorX: 19, anchorY: 18, page: 'props' },
   'ice.slow.2': { w: 38, h: 36, anchorX: 19, anchorY: 18, page: 'props' },
   'ice.slow.3': { w: 38, h: 36, anchorX: 19, anchorY: 18, page: 'props' },
+  'ice.stormShard.0': { w: 48, h: 62, anchorX: 24, anchorY: 31, page: 'props9' },
+  'ice.stormShard.1': { w: 48, h: 62, anchorX: 24, anchorY: 31, page: 'props9' },
+  'ice.stormShard.2': { w: 48, h: 62, anchorX: 24, anchorY: 31, page: 'props9' },
+  'ice.stormShard.3': { w: 48, h: 62, anchorX: 24, anchorY: 31, page: 'props9' },
+  'ice.stormSleet.0': { w: 54, h: 12, anchorX: 27, anchorY: 6, page: 'props9' },
+  'ice.stormSleet.1': { w: 54, h: 12, anchorX: 27, anchorY: 6, page: 'props9' },
+  'ice.stormSleet.2': { w: 54, h: 12, anchorX: 27, anchorY: 6, page: 'props9' },
+  'ice.stormSleet.3': { w: 54, h: 12, anchorX: 27, anchorY: 6, page: 'props9' },
   'lightning.bolt.0': { w: 43, h: 15, anchorX: 22, anchorY: 8, page: 'props4' },
   'lightning.bolt.1': { w: 43, h: 15, anchorX: 22, anchorY: 8, page: 'props4' },
   'lightning.bolt.2': { w: 43, h: 15, anchorX: 22, anchorY: 8, page: 'props4' },
@@ -703,6 +712,8 @@ export const ART_BOXES = {
   'ice.shield': { x: 2, y: 2, w: 43, h: 43 },
   'ice.shieldBreak': { x: 2, y: 3, w: 43, h: 44 },
   'ice.slow': { x: 1, y: 1, w: 36, h: 34 },
+  'ice.stormShard': { x: 2, y: 2, w: 43, h: 47 },
+  'ice.stormSleet': { x: 2, y: 2, w: 49, h: 8 },
   'lightning.bolt': { x: 1, y: 1, w: 41, h: 13 },
   'lightning.chain': { x: 1, y: 1, w: 47, h: 12 },
   'lightning.impact': { x: 1, y: 1, w: 53, h: 46 },

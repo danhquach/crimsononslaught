@@ -3,9 +3,12 @@ import {
   CHAIN_FRAME_COUNT,
   CHAIN_FRAME_RATE,
   EXPLOSION_SCALE_RADIUS,
+  FROST_TINT,
   LARGE_BURN_MIN_RADIUS,
   NOVA_SCALE_RADIUS,
+  SLOW_TINT,
   SPIN_BASE_ORBIT_SPEED,
+  STUN_TINT,
   TELEGRAPH_SCALE_RADIUS,
 } from '../config/fx';
 import type { Vec2 } from './input';
@@ -102,6 +105,29 @@ export function statusOverlay(status: Readonly<EnemyStatus>): string | null {
   }
   if (status.bleeding) return 'status.bleed';
   return null;
+}
+
+/**
+ * How the enemy's sprite is tinted (#219): `fill` paints it one solid colour,
+ * `multiply` lays a colour over its own, `none` clears the tint.
+ */
+export interface StatusTint {
+  readonly mode: 'fill' | 'multiply' | 'none';
+  readonly color: number;
+}
+
+/**
+ * The tint an enemy's status calls for, beside its overlay. Only a real stop
+ * paints the sprite solid: a stun yellow, a freeze ice-blue, and a stun beats
+ * a freeze. A slow that is not a freeze keeps the sprite's own colours under a
+ * light blue, so a chilled enemy never reads as frozen. A stagger is marked by
+ * its overlay alone.
+ */
+export function statusTint(status: Readonly<EnemyStatus>): StatusTint {
+  if (status.stunned) return { mode: 'fill', color: STUN_TINT };
+  if (status.frozen) return { mode: 'fill', color: FROST_TINT };
+  if (status.slowed) return { mode: 'multiply', color: SLOW_TINT };
+  return { mode: 'none', color: 0 };
 }
 
 /** Where a tiled chain segment lies: anchored at `from`, stretched to `to`, turned along the line. */

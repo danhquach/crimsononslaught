@@ -7,6 +7,7 @@ import { BASE_AREA_STATS } from '../config/areas';
 import { ART_BOXES } from '../config/frames';
 import { BASE_TORNADO_STATS } from '../config/lightningRoster';
 import { BASE_METEOR_STATS } from '../config/strikes';
+import { FROST_TINT, SLOW_TINT, STUN_TINT } from '../config/fx';
 import {
   CHAIN_CYCLE_MS,
   areaArtScale,
@@ -19,6 +20,7 @@ import {
   novaScale,
   spinTimeScale,
   statusOverlay,
+  statusTint,
   telegraphScale,
   type EnemyStatus,
 } from './fx';
@@ -48,7 +50,7 @@ describe('effect scales (CO-082)', () => {
 
   it('draws a ground area at radius / 100, so the ring is the patch', () => {
     expect(areaScale(100)).toBe(1);
-    expect(areaScale(BASE_AREA_STATS.ice_blizzard.radius)).toBeCloseTo(1.8);
+    expect(areaScale(BASE_AREA_STATS.ice_blizzard.radius)).toBeCloseTo(0.8);
     // A block with no radius draws nothing rather than a mirrored ring.
     expect(areaScale(-50)).toBe(0);
   });
@@ -160,6 +162,49 @@ describe('statusOverlay', () => {
     );
     expect(statusOverlay({ ...idle, bleeding: true, slowed: true })).toBe('ice.slow');
     expect(statusOverlay({ ...idle, bleeding: true, burning: true })).toBe('fire.burn');
+  });
+});
+
+// #219: a slow keeps the enemy's own colours under a light tint; only a real
+// stop (a stun or a freeze) paints it solid.
+describe('statusTint', () => {
+  it('leaves a free, burning or bleeding enemy untinted', () => {
+    expect(statusTint(idle)).toEqual({ mode: 'none', color: 0 });
+    expect(statusTint({ ...idle, burning: true }).mode).toBe('none');
+    expect(statusTint({ ...idle, bleeding: true }).mode).toBe('none');
+  });
+
+  it('fills a stunned enemy stun yellow and a frozen one frost blue', () => {
+    expect(statusTint({ ...idle, stunned: true })).toEqual({ mode: 'fill', color: STUN_TINT });
+    expect(statusTint({ ...idle, frozen: true, slowed: true })).toEqual({
+      mode: 'fill',
+      color: FROST_TINT,
+    });
+  });
+
+  it('multiplies a slowed enemy by the light slow tint, never filling it', () => {
+    expect(statusTint({ ...idle, slowed: true })).toEqual({ mode: 'multiply', color: SLOW_TINT });
+  });
+
+  it('marks a stagger with its overlay alone', () => {
+    expect(statusTint({ ...idle, staggered: true }).mode).toBe('none');
+    expect(statusTint({ ...idle, staggered: true, slowed: true }).mode).toBe('multiply');
+  });
+
+  it('lets a stun beat a freeze and a freeze beat a slow', () => {
+    expect(statusTint({ ...idle, stunned: true, frozen: true, slowed: true }).color).toBe(
+      STUN_TINT,
+    );
+    expect(statusTint({ ...idle, stunned: true, staggered: true }).color).toBe(STUN_TINT);
+    expect(statusTint({ ...idle, frozen: true, slowed: true, staggered: true }).color).toBe(
+      FROST_TINT,
+    );
+  });
+
+  it('keeps the slow tint light, so the sprite shows through it', () => {
+    const channels = [SLOW_TINT >> 16, (SLOW_TINT >> 8) & 0xff, SLOW_TINT & 0xff];
+    expect(Math.min(...channels)).toBeGreaterThanOrEqual(0x99);
+    expect(SLOW_TINT).not.toBe(FROST_TINT);
   });
 });
 

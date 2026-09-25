@@ -284,7 +284,7 @@ export interface EarthShieldStats {
 }
 
 /**
- * A persistent ground area (#135, spec §9): Blizzard and Earthquake both place
+ * A persistent ground area (#135, spec §9): Ice Storm and Earthquake both place
  * a patch that lives for `duration` and applies `tickDamage` plus its slow
  * every `tickRate` to whatever is standing in it.
  */
