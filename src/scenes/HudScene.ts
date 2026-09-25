@@ -37,11 +37,23 @@ const LABEL_STYLE = {
   stroke: '#000000',
   strokeThickness: 3,
 } as const;
-const SLOT_ROW_HEIGHT = 20;
-const SLOT_SWATCH = 12;
-const SLOT_BAR_WIDTH = 100;
-/** An empty slot's swatch and bar: no spell, so no colour of its own. */
+/** #213: slot icons, left to right along the bottom, wrapping upward past `SLOT_PER_ROW`. */
+const SLOT_RADIUS = 18;
+/** Wide enough for a `SLOT_LABEL_MAX` label at `SLOT_LABEL_STYLE`'s size. */
+const SLOT_PITCH_X = 72;
+const SLOT_PITCH_Y = 62;
+const SLOT_PER_ROW = 6;
 const SLOT_EMPTY_COLOR = 0x555555;
+const SLOT_WEDGE_ALPHA = 0.65;
+const SLOT_BADGE_RADIUS = 8;
+/**
+ * The badge straddles the rim at bottom-right, pushed a little outside it so
+ * its nearest point to the icon's centre stays clear of the glyph's box.
+ */
+const SLOT_BADGE_OFFSET = 15;
+const SLOT_LABEL_STYLE = { ...LABEL_STYLE, fontSize: '11px', strokeThickness: 3 } as const;
+const SLOT_GLYPH_STYLE = { ...LABEL_STYLE, fontSize: '13px', strokeThickness: 2 } as const;
+const SLOT_BADGE_STYLE = { ...LABEL_STYLE, fontSize: '10px', strokeThickness: 0 } as const;
 
 /** Background + fill + label; `set` drives the fill by fraction so callers never touch pixels. */
 class Bar {
@@ -88,45 +100,128 @@ class Bar {
 }
 
 /**
- * One slot box (#144): the spell's colour, its cooldown filling up beside it,
- * and its name — or, for an empty slot, whether it is open or which level
- * unlocks it. A spell with no cooldown (an orbit, a shield) reads as full.
+ * The sweep is quantised to this many steps per turn and each step baked once
+ * into its own small texture (#213), so a cooling icon costs one quad a frame
+ * rather than a Graphics path rebuilt every frame — the arena's fps floors are
+ * tight on a slow runner. Six degrees a step is under two pixels of rim.
  */
-class SlotBox {
-  private readonly swatch: Phaser.GameObjects.Rectangle;
-  private readonly bar: Bar;
+const SLOT_WEDGE_STEPS = 60;
+const SLOT_LOCKED_KEY = 'hud_slot_locked';
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.swatch = scene.add
-      .rectangle(x, y, SLOT_SWATCH, SLOT_SWATCH, SLOT_EMPTY_COLOR)
-      .setOrigin(0, 0)
-      .setStrokeStyle(1, 0x555555);
-    this.bar = new Bar(scene, x + SLOT_SWATCH + 6, y + 1, SLOT_BAR_WIDTH, 10, SLOT_EMPTY_COLOR);
+function wedgeKey(step: number): string {
+  return `hud_slot_wedge_${step}`;
+}
+
+/** Bake the wedge steps and the locked ring once per game; a restarted HUD reuses them. */
+function ensureSlotTextures(scene: Phaser.Scene): void {
+  if (scene.textures.exists(SLOT_LOCKED_KEY)) return;
+  const size = SLOT_RADIUS * 2 + 4;
+  const c = size / 2;
+  const g = scene.make.graphics({}, false);
+  for (let step = 1; step <= SLOT_WEDGE_STEPS; step++) {
+    // The clear part grows clockwise from 12 o'clock; the wedge is the rest.
+    const start = -Math.PI / 2 + (1 - step / SLOT_WEDGE_STEPS) * Math.PI * 2;
+    g.clear().fillStyle(0x000000, 1);
+    if (step === SLOT_WEDGE_STEPS) g.fillCircle(c, c, SLOT_RADIUS);
+    else g.slice(c, c, SLOT_RADIUS, start, Math.PI * 1.5, false).fillPath();
+    g.generateTexture(wedgeKey(step), size, size);
+  }
+  // Locked: a dashed ring and a padlock.
+  g.clear().lineStyle(2, SLOT_EMPTY_COLOR, 1);
+  const dashes = 12;
+  for (let i = 0; i < dashes; i++) {
+    const a = (i / dashes) * Math.PI * 2;
+    g.beginPath()
+      .arc(c, c, SLOT_RADIUS, a, a + Math.PI / dashes)
+      .strokePath();
+  }
+  g.fillStyle(0x888888, 1)
+    .fillRect(c - 6, c - 1, 12, 9)
+    .lineStyle(2, 0x888888, 1)
+    .beginPath()
+    .arc(c, c - 1, 4, Math.PI, 0)
+    .strokePath();
+  g.generateTexture(SLOT_LOCKED_KEY, size, size);
+  g.destroy();
+}
+
+/**
+ * One slot icon (#213): the spell's icon in a circle — until icon art exists,
+ * its colour and its initials — with the cooldown still to run drawn as a dark
+ * wedge that shrinks clockwise from 12 o'clock, the whole seconds left in a
+ * badge on the rim, and a short name underneath. Ready brightens the ring. An
+ * open slot is an empty circle; a locked one is dashed, with a lock and the
+ * level that opens it. Every part is a shape or an image whose properties
+ * change; nothing is redrawn.
+ */
+class SlotIcon {
+  private readonly disc: Phaser.GameObjects.Arc;
+  private readonly wedge: Phaser.GameObjects.Image;
+  private readonly locked: Phaser.GameObjects.Image;
+  private readonly glyph: Phaser.GameObjects.Text;
+  private readonly badgeDisc: Phaser.GameObjects.Arc;
+  private readonly badge: Phaser.GameObjects.Text;
+  private readonly label: Phaser.GameObjects.Text;
+
+  constructor(scene: Phaser.Scene) {
+    ensureSlotTextures(scene);
+    this.disc = scene.add.circle(0, 0, SLOT_RADIUS, 0x000000);
+    // Under the glyph: it darkens the disc but not the glyph, so the icon stays readable.
+    this.wedge = scene.add.image(0, 0, wedgeKey(1)).setAlpha(SLOT_WEDGE_ALPHA);
+    this.locked = scene.add.image(0, 0, SLOT_LOCKED_KEY);
+    this.glyph = scene.add.text(0, 0, '', SLOT_GLYPH_STYLE).setOrigin(0.5);
+    this.badgeDisc = scene.add
+      .circle(0, 0, SLOT_BADGE_RADIUS, 0x111111)
+      .setStrokeStyle(1, 0xaaaaaa);
+    this.badge = scene.add.text(0, 0, '', SLOT_BADGE_STYLE).setOrigin(0.5);
+    this.label = scene.add.text(0, 0, '', SLOT_LABEL_STYLE).setOrigin(0.5, 0);
   }
 
-  setY(y: number): void {
-    this.swatch.setY(y);
-    this.bar.setY(y + 1);
+  /** Centre of the circle. */
+  setPosition(x: number, y: number): void {
+    this.disc.setPosition(x, y);
+    this.wedge.setPosition(x, y);
+    this.locked.setPosition(x, y);
+    this.glyph.setPosition(x, y);
+    this.badgeDisc.setPosition(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET);
+    this.badge.setPosition(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET);
+    this.label.setPosition(x, y + SLOT_RADIUS + 3);
   }
 
   set(row: Readonly<SlotRow>): void {
-    const color = row.kind === 'spell' ? row.color : SLOT_EMPTY_COLOR;
-    this.swatch.setFillStyle(color);
-    this.bar.setFillColor(color);
-    const progress = row.kind === 'spell' ? (row.progress ?? 1) : 0;
-    this.bar.set(progress, slotLabel(row));
+    const spell = row.kind === 'spell' ? row : null;
+    this.label.setText(slotLabel(row));
+    this.glyph.setText(spell?.glyph ?? '');
+    this.badge.setText(spell?.badge ?? '');
+    this.badgeDisc.setVisible(spell?.badge != null);
+    this.locked.setVisible(row.kind === 'locked');
+
+    // Any time still to run shows at least one step, so a spell reads ready only when it is.
+    const step = spell ? Math.ceil(spell.waiting * SLOT_WEDGE_STEPS) : 0;
+    this.wedge.setVisible(step > 0);
+    if (step > 0) this.wedge.setTexture(wedgeKey(step));
+
+    if (spell) {
+      this.disc.setFillStyle(spell.color, 1);
+      this.disc.setStrokeStyle(spell.ready ? 3 : 2, spell.ready ? 0xffffff : 0x777777);
+    } else {
+      this.disc.setFillStyle(0x000000, 0.35);
+      // A locked slot's ring is the dashed one in its texture.
+      if (row.kind === 'open') this.disc.setStrokeStyle(2, SLOT_EMPTY_COLOR);
+      else this.disc.setStrokeStyle();
+    }
   }
 }
 
 /**
  * HUD overlay: timer, HP bar, shield bar, XP bar + level, kill count, boss HP
- * bar, the loadout's slot boxes and the passives held.
+ * bar, the loadout's slot icons and the passives held.
  *
  * The shield bar (#134) sits under HP and is drawn only while the run has a
  * shield equipped, so a run without one reads exactly as it did before. The
- * slot boxes (#144) stack in the bottom-left corner, one per spell casting and
- * one per slot still empty; the passives list runs down the right edge under
- * the kill count. Both stay in the margins so the arena centre is clear.
+ * slot icons (#144, #213) run along the bottom-left corner, one per spell
+ * casting and one per slot still empty; the passives list runs down the right
+ * edge under the kill count. Both stay in the margins so the arena centre is clear.
  *
  * Runs as a parallel scene launched by Game, so it keeps rendering while Game
  * is paused (level-up overlay). It is driven purely by `RunEvent`s on the Game
@@ -141,7 +236,7 @@ export class HudScene extends Phaser.Scene {
   private shieldBar!: Bar;
   private xpBar!: Bar;
   private bossBar!: Bar;
-  private slotBoxes: SlotBox[] = [];
+  private slotIcons: SlotIcon[] = [];
   private passivesText!: Phaser.GameObjects.Text;
 
   constructor() {
@@ -168,7 +263,7 @@ export class HudScene extends Phaser.Scene {
       .text(width - MARGIN, MARGIN + 20, '', { ...LABEL_STYLE, color: EMBERS_COLOR })
       .setOrigin(1, 0);
     this.bossBar = new Bar(this, width / 2 - 200, 56, 400, 14, BOSS_COLOR);
-    this.slotBoxes = [];
+    this.slotIcons = [];
     this.passivesText = this.add
       .text(width - MARGIN, MARGIN + 44, '', { ...LABEL_STYLE, align: 'right' })
       .setOrigin(1, 0);
@@ -204,20 +299,25 @@ export class HudScene extends Phaser.Scene {
   }
 
   /**
-   * Bottom-anchored, so the last box sits on the bottom margin however many
-   * there are; a box is added the first time a row needs one and never removed.
+   * Bottom-anchored in the left corner, left to right, a row of
+   * `SLOT_PER_ROW` and then the next row up; an icon is added the first time a
+   * row needs one and never removed.
    */
   private renderSlots(rows: readonly SlotRow[]): void {
-    const grew = rows.length > this.slotBoxes.length;
-    while (this.slotBoxes.length < rows.length) {
-      this.slotBoxes.push(new SlotBox(this, MARGIN, 0));
-    }
+    const grew = rows.length > this.slotIcons.length;
+    while (this.slotIcons.length < rows.length) this.slotIcons.push(new SlotIcon(this));
     if (grew) {
-      const bottom = this.scale.height - MARGIN;
-      this.slotBoxes.forEach((box, index) =>
-        box.setY(bottom - (this.slotBoxes.length - index) * SLOT_ROW_HEIGHT),
-      );
+      const lines = Math.ceil(this.slotIcons.length / SLOT_PER_ROW);
+      // The bottom line's labels sit on the bottom margin.
+      const bottomY = this.scale.height - MARGIN - 14 - SLOT_RADIUS - 3;
+      this.slotIcons.forEach((icon, index) => {
+        const line = Math.floor(index / SLOT_PER_ROW);
+        icon.setPosition(
+          MARGIN + SLOT_PITCH_X / 2 + (index % SLOT_PER_ROW) * SLOT_PITCH_X,
+          bottomY - (lines - 1 - line) * SLOT_PITCH_Y,
+        );
+      });
     }
-    rows.forEach((row, index) => this.slotBoxes[index]?.set(row));
+    rows.forEach((row, index) => this.slotIcons[index]?.set(row));
   }
 }

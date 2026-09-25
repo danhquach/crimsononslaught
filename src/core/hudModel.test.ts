@@ -7,14 +7,43 @@ import {
   fraction,
   passiveLines,
   shieldBarVisible,
+  cooldownBadge,
+  shortSpellName,
   slotLabel,
   slotRows,
+  spellGlyph,
   type HudModel,
 } from './hudModel';
 import type { RunEventPayloads } from './runEvents';
 
-const FIRE = { id: 'fire', name: 'Fire Bolt', color: 0xff4400, progress: 0.25 };
-const COLUMN = { id: 'fire_column', name: 'Fire Column', color: 0xffaa00, progress: 0.75 };
+const FIRE = { id: 'fire', name: 'Fire Bolt', color: 0xff4400, progress: 0.25, secondsLeft: 1.5 };
+const COLUMN = {
+  id: 'fire_column',
+  name: 'Fire Column',
+  color: 0xffaa00,
+  progress: 0.75,
+  secondsLeft: 0.5,
+};
+const FIRE_ROW = {
+  kind: 'spell',
+  name: 'Fire Bolt',
+  label: 'Fire Bolt',
+  glyph: 'FB',
+  color: 0xff4400,
+  ready: false,
+  waiting: 0.75,
+  badge: '1',
+} as const;
+const COLUMN_ROW = {
+  kind: 'spell',
+  name: 'Fire Column',
+  label: 'Column',
+  glyph: 'FC',
+  color: 0xffaa00,
+  ready: false,
+  waiting: 0.25,
+  badge: null,
+} as const;
 
 function withLoadout(model: Readonly<HudModel>, payload: RunEventPayloads['loadout']): HudModel {
   return applyRunEvent(model, { name: 'loadout', payload });
@@ -171,7 +200,7 @@ describe('slotRows', () => {
   it('shows the default spell, then both slots locked with their unlock levels at level 1', () => {
     const m = withLoadout(INITIAL_HUD, { spells: [FIRE], passives: [] });
     expect(slotRows(m)).toEqual([
-      { kind: 'spell', name: 'Fire Bolt', color: 0xff4400, progress: 0.25 },
+      FIRE_ROW,
       { kind: 'locked', unlockLevel: 2 },
       { kind: 'locked', unlockLevel: 5 },
     ]);
@@ -183,23 +212,47 @@ describe('slotRows', () => {
     const level5 = withLoadout(atLevel(5), { spells: [FIRE], passives: [] });
     expect(slotRows(level5).map((row) => row.kind)).toEqual(['spell', 'open', 'open']);
     const picked = withLoadout(level5, { spells: [FIRE, COLUMN], passives: [] });
-    expect(slotRows(picked)).toEqual([
-      { kind: 'spell', name: 'Fire Bolt', color: 0xff4400, progress: 0.25 },
-      { kind: 'spell', name: 'Fire Column', color: 0xffaa00, progress: 0.75 },
-      { kind: 'open' },
-    ]);
+    expect(slotRows(picked)).toEqual([FIRE_ROW, COLUMN_ROW, { kind: 'open' }]);
   });
 
-  it('gives every casting spell a box, even past three (the ?loadout= hook casts without slots)', () => {
+  it('gives every casting spell an icon, even past three (the ?loadout= hook casts without slots)', () => {
     const fourth = { ...COLUMN, id: 'fire_meteor', name: 'Meteor' };
-    const third = { ...COLUMN, id: 'fire_dragon', name: 'Fire Dragon', progress: null };
+    const third = {
+      ...COLUMN,
+      id: 'fire_dragon',
+      name: 'Fire Dragon',
+      progress: null,
+      secondsLeft: null,
+    };
     const m = withLoadout(INITIAL_HUD, { spells: [FIRE, COLUMN, third, fourth], passives: [] });
-    expect(slotRows(m).map(slotLabel)).toEqual([
-      'Fire Bolt',
-      'Fire Column',
-      'Fire Dragon',
-      'Meteor',
-    ]);
+    expect(slotRows(m).map(slotLabel)).toEqual(['Fire Bolt', 'Column', 'Dragon', 'Meteor']);
+  });
+
+  it('sweeps from fully dark right after a cast to clear when ready', () => {
+    const at = (progress: number, secondsLeft: number) =>
+      slotRows(
+        withLoadout(INITIAL_HUD, { spells: [{ ...FIRE, progress, secondsLeft }], passives: [] }),
+      )[0];
+    expect(at(0, 2)).toMatchObject({ ready: false, waiting: 1, badge: '2' });
+    expect(at(0.5, 1)).toMatchObject({ ready: false, waiting: 0.5, badge: '1' });
+    expect(at(0.9, 0.2)).toMatchObject({ ready: false, waiting: expect.closeTo(0.1), badge: null });
+    expect(at(1, 0)).toMatchObject({ ready: true, waiting: 0, badge: null });
+  });
+
+  it('reads a spell with no cooldown (an orbit, a shield) as always ready', () => {
+    const orbit = { ...FIRE, progress: null, secondsLeft: null };
+    const [row] = slotRows(withLoadout(INITIAL_HUD, { spells: [orbit], passives: [] }));
+    expect(row).toMatchObject({ kind: 'spell', ready: true, waiting: 0, badge: null });
+  });
+
+  it('keeps the sweep in [0, 1] whatever progress it is handed', () => {
+    for (const progress of [-1, 2, Number.NaN]) {
+      const [row] = slotRows(
+        withLoadout(INITIAL_HUD, { spells: [{ ...FIRE, progress }], passives: [] }),
+      );
+      expect(row?.kind === 'spell' && row.waiting).toBeGreaterThanOrEqual(0);
+      expect(row?.kind === 'spell' && row.waiting).toBeLessThanOrEqual(1);
+    }
   });
 
   it('reads as open, not locked, before the first loadout event lands', () => {
@@ -209,11 +262,38 @@ describe('slotRows', () => {
 
 describe('slotLabel', () => {
   it('names the spell, says open, or says locked with the unlock level (spec §10)', () => {
-    expect(slotLabel({ kind: 'spell', name: 'Fire Bolt', color: 0, progress: null })).toBe(
-      'Fire Bolt',
-    );
+    expect(slotLabel(COLUMN_ROW)).toBe('Column');
     expect(slotLabel({ kind: 'open' })).toBe('Open');
-    expect(slotLabel({ kind: 'locked', unlockLevel: 5 })).toBe('Locked · Lv 5');
+    expect(slotLabel({ kind: 'locked', unlockLevel: 5 })).toBe('Lv 5');
+  });
+});
+
+describe('shortSpellName', () => {
+  it('keeps a name that fits, else its last word, else cuts it with an ellipsis', () => {
+    expect(shortSpellName('Fire Bolt')).toBe('Fire Bolt');
+    expect(shortSpellName('Earthquake')).toBe('Earthquake');
+    expect(shortSpellName('Frost Nova Bomb')).toBe('Bomb');
+    expect(shortSpellName('Lightning Companion')).toBe('Companion');
+    expect(shortSpellName('Extraordinarily')).toBe('Extraordi…');
+  });
+});
+
+describe('spellGlyph', () => {
+  it('takes the first letters of the first two words', () => {
+    expect(spellGlyph('Fire Bolt')).toBe('FB');
+    expect(spellGlyph('Frost Nova Bomb')).toBe('FN');
+    expect(spellGlyph('tornado')).toBe('T');
+  });
+});
+
+describe('cooldownBadge', () => {
+  it('shows whole seconds left, floored, and hides under one second', () => {
+    expect(cooldownBadge(3.9)).toBe('3');
+    expect(cooldownBadge(1)).toBe('1');
+    expect(cooldownBadge(0.99)).toBeNull();
+    expect(cooldownBadge(0)).toBeNull();
+    expect(cooldownBadge(null)).toBeNull();
+    expect(cooldownBadge(Number.POSITIVE_INFINITY)).toBeNull();
   });
 });
 

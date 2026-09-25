@@ -53,13 +53,18 @@ export interface RunEventPayloads {
   embers: { embers: number };
 }
 
-/** One casting spell as the HUD shows it. `progress` is `null` for a spell with no cooldown. */
+/**
+ * One casting spell as the HUD shows it. `progress` and `secondsLeft` are
+ * `null` for a spell with no cooldown.
+ */
 export interface LoadoutSpellView {
   id: string;
   name: string;
   /** 24-bit RGB, the spell's card colour. */
   color: number;
   progress: number | null;
+  /** #213: seconds until the next cast, for the badge on the slot icon. */
+  secondsLeft: number | null;
 }
 
 /** One passive held, with the ranks taken of it. */
