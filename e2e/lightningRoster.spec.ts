@@ -143,7 +143,7 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
   }
 
   // #179: every tornado wears its own art, sized to the radius it ticks and
-  // following the patch as it drifts, with the ring still outlining it.
+  // following the patch as it drifts; since CO-153 the ring is hidden under it.
   const tornadoes = areaTrace.flat();
   expect(tornadoes.length, 'tornado samples').toBeGreaterThan(0);
   for (const [i, area] of tornadoes.entries()) {
@@ -151,6 +151,7 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
     expect(Math.abs(area.drawnRadius - area.radius), `tornado ring ${i}`).toBeLessThan(1);
     expect(Math.abs((area.artRadius ?? 0) - area.radius), `tornado art size ${i}`).toBeLessThan(1);
     expect(area.artOffset, `tornado art on its ring ${i}`).toBeLessThan(1);
+    expect(area.ringShown, `tornado hides the ring ${i}`).toBe(false);
   }
 
   // The sword is always out: one blade on the ring from the first frame (spec §9.4 `count` 1).

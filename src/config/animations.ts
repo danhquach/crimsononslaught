@@ -103,6 +103,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
 
   // Fire spell (CO-076).
   spec('fire.fly', 4, 12, LOOP),
+  // Fireball's own flight (CO-153); `fire.fly` stays the dragon's and the companion's shot.
+  spec('fire.ball', 4, 12, LOOP),
   spec('fire.spawn', 4, 15, ONCE),
   spec('fire.explode', 6, 15, ONCE),
   spec('fire.burn', 4, 8, LOOP),

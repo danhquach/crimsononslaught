@@ -2,6 +2,8 @@
 
 Ticket: [#202](https://github.com/danhquach/crimsononslaught/issues/202)
 
+Superseded by CO-153 ([#238](https://github.com/danhquach/crimsononslaught/issues/238)): the bolt is now a ball of lightning, and this sheet was removed.
+
 Lightning Bolt flies from the hero to its target as a short projectile. It needs its own flight clip so it never reads as Chain Lightning's tiled `lightning.chain` strip. The strike and impact bursts on the target are reused as they are (`lightning.strike`, `lightning.impact`).
 
 One sheet. Copy the whole `text` block below and paste it as the prompt. Nothing else to add.
