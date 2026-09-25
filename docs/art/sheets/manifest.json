@@ -679,6 +679,25 @@
     },
     {
       "key": "fire",
+      "ticket": "CO-153",
+      "file": "CO-153/fire_ball.png",
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 200,
+      "rowSpecs": [
+        [
+          {
+            "anim": "ball",
+            "cols": [
+              1,
+              4
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "key": "fire",
       "ticket": "CO-076",
       "file": "CO-076/fire_explosion.png",
       "cols": 6,
@@ -820,18 +839,29 @@
       "rows": 2,
       "sheetCell": 256,
       "rowSpecs": [
+        null,
         [
           {
-            "anim": "chain",
+            "anim": "stun",
             "cols": [
               1,
               4
             ]
           }
-        ],
+        ]
+      ]
+    },
+    {
+      "key": "lightning",
+      "ticket": "CO-153",
+      "file": "CO-153/lightning_chain.png",
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 256,
+      "rowSpecs": [
         [
           {
-            "anim": "stun",
+            "anim": "chain",
             "cols": [
               1,
               4
@@ -1128,8 +1158,8 @@
     },
     {
       "key": "lightning",
-      "ticket": "CO-123",
-      "file": "CO-123/lightning_tornado.jpg",
+      "ticket": "CO-153",
+      "file": "CO-153/lightning_tornado.png",
       "page": 4,
       "cols": 2,
       "rows": 2,
@@ -1159,12 +1189,12 @@
     },
     {
       "key": "lightning",
-      "ticket": "CO-123",
-      "file": "CO-123/lightning_sword.jpg",
+      "ticket": "CO-153",
+      "file": "CO-153/lightning_sword.png",
       "page": 4,
       "cols": 4,
       "rows": 1,
-      "sheetCell": 256,
+      "sheetCell": 376,
       "rowSpecs": [
         [
           {
@@ -1179,8 +1209,8 @@
     },
     {
       "key": "lightning",
-      "ticket": "CO-137",
-      "file": "CO-137/lightning_bolt.png",
+      "ticket": "CO-153",
+      "file": "CO-153/lightning_bolt.png",
       "page": 4,
       "cols": 4,
       "rows": 1,

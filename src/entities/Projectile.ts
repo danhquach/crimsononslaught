@@ -11,8 +11,8 @@ export interface ProjectileLook {
   readonly clip?: string;
 }
 
-/** Fire's fireball — the look every shot had before more than one spell fired them. */
-const FIREBALL: ProjectileLook = { texture: 'proj_fire', clip: 'fire.fly' };
+/** Fire's fireball, on its own flight clip since CO-153: `fire.fly` stays the dragon's and the companion's shot. */
+const FIREBALL: ProjectileLook = { texture: 'proj_fire', clip: 'fire.ball' };
 
 /**
  * One shot in flight (spec §5 "Fire — Fireball"): launched straight at where

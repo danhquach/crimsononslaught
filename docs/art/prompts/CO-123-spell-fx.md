@@ -363,6 +363,8 @@ Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas s
 
 ## 12. `lightning_tornado.png` — the drifting vortex
 
+Superseded by CO-153 ([#238](https://github.com/danhquach/crimsononslaught/issues/238)): the funnel was redrawn and this sheet was removed.
+
 Save as `docs/art/sheets/CO-123/lightning_tornado.png`. Copy the whole block below; it is the complete prompt.
 
 ```text
@@ -382,6 +384,8 @@ Deliver one PNG (preferred; a JPEG on flat magenta is accepted), at the canvas s
 ```
 
 ## 13. `lightning_sword.png` — the orbiting blade, one facing only
+
+Superseded by CO-153 ([#238](https://github.com/danhquach/crimsononslaught/issues/238)): the blade was redrawn and this sheet was removed.
 
 Save as `docs/art/sheets/CO-123/lightning_sword.png`. Copy the whole block below; it is the complete prompt.
 
