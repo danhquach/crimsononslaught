@@ -1,23 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnTarget, tickHitCooldown, tryHit } from './fireColumn';
-
-describe('columnTarget', () => {
-  const caster = { x: 0, y: 0 };
-  const near = { x: 10, y: 0 };
-  const far = { x: 100, y: 0 };
-
-  it('picks the nearest enemy within range', () => {
-    expect(columnTarget(caster, [far, near], 400)).toBe(near);
-  });
-
-  it('ignores an enemy past range', () => {
-    expect(columnTarget(caster, [far], 40)).toBeUndefined();
-  });
-
-  it('is undefined with no enemies at all', () => {
-    expect(columnTarget(caster, [], 400)).toBeUndefined();
-  });
-});
+import { tickHitCooldown, tryHit } from './hitWindow';
 
 describe('tryHit', () => {
   it('hits when the window is open and re-arms it', () => {

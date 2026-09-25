@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import { SWORD_CLIP, SWORD_TEXTURE } from '../config/lightningRoster';
-import { tickHitCooldown, tryHit } from '../core/fireColumn';
+import { tickHitCooldown, tryHit } from '../core/hitWindow';
 import type { Vec2 } from '../core/input';
 import { bladeRotation, swordCut } from '../core/lightningSword';
 import type { SwordStats } from '../core/spellStats';
@@ -20,7 +20,7 @@ import { OrbitingBodySpell } from './OrbitingBodySpell';
  *
  * The ring is `OrbitingBodySpell`'s, shared with Earth's boulders; what is the
  * sword's alone is in `core/lightningSword.ts` — how the blade lies on the ring
- * and what a cut leaves — and the per-enemy window is Fire Column's `tryHit`,
+ * and what a cut leaves — and the per-enemy window is `core/hitWindow.ts`'s `tryHit`,
  * kept here per enemy because the spec gives the sword its own `hitCooldown`
  * where Earth's ring shares one constant through the `Enemy`.
  *

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_SWORD_STATS } from '../config/lightningRoster';
-import { tickHitCooldown, tryHit } from './fireColumn';
+import { tickHitCooldown, tryHit } from './hitWindow';
 import { bladeRotation, swordCut } from './lightningSword';
 import { advanceOrbit, boulderAngles, boulderPosition } from './orbitingBoulders';
 

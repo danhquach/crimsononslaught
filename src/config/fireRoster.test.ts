@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { validateSpellFields } from '../core/playerProfile';
 import { elementOf, isRosterSpellId, SPELLS_BY_ELEMENT } from './loadout';
 import {
-  BASE_FIRE_COLUMN_STATS,
   BASE_FIRE_DRAGON_STATS,
   BASE_FIRE_ROSTER_STATS,
+  BASE_FIRE_WAVE_STATS,
   FIRE_ROSTER_CARDS,
   FIRE_ROSTER_SPELL_IDS,
   isFireRosterSpellId,
@@ -13,7 +13,7 @@ import {
 /** #140: the fire roster rows are the spec's §9.2 table, and they are castable. */
 
 describe('fire roster ids', () => {
-  it('names Fire Column and Fire Dragon, both on Fire', () => {
+  it('names Fire Wave and Fire Dragon, both on Fire', () => {
     for (const id of FIRE_ROSTER_SPELL_IDS) {
       expect(isRosterSpellId(id), id).toBe(true);
       expect(SPELLS_BY_ELEMENT[elementOf(id) ?? 'ice'], id).toContain(id);
@@ -30,19 +30,28 @@ describe('fire roster ids', () => {
 });
 
 describe('fire roster stat blocks', () => {
-  it('carries the spec §9.2 numbers for Fire Column', () => {
-    expect(BASE_FIRE_COLUMN_STATS).toEqual({
+  it('carries the CO-143 numbers for Fire Wave, under the old id', () => {
+    expect(BASE_FIRE_WAVE_STATS).toEqual({
       cooldown: 2.2,
       damage: 18,
-      radius: 55,
-      projectiles: 1,
-      speed: 120,
+      arc: 95,
+      speed: 260,
       range: 180,
-      hitCooldown: 0.5,
+      knockback: 8,
       burn: 8,
       burnDuration: 3,
     });
-    expect(BASE_FIRE_ROSTER_STATS.fire_column).toBe(BASE_FIRE_COLUMN_STATS);
+    expect(BASE_FIRE_ROSTER_STATS.fire_column).toBe(BASE_FIRE_WAVE_STATS);
+  });
+
+  it('reaches its range in about 0.7 s and shoves far less than Earth Spike', () => {
+    expect(BASE_FIRE_WAVE_STATS.range / BASE_FIRE_WAVE_STATS.speed).toBeCloseTo(0.7, 1);
+    expect(BASE_FIRE_WAVE_STATS.knockback).toBeLessThan(25 / 2);
+  });
+
+  it('names Fire Wave on its card', () => {
+    expect(FIRE_ROSTER_CARDS.fire_column.name).toBe('Fire Wave');
+    expect(FIRE_ROSTER_CARDS.fire_column.description).toMatch(/arc of flame/);
   });
 
   it('carries the spec §9.2 numbers for Fire Dragon', () => {

@@ -138,7 +138,7 @@ export function slotLabel(row: Readonly<SlotRow>): string {
 
 /**
  * A name short enough to sit under its icon: whole if it fits, else its last
- * word ("Fire Column" → "Column"), which is still unique within one element's
+ * word ("Fire Wave" → "Wave"), which is still unique within one element's
  * roster, cut with an ellipsis only if even that is too long.
  */
 export function shortSpellName(name: string): string {

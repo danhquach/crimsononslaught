@@ -136,8 +136,14 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // the meteor lands rather than cutting off mid-pulse.
   spec('fire.meteorMark', 4, 4, LOOP),
   spec('fire.meteor', 4, 12, LOOP),
+  // Fire Column's body and hit (CO-123). No spell draws them since Fire Wave
+  // replaced the column (CO-143, #218): they are kept as a reserved background
+  // prop for later, not a spell body.
   spec('fire.column', 4, 12, LOOP),
   spec('fire.columnHit', 4, 15, ONCE),
+  // Fire Wave's flame front (CO-143, #218): the curved rim, drawn bulging
+  // right and turned toward the wave's heading by `spells/FireWaveSpell.ts`.
+  spec('fire.wave', 4, 12, LOOP),
   spec('fire.dragon', 4, 8, LOOP),
 
   spec('ice.arrow', 4, 12, LOOP),
@@ -249,13 +255,12 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   proj_bolt: 'lightning.bolt.0',
   boulder: 'earth.spin.0',
   // #145. The ice bolt's flight art, the ice shield's layer, the strike
-  // telegraph and Fire Column's body; each cut to the size of the placeholder
-  // it replaces, so the sprites the spells already build keep the size they
-  // were tuned at (`docs/art/sheets/manifest.json` `sheetCell`).
+  // telegraph; each cut to the size of the placeholder it replaces, so the
+  // sprites the spells already build keep the size they were tuned at
+  // (`docs/art/sheets/manifest.json` `sheetCell`).
   proj_ice: 'ice.arrow.0',
   shield_ice: 'ice.shield.0',
   fx_telegraph: 'fire.meteorMark.0',
-  fx_column: 'fire.column.0',
   // CO-106: the floor pickups, each cut to its placeholder's size.
   pickup_ember: 'pickupEmber.idle.0',
   pickup_relic: 'pickupRelic.idle.0',

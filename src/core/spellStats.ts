@@ -329,25 +329,24 @@ export interface MeteorStats {
 }
 
 /**
- * Fire Column (spec §9.2): a wide, slow projectile that is not spent on hit —
- * it travels from the caster toward the nearest enemy within `range` and burns
- * every enemy it passes through, at most once per `hitCooldown` s per enemy.
+ * Fire Wave (CO-143, #218; spec §9.2): an `arc`° slice of flame with its tip
+ * at the caster, aimed at the nearest enemy within `range`. Its rim grows
+ * outward at `speed` to `range` and burns and nudges every enemy it sweeps
+ * over, once per wave. The id stays `fire_column` (saved run counts key on it).
  */
-export interface FireColumnStats {
+export interface FireWaveStats {
   /** Seconds between casts. */
   cooldown: number;
   /** Damage one hit deals. */
   damage: number;
-  /** Body radius of the column, in px. */
-  radius: number;
-  /** Columns per cast. */
-  projectiles: number;
-  /** Column speed in px/s. */
+  /** Width of the slice, in degrees. */
+  arc: number;
+  /** Rim speed in px/s. */
   speed: number;
-  /** How far the column travels before it despawns, in px; also the targeting range. */
+  /** How far the rim reaches before the wave ends, in px; also the targeting range. */
   range: number;
-  /** Seconds between two hits on the same enemy. */
-  hitCooldown: number;
+  /** Shove a hit gives, in px, straight away from the caster. */
+  knockback: number;
   /** Burn damage per second applied on hit. */
   burn: number;
   /** Seconds that burn lasts. */
@@ -399,7 +398,7 @@ export interface SpellStatsBySpell {
   ice_blizzard: GroundAreaStats;
   earth_quake: GroundAreaStats;
   fire_meteor: MeteorStats;
-  fire_column: FireColumnStats;
+  fire_column: FireWaveStats;
   fire_dragon: FireDragonStats;
 }
 

@@ -24,7 +24,6 @@ export const TEXTURE_KEYS = [
   'shield_ice',
   'fx_area',
   'fx_telegraph',
-  'fx_column',
   'pickup_ember',
   'pickup_relic',
   'pickup_health',
@@ -81,10 +80,6 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // heavier stroke than the area ring, so it reads as a warning over a full
   // crowd rather than as another patch; its own art is #145.
   fx_telegraph: { shape: 'ring', color: 0xff8a65, width: 200, height: 200, thickness: 6 },
-  // #140: Fire Column's body — a wide disc, twice the spec §9.2 `radius` of 40,
-  // so `Projectile.fire`'s own texture-derived sizing gives it a body that
-  // actually matches the column's reach without touching that logic.
-  fx_column: { shape: 'circle', color: 0xdd2c00, width: 80, height: 80 },
   // #195: the floor pickups, placeholders until their art lands. None is a
   // diamond, so nothing on the floor reads as a gem. An Ember is a small amber
   // point and a relic a large gold ring — the biggest thing on the floor, since

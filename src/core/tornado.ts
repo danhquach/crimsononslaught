@@ -31,7 +31,7 @@ export const TORNADO_EYE = 12;
 /**
  * Which way a cast goes: a unit vector from `caster` toward the nearest enemy
  * within `targetRange`, or `undefined` with none in range — the cast is then
- * spent on nothing, the rule Fire Column's `columnTarget` follows. A target
+ * spent on nothing, the rule Fire Wave's `waveTarget` follows. A target
  * standing on the caster has no direction, so that cast is spent too.
  */
 export function tornadoHeading<T extends Vec2>(
