@@ -8,7 +8,7 @@ import type { SpellCard } from './spells';
  *
  * Meteor is the only one today. The mechanic is `spells/MeteorSpell.ts` over
  * the rules in `core/skyStrike.ts`, and a second strike would be one more row
- * here, the way Blizzard and Earthquake share `GroundAreaSpell`.
+ * here, the way Ice Storm and Earthquake share `GroundAreaSpell`.
  *
  * Meteor's block is the spec's §9.2 table verbatim. How far a strike may land
  * from the target it picked is not in the table, so `METEOR_SCATTER_PX` is a

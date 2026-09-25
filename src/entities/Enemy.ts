@@ -44,13 +44,9 @@ import {
   type BleedState,
 } from '../core/status';
 import { NO_FORCE, confineVelocity, heldForce, sumVelocities } from '../core/vortex';
-import { PLACEHOLDERS, type TextureKey } from '../config/colors';
+import type { TextureKey } from '../config/colors';
+import { statusTint } from '../core/fx';
 import { clearClip, clipDurationMs, showClip } from '../render/animate';
-
-/** A slowed or frozen enemy is tinted the nova's blue so the slow reads on screen. */
-const FROST_TINT = PLACEHOLDERS.fx_nova.color;
-/** A stunned enemy is tinted the bolt's yellow so the stun reads on screen. */
-const STUN_TINT = PLACEHOLDERS.fx_bolt.color;
 
 /** What any enemy needs to come alive: an archetype row, or the boss's own table. */
 export interface EnemyStats {
@@ -144,6 +140,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** #139: in the short stop of a stagger; the overlay pool marks it. */
   get isStaggered(): boolean {
     return this.staggerS > 0;
+  }
+
+  /** #125: showing the white hit flash, which paints over the status tint while it lasts. */
+  get isFlashing(): boolean {
+    return this.flashMs > 0;
   }
 
   /** #139: a bleed is ticking on it; the overlay pool marks it. */
@@ -283,6 +284,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     // The fast enemy's sheet is drawn facing up; it turns to its heading.
     if (this.kind === 'fast') this.setRotation(headingRotation({ x, y }, this.rotation));
     this.show(this.clipPhase(), { x, y });
+    const wasFrozen = this.isFrozen;
     const frost = tickFrost(this.frost, deltaS);
     this.frost = frost.state;
     const stun = tickStun(this.stunS, deltaS);
@@ -290,7 +292,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     const stagger = tickStagger(this.staggerS, deltaS);
     this.staggerS = stagger.remainingS;
     this.boulderCooldownS = tickBoulderCooldown(this.boulderCooldownS, deltaS);
-    if (frost.ended || stun.ended || stagger.ended) this.refreshTint();
+    // A freeze thawing into the slow it leaves behind changes the tint too (#219).
+    const thawed = wasFrozen && !this.isFrozen;
+    if (frost.ended || thawed || stun.ended || stagger.ended) this.refreshTint();
     const burn = tickBurn(this.burn, deltaS);
     this.burn = burn.state;
     const bleed = tickBleed(this.bleed, deltaS);
@@ -396,10 +400,23 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setTintFill(HIT_FLASH_TINT);
   }
 
-  /** The tint says which effect holds the enemy: a stop (stun or stagger) over a slow, nothing when it moves freely. */
+  /**
+   * The tint says which effect holds the enemy (`statusTint`, #219): a stun or
+   * a freeze fills it solid, a slow lays a light blue over its own colours, and
+   * nothing — a stagger included, which its overlay marks — clears it.
+   */
   protected refreshTint(): void {
-    if (this.stunS > 0 || this.staggerS > 0) this.setTintFill(STUN_TINT);
-    else if (this.slowed) this.setTintFill(FROST_TINT);
+    const tint = statusTint({
+      burning: this.isBurning,
+      slowed: this.slowed,
+      frozen: this.isFrozen,
+      stunned: this.isStunned,
+      staggered: this.isStaggered,
+      bleeding: this.isBleeding,
+      radius: this.bodyRadius,
+    });
+    if (tint.mode === 'fill') this.setTintFill(tint.color);
+    else if (tint.mode === 'multiply') this.setTint(tint.color);
     else this.clearTint();
   }
 

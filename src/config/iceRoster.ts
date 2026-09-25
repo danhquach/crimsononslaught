@@ -5,7 +5,7 @@ import type { SpellCard } from './spells';
 /**
  * The rest of the Ice roster (#141, Phase 2 spec §9.3): Frost Nova Bomb, the
  * one Ice spell with no mechanic to share the way Ice Shield, Ice Companion
- * and Blizzard share theirs — it is its own class, `spells/NovaBombSpell.ts`,
+ * and Ice Storm share theirs — it is its own class, `spells/NovaBombSpell.ts`,
  * Phase 1's Frost Nova thrown rather than pulsed from the player.
  *
  * The block is the spec's §9.3 table verbatim.

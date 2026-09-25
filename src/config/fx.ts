@@ -1,4 +1,5 @@
 import { ANIMATIONS } from './animations';
+import { PLACEHOLDERS } from './colors';
 import { ENEMY_ARCHETYPES, MAX_LIVE_ENEMIES } from './enemies';
 import { BASE_EARTH_SHIELD_STATS } from './shields';
 
@@ -27,6 +28,18 @@ export const NOVA_SCALE_RADIUS = 90;
  * itself Earth Spike, which has no orbit.
  */
 export const SPIN_BASE_ORBIT_SPEED = BASE_EARTH_SHIELD_STATS.orbitSpeed;
+
+/** A stunned enemy is filled the bolt's yellow so the stun reads on screen. */
+export const STUN_TINT = PLACEHOLDERS.fx_bolt.color;
+
+/** A frozen enemy is filled the nova's blue: a solid block of ice, the freeze's own look. */
+export const FROST_TINT = PLACEHOLDERS.fx_nova.color;
+
+/**
+ * A slowed enemy that is not frozen is multiplied by this light blue (#219),
+ * so it keeps its own colours and reads as chilled, never as frozen solid.
+ */
+export const SLOW_TINT = 0xb3e5fc;
 
 /** An enemy with a body this large or larger burns with the big flame; the tank is the smallest such. */
 export const LARGE_BURN_MIN_RADIUS = ENEMY_ARCHETYPES.tank.radius;
@@ -110,6 +123,13 @@ export const AREA_DEPTH = -1;
  * ground that ticks is never hidden by the art, and over the arena's props.
  */
 export const AREA_ART_DEPTH = -1.25;
+
+/**
+ * An ice storm's sleet (#219) falls through the air over the enemies standing
+ * in it, as rain would, and under the effects, overlays and damage numbers, so
+ * a hit or a status still reads through the storm.
+ */
+export const AREA_SLEET_DEPTH = 4.5;
 
 /**
  * The arena's scatter props (#120) lie on the floor and under everything the

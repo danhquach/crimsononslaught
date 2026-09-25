@@ -7,7 +7,7 @@ import {
   AREA_SPELL_IDS,
   AREA_TEXTURE,
   BASE_AREA_STATS,
-  BASE_BLIZZARD_STATS,
+  BASE_ICE_STORM_STATS,
   BASE_QUAKE_STATS,
   isAreaSpellId,
 } from './areas';
@@ -36,12 +36,13 @@ describe('area ids', () => {
 });
 
 describe('area stat blocks', () => {
-  it('carries the spec §9.3 numbers for Blizzard', () => {
-    expect(BASE_BLIZZARD_STATS).toEqual({
+  // #219: the §9.3 numbers, but for the radius, cut from 180 to 80.
+  it('carries the spec §9.3 numbers for Ice Storm', () => {
+    expect(BASE_ICE_STORM_STATS).toEqual({
       cooldown: 12,
       tickDamage: 6,
       tickRate: 0.5,
-      radius: 180,
+      radius: 80,
       duration: 6,
       targetRange: 180,
       slowPct: 0.5,
@@ -61,11 +62,11 @@ describe('area stat blocks', () => {
   });
 
   it('gives Earth the damage and Ice the crowd control', () => {
-    expect(BASE_QUAKE_STATS.tickDamage).toBeGreaterThan(BASE_BLIZZARD_STATS.tickDamage);
-    expect(BASE_QUAKE_STATS.slowPct).toBeLessThan(BASE_BLIZZARD_STATS.slowPct);
+    expect(BASE_QUAKE_STATS.tickDamage).toBeGreaterThan(BASE_ICE_STORM_STATS.tickDamage);
+    expect(BASE_QUAKE_STATS.slowPct).toBeLessThan(BASE_ICE_STORM_STATS.slowPct);
     // Earth pays for its longer patch with a longer wait for it.
-    expect(BASE_QUAKE_STATS.duration).toBeGreaterThan(BASE_BLIZZARD_STATS.duration);
-    expect(BASE_QUAKE_STATS.cooldown).toBeGreaterThan(BASE_BLIZZARD_STATS.cooldown);
+    expect(BASE_QUAKE_STATS.duration).toBeGreaterThan(BASE_ICE_STORM_STATS.duration);
+    expect(BASE_QUAKE_STATS.cooldown).toBeGreaterThan(BASE_ICE_STORM_STATS.cooldown);
   });
 
   it('gives both a lifetime worth a whole number of ticks', () => {
@@ -77,9 +78,9 @@ describe('area stat blocks', () => {
   });
 
   it('gives every patch a radius and a reach', () => {
-    // No radius-under-range rule: since #212 the base reach (180, 162) is no
-    // wider than the 180 px patch, so a patch dropped at the edge of its reach
-    // still covers the hero. Areas hurt only enemies, so that costs nothing.
+    // No radius-under-range rule: a patch dropped at the edge of its reach
+    // (180, 162) may or may not cover the hero, and areas hurt only enemies,
+    // so that costs nothing.
     for (const id of AREA_SPELL_IDS) {
       const { radius, targetRange } = BASE_AREA_STATS[id];
       expect(radius, id).toBeGreaterThan(0);
@@ -126,9 +127,49 @@ describe('area looks (#179)', () => {
     }
   });
 
-  it('draws Blizzard and Tornado with their art and Earthquake with the ring until its art lands', () => {
-    expect(AREA_LOOKS.ice_blizzard.clip).toBe('ice.blizzard');
+  it('draws Tornado with its art and Earthquake with the ring until its art lands', () => {
     expect(TORNADO_LOOK.clip).toBe('lightning.tornado');
-    expect(AREA_LOOKS.earth_quake.clip).toBeUndefined();
+    expect(AREA_LOOKS.earth_quake).toEqual({});
+  });
+});
+
+describe('Ice Storm look (#219)', () => {
+  const storm = AREA_LOOKS.ice_blizzard.storm;
+  const names = new Set(ANIMATIONS.map((anim) => anim.name));
+
+  it('names the card Ice Storm, a slow with no freeze in its words', () => {
+    expect(AREA_CARDS.ice_blizzard.name).toBe('Ice Storm');
+    expect(AREA_CARDS.ice_blizzard.description.toLowerCase()).not.toMatch(/freez/);
+    expect(AREA_CARDS.ice_blizzard.stats).toContainEqual(['Radius', '80']);
+  });
+
+  it('is drawn as a storm of sleet and shards from atlas clips, not the ring or one clip', () => {
+    expect(storm).toBeDefined();
+    expect(AREA_LOOKS.ice_blizzard.clip).toBeUndefined();
+    expect(names.has(storm?.sleet.clip ?? '')).toBe(true);
+    expect(names.has(storm?.shards.clip ?? '')).toBe(true);
+  });
+
+  it('falls like rain: steeply down the screen, slanted a little right by the wind', () => {
+    const v = storm?.sleet.velocity ?? { x: 0, y: 0 };
+    expect(v.y).toBeGreaterThan(0);
+    expect(v.x).toBeGreaterThan(0);
+    // Within 20° of straight down.
+    expect(Math.atan2(v.x, v.y)).toBeLessThan((20 * Math.PI) / 180);
+  });
+
+  it('fades the sleet out before the rim, so the storm has no drawn edge', () => {
+    expect(storm?.sleet.rimFade).toBeGreaterThan(0);
+    expect(storm?.sleet.rimFade).toBeLessThanOrEqual(1);
+  });
+
+  it('bursts shards inside the patch a few at a time', () => {
+    expect(storm?.shards.reach).toBeLessThan(1);
+    expect(storm?.shards.maxLive).toBeGreaterThan(0);
+    expect(storm?.shards.maxLive).toBeLessThanOrEqual(3);
+  });
+
+  it('fades the whole storm in over 0.4 s and out over its last 0.6 s', () => {
+    expect(storm?.fade).toEqual({ fadeInS: 0.4, fadeOutS: 0.6 });
   });
 });

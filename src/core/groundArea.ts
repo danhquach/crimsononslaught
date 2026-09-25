@@ -6,7 +6,7 @@ import type { Rng } from './rng';
  * placed once, lives for a duration on the run clock, and applies its effects
  * to whatever is standing in it every `tickEveryS` until it expires.
  *
- * Blizzard and Earthquake are both this; Tornado (#136) is this plus a drift
+ * Ice Storm and Earthquake are both this; Tornado (#136) is this plus a drift
  * and a pull. Every spell before them resolved instantly (a nova, a bolt) or on
  * contact (a projectile, a boulder), so nothing in the game yet keeps an effect
  * alive in a place rather than on an entity.
@@ -18,7 +18,7 @@ import type { Rng } from './rng';
  * hit the same way, with no enter/leave events to keep in step.
  *
  * Spec §6.2: an area has a finite lifetime, so it snapshots its numbers when it
- * is placed — a passive taken while a Blizzard is on the ground grows the
+ * is placed — a passive taken while an Ice Storm is on the ground grows the
  * *next* one rather than the patch under the player's feet.
  *
  * Overlapping areas do not merge: each one ticks on its own clock against its
@@ -61,7 +61,7 @@ export interface AreaStep {
  * It starts with a full interval to pay: the first tick lands `tickEveryS` in,
  * not on the frame it was cast, the same way `CastScheduler` makes a spell wait
  * a full cooldown for its first cast. A free tick on placement would make a
- * 6 s / 0.5 s Blizzard pay 13 ticks where its block promises 12.
+ * 6 s / 0.5 s Ice Storm pay 13 ticks where its block promises 12.
  */
 export function createArea(at: Readonly<Vec2>, rule: Readonly<AreaRule>): GroundArea {
   return {

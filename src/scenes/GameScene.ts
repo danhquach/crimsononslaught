@@ -33,6 +33,7 @@ import {
   tickMagnet,
 } from '../core/pickups';
 import { planProps } from '../core/arenaDressing';
+import { membersOf } from '../core/groundArea';
 import type { Vec2 } from '../core/input';
 import { createRng, deriveSeed, type Rng } from '../core/rng';
 import { RUN_EVENT, emitRunEvent, type RunEventPayloads } from '../core/runEvents';
@@ -189,6 +190,18 @@ const ARENA_LINE = 0x1f1f1f;
 const ARENA_BORDER = 0x5a1620;
 const GRID_CELL = 200;
 
+/** How one enemy standing in a layered ground area is drawn right now (#219). */
+export interface StormEnemyView {
+  readonly slowed: boolean;
+  readonly frozen: boolean;
+  readonly stunned: boolean;
+  /** Under the white hit flash, which paints over any status tint while it lasts. */
+  readonly flashing: boolean;
+  readonly tinted: boolean;
+  /** A solid colour fill rather than a tint over the sprite's own colours. */
+  readonly tintFill: boolean;
+}
+
 /**
  * Crits roll on a stream of their own (#125), seeded from the run's: drawing
  * them from the run's RNG would move every spawn angle and level-up offer of
@@ -207,6 +220,12 @@ const PICKUP_STREAM = 'pickups';
  * the floor never moves a seed's spawns, offers or drops.
  */
 const ARENA_STREAM = 'arena';
+
+/**
+ * Where a ground area's shards fall draws from a stream of its own (#219):
+ * how a storm looks must never move a seed's spawns, offers or drops.
+ */
+const AREA_FX_STREAM = 'areaFx';
 
 /**
  * Where a death's Ember and consumable land, from the death spot, so neither
@@ -369,19 +388,38 @@ export class GameScene extends Phaser.Scene {
    * them have placed and paid out. The browser suite watches a patch appear,
    * tick a crowd and expire, and each one drawn at the radius it ticks, with
    * its spell's art when the atlas has it (#179).
+   *
+   * `storm` (#219) is how each enemy standing in a layered patch is tinted
+   * right now, read in the same step as its status, so the suite can hold a
+   * slowed enemy to a light tint that keeps its colours and a frozen one to
+   * the solid fill.
    */
   get areaReport(): {
     live: AreaView[];
     placed: number;
     hits: number;
+    storm: StormEnemyView[];
   } {
     const spells = this.spells.spells.filter(
       (spell): spell is GroundAreaSpell => spell instanceof GroundAreaSpell,
     );
+    const views = [...this.areas.views];
+    const storms = this.areas.areas.filter((_, i) => views[i]?.storm);
+    const inside = new Set(storms.flatMap((area) => membersOf(area, this.enemies.live)));
     return {
-      live: [...this.areas.views],
+      live: views,
       placed: spells.reduce((total, spell) => total + spell.placed, 0),
       hits: spells.reduce((total, spell) => total + spell.hits, 0),
+      storm: [...inside]
+        .filter((enemy) => enemy.active && !enemy.isDying)
+        .map((enemy) => ({
+          slowed: enemy.slowed,
+          frozen: enemy.isFrozen,
+          stunned: enemy.isStunned,
+          flashing: enemy.isFlashing,
+          tinted: enemy.isTinted,
+          tintFill: enemy.tintFill,
+        })),
     };
   }
 
@@ -573,7 +611,7 @@ export class GameScene extends Phaser.Scene {
     };
     this.numbers = new DamageNumberPool(this);
     this.overlays = new OverlayPool(this);
-    this.areas = new AreaPool(this);
+    this.areas = new AreaPool(this, createRng(deriveSeed(seed, AREA_FX_STREAM)));
     this.telegraphs = new TelegraphPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
     // Its colliders belong to the physics world; the scene keeps the system
