@@ -22,8 +22,6 @@ const SPEC_KEYS = [
   'shield_ice',
   'fx_area',
   'fx_telegraph',
-  // #140: Fire Column's body.
-  'fx_column',
   // #195: Embers and relics on the floor.
   'pickup_ember',
   'pickup_relic',

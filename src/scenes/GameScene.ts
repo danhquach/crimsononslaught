@@ -47,9 +47,9 @@ import type {
   EarthShieldStats,
   GroundAreaStats,
   EarthStats,
-  FireColumnStats,
   FireDragonStats,
   FireStats,
+  FireWaveStats,
   IceShieldStats,
   IceStats,
   LightningStats,
@@ -155,7 +155,7 @@ import { XpGem } from '../entities/XpGem';
 import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { LightningBoltSpell } from '../spells/LightningBoltSpell';
 import { FireballSpell } from '../spells/FireballSpell';
-import { FireColumnSpell } from '../spells/FireColumnSpell';
+import { FireWaveSpell } from '../spells/FireWaveSpell';
 import { FireDragonSpell } from '../spells/FireDragonSpell';
 import { IceArrowSpell } from '../spells/IceArrowSpell';
 import { NovaBombSpell } from '../spells/NovaBombSpell';
@@ -411,15 +411,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Test hook (#140): Fire Column and Fire Dragon, whichever is equipped —
+   * Test hook (#140): Fire Wave and Fire Dragon, whichever is equipped —
    * hits each has landed and shots each has in the air right now. The browser
    * suite watches a run land hits with both and hold their pool caps.
    */
   get fireReport(): { id: RosterSpellId; hits: number; live: number }[] {
     return this.spells.spells
       .filter(
-        (spell): spell is FireColumnSpell | FireDragonSpell =>
-          spell instanceof FireColumnSpell || spell instanceof FireDragonSpell,
+        (spell): spell is FireWaveSpell | FireDragonSpell =>
+          spell instanceof FireWaveSpell || spell instanceof FireDragonSpell,
       )
       .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
   }
@@ -901,12 +901,11 @@ export class GameScene extends Phaser.Scene {
           this.rng,
         );
       case 'fire_column':
-        return new FireColumnSpell(
+        return new FireWaveSpell(
           this,
           this.player,
           this.enemies,
-          this.collisions,
-          stats as Readonly<FireColumnStats>,
+          stats as Readonly<FireWaveStats>,
           damage,
           this.fx,
         );

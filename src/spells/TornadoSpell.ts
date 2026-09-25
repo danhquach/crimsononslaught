@@ -74,7 +74,7 @@ export class TornadoSpell extends Spell<'lightning_tornado'> {
   /**
    * One cast: a tornado from the caster toward the nearest enemy in
    * `targetRange`; with nothing in range the cast is spent on nothing, the rule
-   * Fire Column follows. A pool at its cap drops the tornado, so the cast is
+   * Fire Wave follows. A pool at its cap drops the tornado, so the cast is
    * spent — a backlog waiting for room would land them all at once, long after
    * the moment that asked for them.
    */

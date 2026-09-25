@@ -1,18 +1,18 @@
 import { expect, test, type Page } from '@playwright/test';
 import { FIRE_ROSTER_SPELL_IDS } from '../src/config/fireRoster';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
-import { MAX_LIVE_COLUMNS } from '../src/core/fireColumn';
+import { MAX_LIVE_WAVES } from '../src/core/fireWave';
 import { MAX_LIVE_DRAGONS } from '../src/core/homing';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
 
 /**
- * #140 in the browser: a run carrying Fire Column and Fire Dragon, equipped
+ * #140 in the browser: a run carrying Fire Wave (CO-143) and Fire Dragon, equipped
  * through the `?loadout=` test hook, in a filling arena so both have a crowd
  * to hit.
  *
- * `core/fireColumn.test.ts` covers the column's targeting and hit window, and
+ * `core/fireWave.test.ts` covers the wave's targeting, arc and swept band, and
  * `core/homing.ts`'s own tests cover the dragon's steering. What only a real
  * run can show is that both reach the pool, land hits on live enemies, hold
  * their caps in a scaled run, and the frame rate survives it all (spec §11).
@@ -35,7 +35,7 @@ const SAMPLE_MS = 100;
 const MIN_FPS = 20;
 
 const CAPS: Readonly<Record<(typeof FIRE_ROSTER_SPELL_IDS)[number], number>> = {
-  fire_column: MAX_LIVE_COLUMNS,
+  fire_column: MAX_LIVE_WAVES,
   fire_dragon: MAX_LIVE_DRAGONS,
 };
 
@@ -58,7 +58,7 @@ async function answerLevelUp(page: Page): Promise<void> {
   if (paused) await page.keyboard.press('1');
 }
 
-test('Fire Column and Fire Dragon land hits on a live crowd and hold their caps', async ({
+test('Fire Wave and Fire Dragon land hits on a live crowd and hold their caps', async ({
   page,
 }) => {
   const errors = collectErrors(page);

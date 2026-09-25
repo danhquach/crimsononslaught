@@ -20,7 +20,7 @@ import type { DamageSink } from './DamageSink';
  * Fire Bolt (spec §9.2): every `cooldown` s a volley of `projectiles` bolts
  * leaves the caster, each at its own nearest enemy within `range`. A hit deals
  * `damage` to the enemy struck, then explodes: `damage * aoeDamageFactor` to
- * every other enemy within `aoeRadius` of it. Burn is Fire Column's identity
+ * every other enemy within `aoeRadius` of it. Burn is Fire Wave's identity
  * now (spec §9.2), not Fire Bolt's.
  *
  * The rules — targets, splash, explosion damage, burn — live in

@@ -112,7 +112,7 @@ test('meteors telegraph a point, hold for the fall and land on the crowd', async
   // And the landings hit live enemies, more than one at a time: the blast is an
   // area, so a landing reaches the crowd around its mark, not only the enemy it
   // was aimed at. Not an average per strike (#187): which cards the level-ups
-  // offer decides how thick the crowd gets, and a run that draws Fire Column
+  // offer decides how thick the crowd gets, and a run that draws Fire Wave
   // early clears it to about one enemy per strike. About a third of landings
   // hit nothing on either build — the primary spell often kills the target
   // during the fall.

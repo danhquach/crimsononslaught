@@ -83,7 +83,7 @@ export function hasBurn(state: Readonly<BurnState>): boolean {
 
 /**
  * A hit lands on an enemy with `dps` burn for `durationS` s (spec §5: "dmg/s
- * for 2 s"; Fire Column's own window is spec §9.2's `burnDuration`). A fresh
+ * for 2 s"; Fire Wave's own window is spec §9.2's `burnDuration`). A fresh
  * hit keeps whichever dps is higher and whichever clock runs longer — its own
  * duration or what is already left — so a burn never stacks and a shorter,
  * weaker hit never cuts a stronger one short. `dps` 0 is the unperked spell:

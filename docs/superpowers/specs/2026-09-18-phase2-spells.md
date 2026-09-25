@@ -326,7 +326,7 @@ Where each node goes:
 | Node | Fate |
 |---|---|
 | Kindling (+damage) | `passive_power` |
-| Burn (burn dmg/s) | Always-on stat block of Fire Column |
+| Burn (burn dmg/s) | Always-on stat block of Fire Wave |
 | Big Blast (`aoeDamageFactor` → 1) | Always-on stat block of Meteor |
 | Blast Radius (+`aoeRadius`) | `passive_expanse` |
 | Long Throw (+`range`) | `passive_expanse` |
@@ -405,7 +405,7 @@ type-specific damage.
 - Every player spell's `range` and `targetRange` was cut to about ×0.45 by
   [#212](https://github.com/danhquach/crimsononslaught/issues/212), so a new
   run reaches only what is on screen and Expanse earns more reach. Fire Bolt,
-  Lightning Bolt and Chain Lightning are 150 and Fire Column 180, set by hand.
+  Lightning Bolt and Chain Lightning are 150 and Fire Wave 180, set by hand.
   Companion ranges, `chainRange` and every radius are unchanged.
 - A spell casts only with an enemy in its `range` or `targetRange`, and a
   companion attacks only with a target (#212). A cast that comes due with
@@ -419,7 +419,7 @@ type-specific damage.
 |---|---|---|---|
 | Fire Bolt (default) | `fire` | Fast projectile at the nearest enemy, small explosion on hit | — |
 | Meteor | `fire_meteor` | Falls on a nearby target after a telegraph; big damage, slow | #138 |
-| Fire Column | `fire_column` | Slow column travels out from the player, burns what it touches | — |
+| Fire Wave | `fire_column` | A 95° arc of flame spreads out from the player toward the nearest enemy; burns and nudges every enemy it sweeps over, once per wave ([#218](https://github.com/danhquach/crimsononslaught/issues/218); was Fire Column, id kept for saves) | — |
 | Fire Companion | `fire_companion` | Ranged ally, auto-shoots nearby enemies, light burn | #133 |
 | Fire Dragon | `fire_dragon` | Homing missile, heavy single-target damage | #137 |
 
@@ -430,21 +430,29 @@ type-specific damage.
 | `damage` | 12 | 60 | 18 | 8 | 45 |
 | `aoeRadius` | 65 | 130 | — | — | 30 |
 | `aoeDamageFactor` | 0.5 | 1.0 | — | — | 0.4 |
-| `radius` | — | — | 55 | — | — |
-| `projectiles` | 1 | 1 | 1 | 1 | 1 |
-| `speed` | 350 | — | 120 | 320 | 260 |
+| `arc` | — | — | 95° | — | — |
+| `projectiles` | 1 | 1 | — | 1 | 1 |
+| `speed` | 350 | — | 260 | 320 | 260 |
 | `range` | 150 | — | 180 | — | — |
 | `targetRange` | — | 189 | — | 260 | 189 |
 | `fallDelay` | — | 1.0 | — | — | — |
 | `homingTurnRate` | — | — | — | — | 4.0 rad/s |
 | `duration` | — | — | — | — | 3.0 |
 | `leashRadius` | — | — | — | 60 | — |
-| `hitCooldown` | — | — | 0.5 | — | — |
+| `knockback` | — | — | 8 | — | — |
 | `burn` | — | — | 8 | 2 | — |
 | `burnDuration` | — | — | 3.0 | 2.0 | — |
 
-Fire Bolt is today's Fire block with `burn` removed — burn is Fire Column's
+Fire Bolt is today's Fire block with `burn` removed — burn is Fire Wave's
 identity now, and a 0-valued field with nothing to raise it is dead weight.
+
+Fire Wave (#218) is a pie slice with its tip at the player, `arc` wide and
+aimed at the nearest enemy in `range`, the heading locked at the cast. Its rim
+grows at `speed` and ends at `range` (about 0.7 s). An enemy is hit once per
+wave, when the rim's band for that frame overlaps its body and its body is
+inside the slice (centre within half the arc, or its body over an edge). A hit
+deals `damage`, applies `burn` and shoves the enemy `knockback` px away from
+the player. `arc` is unscaled, so Expanse lengthens the reach, not the arc.
 
 Fire Dragon's homing (#137) turns the shot's heading toward its target by at
 most `homingTurnRate` per second, so a dragon fired away from its mark arcs

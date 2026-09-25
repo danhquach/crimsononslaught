@@ -3,8 +3,7 @@
  *
  * The blade rides Earth's orbiting ring — spacing, the turn and the position
  * are `core/orbitingBoulders.ts`'s, and the per-enemy window between two cuts
- * is `core/fireColumn.ts`'s `tryHit`, kept by the spell per enemy the way a
- * column keeps its own. What is the sword's alone is here: how the blade lies
+ * is `core/hitWindow.ts`'s `tryHit`, kept by the spell per enemy. What is the sword's alone is here: how the blade lies
  * on the ring, and what a cut leaves behind.
  *
  * `spells/LightningSwordSpell.ts` is the Phaser side; everything decidable

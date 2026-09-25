@@ -20,7 +20,7 @@ import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from
 function baseStatsLeaveStatus(spellId: SpellId): boolean {
   switch (spellId) {
     case 'fire':
-      // Burn is Fire Column's identity now (spec §9.2); Fire Bolt leaves none.
+      // Burn is Fire Wave's identity now (spec §9.2); Fire Bolt leaves none.
       return false;
     case 'ice':
       return BASE_SPELL_STATS.ice.slowPct > 0;

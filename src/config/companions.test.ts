@@ -74,7 +74,7 @@ describe('companion stat blocks', () => {
   });
 
   it('burns for a positive window', () => {
-    // `Enemy.applyBurn` takes a per-hit duration now (spec §9.2 Fire Column),
+    // `Enemy.applyBurn` takes a per-hit duration now (spec §9.2 Fire Wave),
     // so a companion's own window no longer has to match the global default —
     // it only has to be a real, positive duration.
     expect(BASE_COMPANION_STATS.fire_companion.burnDuration).toBeGreaterThan(0);
