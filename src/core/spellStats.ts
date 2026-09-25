@@ -290,8 +290,9 @@ export interface EarthShieldStats {
 
 /**
  * A persistent ground area (#135, spec §9): Ice Storm and Earthquake both place
- * a patch that lives for `duration` and applies `tickDamage` plus its slow
- * every `tickRate` to whatever is standing in it.
+ * a patch that lives for `duration` and applies `tickDamage` plus its slow or
+ * stagger every `tickRate` to whatever is standing in it. Ice Storm slows;
+ * Earthquake staggers (#220) and carries no slow fields at all.
  */
 export interface GroundAreaStats {
   /** Seconds between casts. */
@@ -306,10 +307,16 @@ export interface GroundAreaStats {
   duration: number;
   /** How far from the player a patch may be placed, in px. */
   targetRange: number;
-  /** Speed cut a tick applies, 0-1. */
-  slowPct: number;
+  /** Speed cut a tick applies, 0-1; absent on a patch that does not slow. */
+  slowPct?: number;
   /** Seconds that slow lasts. */
-  slowDuration: number;
+  slowDuration?: number;
+  /**
+   * Seconds each tick stops an enemy for, refreshed rather than stacked; capped
+   * under the tick interval by `areaStaggerS` (#220). Absent on a patch that
+   * does not stagger.
+   */
+  staggerDuration?: number;
 }
 
 /**

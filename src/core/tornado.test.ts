@@ -89,7 +89,7 @@ describe('driftArea (#142)', () => {
 describe('tornadoPulls (#142)', () => {
   it('pulls everything between the eye and pullRadius straight at the centre at pullForce', () => {
     const centre = { x: 100, y: 100 };
-    const right = { x: 200, y: 100 };
+    const right = { x: centre.x + base.pullRadius * 0.75, y: 100 };
     const pulls = tornadoPulls(centre, [right], base.pullRadius, base.pullForce);
     expect(pulls).toHaveLength(1);
     expect(pulls[0]?.enemy).toBe(right);

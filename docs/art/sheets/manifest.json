@@ -1657,6 +1657,19 @@
       "rows": 1,
       "sheetCell": 304,
       "rowSpecs": [[{ "anim": "fly", "cols": [1, 4] }]]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-145",
+      "file": "CO-145/earth_quake_rift.png",
+      "page": 9,
+      "cols": 2,
+      "rows": 2,
+      "sheetCell": 768,
+      "rowSpecs": [
+        [{ "anim": "quakeRift", "cols": [1, 2], "centred": true }],
+        [{ "anim": "quakeRift", "cols": [1, 2], "centred": true }]
+      ]
     }
   ]
 }

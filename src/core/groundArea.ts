@@ -24,7 +24,8 @@ import type { Rng } from './rng';
  * Overlapping areas do not merge: each one ticks on its own clock against its
  * own members, so an enemy in two of them takes both, and the slows they carry
  * resolve to the strongest through `applyFrost` rather than stacking (spec
- * §9.3). Pure TS, no Phaser import.
+ * §9.3); their staggers refresh through `applyStagger` the same way (#220).
+ * Pure TS, no Phaser import.
  */
 
 /** The numbers an area is placed with, as the live stat block said them at that moment. */
@@ -111,6 +112,24 @@ export function advanceArea(area: Readonly<GroundArea>, deltaS: number): AreaSte
     ticks: owed,
     expired: remainingS <= 0,
   };
+}
+
+/**
+ * The longest share of a tick interval an area's stagger may last (#220). A
+ * stagger is a full stop (`staggerSpeedFactor` is 0), so a stop as long as the
+ * interval would pin an enemy in place for the whole patch; capped here, every
+ * stop ends before the next tick lands and the enemy walks for the rest.
+ */
+export const AREA_STAGGER_MAX_FRACTION = 0.6;
+
+/**
+ * The stop one tick of a patch applies (#220): its `staggerDuration`, however
+ * far a duration passive has scaled it, held under `AREA_STAGGER_MAX_FRACTION`
+ * of the patch's `tickRate`. 0 is a patch that staggers nothing.
+ */
+export function areaStaggerS(staggerDuration: number, tickRate: number): number {
+  if (!(staggerDuration > 0) || !(tickRate > 0)) return 0;
+  return Math.min(staggerDuration, AREA_STAGGER_MAX_FRACTION * tickRate);
 }
 
 /**

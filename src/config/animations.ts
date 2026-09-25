@@ -170,7 +170,11 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('earth.spike', 5, 15, ONCE),
   spec('earth.shield', 4, 6, LOOP),
   spec('earth.shieldBreak', 4, 15, ONCE),
+  // Earthquake (CO-145, #220): a star of fissures with amber deep inside and
+  // no rim, rumbling in place. `earth.quake` above, a cracked disc inside a
+  // rock ring, is no longer drawn by the spell and is kept for later.
   spec('earth.quake', 4, 8, LOOP),
+  spec('earth.quakeRift', 4, 8, LOOP),
 
   // Cross-element status overlays (#139): bleed and stagger are applied by
   // spells of any element, so they hang off `status` rather than off the

@@ -377,7 +377,7 @@ Where each node goes:
 | Node | Fate |
 |---|---|
 | +damage | `passive_power` |
-| +knockback | Always-on: every Earth spell that strikes an enemy carries `knockback`; Earthquake slows instead |
+| +knockback | Always-on: every Earth spell that strikes an enemy carries `knockback`; Earthquake staggers instead (#220) |
 | Crush (×dmg to Tanks) | Dropped — no type-specific damage in the new model |
 | +orbit radius | `passive_expanse` |
 | +boulder size | `passive_expanse` |
@@ -581,8 +581,8 @@ block, and a stun still fills it yellow. Ice Storm is a slow and never freezes.
 | `chainRange` | — | 120 | — | — | — |
 | `chainFalloff` | — | 0.8 | — | — | — |
 | `targetRange` | 150 | 150 | 162 | 200 | — |
-| `radius` | — | — | 110 | — | — |
-| `pullRadius` | — | — | 150 | — | — |
+| `radius` | — | — | 60 | — | — |
+| `pullRadius` | — | — | 80 | — | — |
 | `pullForce` | — | — | 90 | — | — |
 | `speed` | — | — | 60 | — | — |
 | `chaseSpeed` | — | — | — | 240 | — |
@@ -608,7 +608,7 @@ stagger refreshes the timer.
 | Earth Spike (default) | `earth` | Slow stone spike flung at the nearest enemy; strikes the first enemy it touches (`pierce` 1), a light shove, a 5% bleed chance per hit; can miss and flies on to its range (#205) | #139 |
 | Boulder | `earth_boulder` | Heavy rolling boulder, big damage and knockback, passes through a few enemies | — |
 | Earth Shield | `earth_shield` | Stones circle the player, knock back, have their own HP and return after a cooldown | #134 |
-| Earthquake | `earth_quake` | Ground area, continuous damage and slow, long cooldown | #135 |
+| Earthquake | `earth_quake` | Ground area, continuous damage and a stagger every tick, long cooldown | #135 |
 | Earth Companion | `earth_companion` | Melee ally, heavy knockback | #133 |
 
 | Field | `earth` | `earth_boulder` | `earth_shield` | `earth_quake` | `earth_companion` |
@@ -619,7 +619,7 @@ stagger refreshes the timer.
 | `damage` | 16 | 40 | 10 | — | 14 |
 | `tickDamage` | — | — | — | 8 | — |
 | `tickRate` | — | — | — | 0.5 | — |
-| `radius` | — | 36 | — | 180 | — |
+| `radius` | — | 36 | — | 80 | — |
 | `speed` | 260 | 280 | — | — | — |
 | `chaseSpeed` | — | — | — | — | 200 |
 | `range` | 144 | 207 | — | — | — |
@@ -632,17 +632,24 @@ stagger refreshes the timer.
 | `size` | — | — | 14 | — | — |
 | `hitCooldown` | — | — | 0.4 | — | — |
 | `shieldHp` | — | — | 80 | — | — |
-| `duration` | — | — | — | 6.0 | — |
+| `duration` | — | — | — | 8.0 | — |
 | `knockback` | 25 | 120 | 60 | — | 80 |
-| `slowPct` | — | — | — | 0.35 | — |
-| `slowDuration` | — | — | — | 1.0 | — |
+| `staggerDuration` | — | — | — | 0.2 | — |
 | `bleed` | 4 | — | — | — | — |
 | `bleedDuration` | 3.0 | — | — | — | — |
 | `bleedChance` | 0.05 | — | — | — | — |
 
-Earthquake's `duration` and the slow its prose promises are not in the table
-above; `config/areas.ts` carries both as tuning values (8 s, 30% for 1 s) for
-#147's pass to confirm.
+Earthquake (#220) is radius 80, staggers 0.2 s per tick and has no slow: an
+earth patch that slowed read as an ice one. The stop is capped at 60% of
+`tickRate` (`areaStaggerS` in `core/groundArea.ts`), so however far a duration
+passive scales `staggerDuration`, no enemy is held through a tick. Its 8 s
+`duration` is a tuning value for #147's pass to confirm.
+
+It is drawn as a star of fissures with amber deep in the widest cracks and
+broken stone heaved up along their lips, rumbling in place (`earth.quakeRift`,
+CO-145). There is no ring: the crack tips reach the radius that ticks, so the
+broken ground itself says where the patch ends. Without the atlas the ring
+draws instead.
 
 Earth Shield is Phase 1's Orbiting Boulders block plus a shared HP pool: the
 ring absorbs `shieldHp` of player damage, breaks at 0, and returns after

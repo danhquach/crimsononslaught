@@ -142,7 +142,7 @@ const PASSIVE_LIST = [
   {
     id: 'passive_expanse',
     name: 'Expanse',
-    description: 'Radii, reach and bodies grow 12%.',
+    description: 'Spell areas, reach and sizes grow 12%.',
     field: 'areaMul',
     op: 'mul',
     amount: 1.12,
