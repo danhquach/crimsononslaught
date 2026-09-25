@@ -132,6 +132,7 @@ can change.
 | `critChance` | 0 | Chance per damage instance to crit, 0–1 |
 | `critMultiplier` | 1.5 | Damage multiplier on a crit |
 | `damageReduction` | 0 | Fraction of incoming player damage removed, 0–1 |
+| `pierceBonus` | 0 | Extra enemies a piercing spell passes through, added to its `pierce` ([#206](https://github.com/danhquach/crimsononslaught/issues/206)) |
 
 `critChance` / `critMultiplier` are the stats
 [#125](https://github.com/danhquach/crimsononslaught/issues/125) asks the
@@ -170,7 +171,7 @@ accumulated in place, so a wrong rank can never be baked in.
 
 ## 5. Passives
 
-Thirteen passives, shared by every element. A passive is data:
+Fourteen passives, shared by every element. A passive is data:
 
 ```ts
 interface Passive {
@@ -181,6 +182,7 @@ interface Passive {
   op: 'add' | 'mul';
   amount: number;
   maxRank?: number;               // absent = stacks without limit
+  requiresStat?: SpellStatField;  // offered only while a casting spell carries it
 }
 ```
 
@@ -199,6 +201,7 @@ interface Passive {
 | `passive_regeneration` | Regeneration | `hpRegen` | add | 0.5 | 6 |
 | `passive_magnet` | Magnet | `pickupRadius` | mul | 1.25 | 3 |
 | `passive_avarice` | Avarice | `xpGain` | mul | 1.12 | 5 |
+| `passive_pierce` | Pierce | `pierceBonus` | add | 1 | 3 |
 
 Notes:
 
@@ -211,7 +214,13 @@ Notes:
   survivable or how lucky the player is caps, including Vitality, which Phase 1
   capped at rank 3.
 - Passives never grant a behaviour a spell does not already have. A passive that
-  adds projectiles, pierce or chains is out of scope here — see §13.
+  adds projectiles or chains is out of scope here — see §13.
+- Pierce ([#206](https://github.com/danhquach/crimsononslaught/issues/206)) is
+  the one count a passive may raise: +1 per rank, added rather than multiplied,
+  capped at rank 3. It reaches only spells whose block already has `pierce`
+  (Earth Spike 1 → 4, Boulder 5 → 8 at rank 3), and it is offered only while a
+  casting spell carries `pierce` (`requiresStat`, §7.1), so it is never a dead
+  pick.
 
 ## 6. From the profile to a spell's stat block
 
@@ -227,11 +236,13 @@ category decides which profile multiplier reaches it.
 | area | `areaMul` | `aoeRadius`, `radius`, `breakRadius`, `chainRange`, `orbitRadius`, `leashRadius`, `targetRange`, `range`, `size`, `pullRadius` |
 | speed | `projectileSpeedMul` | `speed`, `orbitSpeed`, `chaseSpeed` (companions) |
 | duration | `durationMul` | `duration`, `burnDuration`, `bleedDuration`, `slowDuration`, `freezeDuration`, `stunDuration`, `staggerDuration` |
-| unscaled | — | counts (`projectiles`, `strikes`, `chains`, `count`, `pierce`), fractions (`slowPct`, `freezeChance`, `stunChance`, `bleedChance`, `chainFalloff`, `aoeDamageFactor`), `knockback`, `pullForce`, `homingTurnRate`, `hitCooldown`, `tickRate`, `shieldHp` |
+| pierce | `+ pierceBonus` (added, not multiplied) | `pierce` |
+| unscaled | — | counts (`projectiles`, `strikes`, `chains`, `count`), fractions (`slowPct`, `freezeChance`, `stunChance`, `bleedChance`, `chainFalloff`, `aoeDamageFactor`), `knockback`, `pullForce`, `homingTurnRate`, `hitCooldown`, `tickRate`, `shieldHp` |
 
 Counts stay unscaled on purpose: a global "+12% area" that silently became
 "+12% boulders" would round to nothing on a 3-boulder ring and to a lot on a
-9-boulder one. Counts change only in a spell's own block and in #147's pass.
+9-boulder one. Counts change only in a spell's own block and in #147's pass —
+except `pierce`, which the Pierce passive adds a flat +1 to per rank (§5).
 
 Adding a field to a spell block without adding it to this table is a config
 error; the boot-time validation (§12) reports it.
@@ -245,7 +256,9 @@ effectiveStats(base: SpellStats, profile: PlayerProfile): SpellStats
 Pure, in `core/`, called where the value is used — not stored on the loadout:
 
 - Every field is `base[field] × profile[multiplier for its category]`, `1` for
-  unscaled fields.
+  unscaled fields, except `pierce`, which is `base.pierce + profile.pierceBonus`.
+  Only fields the base block carries are written, so a spell that does not
+  pierce never gains a `pierce`.
 - `cooldown` is read by the cast scheduler when a cast completes, so a Haste
   taken mid-run shortens the *next* interval and never rewinds a timer that is
   already running.
@@ -286,7 +299,9 @@ On each level-up, in order:
    state 3: the slot waits for a later level and the run still gets the upgrade
    it earned.
 2. **Otherwise** → offer 3 passives drawn from those with `rank < maxRank`, via
-   `rng.shuffle(pool).slice(0, 3)`. Uncapped passives are always eligible.
+   `rng.shuffle(pool).slice(0, 3)`. Uncapped passives are always eligible. A
+   passive with a `requiresStat` is eligible only while a casting spell's base
+   block carries that stat — slotted or not, so a `?loadout=` extra counts.
 3. **Nothing eligible** → no overlay; grant `EMPTY_OFFER_MAX_HP_BONUS` (+10 max
    HP) and resume, exactly as Phase 1 does.
 
@@ -730,7 +745,9 @@ Deferred, deliberately:
   element, as the epic states. Revisit after the rebalance.
 - **Count passives** (+1 projectile, +1 chain, +1 boulder). They interact with
   every spell differently and would need a per-spell cap to stay sane. The three
-  Phase 1 nodes that did this are dropped (§8).
+  Phase 1 nodes that did this are dropped (§8). Pierce is the exception
+  ([#206](https://github.com/danhquach/crimsononslaught/issues/206), §5): it only
+  ever lets a shot strike more enemies, and a rank cap of 3 bounds it.
 - **Spell levels / evolutions.** Still out, as in Phase 1 §2.
 - **Removing or re-rolling a pick.** No skip, no re-roll (§7.3).
 - **Passive rarity or weighting.** Every eligible passive is equally likely;

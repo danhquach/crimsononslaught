@@ -1,8 +1,9 @@
 import { PICKUP_RADIUS } from './gems';
 import { PLAYER_MAX_HP, PLAYER_SPEED } from './player';
+import type { SpellStatField } from './spellFields';
 
 /**
- * The player profile a run accumulates and the thirteen passives that change
+ * The player profile a run accumulates and the fourteen passives that change
  * it (Phase 2 spec §4, §5).
  *
  * A passive is one `{field, op, amount}` change, applied once per rank. It
@@ -46,6 +47,8 @@ export interface PlayerProfile {
   critMultiplier: number;
   /** Fraction of incoming player damage removed, 0-1. */
   damageReduction: number;
+  /** Extra enemies a piercing spell passes through, added to its `pierce` (#206). */
+  pierceBonus: number;
 }
 
 export type ProfileField = keyof PlayerProfile;
@@ -69,6 +72,7 @@ export const BASE_PLAYER_PROFILE: Readonly<PlayerProfile> = {
   critChance: 0,
   critMultiplier: 1.5,
   damageReduction: 0,
+  pierceBonus: 0,
 };
 
 /**
@@ -105,6 +109,11 @@ export interface Passive {
   op: 'add' | 'mul';
   amount: number;
   maxRank?: number;
+  /**
+   * A stat at least one casting spell must carry for this passive to be
+   * offered, so it never shows up as a dead pick (#206). Absent: always offered.
+   */
+  requiresStat?: SpellStatField;
 }
 
 /**
@@ -226,6 +235,16 @@ const PASSIVE_LIST = [
     op: 'mul',
     amount: 1.12,
     maxRank: 5,
+  },
+  {
+    id: 'passive_pierce',
+    name: 'Pierce',
+    description: 'Piercing spells pass through 1 more enemy.',
+    field: 'pierceBonus',
+    op: 'add',
+    amount: 1,
+    maxRank: 3,
+    requiresStat: 'pierce',
   },
 ] as const satisfies readonly Passive[];
 

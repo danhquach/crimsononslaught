@@ -26,8 +26,13 @@ import {
  * Pure TS, no Phaser import.
  */
 
-/** Which profile field scales each category; `unscaled` is left alone. */
-const CATEGORY_MULTIPLIER: Readonly<Record<Exclude<StatCategory, 'unscaled'>, ProfileField>> = {
+/**
+ * Which profile field scales each category; `unscaled` is left alone and
+ * `pierce` is added to, not scaled.
+ */
+const CATEGORY_MULTIPLIER: Readonly<
+  Record<Exclude<StatCategory, 'unscaled' | 'pierce'>, ProfileField>
+> = {
   damage: 'damageMul',
   cooldown: 'cooldownMul',
   area: 'areaMul',
@@ -88,10 +93,13 @@ function clampField(field: ProfileField, value: number): number {
 
 /**
  * Spec §6.2: one spell's numbers as it casts them right now. Each field is
- * `base × profile[multiplier for its category]`; unscaled fields and fields
- * missing from the category map are copied through untouched — an unknown field
- * is a config error `validateSpellFields` reports at boot, not a reason to
- * throw mid-run.
+ * `base × profile[multiplier for its category]`, except `pierce`, which is
+ * `base + profile.pierceBonus` (#206); unscaled fields and fields missing from
+ * the category map are copied through untouched — an unknown field is a config
+ * error `validateSpellFields` reports at boot, not a reason to throw mid-run.
+ *
+ * Only the fields `base` carries are written, so a spell that does not pierce
+ * never gains a `pierce` from the Pierce passive.
  *
  * Called where the value is used, never stored on the loadout: a snapshotting
  * caller (a projectile in flight) reads once at spawn, a live one (a companion,
@@ -101,14 +109,17 @@ export function resolveSpellStats(base: SpellStatBlock, profile: PlayerProfile):
   const out: Record<string, number> = {};
   for (const [field, value] of Object.entries(base)) {
     if (value === undefined) continue;
-    out[field] = value * multiplierFor(field as SpellStatField, profile);
+    out[field] =
+      STAT_CATEGORIES[field as SpellStatField] === 'pierce'
+        ? value + profile.pierceBonus
+        : value * multiplierFor(field as SpellStatField, profile);
   }
   return out as SpellStatBlock;
 }
 
 function multiplierFor(field: SpellStatField, profile: PlayerProfile): number {
   const category: StatCategory | undefined = STAT_CATEGORIES[field];
-  if (category === undefined || category === 'unscaled') return 1;
+  if (category === undefined || category === 'unscaled' || category === 'pierce') return 1;
   return profile[CATEGORY_MULTIPLIER[category]];
 }
 

@@ -11,6 +11,7 @@ import {
   type SpellStatBlock,
   type SpellStatField,
 } from '../config/spellFields';
+import { BASE_EARTH_ROSTER_STATS } from '../config/earthRoster';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { resolveProfile, resolveSpellStats, validateSpellFields } from './playerProfile';
 import { createRng } from './rng';
@@ -37,6 +38,7 @@ const PROBE: PlayerProfile = {
   areaMul: 5,
   projectileSpeedMul: 7,
   durationMul: 11,
+  pierceBonus: 13,
 };
 
 const CATEGORY_PROBE: Readonly<Record<string, number>> = {
@@ -45,6 +47,8 @@ const CATEGORY_PROBE: Readonly<Record<string, number>> = {
   area: 5,
   speed: 7,
   duration: 11,
+  // 1 + 13: pierce is added to, not multiplied.
+  pierce: 14,
   unscaled: 1,
 };
 
@@ -166,6 +170,28 @@ describe('resolveSpellStats', () => {
     const base: SpellStatBlock = { damage: 12, aoeRadius: 50, duration: 3 };
     expect(resolveSpellStats(base, BASE_PLAYER_PROFILE)).toEqual(base);
     expect(base).toEqual({ damage: 12, aoeRadius: 50, duration: 3 });
+  });
+
+  it('adds Pierce to exactly the blocks that pierce (#206)', () => {
+    const profile = resolveProfile(ranks([['passive_pierce', 3]]));
+    expect(profile.pierceBonus).toBe(3);
+    // The ticket's numbers at rank 3: Earth Spike 1 -> 4, Boulder 5 -> 8.
+    expect(resolveSpellStats(BASE_SPELL_STATS.earth, profile).pierce).toBe(4);
+    expect(resolveSpellStats(BASE_EARTH_ROSTER_STATS.earth_boulder, profile).pierce).toBe(8);
+    // A block without `pierce` gains none and is otherwise untouched.
+    expect(resolveSpellStats(BASE_SPELL_STATS.fire, profile)).toEqual(BASE_SPELL_STATS.fire);
+  });
+
+  it('still multiplies the other fields of a piercing block', () => {
+    const profile = resolveProfile(
+      ranks([
+        ['passive_pierce', 1],
+        ['passive_power', 1],
+      ]),
+    );
+    const out = resolveSpellStats({ damage: 10, pierce: 5 }, profile);
+    expect(out.pierce).toBe(6);
+    expect(out.damage).toBeCloseTo(11);
   });
 
   it('passes a field outside the category map through unscaled', () => {

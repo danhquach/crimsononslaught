@@ -175,6 +175,46 @@ describe('levelUpOffer — passives once the loadout is full (spec §7.1)', () =
   });
 });
 
+describe('levelUpOffer — Pierce only while a spell pierces (#206)', () => {
+  const PIERCING = new Set(['damage', 'pierce'] as const);
+  const offersPierce = (loadout: Loadout, carried?: ReadonlySet<'damage' | 'pierce'>): boolean => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const offer = levelUpOffer(createRng(seed), {
+        loadout,
+        level: SLOT_3_LEVEL + 1,
+        actives: [],
+        carried,
+      });
+      if (offer.some((card) => card.id === 'passive_pierce')) return true;
+    }
+    return false;
+  };
+
+  it('never offers Pierce when no casting spell carries pierce', () => {
+    const ids = (carried?: ReadonlySet<'damage'>): string[] =>
+      eligiblePassives(fullLoadout(), PASSIVES, carried).map((p) => p.id);
+    expect(ids()).not.toContain('passive_pierce');
+    expect(ids(new Set(['damage']))).not.toContain('passive_pierce');
+    expect(offersPierce(fullLoadout())).toBe(false);
+    expect(offersPierce(fullLoadout(), new Set(['damage']))).toBe(false);
+  });
+
+  it('offers Pierce while one does, until it reaches rank 3', () => {
+    let loadout = fullLoadout();
+    expect(eligiblePassives(loadout, PASSIVES, PIERCING).map((p) => p.id)).toContain(
+      'passive_pierce',
+    );
+    expect(offersPierce(loadout, PIERCING)).toBe(true);
+
+    for (let rank = 0; rank < 3; rank++) loadout = takePassive(loadout, 'passive_pierce');
+    expect(eligiblePassives(loadout, PASSIVES, PIERCING).map((p) => p.id)).not.toContain(
+      'passive_pierce',
+    );
+    expect(offersPierce(loadout, PIERCING)).toBe(false);
+    expect(() => takePassive(loadout, 'passive_pierce')).toThrow();
+  });
+});
+
 describe('levelUpOffer — what the build can actually cast', () => {
   it('falls through to passives when no offerable active exists', () => {
     // Today's build: the roster spells have no implementation, so the catalog

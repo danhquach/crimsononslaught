@@ -1449,6 +1449,7 @@ export class GameScene extends Phaser.Scene {
       loadout: this.spells.loadout,
       level: this.run.level,
       actives: this.activeCatalog(),
+      carried: this.spells.carriedStats,
     });
     const resolution = resolveLevelUp(offer);
     if (resolution.kind === 'fallback') {
