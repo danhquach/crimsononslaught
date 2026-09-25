@@ -1,7 +1,14 @@
 import type { RosterSpellId } from '../config/loadout';
 import type { PassiveId, PlayerProfile } from '../config/passives';
+import type { RelicBuffId } from '../config/relics';
 import type { SpellStatBlock, SpellStatField } from '../config/spellFields';
-import { equip as equipInLoadout, profileOf, takePassive, type Loadout } from './loadout';
+import {
+  equip as equipInLoadout,
+  profileOf,
+  takePassive,
+  takeRelic,
+  type Loadout,
+} from './loadout';
 import { resolveSpellStats } from './playerProfile';
 import type { Spell } from './spell';
 import type { SpellStats } from './spellStats';
@@ -115,6 +122,12 @@ export class Spellbook {
    */
   takePassive(passiveId: PassiveId): void {
     this.current = takePassive(this.current, passiveId);
+    this.refresh();
+  }
+
+  /** Take one rank of a relic buff (#227); every equipped spell is re-resolved like a passive. */
+  takeRelic(buffId: RelicBuffId): void {
+    this.current = takeRelic(this.current, buffId);
     this.refresh();
   }
 

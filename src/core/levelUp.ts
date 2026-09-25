@@ -9,18 +9,20 @@ import { EMPTY_OFFER_MAX_HP_BONUS } from '../config/progression';
  * travels back to Game as a `LEVEL_UP_EVENT.pick` on the Game scene's emitter.
  *
  * A card is either an **active** (a spell for an open slot) or a **passive** (a
- * rank of a global passive); one offer never mixes the two (spec §7.1).
+ * rank of a global passive); one offer never mixes the two (spec §7.1). A
+ * relic's offer (#227, `core/relicOffer.ts`) uses the same overlay with
+ * **relic** cards, a rank of a relic buff.
  *
  * Pure TS, no Phaser import.
  */
 
 /**
- * What one card shows. `rank` / `maxRank` are passives only: `rank` is the rank
- * the pick grants, `maxRank` the cap it counts towards — absent on a passive
- * that never caps, and on every active.
+ * What one card shows. `rank` / `maxRank` are passives and relics only: `rank`
+ * is the rank the pick grants, `maxRank` the cap it counts towards — absent on
+ * a passive that never caps, and on every active and relic.
  */
 export interface OfferCard {
-  kind: 'active' | 'passive';
+  kind: 'active' | 'passive' | 'relic';
   id: string;
   name: string;
   description: string;
@@ -66,13 +68,14 @@ const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v
 export function isOfferCard(data: unknown): data is OfferCard {
   if (typeof data !== 'object' || data === null) return false;
   const c = data as Record<string, unknown>;
-  if (c.kind !== 'active' && c.kind !== 'passive') return false;
+  if (c.kind !== 'active' && c.kind !== 'passive' && c.kind !== 'relic') return false;
   if (!isNonEmptyString(c.id) || !isNonEmptyString(c.name) || !isNonEmptyString(c.description)) {
     return false;
   }
   // An active carries no rank at all; a passive always ranks, and caps only
-  // when its config does.
+  // when its config does; a relic always ranks and never caps.
   if (c.kind === 'active') return c.rank === undefined && c.maxRank === undefined;
   if (!isPositiveInt(c.rank)) return false;
+  if (c.kind === 'relic') return c.maxRank === undefined;
   return c.maxRank === undefined || (isPositiveInt(c.maxRank) && c.rank <= c.maxRank);
 }

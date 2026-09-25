@@ -5,3 +5,5 @@ package-lock.json
 docs/
 playwright-report/
 test-results/
+# Machine-local, git-ignored, and rewritten by the Claude Code harness.
+.claude/settings.local.json

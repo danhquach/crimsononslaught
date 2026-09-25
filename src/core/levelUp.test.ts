@@ -88,6 +88,13 @@ describe('isOfferCard', () => {
     expect(isOfferCard(uncapped('passive_haste', 7))).toBe(true);
   });
 
+  it('accepts a relic, which always ranks and never caps (#227)', () => {
+    const relic: OfferCard = { ...uncapped('relic_hourglass', 2), kind: 'relic' };
+    expect(isOfferCard(relic)).toBe(true);
+    expect(isOfferCard({ ...relic, rank: undefined })).toBe(false);
+    expect(isOfferCard({ ...relic, maxRank: 5 })).toBe(false);
+  });
+
   it('accepts an active, which carries no rank at all', () => {
     expect(isOfferCard(active('fire_meteor'))).toBe(true);
     expect(isOfferCard({ ...active('fire_meteor'), rank: 1 })).toBe(false);

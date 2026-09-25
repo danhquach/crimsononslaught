@@ -10,6 +10,7 @@ import {
 } from '../config/loadout';
 import { UPGRADES } from '../config/meta';
 import { PASSIVES, passiveById, type PassiveId, type PlayerProfile } from '../config/passives';
+import { RELIC_BUFFS, relicBuffById, type RelicBuffId } from '../config/relics';
 import { resolveProfile, validatePassives } from './playerProfile';
 
 /**
@@ -44,6 +45,11 @@ export interface Loadout {
    * run's whole length; resolved with the passives in `profileOf`.
    */
   readonly upgrades: ReadonlyMap<string, number>;
+  /**
+   * Relic buff id -> ranks picked this run (#227). Uncapped; resolved with the
+   * upgrades and passives in `profileOf`.
+   */
+  readonly relics: ReadonlyMap<RelicBuffId, number>;
 }
 
 /** Why an equip was refused (spec §3.1, §3.2). */
@@ -68,6 +74,7 @@ export function buildLoadout(
     slots: [null, null],
     passives: new Map(),
     upgrades,
+    relics: new Map(),
   };
 }
 
@@ -161,6 +168,18 @@ export function takePassive(loadout: Loadout, passiveId: PassiveId): Loadout {
   return { ...loadout, passives };
 }
 
+/**
+ * Add one rank of a relic buff (#227), returning a new loadout. Buffs never cap
+ * their rank; an unknown id throws, since the relic offer only draws shipped
+ * buffs.
+ */
+export function takeRelic(loadout: Loadout, buffId: RelicBuffId): Loadout {
+  if (!relicBuffById(buffId)) throw new Error(`unknown relic buff "${buffId}"`);
+  const relics = new Map(loadout.relics);
+  relics.set(buffId, (relics.get(buffId) ?? 0) + 1);
+  return { ...loadout, relics };
+}
+
 /** What `validateLoadoutConfig` checks; each part defaults to the shipped config. */
 export interface LoadoutConfig {
   rosters?: Readonly<Record<ElementId, readonly string[]>>;
@@ -170,14 +189,16 @@ export interface LoadoutConfig {
 
 /**
  * The player profile this loadout resolves to (spec §4.2): the permanent
- * upgrades and the run's passives in one pass, so an upgrade's `mul` and a
- * passive's `mul` on the same field multiply like two passives would. Ids never
- * collide — upgrades are `upgrade_*`, passives `passive_*`.
+ * upgrades, the run's passives and its relic buffs (#227) in one pass, so an
+ * upgrade's `mul` and a passive's `mul` on the same field multiply like two
+ * passives would, and the clamps hold on the total. Ids never collide —
+ * upgrades are `upgrade_*`, passives `passive_*`, relic buffs `relic_*`.
  */
 export function profileOf(loadout: Loadout): PlayerProfile {
-  return resolveProfile(new Map([...loadout.upgrades, ...loadout.passives]), [
+  return resolveProfile(new Map([...loadout.upgrades, ...loadout.passives, ...loadout.relics]), [
     ...UPGRADES,
     ...PASSIVES,
+    ...RELIC_BUFFS,
   ]);
 }
 
@@ -185,15 +206,24 @@ export function profileOf(loadout: Loadout): PlayerProfile {
  * Boot-time check of the loadout config (spec §12). Returns one line per
  * problem and never throws, so a bad config logs and the game still starts:
  * every element's roster is led by its default spell and holds no spell another
- * element also claims, the slot unlock levels ascend, and the passive list
- * passes `validatePassives`. Tests pass their own config in `config`.
+ * element also claims, the slot unlock levels ascend, and the passive and relic
+ * buff lists pass `validatePassives`, each buff with a positive weight. Tests
+ * pass their own config in `config`.
  */
 export function validateLoadoutConfig(config: LoadoutConfig = {}): string[] {
   const rosters = config.rosters ?? SPELLS_BY_ELEMENT;
   const defaults = config.defaults ?? DEFAULT_SPELL_BY_ELEMENT;
   const unlockLevels = config.unlockLevels ?? SLOT_UNLOCK_LEVELS;
 
-  const problems: string[] = [...validatePassives()];
+  const problems: string[] = [
+    ...validatePassives(),
+    ...validatePassives(RELIC_BUFFS).map((p) => p.replace(/passive /, 'relic buff ')),
+  ];
+  for (const buff of RELIC_BUFFS) {
+    if (!Number.isFinite(buff.weight) || buff.weight <= 0) {
+      problems.push(`relic buff "${buff.id}": weight must be > 0, got ${buff.weight}`);
+    }
+  }
   const owner = new Map<string, ElementId>();
 
   for (const element of ELEMENTS) {

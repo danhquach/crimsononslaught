@@ -27,6 +27,9 @@ const BACKDROP_ALPHA = 0.65;
  * resumed and this scene stops. The HUD is a
  * separate parallel scene and stays visible throughout. A gamepad moves the
  * selection with the D-pad or left stick and picks with A.
+ *
+ * A relic's offer (#227) is the same overlay with relic cards and its own
+ * title, so every flow that answers a level-up answers a relic too.
  */
 export class LevelUpScene extends Phaser.Scene {
   private cards: readonly OfferCard[] = [];
@@ -56,16 +59,18 @@ export class LevelUpScene extends Phaser.Scene {
     // Full-screen backdrop; interactive so clicks never reach Game objects underneath.
     this.add.rectangle(0, 0, width, height, 0x000000, BACKDROP_ALPHA).setOrigin(0).setInteractive();
 
+    const relic = this.cards.every((card) => card.kind === 'relic');
     this.add
-      .text(width / 2, 70, 'Level up!', {
+      .text(width / 2, 70, relic ? 'Relic found!' : 'Level up!', {
         fontFamily: 'Georgia, serif',
         fontSize: '48px',
         color: '#dc143c',
       })
       .setOrigin(0.5);
     const keys = this.cards.length === 1 ? '1' : `1–${this.cards.length}`;
+    const choose = relic ? 'Choose a buff for the rest of the run' : 'Choose an upgrade';
     this.add
-      .text(width / 2, 118, `Choose an upgrade  ·  click a card, press ${keys}, or use a gamepad`, {
+      .text(width / 2, 118, `${choose}  ·  click a card, press ${keys}, or use a gamepad`, {
         fontFamily: 'Georgia, serif',
         fontSize: '18px',
         color: '#cccccc',
@@ -114,7 +119,7 @@ export class LevelUpScene extends Phaser.Scene {
       color: '#ffffff',
       wordWrap: { width: innerWidth },
     });
-    const kind = this.add.text(left, top + 92, card.kind === 'active' ? 'New spell' : 'Passive', {
+    const kind = this.add.text(left, top + 92, KIND_LABEL[card.kind], {
       fontFamily: 'monospace',
       fontSize: '13px',
       color: accentOf(card),
@@ -162,7 +167,13 @@ export class LevelUpScene extends Phaser.Scene {
   }
 }
 
-/** `Rank 2/5`, `Rank 2` for a passive that never caps, nothing for a spell. */
+const KIND_LABEL: Readonly<Record<OfferCard['kind'], string>> = {
+  active: 'New spell',
+  passive: 'Passive',
+  relic: 'Relic',
+};
+
+/** `Rank 2/5`, `Rank 2` for a passive or relic that never caps, nothing for a spell. */
 function rankLabel(card: OfferCard): string {
   if (card.rank === undefined) return '';
   return card.maxRank === undefined ? `Rank ${card.rank}` : `Rank ${card.rank}/${card.maxRank}`;

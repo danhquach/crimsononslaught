@@ -23,6 +23,7 @@ import {
   type OfferCard,
 } from '../core/levelUp';
 import { levelUpOffer, type ActiveCard } from '../core/levelUpOffer';
+import { relicOffer } from '../core/relicOffer';
 import { PLAYER_EVENT } from '../core/health';
 import {
   PICKUP_EVENT,
@@ -70,6 +71,7 @@ import {
   passiveById,
   type PlayerProfile,
 } from '../config/passives';
+import { isRelicBuffId } from '../config/relics';
 import { AREA_CARDS, AREA_SPELL_IDS, BASE_AREA_STATS, isAreaSpellId } from '../config/areas';
 import {
   BASE_STRIKE_STATS,
@@ -230,6 +232,13 @@ const ARENA_STREAM = 'arena';
 const AREA_FX_STREAM = 'areaFx';
 
 /**
+ * Relic offers draw from a stream of their own (#227), not the pickup stream:
+ * that one also rolls every drop, so a relic's draw would move every drop after
+ * it. Here it moves nothing but the next relic's offer.
+ */
+const RELIC_OFFER_STREAM = 'relicOffers';
+
+/**
  * Where a death's Ember and consumable land, from the death spot, so neither
  * hides under the gem that lands on the spot itself. Well inside the pickup
  * radius, so walking over the gem takes them too.
@@ -288,6 +297,8 @@ export class GameScene extends Phaser.Scene {
   private critRng!: Rng;
   /** Drop rolls and relic placement only (#195); see `PICKUP_STREAM`. */
   private pickupRng!: Rng;
+  /** Relic offers only (#227); see `RELIC_OFFER_STREAM`. */
+  private relicRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -297,6 +308,8 @@ export class GameScene extends Phaser.Scene {
   private collisions!: CollisionSystem;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
   private pendingLevelUps = 0;
+  /** Relics touched but not yet offered (#227); drained after the level-ups, one per frame. */
+  private pendingRelics = 0;
   /** The cards the open overlay is showing; a pick is only honoured against these. */
   private offer: readonly OfferCard[] = [];
   /** `?invulnerable=1` (test hook): contact damage is dropped before it reaches the player. */
@@ -584,6 +597,7 @@ export class GameScene extends Phaser.Scene {
     this.rng = createRng(seed);
     this.critRng = createRng(seed ^ CRIT_STREAM);
     this.pickupRng = createRng(deriveSeed(seed, PICKUP_STREAM));
+    this.relicRng = createRng(deriveSeed(seed, RELIC_OFFER_STREAM));
     this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -594,6 +608,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.disableUpdate();
     this.physics.world.fixedStep = false;
     this.pendingLevelUps = 0;
+    this.pendingRelics = 0;
     this.magnetMsLeft = 0;
     this.offer = [];
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
@@ -698,8 +713,9 @@ export class GameScene extends Phaser.Scene {
     // Spec §4 step 3: XP owed from the last pickup is paid before the run moves
     // on. Draining here rather than at pickup is what sequences several levels
     // from one gem: each overlay pauses Game, and the next update after it
-    // closes opens the following one.
-    if (this.drainLevelUps()) return;
+    // closes opens the following one. A relic's offer (#227) queues behind
+    // them the same way, so one owed on the same frame is shown next, not lost.
+    if (this.drainLevelUps() || this.drainRelics()) return;
     for (const step of simulationSteps(this.run.tick(delta))) {
       // The step that ends the run (spec §4 step 4) is the frame's last: Result
       // is queued, and nothing after it should move or land a second outcome.
@@ -1177,9 +1193,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * #195: an Ember is banked into the run on touch, and a relic is only
-   * counted and announced, since its effect is a later ticket's. A consumable
-   * takes effect (#128).
+   * #195: an Ember is banked into the run on touch. A consumable takes effect
+   * (#128), and a relic queues its offer (#227).
    */
   private onPickup(pickup: Pickup): void {
     const collected = this.pickups.collect(pickup);
@@ -1235,9 +1250,14 @@ export class GameScene extends Phaser.Scene {
     return bombTargets(this.enemies.live, this.cameras.main.worldView, (e) => e instanceof Boss);
   }
 
-  /** #195 stub: a later ticket gives relics their effect. */
+  /**
+   * #195's count and announcement, then the relic's offer (#227). The offer is
+   * only queued: this runs inside the overlap callback, mid-step, and `update`
+   * opens it before the next step.
+   */
   private onRelic(): void {
     this.events.emit(PICKUP_EVENT.relic, { relics: this.run.recordRelic() });
+    this.pendingRelics += 1;
   }
 
   /**
@@ -1471,6 +1491,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * #227: offer the relics owed, one overlay at a time, like `drainLevelUps`.
+   * Returns true when one opened — Game is paused and this frame is over. A
+   * relic with no buff left to offer (all at their caps) passes silently.
+   */
+  private drainRelics(): boolean {
+    while (this.pendingRelics > 0) {
+      this.pendingRelics -= 1;
+      if (this.openRelicOffer()) return true;
+    }
+    return false;
+  }
+
+  /** #227: pause and offer up to 3 relic buffs on the level-up overlay. */
+  private openRelicOffer(): boolean {
+    const cards = relicOffer(this.relicRng, {
+      ranks: this.spells.loadout.relics,
+      profile: this.spells.profile,
+    });
+    if (cards.length === 0) return false;
+    this.offer = cards;
+    const payload: LevelUpPayload = { offer: cards };
+    this.audio.play('progress.levelUp');
+    this.scene.pause();
+    this.scene.launch(SCENE.levelUp, payload);
+    return true;
+  }
+
+  /**
    * Take the pick the overlay sent. Only a card from the offer that is still
    * open counts, so a stray or out-of-date pick is logged and dropped rather
    * than granting something this run was never shown.
@@ -1482,10 +1530,15 @@ export class GameScene extends Phaser.Scene {
       console.warn(`[Game] ignoring pick of unoffered card "${offerId}"`);
       return;
     }
+    if (card.kind === 'relic') {
+      if (this.takeRelic(card.id)) this.audio.play('progress.perk');
+      return;
+    }
     const taken = card.kind === 'active' ? this.equipActive(card.id) : this.takePassive(card.id);
     if (!taken) return;
     this.audio.play('progress.perk');
     // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
+    // Relic buffs stay out of it: Result lists perks as the passives taken.
     this.run.recordPerk(card.name);
   }
 
@@ -1508,6 +1561,19 @@ export class GameScene extends Phaser.Scene {
     if (!isPassiveId(passiveId)) return false;
     const before = this.spells.profile;
     this.spells.takePassive(passiveId);
+    this.syncPlayerStats(before);
+    return true;
+  }
+
+  /**
+   * A picked relic buff (#227) lands on the loadout like a passive rank, and
+   * reaches the spells and the player the same way — Bloodstone's heal
+   * included.
+   */
+  private takeRelic(buffId: string): boolean {
+    if (!isRelicBuffId(buffId)) return false;
+    const before = this.spells.profile;
+    this.spells.takeRelic(buffId);
     this.syncPlayerStats(before);
     return true;
   }
