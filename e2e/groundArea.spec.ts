@@ -224,6 +224,7 @@ test('an earthquake staggers what stands in it, never slows it, and leaves its c
   // Each tint is read with its status in the one `areaReport` (#198), so a
   // stagger that ends between two reads cannot pair with a later tint.
   const tints: Report['tints'] = [];
+  let staggers = 0;
   const until = Date.now() + WALL_CAP_MS;
   let runMs = 0;
   while (runMs < QUAKE_RUN_MS && Date.now() < until) {
@@ -231,6 +232,7 @@ test('an earthquake staggers what stands in it, never slows it, and leaves its c
     const current = await sample(page);
     if (!current) break;
     tints.push(...current.tints);
+    staggers = current.staggers;
     runMs = (await readHud(page)).elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
@@ -240,11 +242,11 @@ test('an earthquake staggers what stands in it, never slows it, and leaves its c
     tints.filter((e) => e.slowed),
     'slowed enemies',
   ).toEqual([]);
+  // Counted where the tick applies it, so only enemies inside a quake. A poll
+  // rarely catches a 0.2 s stagger in an 80-radius patch: main CI saw an enemy
+  // in a patch 5 times in 26 polls, and none of them staggered.
+  expect(staggers, 'staggers applied inside a quake').toBeGreaterThan(0);
   const staggered = tints.filter((e) => e.staggered);
-  expect(
-    staggered.filter((e) => e.inPatch).length,
-    'staggered enemies inside a quake',
-  ).toBeGreaterThan(0);
   // A stagger has no tint of its own: the overlay marks it. A stun and the
   // hit flash fill the sprite for their own reasons, so those are left out.
   for (const enemy of staggered.filter((e) => !e.stunned && !e.flashing)) {

@@ -46,6 +46,8 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
   private patches = 0;
   /** Test hook (#135): enemy-ticks its patches have paid out, across every cast. */
   private ticked = 0;
+  /** Test hook (#235): staggers its ticks have applied, each to an enemy inside a patch. */
+  private staggered = 0;
 
   constructor(
     id: AreaSpellId,
@@ -72,6 +74,14 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
   /** Enemy-ticks paid out so far: one per enemy per tick of every patch. */
   get hits(): number {
     return this.ticked;
+  }
+
+  /**
+   * Staggers applied so far. A 0.2 s stagger is gone before most polls land,
+   * so the browser suite counts them here rather than sampling enemies.
+   */
+  get staggers(): number {
+    return this.staggered;
   }
 
   /** The live block, as the ground-area stats this id resolves to. */
@@ -131,7 +141,10 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
       if (!enemy.active) continue;
       this.ticked += 1;
       if (slowPct > 0) enemy.applyFrost({ slowPct, slowDuration, freeze: false });
-      if (staggerS > 0) enemy.applyStagger(staggerS);
+      if (staggerS > 0) {
+        enemy.applyStagger(staggerS);
+        this.staggered += 1;
+      }
       this.damage(enemy, tickDamage, 'tick');
     }
   }
