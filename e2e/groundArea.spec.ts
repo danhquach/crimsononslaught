@@ -38,6 +38,9 @@ const RUN_MS = 100_000;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
+/** The frame sweep for a slowed enemy: in chunks, a level-up answered between them. */
+const SWEEP_CHUNK_MS = 1_000;
+const SWEEP_CAP_MS = 10_000;
 /** The quake-only run: long enough for three casts on a 14 s cooldown. */
 const QUAKE_RUN_MS = 150_000;
 
@@ -57,6 +60,30 @@ function sample(page: Page): Promise<Report | null> {
     if (!game.scene.isActive(scene.game) && !game.scene.isPaused(scene.game)) return null;
     return (game.scene.getScene(scene.game) as GameScene).areaReport;
   }, SCENE);
+}
+
+/**
+ * The slowed enemies of every frame for up to `ms` of wall clock, stopping at
+ * the first frame that has any. A poll lands every few seconds of a scaled run
+ * and a 1 s slow is gone between most of them (#235); reading each frame from
+ * inside the page does not miss it. A paused Game adds nothing.
+ */
+function sweepSlowed(page: Page, ms: number): Promise<Report['tints']> {
+  return page.evaluate(
+    async ({ scene, ms }) => {
+      const { game } = await import('/src/main.ts');
+      const gameScene = game.scene.getScene(scene.game) as GameScene;
+      const end = performance.now() + ms;
+      while (performance.now() < end) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        if (!game.scene.isActive(scene.game)) continue;
+        const slowed = gameScene.areaReport.tints.filter((e) => e.slowed);
+        if (slowed.length > 0) return slowed;
+      }
+      return [];
+    },
+    { scene: SCENE, ms },
+  );
 }
 
 /** Answer any level-up overlay with its first card, so the run never sits paused. */
@@ -170,12 +197,18 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
 
   // #219: a slowed enemy keeps its own colours under a light tint, whichever
   // spell slowed it; only a freeze paints it solid. The hit flash and a stun
-  // fill it for their own reasons, so those samples are left out. Ice Arrow
-  // and both areas slow, so a run holds many of these; the storm's own, at
-  // radius 80, are only a few, so every one is checked but none is required.
-  const chilled = trace.flatMap((report) =>
-    report.tints.filter((e) => e.slowed && !e.frozen && !e.stunned && !e.flashing),
-  );
+  // fill it for their own reasons, so those samples are left out. Only Ice
+  // Arrow and the storm slow since the quake staggers instead (#220), and the
+  // polls can miss every one (#235), so frames are swept until one is seen.
+  // The storm's own, at radius 80, are only a few, so none is required.
+  const isChilled = (e: Report['tints'][number]): boolean =>
+    e.slowed && !e.frozen && !e.stunned && !e.flashing;
+  const chilled = trace.flatMap((report) => report.tints.filter(isChilled));
+  const sweepUntil = Date.now() + SWEEP_CAP_MS;
+  while (chilled.length === 0 && Date.now() < sweepUntil) {
+    await answerLevelUp(page);
+    chilled.push(...(await sweepSlowed(page, SWEEP_CHUNK_MS)).filter(isChilled));
+  }
   expect(chilled.length, 'slowed enemies sampled').toBeGreaterThan(0);
   for (const enemy of chilled) {
     const where = enemy.inStorm ? 'in a storm' : 'outside a storm';
@@ -224,6 +257,7 @@ test('an earthquake staggers what stands in it, never slows it, and leaves its c
   // Each tint is read with its status in the one `areaReport` (#198), so a
   // stagger that ends between two reads cannot pair with a later tint.
   const tints: Report['tints'] = [];
+  let staggers = 0;
   const until = Date.now() + WALL_CAP_MS;
   let runMs = 0;
   while (runMs < QUAKE_RUN_MS && Date.now() < until) {
@@ -231,6 +265,7 @@ test('an earthquake staggers what stands in it, never slows it, and leaves its c
     const current = await sample(page);
     if (!current) break;
     tints.push(...current.tints);
+    staggers = current.staggers;
     runMs = (await readHud(page)).elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
@@ -240,11 +275,11 @@ test('an earthquake staggers what stands in it, never slows it, and leaves its c
     tints.filter((e) => e.slowed),
     'slowed enemies',
   ).toEqual([]);
+  // Counted where the tick applies it, so only enemies inside a quake. A poll
+  // rarely catches a 0.2 s stagger in an 80-radius patch: main CI saw an enemy
+  // in a patch 5 times in 26 polls, and none of them staggered.
+  expect(staggers, 'staggers applied inside a quake').toBeGreaterThan(0);
   const staggered = tints.filter((e) => e.staggered);
-  expect(
-    staggered.filter((e) => e.inPatch).length,
-    'staggered enemies inside a quake',
-  ).toBeGreaterThan(0);
   // A stagger has no tint of its own: the overlay marks it. A stun and the
   // hit flash fill the sprite for their own reasons, so those are left out.
   for (const enemy of staggered.filter((e) => !e.stunned && !e.flashing)) {

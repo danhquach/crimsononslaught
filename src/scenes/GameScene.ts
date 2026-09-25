@@ -193,8 +193,6 @@ const GRID_CELL = 200;
 /** How one live enemy is tinted right now (#219), and whether it stands in an ice storm. */
 export interface EnemyTintView {
   readonly inStorm: boolean;
-  /** Inside any live patch, storm or not (#220). */
-  readonly inPatch: boolean;
   readonly slowed: boolean;
   readonly staggered: boolean;
   readonly frozen: boolean;
@@ -397,12 +395,14 @@ export class GameScene extends Phaser.Scene {
    * same step as its status and marked when it stands in an ice storm, so the
    * suite can hold every slowed enemy — the storm's and any other spell's —
    * to a light tint that keeps its colours, and every staggered one (#220) to
-   * no tint at all.
+   * no tint at all. `staggers` counts every stagger a patch has applied, so
+   * the suite need not catch one of 0.2 s in a poll.
    */
   get areaReport(): {
     live: AreaView[];
     placed: number;
     hits: number;
+    staggers: number;
     tints: EnemyTintView[];
   } {
     const spells = this.spells.spells.filter(
@@ -411,16 +411,15 @@ export class GameScene extends Phaser.Scene {
     const views = [...this.areas.views];
     const storms = this.areas.areas.filter((_, i) => views[i]?.storm);
     const inside = new Set(storms.flatMap((area) => membersOf(area, this.enemies.live)));
-    const inPatch = new Set(this.areas.areas.flatMap((area) => membersOf(area, this.enemies.live)));
     return {
       live: views,
       placed: spells.reduce((total, spell) => total + spell.placed, 0),
       hits: spells.reduce((total, spell) => total + spell.hits, 0),
+      staggers: spells.reduce((total, spell) => total + spell.staggers, 0),
       tints: this.enemies.live
         .filter((enemy) => enemy.active && !enemy.isDying)
         .map((enemy) => ({
           inStorm: inside.has(enemy),
-          inPatch: inPatch.has(enemy),
           slowed: enemy.slowed,
           staggered: enemy.isStaggered,
           frozen: enemy.isFrozen,
