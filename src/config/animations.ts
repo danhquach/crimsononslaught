@@ -124,7 +124,9 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
 
   // Earth spell (CO-079).
   spec('earth.spin', 6, 12, LOOP),
-  spec('earth.impact', 5, 15, ONCE),
+  // Ember rock burst (CO-146): four frames, at 12 fps so it lasts as long as
+  // the five-frame burst it replaced.
+  spec('earth.impact', 4, 12, ONCE),
   spec('earth.dust', 5, 12, ONCE),
   // Earth Spike in flight (CO-138, #205): the stone shard drawn flying right,
   // its chips trailing; turned along its flight by `entities/Projectile.ts`.

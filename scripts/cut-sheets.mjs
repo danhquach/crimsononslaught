@@ -23,6 +23,8 @@ import { fileURLToPath } from 'node:url';
 import {
   alphaCell,
   blit,
+  capMagenta,
+  capMagentaIndices,
   centreBounds,
   clearOutside,
   cornerKey,
@@ -110,6 +112,8 @@ function cutSheet(sheet) {
   let counters = {};
 
   sheet.rowSpecs.forEach((rowSpec, row) => {
+    // A retired row: its art was redrawn on another sheet and is not cut.
+    if (rowSpec === null) return;
     const { frames, blanks, counters: next } = expandRow(sheet.key, rowSpec, sheet.cols, counters);
     counters = next;
 
@@ -130,6 +134,7 @@ function cutSheet(sheet) {
       const kept = trimBorderLines(img, cell, key, TOL_KEYED, TOL_SOLID);
       const local = { x: kept.x - cell.x, y: kept.y - cell.y, w: kept.w, h: kept.h };
       const keyed = clearOutside(keyCell(img, cell, key, TOL_KEYED, TOL_SOLID), local);
+      if (sheet.maxMagenta !== undefined) capMagenta(keyed, sheet.maxMagenta);
       return { cell, keyed, local };
     };
     const where = (col) => `${sheet.file} row ${row + 1} col ${col + 1}`;
@@ -230,6 +235,7 @@ function cutSheet(sheet) {
         artY: artY + pad,
         artW,
         artH,
+        maxMagenta: sheet.maxMagenta,
       });
     }
   }
@@ -260,6 +266,15 @@ function writePage(page, frames) {
   const atlas = { width, height, data: new Uint8ClampedArray(width * height * 4) };
   for (const p of placements) blit(atlas, p.image, p.x, p.y);
   const { palette, indices } = quantize(atlas, 256);
+  for (const p of placements.filter((p) => p.maxMagenta !== undefined)) {
+    capMagentaIndices(
+      atlas,
+      palette,
+      indices,
+      { x: p.x, y: p.y, w: p.width, h: p.height },
+      p.maxMagenta,
+    );
+  }
 
   // Measured on the page as it ships, the way a cell is measured: quantising
   // can lift a faint glow pixel over the art threshold, so a frame clear

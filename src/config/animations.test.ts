@@ -16,7 +16,10 @@ import sheetManifest from '../../docs/art/sheets/manifest.json';
 const manifest = sheetManifest as unknown as {
   sheets: {
     key: string;
-    rowSpecs: { anim: string; facing?: string; cols: [number, number]; centred?: boolean }[][];
+    /** `null` is a retired row, which the cutter skips. */
+    rowSpecs: (
+      { anim: string; facing?: string; cols: [number, number]; centred?: boolean }[] | null
+    )[];
   }[];
 };
 
@@ -25,7 +28,7 @@ function manifestCounts(): Map<string, number> {
   const counts = new Map<string, number>();
   for (const sheet of manifest.sheets) {
     for (const row of sheet.rowSpecs) {
-      for (const seg of row) {
+      for (const seg of row ?? []) {
         const name = `${sheet.key}.${seg.anim}${seg.facing ? `.${seg.facing}` : ''}`;
         counts.set(name, (counts.get(name) ?? 0) + (seg.cols[1] - seg.cols[0] + 1));
       }
@@ -189,7 +192,7 @@ function centredClips(): Set<string> {
   const clips = new Set<string>();
   for (const sheet of manifest.sheets) {
     for (const row of sheet.rowSpecs) {
-      for (const seg of row) {
+      for (const seg of row ?? []) {
         if (seg.centred) clips.add(`${sheet.key}.${seg.anim}${seg.facing ? `.${seg.facing}` : ''}`);
       }
     }

@@ -22,7 +22,9 @@
     "            column range. Columns not covered by any segment are declared",
     "            blank and the cutter fails if it finds art there. When the same",
     "            anim+facing appears on a later row its frames continue numbering",
-    "            (the boss death runs across two rows).",
+    "            (the boss death runs across two rows). A row given as null is",
+    "            retired: its art was redrawn on another sheet and it is not cut",
+    "            or checked at all (CO-079's spin and impact rows, redrawn as CO-146).",
     "allowEdge   sides on which this row's art is deliberately cut off by the",
     "            sheet border, relaxing the 'bbox touches the cell edge' check on",
     "            those sides only. Two rows need it and both are intentional: the",
@@ -57,7 +59,18 @@
     "            at the cell corner) and no edge-overrun check (the art runs off",
     "            every edge on purpose). Keep sheetCell a multiple of 4 so the",
     "            downscale lands on whole source pixels and the tile stays",
-    "            seamless."
+    "            seamless.",
+    "",
+    "maxMagenta  a colour-keyed sheet only. After keying, any visible pixel",
+    "            whose red and blue both stand more than this above its green",
+    "            has the excess taken off both, so it keeps its alpha and its",
+    "            darkness but loses the purple. It is for the dark purple rim",
+    "            left where an outline was antialiased onto the magenta key:",
+    "            too far from the key to be keyed out, so despill never sees it.",
+    "            Off by default, because plenty of art is purple on purpose.",
+    "            The CO-079 boulder needs it (CO-146): its stone carries under",
+    "            20 of excess and its fringe 30 or more, so 20 clears the one",
+    "            and leaves the other."
   ],
   "sheets": [
     {
@@ -834,25 +847,10 @@
       "cols": 6,
       "rows": 3,
       "sheetCell": 128,
+      "maxMagenta": 20,
       "rowSpecs": [
-        [
-          {
-            "anim": "spin",
-            "cols": [
-              1,
-              6
-            ]
-          }
-        ],
-        [
-          {
-            "anim": "impact",
-            "cols": [
-              1,
-              5
-            ]
-          }
-        ],
+        null,
+        null,
         [
           {
             "anim": "dust",
@@ -863,6 +861,26 @@
           }
         ]
       ]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-146",
+      "file": "CO-146/earth_boulder_spin.png",
+      "cols": 6,
+      "rows": 1,
+      "sheetCell": 236,
+      "maxMagenta": 20,
+      "rowSpecs": [[{ "anim": "spin", "cols": [1, 6] }]]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-146",
+      "file": "CO-146/earth_impact.png",
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 256,
+      "maxMagenta": 20,
+      "rowSpecs": [[{ "anim": "impact", "cols": [1, 4] }]]
     },
     {
       "key": "fire",
