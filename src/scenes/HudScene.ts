@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
+import { FRAMES, type FrameName } from '../config/frames';
 import { CURRENCY_NAME } from '../config/meta';
+import { artFrame } from '../core/animation';
 import {
   INITIAL_HUD,
   applyRunEvent,
@@ -16,6 +18,7 @@ import {
 } from '../core/hudModel';
 import { onRunEvents, type RunEvent } from '../core/runEvents';
 import { SCENE } from '../core/scenePayloads';
+import { hasIconArt } from '../render/spellIcon';
 
 const MARGIN = 16;
 const BAR_WIDTH = 240;
@@ -44,6 +47,12 @@ const SLOT_PITCH_X = 72;
 const SLOT_PITCH_Y = 62;
 const SLOT_PER_ROW = 6;
 const SLOT_EMPTY_COLOR = 0x555555;
+/**
+ * CO-154: the icon art's disc, drawn inside the ring so the ring (brighter when
+ * ready) still shows round it. The silhouette sits in the middle ~23 px, clear
+ * of the badge, whose nearest point is 15·√2 − 8 ≈ 13 px from the centre.
+ */
+const SLOT_ICON_SIZE = 32;
 const SLOT_WEDGE_ALPHA = 0.65;
 const SLOT_BADGE_RADIUS = 8;
 /**
@@ -146,16 +155,17 @@ function ensureSlotTextures(scene: Phaser.Scene): void {
 }
 
 /**
- * One slot icon (#213): the spell's icon in a circle — until icon art exists,
- * its colour and its initials — with the cooldown still to run drawn as a dark
- * wedge that shrinks clockwise from 12 o'clock, the whole seconds left in a
- * badge on the rim, and a short name underneath. Ready brightens the ring. An
+ * One slot icon (#213): the spell's icon art in a circle (CO-154) — or, with no
+ * art for it or no atlas, its colour and its initials — with the cooldown still
+ * to run drawn as a dark wedge that shrinks clockwise from 12 o'clock, the whole
+ * seconds left in a badge on the rim, and a short name underneath. Ready brightens the ring. An
  * open slot is an empty circle; a locked one is dashed, with a lock and the
  * level that opens it. Every part is a shape or an image whose properties
  * change; nothing is redrawn.
  */
 class SlotIcon {
   private readonly disc: Phaser.GameObjects.Arc;
+  private readonly icon: Phaser.GameObjects.Image;
   private readonly wedge: Phaser.GameObjects.Image;
   private readonly locked: Phaser.GameObjects.Image;
   private readonly glyph: Phaser.GameObjects.Text;
@@ -166,6 +176,8 @@ class SlotIcon {
   constructor(scene: Phaser.Scene) {
     ensureSlotTextures(scene);
     this.disc = scene.add.circle(0, 0, SLOT_RADIUS, 0x000000);
+    // Under the wedge, so a cooling spell's art darkens like the disc does.
+    this.icon = scene.add.image(0, 0, '__DEFAULT').setVisible(false);
     // Under the glyph: it darkens the disc but not the glyph, so the icon stays readable.
     this.wedge = scene.add.image(0, 0, wedgeKey(1)).setAlpha(SLOT_WEDGE_ALPHA);
     this.locked = scene.add.image(0, 0, SLOT_LOCKED_KEY);
@@ -180,6 +192,7 @@ class SlotIcon {
   /** Centre of the circle. */
   setPosition(x: number, y: number): void {
     this.disc.setPosition(x, y);
+    this.icon.setPosition(x, y);
     this.wedge.setPosition(x, y);
     this.locked.setPosition(x, y);
     this.glyph.setPosition(x, y);
@@ -190,8 +203,10 @@ class SlotIcon {
 
   set(row: Readonly<SlotRow>): void {
     const spell = row.kind === 'spell' ? row : null;
+    const art = spell?.icon && hasIconArt(this.icon.scene, spell.icon) ? spell.icon : null;
+    this.showIcon(art);
     this.label.setText(slotLabel(row));
-    this.glyph.setText(spell?.glyph ?? '');
+    this.glyph.setText(art ? '' : (spell?.glyph ?? ''));
     this.badge.setText(spell?.badge ?? '');
     this.badgeDisc.setVisible(spell?.badge != null);
     this.locked.setVisible(row.kind === 'locked');
@@ -202,7 +217,8 @@ class SlotIcon {
     if (step > 0) this.wedge.setTexture(wedgeKey(step));
 
     if (spell) {
-      this.disc.setFillStyle(spell.color, 1);
+      // Behind art the disc is only a dark backing; the art carries the colour.
+      this.disc.setFillStyle(art ? 0x000000 : spell.color, 1);
       this.disc.setStrokeStyle(spell.ready ? 3 : 2, spell.ready ? 0xffffff : 0x777777);
     } else {
       this.disc.setFillStyle(0x000000, 0.35);
@@ -210,6 +226,14 @@ class SlotIcon {
       if (row.kind === 'open') this.disc.setStrokeStyle(2, SLOT_EMPTY_COLOR);
       else this.disc.setStrokeStyle();
     }
+  }
+
+  /** Point the icon at `frame`'s art box, or hide it; unchanged frames are left alone. */
+  private showIcon(frame: FrameName | null): void {
+    this.icon.setVisible(frame !== null);
+    if (!frame || this.icon.frame.name === artFrame(frame)) return;
+    this.icon.setTexture(FRAMES[frame].page, artFrame(frame));
+    this.icon.setScale(SLOT_ICON_SIZE / Math.max(this.icon.width, this.icon.height));
   }
 }
 

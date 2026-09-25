@@ -1718,6 +1718,78 @@
         [{ "anim": "quakeRift", "cols": [1, 2], "centred": true }],
         [{ "anim": "quakeRift", "cols": [1, 2], "centred": true }]
       ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-154",
+      "file": "CO-154/icons_fire.png",
+      "page": 10,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "fire", "cols": [1, 1], "centred": true },
+          { "anim": "fire_meteor", "cols": [2, 2], "centred": true },
+          { "anim": "fire_column", "cols": [3, 3], "centred": true },
+          { "anim": "fire_companion", "cols": [4, 4], "centred": true },
+          { "anim": "fire_dragon", "cols": [5, 5], "centred": true }
+        ]
+      ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-154",
+      "file": "CO-154/icons_ice.png",
+      "page": 10,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "ice", "cols": [1, 1], "centred": true },
+          { "anim": "ice_nova_bomb", "cols": [2, 2], "centred": true },
+          { "anim": "ice_shield", "cols": [3, 3], "centred": true },
+          { "anim": "ice_companion", "cols": [4, 4], "centred": true },
+          { "anim": "ice_blizzard", "cols": [5, 5], "centred": true }
+        ]
+      ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-154",
+      "file": "CO-154/icons_lightning.png",
+      "page": 10,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "lightning", "cols": [1, 1], "centred": true },
+          { "anim": "lightning_chain", "cols": [2, 2], "centred": true },
+          { "anim": "lightning_tornado", "cols": [3, 3], "centred": true },
+          { "anim": "lightning_companion", "cols": [4, 4], "centred": true },
+          { "anim": "lightning_sword", "cols": [5, 5], "centred": true }
+        ]
+      ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-154",
+      "file": "CO-154/icons_earth.png",
+      "page": 10,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "earth", "cols": [1, 1], "centred": true },
+          { "anim": "earth_boulder", "cols": [2, 2], "centred": true },
+          { "anim": "earth_shield", "cols": [3, 3], "centred": true },
+          { "anim": "earth_quake", "cols": [4, 4], "centred": true },
+          { "anim": "earth_companion", "cols": [5, 5], "centred": true }
+        ]
+      ]
     }
   ]
 }

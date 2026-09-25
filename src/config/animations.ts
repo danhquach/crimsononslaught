@@ -12,6 +12,7 @@
 
 import type { TextureKey } from './colors';
 import type { FrameName } from './frames';
+import { ROSTER_SPELL_IDS } from './loadout';
 
 export interface AnimationSpec {
   /** Animation key, matching the frame prefix, e.g. `hero.walk.down`. */
@@ -241,6 +242,10 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('arena.column', 1, 1, ONCE),
   spec('arena.gravestone', 1, 1, ONCE),
   spec('arena.bush', 1, 1, ONCE),
+
+  // HUD slot icons (CO-154): one still per roster spell, drawn by HudScene
+  // straight from the atlas, never played.
+  ...ROSTER_SPELL_IDS.map((id) => spec(`icon.${id}`, 1, 1, ONCE)),
 ];
 
 /**

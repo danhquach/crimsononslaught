@@ -1,4 +1,6 @@
+import type { FrameName } from '../config/frames';
 import { SLOT_UNLOCK_LEVELS } from '../config/loadout';
+import { spellIconFrame } from '../config/spellIcons';
 import type { LoadoutPassiveView, LoadoutSpellView, RunEvent, RunPhase } from './runEvents';
 
 /**
@@ -40,7 +42,9 @@ export type SlotRow =
       name: string;
       /** The name cut to fit under the icon. */
       label: string;
-      /** Stands in for icon art until it exists: the name's initials. */
+      /** The icon art (CO-154), `null` for a spell with none yet. */
+      icon: FrameName | null;
+      /** Stands in for `icon` when there is none, or no atlas: the name's initials. */
       glyph: string;
       color: number;
       ready: boolean;
@@ -108,12 +112,13 @@ export function applyRunEvent(model: Readonly<HudModel>, event: RunEvent): HudMo
  * gets an icon for each.
  */
 export function slotRows(model: Readonly<HudModel>): SlotRow[] {
-  const rows: SlotRow[] = model.spells.map(({ name, color, progress, secondsLeft }) => {
+  const rows: SlotRow[] = model.spells.map(({ id, name, color, progress, secondsLeft }) => {
     const waiting = progress === null ? 0 : 1 - fraction(progress, 1);
     return {
       kind: 'spell',
       name,
       label: shortSpellName(name),
+      icon: spellIconFrame(id) ?? null,
       glyph: spellGlyph(name),
       color,
       ready: waiting === 0,
