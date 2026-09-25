@@ -890,10 +890,13 @@ export class GameScene extends Phaser.Scene {
         );
       case 'earth':
         return new EarthSpikeSpell(
+          this,
           this.player,
           this.enemies,
+          this.collisions,
           stats as Readonly<EarthStats>,
           damage,
+          this.rng,
           this.fx,
         );
       case 'earth_boulder':

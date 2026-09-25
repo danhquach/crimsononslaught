@@ -21,6 +21,7 @@ export const TEXTURE_KEYS = [
   'boulder',
   'companion',
   'proj_ice',
+  'proj_spike',
   'shield_ice',
   'fx_area',
   'fx_telegraph',
@@ -67,6 +68,10 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // today, so the second element to shoot needs a look of its own or its bolts
   // read as fireballs; the sheet itself is #145.
   proj_ice: { shape: 'diamond', color: 0x80d8ff, width: 12, height: 12 },
+  // #205: Earth Spike in flight — a long stone diamond, so it reads as a shot
+  // and never as the round `boulder` disc. With the atlas it plays `earth.fly`
+  // (CO-138); the body stays this disc's circle, round the shard's middle.
+  proj_spike: { shape: 'diamond', color: 0xa1887f, width: 16, height: 8 },
   // #134: the Ice Shield's layer, drawn around the player. A ring rather
   // than a disc so the hero is still visible through it; its own art is #145.
   shield_ice: { shape: 'ring', color: 0xb3e5fc, width: 44, height: 44, thickness: 3 },

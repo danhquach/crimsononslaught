@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { EARTH_ROSTER_SPELL_IDS } from '../src/config/earthRoster';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
+import { MAX_LIVE_SPIKES } from '../src/core/earthSpike';
 import { MAX_LIVE_BOULDERS } from '../src/core/rollingBoulder';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
@@ -53,12 +54,9 @@ const SAMPLE_MS = 100;
 /** The floor the frame rate must hold at, the same one the other roster suites use. */
 const MIN_FPS = 20;
 
-/**
- * What `live` counts for each spell, and the cap it may never pass. The spike
- * is instantaneous and puts no body in the world, so its cap is 0.
- */
+/** What `live` counts for each spell — its projectiles in the air — and the cap it may never pass. */
 const CAPS: Readonly<Record<string, number>> = {
-  earth: 0,
+  earth: MAX_LIVE_SPIKES,
   earth_boulder: MAX_LIVE_BOULDERS,
 };
 

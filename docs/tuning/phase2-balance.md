@@ -271,7 +271,7 @@ would be the natural follow-up.
 | `waves.ts` | spawns/s, waves 3–5 | 3.5 / 4.5 / 5 | **3 / 3.5 / 4** | Every run died 3:00–4:30 as the crowd climbed to the 300 cap; the single biggest survival lever |
 | `boss.ts` | `hp` | 1500 | **2400** | Three actives and an uncapped passive stack out-damage one spell and a 7-node tree; holds the fight in 45–90 s |
 | `spells.ts` | Fire Bolt `aoeRadius` | 50 | **65** | Crowd reach for Fire, which has no crowd control; worth little against a lone boss |
-| `spells.ts` | Earth Spike `radius` | 40 | **55** | Same, for Earth |
+| `spells.ts` | Earth Spike `radius` | 40 | **55** | Same, for Earth. Superseded by #205: the spike is a flying single-target shot with no `radius` |
 | `strikes.ts` | Meteor `cooldown` / `aoeRadius` | 4.0 / 110 | **3.2 / 130** | Fire's crowd wipe; took Fire from 2/5 to 3/5 |
 | `fireRoster.ts` | Fire Column `cooldown` / `radius` / `burn` | 3.0 / 40 / 6 | **2.2 / 55 / 8** | Fire's only wide repeatable tool |
 | `earthRoster.ts` | Boulder `pierce` | 3 | **5** | Pure crowd value — pierce does nothing against one target |
@@ -384,3 +384,38 @@ What the runs say:
   consumable is a given, not a relief.
 - **No tuning change.** If the drop rate is ever raised, re-run this sweep
   first; health and the bomb together are then enough to carry a run.
+
+---
+
+# Earth Spike as a flying shot (#205, 2026-09-25)
+
+#205 turned Earth Spike from an instant eruption under the target, which hit
+every enemy within 55 px for a 70 px shove and always bled, into a slow shot:
+260 px/s over its 144 px range, stopping at the first enemy it touches
+(`pierce` 1), a 25 px shove and a 5% bleed chance per hit. Damage (16) and
+cooldown (1.1 s) are unchanged. The ticket asked for Earth's boss time to be
+re-checked after the change, with `damage` as the lever if Earth fell short.
+
+**Method.** The CO-125 bot adapted for the 20-minute run (boss at 20:00,
+TTK = win time − 20:00, the Intro screen answered first), kit-first picks,
+seeds 1–5, `timeScale=4`. The branch and `main` (bfe1b4f) each ran from their
+own worktree on their own port, two runs at a time. The `main` mortal row is the
+#175 re-measure on 8a16e15; Earth's kit is the same on both commits.
+
+| Build | Mode | Survived (seeds 1–5) | Reached boss | Boss TTK | mean |
+|---|---|---|---|---|---|
+| branch | mortal | 20:02 · 20:42 · 21:28 · 20:36 · 20:41 | 5 / 5 | — · 42 · 88 · 37 · 42 s | 52 |
+| main (8a16e15) | mortal | 20:44 · 21:07 · 16:29 · 20:54 · 20:47 | 4 / 5 | 44 · 68 · — · 54 · 48 s | 54 |
+| branch | invulnerable | all won | 5 / 5 | 75 · 31 · 44 · 45 · 43 s | 47.6 |
+| main | invulnerable | all won | 5 / 5 | 52 · 48 · 32 · 60 · 45 s | 47.4 |
+
+Seed 1 on the branch reached the boss and died two seconds into the fight.
+
+- **Earth did not get weaker where it counts.** It still reaches the boss on
+  every seed, and the boss time is unchanged to within the noise (invulnerable
+  mean 47.6 s against 47.4 s). By 20:00 an Earth run is level 34–50 with
+  Boulder, Earthquake and the passives stacked, so the default is a small part
+  of the fight, and it was never Earth's crowd clear either.
+- **No tuning change.** `damage` stays 16. Both builds show one invulnerable
+  run near 31–32 s. That is #210's 20-minute boss floor question, not this
+  spell's.

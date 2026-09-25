@@ -19,6 +19,8 @@ const SPEC_KEYS = [
   // colour on day one; the companions' own sheets land with #146.
   'companion',
   'proj_ice',
+  // #205: Earth Spike's shot, apart from Boulder's disc.
+  'proj_spike',
   'shield_ice',
   'fx_area',
   'fx_telegraph',

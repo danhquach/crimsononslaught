@@ -1,5 +1,85 @@
 {
   "frames": {
+    "earth.fly.0": {
+      "frame": {
+        "x": 197,
+        "y": 1,
+        "w": 47,
+        "h": 15
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 47,
+        "h": 15
+      },
+      "sourceSize": {
+        "w": 47,
+        "h": 15
+      }
+    },
+    "earth.fly.1": {
+      "frame": {
+        "x": 245,
+        "y": 1,
+        "w": 47,
+        "h": 15
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 47,
+        "h": 15
+      },
+      "sourceSize": {
+        "w": 47,
+        "h": 15
+      }
+    },
+    "earth.fly.2": {
+      "frame": {
+        "x": 293,
+        "y": 1,
+        "w": 47,
+        "h": 15
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 47,
+        "h": 15
+      },
+      "sourceSize": {
+        "w": 47,
+        "h": 15
+      }
+    },
+    "earth.fly.3": {
+      "frame": {
+        "x": 341,
+        "y": 1,
+        "w": 47,
+        "h": 15
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 47,
+        "h": 15
+      },
+      "sourceSize": {
+        "w": 47,
+        "h": 15
+      }
+    },
     "ice.stormShard.0": {
       "frame": {
         "x": 1,
@@ -82,7 +162,7 @@
     },
     "ice.stormSleet.0": {
       "frame": {
-        "x": 197,
+        "x": 389,
         "y": 1,
         "w": 54,
         "h": 12
@@ -102,7 +182,7 @@
     },
     "ice.stormSleet.1": {
       "frame": {
-        "x": 252,
+        "x": 444,
         "y": 1,
         "w": 54,
         "h": 12
@@ -122,7 +202,7 @@
     },
     "ice.stormSleet.2": {
       "frame": {
-        "x": 307,
+        "x": 499,
         "y": 1,
         "w": 54,
         "h": 12
@@ -142,7 +222,7 @@
     },
     "ice.stormSleet.3": {
       "frame": {
-        "x": 362,
+        "x": 554,
         "y": 1,
         "w": 54,
         "h": 12
@@ -165,7 +245,7 @@
     "app": "scripts/cut-sheets.mjs",
     "format": "RGBA8888",
     "size": {
-      "w": 512,
+      "w": 1024,
       "h": 64
     },
     "scale": "1"

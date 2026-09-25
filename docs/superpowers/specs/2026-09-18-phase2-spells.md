@@ -227,7 +227,7 @@ category decides which profile multiplier reaches it.
 | area | `areaMul` | `aoeRadius`, `radius`, `breakRadius`, `chainRange`, `orbitRadius`, `leashRadius`, `targetRange`, `range`, `size`, `pullRadius` |
 | speed | `projectileSpeedMul` | `speed`, `orbitSpeed`, `chaseSpeed` (companions) |
 | duration | `durationMul` | `duration`, `burnDuration`, `bleedDuration`, `slowDuration`, `freezeDuration`, `stunDuration`, `staggerDuration` |
-| unscaled | — | counts (`projectiles`, `strikes`, `chains`, `count`, `pierce`), fractions (`slowPct`, `freezeChance`, `stunChance`, `chainFalloff`, `aoeDamageFactor`), `knockback`, `pullForce`, `homingTurnRate`, `hitCooldown`, `tickRate`, `shieldHp` |
+| unscaled | — | counts (`projectiles`, `strikes`, `chains`, `count`, `pierce`), fractions (`slowPct`, `freezeChance`, `stunChance`, `bleedChance`, `chainFalloff`, `aoeDamageFactor`), `knockback`, `pullForce`, `homingTurnRate`, `hitCooldown`, `tickRate`, `shieldHp` |
 
 Counts stay unscaled on purpose: a global "+12% area" that silently became
 "+12% boulders" would round to nothing on a 3-boulder ring and to a lot on a
@@ -590,7 +590,7 @@ stagger refreshes the timer.
 
 | Spell | id | Behaviour | Needs |
 |---|---|---|---|
-| Earth Spike (default) | `earth` | Spike erupts under a nearby enemy, knocks back, applies bleed | #139 |
+| Earth Spike (default) | `earth` | Slow stone spike flung at the nearest enemy; strikes the first enemy it touches (`pierce` 1), a light shove, a 5% bleed chance per hit; can miss and flies on to its range (#205) | #139 |
 | Boulder | `earth_boulder` | Heavy rolling boulder, big damage and knockback, passes through a few enemies | — |
 | Earth Shield | `earth_shield` | Stones circle the player, knock back, have their own HP and return after a cooldown | #134 |
 | Earthquake | `earth_quake` | Ground area, continuous damage and slow, long cooldown | #135 |
@@ -604,13 +604,13 @@ stagger refreshes the timer.
 | `damage` | 16 | 40 | 10 | — | 14 |
 | `tickDamage` | — | — | — | 8 | — |
 | `tickRate` | — | — | — | 0.5 | — |
-| `radius` | 55 | 36 | — | 180 | — |
-| `speed` | — | 280 | — | — | — |
+| `radius` | — | 36 | — | 180 | — |
+| `speed` | 260 | 280 | — | — | — |
 | `chaseSpeed` | — | — | — | — | 200 |
-| `range` | — | 207 | — | — | — |
-| `targetRange` | 144 | — | — | 162 | 200 |
+| `range` | 144 | 207 | — | — | — |
+| `targetRange` | — | — | — | 162 | 200 |
 | `leashRadius` | — | — | — | — | 200 |
-| `pierce` | — | 5 | — | — | — |
+| `pierce` | 1 | 5 | — | — | — |
 | `count` | — | — | 3 | — | — |
 | `orbitRadius` | — | — | 80 | — | — |
 | `orbitSpeed` | — | — | 2.5 rad/s | — | — |
@@ -618,11 +618,12 @@ stagger refreshes the timer.
 | `hitCooldown` | — | — | 0.4 | — | — |
 | `shieldHp` | — | — | 80 | — | — |
 | `duration` | — | — | — | 6.0 | — |
-| `knockback` | 70 | 120 | 60 | — | 80 |
+| `knockback` | 25 | 120 | 60 | — | 80 |
 | `slowPct` | — | — | — | 0.35 | — |
 | `slowDuration` | — | — | — | 1.0 | — |
 | `bleed` | 4 | — | — | — | — |
 | `bleedDuration` | 3.0 | — | — | — | — |
+| `bleedChance` | 0.05 | — | — | — | — |
 
 Earthquake's `duration` and the slow its prose promises are not in the table
 above; `config/areas.ts` carries both as tuning values (8 s, 30% for 1 s) for

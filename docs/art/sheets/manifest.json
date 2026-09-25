@@ -1647,6 +1647,16 @@
       "rows": 1,
       "sheetCell": 320,
       "rowSpecs": [[{ "anim": "stormShard", "cols": [1, 4], "centred": true }]]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-138",
+      "file": "CO-138/earth_spike_fly.png",
+      "page": 9,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 304,
+      "rowSpecs": [[{ "anim": "fly", "cols": [1, 4] }]]
     }
   ]
 }
