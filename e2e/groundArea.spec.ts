@@ -38,6 +38,8 @@ const RUN_MS = 100_000;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
+/** The quake-only run: long enough for three casts on a 14 s cooldown. */
+const QUAKE_RUN_MS = 150_000;
 
 /**
  * The floor the frame rate must hold at with patches on the ground, the same
@@ -134,10 +136,14 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
     }
   }
 
-  // Neither draws a single clip under the ring: Ice Storm is layered (#219)
-  // and Earthquake, whose sheet has not landed, is the ring alone (#179).
+  // Ice Storm is layered (#219) and draws no single clip; Earthquake is its
+  // fissures with no ring (#220), spanning the radius that ticks (checked above).
   const clips = new Set(trace.flatMap((report) => report.live.map((area) => area.clip)));
-  expect([...clips], 'art the patches were drawn with').toEqual([null]);
+  expect([...clips].sort(), 'art the patches were drawn with').toEqual(['earth.quakeRift', null]);
+  const quakes = trace.flatMap((report) =>
+    report.live.filter((area) => area.clip === 'earth.quakeRift'),
+  );
+  for (const quake of quakes) expect(quake.ringShown, 'a quake hides the ring').toBe(false);
 
   // #219: Ice Storm is drawn as sleet over the crowd with no ring and no
   // drawn edge: every piece that can be seen is inside the radius that ticks,
@@ -196,6 +202,54 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
     arena?.fps,
     `fps with ${arena?.areas} patches over ${arena?.enemies} enemies`,
   ).toBeGreaterThan(MIN_FPS);
+
+  expect(errors).toEqual([]);
+});
+
+test('an earthquake staggers what stands in it, never slows it, and leaves its colours', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+
+  // Earth alone: level-ups offer only the run's own element (spec §7.1), and
+  // nothing on Earth slows or staggers but the quake, so any slow is a bug and
+  // every stagger is the quake's.
+  await page.goto(`/?seed=1&timeScale=10&invulnerable=1&loadout=earth_quake`);
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  const { x, y } = cardCenter(SPELL_IDS.indexOf('earth'));
+  await page.mouse.click(x, y);
+  await waitForScene(page, SCENE.game);
+
+  // Each tint is read with its status in the one `areaReport` (#198), so a
+  // stagger that ends between two reads cannot pair with a later tint.
+  const tints: Report['tints'] = [];
+  const until = Date.now() + WALL_CAP_MS;
+  let runMs = 0;
+  while (runMs < QUAKE_RUN_MS && Date.now() < until) {
+    await answerLevelUp(page);
+    const current = await sample(page);
+    if (!current) break;
+    tints.push(...current.tints);
+    runMs = (await readHud(page)).elapsedMs;
+    await page.waitForTimeout(SAMPLE_MS);
+  }
+  expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(QUAKE_RUN_MS);
+
+  expect(
+    tints.filter((e) => e.slowed),
+    'slowed enemies',
+  ).toEqual([]);
+  const staggered = tints.filter((e) => e.staggered);
+  expect(
+    staggered.filter((e) => e.inPatch).length,
+    'staggered enemies inside a quake',
+  ).toBeGreaterThan(0);
+  // A stagger has no tint of its own: the overlay marks it. A stun and the
+  // hit flash fill the sprite for their own reasons, so those are left out.
+  for (const enemy of staggered.filter((e) => !e.stunned && !e.flashing)) {
+    expect(enemy.tinted, 'a staggered enemy is not tinted').toBe(false);
+  }
 
   expect(errors).toEqual([]);
 });

@@ -50,20 +50,28 @@ describe('area stat blocks', () => {
     });
   });
 
+  // #220: radius 180 → 80, the slow swapped for a 0.2 s stagger each tick.
   it('carries the spec §9.5 numbers for Earthquake', () => {
-    // `duration` and the slow are this file's tuning values; the rest is §9.5.
-    expect(BASE_QUAKE_STATS).toMatchObject({
+    expect(BASE_QUAKE_STATS).toEqual({
       cooldown: 14,
       tickDamage: 8,
       tickRate: 0.5,
-      radius: 180,
+      radius: 80,
+      duration: 8,
       targetRange: 162,
+      staggerDuration: 0.2,
     });
   });
 
-  it('gives Earth the damage and Ice the crowd control', () => {
+  it('lets Ice slow and Earth stagger', () => {
+    expect(BASE_QUAKE_STATS.slowPct).toBeUndefined();
+    expect(BASE_QUAKE_STATS.staggerDuration).toBeGreaterThan(0);
+    expect(BASE_ICE_STORM_STATS.slowPct).toBeGreaterThan(0);
+    expect(BASE_ICE_STORM_STATS.staggerDuration).toBeUndefined();
+  });
+
+  it('gives Earth the damage', () => {
     expect(BASE_QUAKE_STATS.tickDamage).toBeGreaterThan(BASE_ICE_STORM_STATS.tickDamage);
-    expect(BASE_QUAKE_STATS.slowPct).toBeLessThan(BASE_ICE_STORM_STATS.slowPct);
     // Earth pays for its longer patch with a longer wait for it.
     expect(BASE_QUAKE_STATS.duration).toBeGreaterThan(BASE_ICE_STORM_STATS.duration);
     expect(BASE_QUAKE_STATS.cooldown).toBeGreaterThan(BASE_ICE_STORM_STATS.cooldown);
@@ -127,9 +135,11 @@ describe('area looks (#179)', () => {
     }
   });
 
-  it('draws Tornado with its art and Earthquake with the ring until its art lands', () => {
+  // #220: Earthquake's fissures are its whole look; Tornado's funnel keeps the ring.
+  it('draws Tornado over the ring and Earthquake as its fissures alone', () => {
     expect(TORNADO_LOOK.clip).toBe('lightning.tornado');
-    expect(AREA_LOOKS.earth_quake).toEqual({});
+    expect(TORNADO_LOOK.ringless).toBeUndefined();
+    expect(AREA_LOOKS.earth_quake).toEqual({ clip: 'earth.quakeRift', ringless: true });
   });
 });
 

@@ -57,13 +57,16 @@ export const BASE_CHAIN_LIGHTNING_STATS: Readonly<ChainLightningStats> = {
  */
 export const TORNADO_LOOK: AreaLook = { clip: 'lightning.tornado' };
 
-/** Spec §9.4 base block. */
+/**
+ * Spec §9.4 base block, the eye cut 110 → 60 and the pull 150 → 80 (#220): at
+ * the old size the funnel, drawn to fit the eye, covered the hero.
+ */
 export const BASE_TORNADO_STATS: Readonly<TornadoStats> = {
   cooldown: 9,
   tickDamage: 5,
   tickRate: 0.4,
-  radius: 110,
-  pullRadius: 150,
+  radius: 60,
+  pullRadius: 80,
   pullForce: 90,
   speed: 60,
   targetRange: 162,
@@ -118,7 +121,7 @@ export const LIGHTNING_ROSTER_CARDS: Readonly<Record<LightningRosterSpellId, Spe
     stats: [
       ['Cooldown', '9 s'],
       ['Damage', '5 every 0.4 s'],
-      ['Pull', '90 px/s within 150'],
+      ['Pull', '90 px/s within 80'],
       ['Lasts', '5 s'],
     ],
   },

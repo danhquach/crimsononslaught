@@ -1,5 +1,11 @@
 import { AREA_LOOKS, type AreaSpellId } from '../config/areas';
-import { createArea, densestSpot, membersOf, type GroundArea } from '../core/groundArea';
+import {
+  areaStaggerS,
+  createArea,
+  densestSpot,
+  membersOf,
+  type GroundArea,
+} from '../core/groundArea';
 import type { Vec2 } from '../core/input';
 import type { Rng } from '../core/rng';
 import { Spell, anyWithin } from '../core/spell';
@@ -10,13 +16,15 @@ import type { DamageSink } from './DamageSink';
 
 /**
  * A persistent ground area (#135, Phase 2 spec §9): Ice Storm and Earthquake.
- * One cast drops a patch on the crowd, and the patch keeps damaging and slowing
- * whatever stands in it until its duration runs out.
+ * One cast drops a patch on the crowd, and the patch keeps damaging whatever
+ * stands in it until its duration runs out: Ice Storm slowing it, Earthquake
+ * staggering it (#220).
  *
  * One class serves both and `config/areas.ts` decides which is which, the way
  * `CompanionSpell` serves all four allies: they differ only in the numbers —
- * Ice trades damage for the element's signature slow, Earth the other way — and
- * a subclass each would be two copies of this file.
+ * Ice trades damage for the element's signature slow, Earth trades the slow
+ * for damage and a stutter — and a subclass each would be two copies of this
+ * file.
  *
  * The rules are `core/groundArea.ts`'s and the patch on screen is
  * `systems/AreaPool.ts`'s; this class only chooses where a cast lands and what
@@ -86,13 +94,15 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
    * that asked for them.
    */
   protected cast(): void {
-    const { radius, duration, tickRate, targetRange, tickDamage, slowPct, slowDuration } =
-      this.areaStats;
+    const { radius, duration, tickRate, targetRange, tickDamage } = this.areaStats;
+    const slowPct = this.areaStats.slowPct ?? 0;
+    const slowDuration = this.areaStats.slowDuration ?? 0;
+    const staggerS = areaStaggerS(this.areaStats.staggerDuration ?? 0, tickRate);
     const at = densestSpot(this.caster, this.enemies.live, radius, targetRange, this.rng);
     const area = createArea(at, { radius, durationS: duration, tickEveryS: tickRate });
     const placed = this.areas.place(
       area,
-      (live) => this.applyTick(live, tickDamage, slowPct, slowDuration),
+      (live) => this.applyTick(live, tickDamage, slowPct, slowDuration, staggerS),
       {},
       AREA_LOOKS[this.id],
     );
@@ -100,24 +110,28 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
   }
 
   /**
-   * One tick of one patch: every enemy inside is chilled and then hit, in that
-   * order — the status-before-damage convention `CompanionSpell.onCompanionHit`
-   * follows, so a tick that kills has still applied its slow while the enemy
-   * was there to take it.
+   * One tick of one patch: every enemy inside is chilled or staggered and then
+   * hit, in that order — the status-before-damage convention
+   * `CompanionSpell.onCompanionHit` follows, so a tick that kills has still
+   * applied its status while the enemy was there to take it.
    *
    * Two patches overlapping tick independently (spec §9.3): the damage of each
-   * lands, and `applyFrost` keeps the stronger slow rather than summing them.
+   * lands, `applyFrost` keeps the stronger slow rather than summing them, and a
+   * stagger refreshes rather than stacks. `staggerS` is already capped under
+   * the tick interval (`areaStaggerS`), so no enemy is held through a tick.
    */
   private applyTick(
     area: Readonly<GroundArea>,
     tickDamage: number,
     slowPct: number,
     slowDuration: number,
+    staggerS: number,
   ): void {
     for (const enemy of membersOf(area, this.enemies.live)) {
       if (!enemy.active) continue;
       this.ticked += 1;
       if (slowPct > 0) enemy.applyFrost({ slowPct, slowDuration, freeze: false });
+      if (staggerS > 0) enemy.applyStagger(staggerS);
       this.damage(enemy, tickDamage, 'tick');
     }
   }

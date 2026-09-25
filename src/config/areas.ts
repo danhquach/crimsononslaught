@@ -11,16 +11,16 @@ import type { SpellCard } from './spells';
  * The mechanic is one class (`spells/GroundAreaSpell.ts`) over the rules in
  * `core/groundArea.ts`, so what separates Ice Storm from Earthquake is only the
  * row here: Ice buys the element's crowd control with a heavy slow, Earth buys
- * damage with a longer patch and a longer wait for it. Tornado (#136) is this
+ * damage with a longer patch and a longer wait for it, and staggers rather than
+ * slows (#220). Tornado (#136) is this
  * mechanic plus a drift and a pull and belongs to that ticket.
  *
  * Ice Storm's block is the spec's §9.3 table, its radius cut to 80 (#219).
- * Earthquake's §9.5 table
- * gives its cooldown, tick and radius but not its `duration` or the slow the
- * spec's prose promises it ("Earthquake slows instead" of carrying Earth's
- * knockback, §9.5), so those two are tuning values here: a patch that lives
- * longer than Ice Storm's on a longer cooldown, slowing by less than Ice's
- * signature 50%. #147's balance pass owns both numbers.
+ * Earthquake's §9.5 table gives its cooldown and tick but not its `duration`,
+ * which is a tuning value here: a patch that lives longer than Ice Storm's on a
+ * longer cooldown. #220 cut its radius to 80 and swapped the slow for a 0.2 s
+ * stagger each tick, so an earth patch no longer reads as an ice one. #147's
+ * balance pass owns the numbers.
  *
  * Pure data, no Phaser import.
  */
@@ -48,16 +48,18 @@ export const BASE_ICE_STORM_STATS: Readonly<GroundAreaStats> = {
   slowDuration: 1,
 };
 
-/** Spec §9.5 base block; `duration` and the slow are the tuning values noted above. */
+/**
+ * Spec §9.5 base block; `duration` is the tuning value noted above. No slow
+ * fields: a 0 slow with nothing to raise it is dead weight (spec §9.2).
+ */
 export const BASE_QUAKE_STATS: Readonly<GroundAreaStats> = {
   cooldown: 14,
   tickDamage: 8,
   tickRate: 0.5,
-  radius: 180,
+  radius: 80,
   duration: 8,
   targetRange: 162,
-  slowPct: 0.3,
-  slowDuration: 1,
+  staggerDuration: 0.2,
 };
 
 export const BASE_AREA_STATS = {
@@ -123,18 +125,22 @@ export interface StormLook {
  * new area spell brings its art without the pool changing.
  *
  * A `storm` look (#219) is drawn in place of the ring whenever its clips are
- * in the atlas; without the atlas the ring alone draws.
+ * in the atlas; without the atlas the ring alone draws. A `ringless` clip
+ * (#220) is the same bargain for plain art: the ring hides while the art
+ * draws, and comes back when the clip is missing.
  */
 export interface AreaLook {
   readonly clip?: string;
+  readonly ringless?: boolean;
   readonly storm?: StormLook;
 }
 
 /**
  * Ice Storm (#219): sleet falling steeply, slanted a little right by the wind,
  * over the crowd, and ice bursting on the stones where it lands. No frosted
- * floor and no rim: the sleet thins out toward the edge. Earthquake's sheet is
- * still being redrawn (#145), so it draws the ring until its clip lands here.
+ * floor and no rim: the sleet thins out toward the edge. Earthquake (#220) is
+ * a star of fissures, amber deep in the cracks, drawn without the ring: its
+ * crack tips reach the radius that ticks, so the ground itself says where.
  */
 export const AREA_LOOKS: Readonly<Record<AreaSpellId, AreaLook>> = {
   ice_blizzard: {
@@ -153,7 +159,7 @@ export const AREA_LOOKS: Readonly<Record<AreaSpellId, AreaLook>> = {
       fade: { fadeInS: 0.4, fadeOutS: 0.6 },
     },
   },
-  earth_quake: {},
+  earth_quake: { clip: 'earth.quakeRift', ringless: true },
 };
 
 /** What a level-up card says about each area (spec §7.1, cards per #132). */
@@ -172,11 +178,13 @@ export const AREA_CARDS: Readonly<Record<AreaSpellId, SpellCard>> = {
   earth_quake: {
     name: 'Earthquake',
     color: PLACEHOLDERS.boulder.color,
-    description: 'The ground splits open and keeps shaking whatever stands on it.',
+    description:
+      'The ground splits open and keeps shaking whatever stands on it, knocking it off its feet.',
     stats: [
       ['Cooldown', '14 s'],
       ['Damage', '8 every 0.5 s'],
-      ['Radius', '180'],
+      ['Radius', '80'],
+      ['Stagger', '0.2 s per shake'],
       ['Lasts', '8 s'],
     ],
   },

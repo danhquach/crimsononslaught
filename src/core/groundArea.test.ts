@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AREA_STAGGER_MAX_FRACTION,
   advanceArea,
+  areaStaggerS,
   createArea,
   densestSpot,
   isLive,
@@ -9,6 +11,7 @@ import {
   type GroundArea,
 } from './groundArea';
 import { createRng } from './rng';
+import { applyStagger, staggerSpeedFactor, tickStagger } from './status';
 
 /** A §9.3-shaped block (Ice Storm's before #219 cut its radius): 180 px for 6 s, ticking twice a second. */
 const BLIZZARD: AreaRule = { radius: 180, durationS: 6, tickEveryS: 0.5 };
@@ -208,5 +211,58 @@ describe('densestSpot', () => {
     const drawn = createRng(3);
     densestSpot(CENTRE, tied, RADIUS, RANGE, drawn);
     expect(drawn.next()).not.toBe(createRng(3).next());
+  });
+});
+
+describe('areaStaggerS (#220)', () => {
+  it('passes the base 0.2 s stop through at a 0.5 s tick', () => {
+    expect(areaStaggerS(0.2, 0.5)).toBe(0.2);
+  });
+
+  it('caps a scaled-up stop short of the next tick', () => {
+    expect(areaStaggerS(0.5, 0.5)).toBeCloseTo(AREA_STAGGER_MAX_FRACTION * 0.5, 9);
+    expect(areaStaggerS(0.5, 0.5)).toBeCloseTo(0.3, 9);
+  });
+
+  it('staggers nothing for a patch that carries no stagger', () => {
+    expect(areaStaggerS(0, 0.5)).toBe(0);
+  });
+
+  it('never holds an enemy standing in the patch through a whole tick window', () => {
+    // An 8 s / 0.5 s Earthquake ticking a standing enemy at 60 fps, for the
+    // base stop and for stops a stacked duration build could scale it to.
+    const tickEveryS = 0.5;
+    const durationS = 8;
+    const frameS = 1 / 60;
+    const framesPerTick = Math.round(tickEveryS / frameS);
+    for (const staggerDuration of [0.2, 0.3, 0.5, 1, 10]) {
+      const stop = areaStaggerS(staggerDuration, tickEveryS);
+      let area = createArea(CENTRE, { radius: 80, durationS, tickEveryS });
+      let remainingS = 0;
+      let windowFrames = 0;
+      let freeFrames = 0;
+      let windows = 0;
+      let ticked = false;
+      while (isLive(area)) {
+        const step = advanceArea(area, frameS);
+        area = step.area;
+        for (let i = 0; i < step.ticks; i += 1) remainingS = applyStagger(remainingS, stop);
+        if (step.ticks > 0) {
+          // A window closes on every tick: it must have left the enemy free for 40%.
+          if (ticked) {
+            expect(freeFrames / windowFrames, `${staggerDuration}`).toBeGreaterThanOrEqual(0.4);
+            windows += 1;
+          }
+          ticked = true;
+          windowFrames = 0;
+          freeFrames = 0;
+        }
+        remainingS = tickStagger(remainingS, frameS).remainingS;
+        windowFrames += 1;
+        if (staggerSpeedFactor(remainingS) === 1) freeFrames += 1;
+      }
+      expect(windowFrames, `${staggerDuration}`).toBeLessThanOrEqual(framesPerTick);
+      expect(windows, `${staggerDuration}`).toBe(durationS / tickEveryS - 1);
+    }
   });
 });

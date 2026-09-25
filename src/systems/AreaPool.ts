@@ -129,7 +129,8 @@ interface LiveArea {
  * Every patch is drawn with the `fx_area` ring. A spell with art of its own
  * passes its `AreaLook` and the patch also plays that clip just under the ring,
  * sized so the art spans the patch (#179); without the clip in the atlas the
- * ring alone still draws, so no spell waits on its art.
+ * ring alone still draws, so no spell waits on its art. A `ringless` look
+ * (#220, Earthquake) hides the ring while its art draws.
  *
  * A storm look (#219, Ice Storm) is drawn instead of the ring: sleet that
  * streaks across the patch on the run clock and fades out before the edge, and
@@ -217,12 +218,13 @@ export class AreaPool {
       .setPosition(area.x, area.y)
       .setScale(areaScale(area.radius));
     const storm = this.startStorm(look.storm);
-    // The ring is still the patch's slot in the pool; a storm just hides it.
-    sprite.setVisible(storm === null);
+    const art = storm ? null : this.showArt(area, look);
+    // The ring is still the patch's slot in the pool; a storm or ringless art just hides it.
+    sprite.setVisible(storm === null && !(art && look.ringless));
     this.live.push({
       area,
       sprite,
-      art: storm ? null : this.showArt(area, look),
+      art,
       storm,
       onTick,
       hooks,
