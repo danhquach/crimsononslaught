@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   centreBounds,
   alphaCell,
+  capMagenta,
+  capMagentaIndices,
   clearOutside,
   cornerKey,
   crop,
@@ -123,6 +125,60 @@ describe('despill', () => {
 
   it('reports nothing for a fully keyed-out pixel', () => {
     expect(despill(MAGENTA, MAGENTA, 0)).toEqual([0, 0, 0]);
+  });
+});
+
+describe('capMagenta', () => {
+  it('takes the purple off a dark rim pixel and keeps its alpha and darkness', () => {
+    // A dark outline antialiased onto the key: red and blue 90 over green.
+    const rim = image(1, 1, () => [145, 36, 126, 255]);
+    capMagenta(rim, 20);
+    expect([...rim.data]).toEqual([145 - 70, 36, 126 - 70, 255]);
+  });
+
+  it('leaves art whose own tint is under the cap, and art that is not magenta', () => {
+    const art = image(
+      3,
+      1,
+      (x) =>
+        [
+          [90, 72, 91],
+          [150, 90, 60],
+          [40, 200, 40],
+        ][x],
+    );
+    const before = [...art.data];
+    capMagenta(art, 20);
+    expect([...art.data]).toEqual(before);
+  });
+
+  it('skips fully transparent pixels', () => {
+    const clear = image(1, 1, () => [...MAGENTA, 0]);
+    capMagenta(clear, 20);
+    expect([...clear.data]).toEqual([...MAGENTA, 0]);
+  });
+});
+
+describe('capMagentaIndices', () => {
+  const palette = [
+    [0, 0, 0, 0],
+    [157, 69, 154, 208], // purple, put there by some other sheet
+    [70, 50, 45, 200], // dark brown at a close alpha
+    [230, 230, 240, 208], // pale, at the purple entry's exact alpha
+  ];
+
+  it('moves a pixel off a purple entry to the entry nearest its own colour', () => {
+    const img = image(2, 1, () => [80, 55, 60, 205]);
+    const indices = new Uint8Array([1, 1]);
+    capMagentaIndices(img, palette, indices, { x: 0, y: 0, w: 2, h: 1 }, 20);
+    expect([...indices]).toEqual([2, 2]);
+  });
+
+  it('touches nothing outside its rect, and no pixel already under the cap', () => {
+    const img = image(3, 1, () => [80, 55, 60, 205]);
+    const indices = new Uint8Array([1, 3, 1]);
+    capMagentaIndices(img, palette, indices, { x: 1, y: 0, w: 2, h: 1 }, 20);
+    expect([...indices]).toEqual([1, 3, 2]);
   });
 });
 

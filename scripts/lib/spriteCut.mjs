@@ -218,6 +218,70 @@ export function keyCell(img, rect, key, tol0, tol1) {
 }
 
 /**
+ * Pull magenta back out of a keyed cell, in place, wherever a visible pixel's
+ * red and blue both stand more than `cap` above its green (CO-146).
+ *
+ * The distance key cannot see this fringe. A dark outline antialiased onto the
+ * magenta background comes out a dark purple, which is as far from the key as
+ * the stone is, so `softAlpha` keeps it solid and `despill` has no coverage to
+ * undo. Taking the excess off red and blue alike keeps the pixel's alpha and
+ * its darkness, and art whose own tint stays under `cap` is left alone.
+ */
+export function capMagenta(img, cap) {
+  for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i + 3] === 0) continue;
+    const excess = Math.min(img.data[i], img.data[i + 2]) - img.data[i + 1] - cap;
+    if (excess <= 0) continue;
+    img.data[i] -= excess;
+    img.data[i + 2] -= excess;
+  }
+  return img;
+}
+
+/**
+ * The same cap, held on a quantised page: every pixel of `rect` whose palette
+ * colour breaks it is moved to the palette entry nearest its own colour in
+ * `img`, the page before quantising, among the entries that keep the cap. In
+ * place. The palette itself is untouched, so no other frame moves.
+ *
+ * `capMagenta` alone is not enough, because a page's palette is shared: a
+ * capped pixel can still quantise to a purple entry some other sheet on the
+ * page put there, most often a soft edge pixel whose alpha only a purple
+ * entry matches. Matching from the pixel's own colour rather than from that
+ * entry is what keeps a dark rim pixel dark.
+ */
+export function capMagentaIndices(img, palette, indices, rect, cap) {
+  const over = (c) => c[3] >= 8 && Math.min(c[0], c[2]) - c[1] > cap;
+  const nearest = new Map();
+  for (let y = rect.y; y < rect.y + rect.h; y += 1) {
+    for (let x = rect.x; x < rect.x + rect.w; x += 1) {
+      const p = y * img.width + x;
+      if (!over(palette[indices[p]])) continue;
+      const c = pixelAt(img, x, y);
+      const key = c.join(',');
+      let match = nearest.get(key);
+      if (match === undefined) {
+        let bestDist = Infinity;
+        palette.forEach((q, j) => {
+          if (over(q)) return;
+          // The quantiser's own metric, so the swap is the choice it would
+          // have made had the purple entries not been there.
+          const d =
+            (q[0] - c[0]) ** 2 + (q[1] - c[1]) ** 2 + (q[2] - c[2]) ** 2 + ((q[3] - c[3]) * 3) ** 2;
+          if (d < bestDist) {
+            bestDist = d;
+            match = j;
+          }
+        });
+        nearest.set(key, match);
+      }
+      indices[p] = match;
+    }
+  }
+  return indices;
+}
+
+/**
  * True when a sheet arrived already keyed: it carries a real alpha channel
  * whose background is transparent, rather than art flattened onto a flat
  * colour to key out.
