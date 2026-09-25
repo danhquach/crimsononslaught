@@ -162,16 +162,19 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
     0,
   );
 
-  // #219: an enemy slowed in the storm keeps its own colours under a light
-  // tint; only a freeze paints it solid. The hit flash and a stun fill it
-  // for their own reasons, so those samples are left out.
+  // #219: a slowed enemy keeps its own colours under a light tint, whichever
+  // spell slowed it; only a freeze paints it solid. The hit flash and a stun
+  // fill it for their own reasons, so those samples are left out. Ice Arrow
+  // and both areas slow, so a run holds many of these; the storm's own, at
+  // radius 80, are only a few, so every one is checked but none is required.
   const chilled = trace.flatMap((report) =>
-    report.storm.filter((e) => e.slowed && !e.frozen && !e.stunned && !e.flashing),
+    report.tints.filter((e) => e.slowed && !e.frozen && !e.stunned && !e.flashing),
   );
-  expect(chilled.length, 'slowed enemies sampled inside a storm').toBeGreaterThan(0);
+  expect(chilled.length, 'slowed enemies sampled').toBeGreaterThan(0);
   for (const enemy of chilled) {
-    expect(enemy.tinted, 'a slowed enemy is tinted').toBe(true);
-    expect(enemy.tintFill, 'a slowed enemy is not filled solid').toBe(false);
+    const where = enemy.inStorm ? 'in a storm' : 'outside a storm';
+    expect(enemy.tinted, `a slowed enemy ${where} is tinted`).toBe(true);
+    expect(enemy.tintFill, `a slowed enemy ${where} is not filled solid`).toBe(false);
   }
 
   // Spec §11: the patches tick against a full arena and the run still draws.

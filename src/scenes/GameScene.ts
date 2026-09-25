@@ -190,8 +190,9 @@ const ARENA_LINE = 0x1f1f1f;
 const ARENA_BORDER = 0x5a1620;
 const GRID_CELL = 200;
 
-/** How one enemy standing in a layered ground area is drawn right now (#219). */
-export interface StormEnemyView {
+/** How one live enemy is tinted right now (#219), and whether it stands in an ice storm. */
+export interface EnemyTintView {
+  readonly inStorm: boolean;
   readonly slowed: boolean;
   readonly frozen: boolean;
   readonly stunned: boolean;
@@ -389,16 +390,16 @@ export class GameScene extends Phaser.Scene {
    * tick a crowd and expire, and each one drawn at the radius it ticks, with
    * its spell's art when the atlas has it (#179).
    *
-   * `storm` (#219) is how each enemy standing in a layered patch is tinted
-   * right now, read in the same step as its status, so the suite can hold a
-   * slowed enemy to a light tint that keeps its colours and a frozen one to
-   * the solid fill.
+   * `tints` (#219) is how each live enemy is tinted right now, read in the
+   * same step as its status and marked when it stands in an ice storm, so the
+   * suite can hold every slowed enemy — the storm's and any other spell's —
+   * to a light tint that keeps its colours.
    */
   get areaReport(): {
     live: AreaView[];
     placed: number;
     hits: number;
-    storm: StormEnemyView[];
+    tints: EnemyTintView[];
   } {
     const spells = this.spells.spells.filter(
       (spell): spell is GroundAreaSpell => spell instanceof GroundAreaSpell,
@@ -410,9 +411,10 @@ export class GameScene extends Phaser.Scene {
       live: views,
       placed: spells.reduce((total, spell) => total + spell.placed, 0),
       hits: spells.reduce((total, spell) => total + spell.hits, 0),
-      storm: [...inside]
+      tints: this.enemies.live
         .filter((enemy) => enemy.active && !enemy.isDying)
         .map((enemy) => ({
+          inStorm: inside.has(enemy),
           slowed: enemy.slowed,
           frozen: enemy.isFrozen,
           stunned: enemy.isStunned,
