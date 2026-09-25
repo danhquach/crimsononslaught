@@ -161,25 +161,30 @@ export interface SwordStats {
 
 /**
  * Earth Spike (#143, Phase 2 spec §9.5): the element's default. Every
- * `cooldown` s a spike erupts under the nearest enemy within `targetRange`,
- * hitting everything within `radius` of it for `damage`, shoving each of them
- * `knockback` px away from the eruption and leaving a bleed behind.
+ * `cooldown` s a slow stone spike is flung at the nearest enemy within `range`
+ * (#205). It strikes the first enemies it touches, up to `pierce` of them, for
+ * `damage` and a light `knockback`, and each hit bleeds on a `bleedChance`
+ * roll; one that misses flies on to its `range` and despawns.
  */
 export interface EarthStats {
   /** Seconds between casts. */
   cooldown: number;
-  /** Damage the eruption deals to every enemy it catches. */
+  /** Damage one strike deals. */
   damage: number;
-  /** How far the eruption reaches from the spike, in px. */
-  radius: number;
-  /** How far from the caster the spike may erupt, in px. */
-  targetRange: number;
+  /** Flight speed in px/s. */
+  speed: number;
+  /** How far it flies before it despawns, in px; also the targeting range. */
+  range: number;
+  /** How many enemies one spike may strike in total (#206 raises it). */
+  pierce: number;
   /** Knockback distance in px, away from the spike. */
   knockback: number;
-  /** Bleed damage per second applied on hit (#139). */
+  /** Bleed damage per second applied on a landed roll (#139). */
   bleed: number;
   /** Seconds that bleed lasts. */
   bleedDuration: number;
+  /** Chance per strike, 0–1, that the hit bleeds. */
+  bleedChance: number;
 }
 
 /**

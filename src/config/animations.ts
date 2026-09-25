@@ -126,6 +126,9 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('earth.spin', 6, 12, LOOP),
   spec('earth.impact', 5, 15, ONCE),
   spec('earth.dust', 5, 12, ONCE),
+  // Earth Spike in flight (CO-138, #205): the stone shard drawn flying right,
+  // its chips trailing; turned along its flight by `entities/Projectile.ts`.
+  spec('earth.fly', 4, 10, LOOP),
 
   // Phase 2 spell FX (CO-123, #145). Every spell the Phase 2 roster added that
   // does not reuse a Phase 1 clip; what each one reuses instead is listed in
@@ -162,6 +165,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('lightning.tornado', 4, 10, LOOP),
   spec('lightning.sword', 4, 12, LOOP),
 
+  // Earth Spike's eruption (CO-123). No spell draws it since the spike became
+  // a flying shot (#205, `earth.fly`); it is kept for later.
   spec('earth.spike', 5, 15, ONCE),
   spec('earth.shield', 4, 6, LOOP),
   spec('earth.shieldBreak', 4, 15, ONCE),
@@ -260,6 +265,8 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   // #202: Lightning Bolt's shot, the head-and-tail bolt drawn flying right.
   proj_bolt: 'lightning.bolt.0',
   boulder: 'earth.spin.0',
+  // #205: Earth Spike's shot, the shard drawn flying right.
+  proj_spike: 'earth.fly.0',
   // #145. The ice bolt's flight art, the ice shield's layer, the strike
   // telegraph; each cut to the size of the placeholder it replaces, so the
   // sprites the spells already build keep the size they were tuned at

@@ -61,15 +61,15 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
   },
   earth: {
     name: 'Earth Spike',
-    color: PLACEHOLDERS.boulder.color,
+    color: PLACEHOLDERS.proj_spike.color,
     description:
-      'A spike erupts under a nearby enemy, hurling the group back and leaving it bleeding.',
+      'Flings a slow stone spike at the nearest enemy; a light shove, and sometimes it bleeds.',
     stats: [
       ['Cooldown', '1.1 s'],
       ['Damage', '16'],
-      ['Radius', '55'],
-      ['Knockback', '70'],
-      ['Bleed', '4 dps for 3 s'],
+      ['Knockback', '25'],
+      ['Bleed', '5%: 4 dps for 3 s'],
+      ['Pierces', '1 enemy'],
     ],
   },
 };
@@ -122,11 +122,13 @@ export const BASE_SPELL_STATS: Readonly<{
   earth: {
     cooldown: 1.1,
     damage: 16,
-    radius: 55,
-    targetRange: 144,
-    knockback: 70,
+    speed: 260,
+    range: 144,
+    pierce: 1,
+    knockback: 25,
     bleed: 4,
     bleedDuration: 3,
+    bleedChance: 0.05,
   },
 };
 

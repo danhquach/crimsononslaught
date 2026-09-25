@@ -191,8 +191,8 @@ describe('validateSpellFields', () => {
     expect(new Set(fields).size).toBe(fields.length);
     // 45 since #143 retired Crush with Phase 1's Orbiting Boulders: `earth` is
     // Earth Spike now, and no spell multiplies damage by enemy type. 46 since
-    // Fire Wave's `arc` (#218).
-    expect(fields.length).toBe(46);
+    // Fire Wave's `arc` (#218), 47 since Earth Spike's `bleedChance` (#205).
+    expect(fields.length).toBe(47);
   });
 
   // CO-109 routes every equipped spell's block through the category map, so a

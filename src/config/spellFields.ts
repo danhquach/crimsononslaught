@@ -69,6 +69,7 @@ export const STAT_CATEGORIES = {
   slowPct: 'unscaled',
   freezeChance: 'unscaled',
   stunChance: 'unscaled',
+  bleedChance: 'unscaled',
   chainFalloff: 'unscaled',
   aoeDamageFactor: 'unscaled',
   knockback: 'unscaled',

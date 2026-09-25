@@ -78,9 +78,9 @@ describe('spell card stats match spec §5 base values', () => {
     expect(SPELL_CARDS.earth.stats).toEqual([
       ['Cooldown', '1.1 s'],
       ['Damage', '16'],
-      ['Radius', '55'],
-      ['Knockback', '70'],
-      ['Bleed', '4 dps for 3 s'],
+      ['Knockback', '25'],
+      ['Bleed', '5%: 4 dps for 3 s'],
+      ['Pierces', '1 enemy'],
     ]);
   });
 });
@@ -150,11 +150,13 @@ describe('base stat blocks', () => {
     expect(BASE_SPELL_STATS.earth).toEqual({
       cooldown: 1.1,
       damage: 16,
-      radius: 55,
-      targetRange: 144,
-      knockback: 70,
+      speed: 260,
+      range: 144,
+      pierce: 1,
+      knockback: 25,
       bleed: 4,
       bleedDuration: 3,
+      bleedChance: 0.05,
     });
   });
 

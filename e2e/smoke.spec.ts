@@ -27,8 +27,10 @@ function baseStatsLeaveStatus(spellId: SpellId): boolean {
     case 'lightning':
       return BASE_SPELL_STATS.lightning.staggerDuration > 0;
     case 'earth':
-      // Bleed is Earth Spike's identity now (spec §9.5); it shows the burn overlay.
-      return BASE_SPELL_STATS.earth.bleed > 0;
+      // Bleed is Earth Spike's identity (spec §9.5), on a 5% roll per hit since
+      // #205; it shows the burn overlay. A roll may never land in the window,
+      // which the bound below allows: it only caps the overlays.
+      return BASE_SPELL_STATS.earth.bleed > 0 && BASE_SPELL_STATS.earth.bleedChance > 0;
   }
 }
 
