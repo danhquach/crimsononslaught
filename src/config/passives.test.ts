@@ -23,6 +23,7 @@ const SPEC_TABLE: readonly [string, string, 'add' | 'mul', number, number | unde
   ['passive_regeneration', 'hpRegen', 'add', 0.5, 6],
   ['passive_magnet', 'pickupRadius', 'mul', 1.25, 3],
   ['passive_avarice', 'xpGain', 'mul', 1.12, 5],
+  ['passive_pierce', 'pierceBonus', 'add', 1, 3],
 ];
 
 describe('passives config', () => {
@@ -53,6 +54,13 @@ describe('passives config', () => {
     ]);
   });
 
+  it('gates only Pierce on a stat, the one it raises (#206)', () => {
+    const gated = PASSIVES.filter((passive) => passive.requiresStat !== undefined);
+    expect(gated.map((passive) => [passive.id, passive.requiresStat])).toEqual([
+      ['passive_pierce', 'pierce'],
+    ]);
+  });
+
   it('holds the spec §4.1 base profile and the §4.3 clamps', () => {
     expect(BASE_PLAYER_PROFILE).toEqual({
       moveSpeed: 180,
@@ -68,6 +76,7 @@ describe('passives config', () => {
       critChance: 0,
       critMultiplier: 1.5,
       damageReduction: 0,
+      pierceBonus: 0,
     });
     expect(PROFILE_CLAMPS).toEqual({
       cooldownMul: { min: 0.35 },

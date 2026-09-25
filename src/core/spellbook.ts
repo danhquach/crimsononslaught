@@ -1,6 +1,6 @@
 import type { RosterSpellId } from '../config/loadout';
 import type { PassiveId, PlayerProfile } from '../config/passives';
-import type { SpellStatBlock } from '../config/spellFields';
+import type { SpellStatBlock, SpellStatField } from '../config/spellFields';
 import { equip as equipInLoadout, profileOf, takePassive, type Loadout } from './loadout';
 import { resolveSpellStats } from './playerProfile';
 import type { Spell } from './spell';
@@ -52,6 +52,21 @@ export class Spellbook {
 
   get loadout(): Loadout {
     return this.current;
+  }
+
+  /**
+   * Every stat the spells casting right now carry in their base blocks — slotted
+   * or not, so a `?loadout=` extra counts. What gates a passive's
+   * `requiresStat` at level-up (#206).
+   */
+  get carriedStats(): ReadonlySet<SpellStatField> {
+    const carried = new Set<SpellStatField>();
+    for (const spell of this.live) {
+      for (const [field, value] of Object.entries(this.baseStats(spell.id) ?? {})) {
+        if (value !== undefined) carried.add(field as SpellStatField);
+      }
+    }
+    return carried;
   }
 
   /** The profile the loadout's passives resolve to — what scales every block. */

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { BASE_BOULDER_STATS } from '../config/earthRoster';
 import { SLOT_UNLOCK_LEVELS } from '../config/loadout';
+import type { SpellStatBlock } from '../config/spellFields';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { buildLoadout } from './loadout';
 import { RunState } from './runState';
@@ -207,6 +209,37 @@ describe('Spellbook (CO-109)', () => {
     damage = 100;
     spells.refresh();
     expect(fire.stats.damage).toBe(100);
+  });
+
+  it('raises a live piercing spell with Pierce, and leaves the others alone (#206)', () => {
+    // A Boulder's block under a stub id: the rig casts stubs, the resolver only
+    // sees the block.
+    const spells = book(factory, (spellId) =>
+      spellId === 'fire' ? BASE_BOULDER_STATS : baseStats(spellId),
+    );
+    const boulder = equip(spells, 'fire');
+    const ice = equip(spells, 'ice');
+    const pierceOf = (spell: StubSpell): number | undefined =>
+      (spell.stats as SpellStatBlock).pierce;
+    expect(pierceOf(boulder)).toBe(5);
+
+    spells.takePassive('passive_pierce');
+    expect(pierceOf(boulder)).toBe(6);
+    expect(pierceOf(ice)).toBeUndefined();
+    expect(ice.stats).toEqual(BASE_SPELL_STATS.ice);
+  });
+
+  it('reports the stats its casting spells carry', () => {
+    const spells = book(factory, (spellId) =>
+      spellId === 'ice' ? BASE_BOULDER_STATS : baseStats(spellId),
+    );
+    expect([...spells.carriedStats]).toEqual([]);
+    equip(spells, 'fire');
+    expect(spells.carriedStats).toEqual(new Set(Object.keys(BASE_SPELL_STATS.fire)));
+    expect(spells.carriedStats.has('pierce')).toBe(false);
+    // Cast without a slot, as the default and `?loadout=` extras are: it still counts.
+    equip(spells, 'ice');
+    expect(spells.carriedStats.has('pierce')).toBe(true);
   });
 
   it('throws on a passive the loadout cannot take', () => {

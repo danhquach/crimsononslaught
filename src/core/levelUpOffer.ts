@@ -1,5 +1,6 @@
 import type { RosterSpellId } from '../config/loadout';
 import { PASSIVES, isPassiveId, type Passive } from '../config/passives';
+import type { SpellStatField } from '../config/spellFields';
 import { MAX_OFFER_SIZE, type OfferCard } from './levelUp';
 import { equippableSpells, openSlots, passiveRank, type Loadout } from './loadout';
 import type { Rng } from './rng';
@@ -12,8 +13,9 @@ import type { Rng } from './rng';
  *
  * 1. An active slot is unlocked and empty -> offer the element's unequipped
  *    actives, so a slot is always filled before anything else is handed out.
- * 2. Otherwise -> offer passives that are not at `maxRank`. Four passives never
- *    cap, so this pool never runs dry the way the Phase 1 perk trees did.
+ * 2. Otherwise -> offer passives that are not at `maxRank` and whose
+ *    `requiresStat`, if any, a casting spell carries. Four passives never cap,
+ *    so this pool never runs dry the way the Phase 1 perk trees did.
  * 3. Neither pool has a card -> an empty offer, which `resolveLevelUp` answers
  *    with the silent +10 max HP instead of an overlay.
  *
@@ -51,12 +53,21 @@ export function offerableActives(loadout: Loadout, catalog: ActiveCatalog): Acti
  * Passives below their `maxRank`; an uncapped passive is always eligible
  * (spec §5). A passive outside the shipped list — a test's own config — reads
  * as rank 0, since only shipped ids can be in the loadout's map.
+ *
+ * A passive with a `requiresStat` is eligible only while `carried` holds that
+ * stat (#206). `carried` defaults to empty, so a caller that does not say what
+ * its spells carry can never be offered a dead pick.
  */
 export function eligiblePassives(
   loadout: Loadout,
   passives: readonly Passive[] = PASSIVES,
+  carried: ReadonlySet<SpellStatField> = new Set(),
 ): Passive[] {
-  return passives.filter((passive) => rankOf(loadout, passive.id) < (passive.maxRank ?? Infinity));
+  return passives.filter(
+    (passive) =>
+      rankOf(loadout, passive.id) < (passive.maxRank ?? Infinity) &&
+      (passive.requiresStat === undefined || carried.has(passive.requiresStat)),
+  );
 }
 
 /** One level-up's inputs. `passives` and `size` default to the shipped config. */
@@ -70,6 +81,12 @@ export interface OfferInput {
   level: number;
   /** Every active this build can cast (`ActiveCatalog`). */
   actives: ActiveCatalog;
+  /**
+   * Every stat the spells casting right now carry in their base blocks
+   * (`Spellbook.carriedStats`). Gates a passive's `requiresStat`; absent, no
+   * such passive is offered.
+   */
+  carried?: ReadonlySet<SpellStatField>;
   passives?: readonly Passive[];
   size?: number;
 }
@@ -79,7 +96,7 @@ export interface OfferInput {
  * run's seeded RNG, so the same seed replays the same offers in the same order.
  */
 export function levelUpOffer(rng: Rng, input: OfferInput): OfferCard[] {
-  const { loadout, level, actives, passives = PASSIVES, size = MAX_OFFER_SIZE } = input;
+  const { loadout, level, actives, carried, passives = PASSIVES, size = MAX_OFFER_SIZE } = input;
   if (size <= 0) return [];
 
   if (openSlots(loadout, level) > 0) {
@@ -88,7 +105,7 @@ export function levelUpOffer(rng: Rng, input: OfferInput): OfferCard[] {
   }
 
   return rng
-    .shuffle(eligiblePassives(loadout, passives))
+    .shuffle(eligiblePassives(loadout, passives, carried))
     .slice(0, size)
     .map((passive) => passiveCard(loadout, passive));
 }
