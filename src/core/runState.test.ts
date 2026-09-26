@@ -526,14 +526,21 @@ describe('simulationSteps', () => {
   });
 
   it('bounds every step whatever the frame length', () => {
+    // ~150k steps: checked in plain code and asserted once, since an `expect` per
+    // step cost ~4 s on CI against the 5 s timeout (the code itself takes ~5 ms).
+    const closeTo = (a: number, b: number) => Math.abs(a - b) < 5e-10; // toBeCloseTo(_, 9)
+    const bad: string[] = [];
     for (let deltaMs = 1; deltaMs <= 6000; deltaMs += 7) {
-      const frame = { startMs: 0, deltaMs };
-      const steps = simulationSteps(frame);
-      expect(steps.length, String(deltaMs)).toBeGreaterThan(0);
+      const steps = simulationSteps({ startMs: 0, deltaMs });
+      if (steps.length === 0) bad.push(`${deltaMs}: no steps`);
+      let cursor = 0;
       for (const step of steps) {
-        expect(step.deltaMs, String(deltaMs)).toBeLessThanOrEqual(SIM_STEP_MS * 1.5 + 1e-9);
+        if (step.deltaMs > SIM_STEP_MS * 1.5 + 1e-9) bad.push(`${deltaMs}: step ${step.deltaMs}`);
+        if (!closeTo(step.startMs, cursor)) bad.push(`${deltaMs}: gap at ${step.startMs}`);
+        cursor += step.deltaMs;
       }
-      contiguous(steps, frame);
+      if (!closeTo(cursor, deltaMs)) bad.push(`${deltaMs}: ends at ${cursor}`);
     }
+    expect(bad).toEqual([]);
   });
 });
