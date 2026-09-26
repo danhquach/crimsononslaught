@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { flightRotation } from '../core/fx';
+import { flightFlipY, flightRotation } from '../core/fx';
 import { isLiveTarget, retarget, steerToward, tickLifetime } from '../core/homing';
 import type { Enemy } from './Enemy';
 import { type ProjectileLook, Projectile } from './Projectile';
@@ -44,6 +44,7 @@ export class HomingProjectile extends Projectile {
     // Range is what `Projectile.spent` measures; this shot times out instead,
     // so it is set past any flight, and the launch line is a plain `fire`.
     this.fire(x, y, target, speed, Infinity, look);
+    this.setFlipY(flightFlipY(this.rotation));
   }
 
   /**
@@ -58,6 +59,8 @@ export class HomingProjectile extends Projectile {
     const next = steerToward(body.velocity, this, this.target, this.turnRate * deltaS, this.speed);
     body.velocity.set(next.x, next.y);
     this.setRotation(flightRotation(next, this.rotation));
+    // Turned by rotation alone, a dragon flying left would be drawn belly up.
+    this.setFlipY(flightFlipY(this.rotation));
   }
 
   /** What it is flying at right now; null once its target is gone and nothing is in range. */

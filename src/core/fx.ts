@@ -66,6 +66,15 @@ export function flightRotation(velocity: Readonly<Vec2>, previous: number): numb
   return Math.atan2(velocity.y, velocity.x);
 }
 
+/**
+ * Whether art drawn facing right, turned by `rotation`, is mirrored top to
+ * bottom to stay upright (CO-162): flying left, rotation alone draws it belly
+ * up, so any heading with a leftward part flips it.
+ */
+export function flightFlipY(rotation: number): boolean {
+  return Math.cos(rotation) < 0;
+}
+
 /** The knockback dust is drawn blowing the way the enemy was pushed; the sheet blows right. */
 export function dustFlip(push: Readonly<Vec2>): boolean {
   return push.x < 0;

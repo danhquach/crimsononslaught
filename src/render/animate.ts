@@ -51,6 +51,7 @@ export function clearClip(sprite: Phaser.Physics.Arcade.Sprite): void {
   sprite.anims.stop();
   sprite.anims.currentAnim = null;
   sprite.setFlipX(false);
+  sprite.setFlipY(false);
   sprite.setRotation(0);
 }
 

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { DRAGON_DRAW_SCALE } from '../config/fireRoster';
 import { splashTargets } from '../core/fireball';
 import { explosionScale } from '../core/fx';
 import { MAX_LIVE_DRAGONS } from '../core/homing';
@@ -13,8 +14,22 @@ import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
 
-/** Fire Dragon's shot wears Fire's own look (#137's art lands separately). */
-const DRAGON_LOOK: ProjectileLook = { texture: 'proj_fire', clip: 'fire.fly' };
+/** Fire Dragon's shot flies as its own dragon (CO-162), drawn at half size over Fire's 6 px body. */
+const DRAGON_LOOK: ProjectileLook = {
+  texture: 'proj_fire',
+  clip: 'fire.dragon',
+  scale: DRAGON_DRAW_SCALE,
+};
+
+/** One dragon in flight, as the browser suite reads it. */
+export interface DragonShot {
+  readonly clip: string | null;
+  readonly bodyRadius: number;
+  readonly rotation: number;
+  readonly flipY: boolean;
+  readonly vx: number;
+  readonly vy: number;
+}
 
 /**
  * Fire Dragon (#137, spec §9.2): every `cooldown` s a homing missile leaves the
@@ -74,6 +89,27 @@ export class FireDragonSpell extends Spell<'fire_dragon'> {
   /** Direct hits this spell has landed — what the browser suite watches it fight with. */
   get hits(): number {
     return this.landed;
+  }
+
+  /**
+   * Test hook (CO-162): how each dragon in the air is drawn right now — its
+   * clip, hit radius, rotation and flip beside the velocity it is flying along.
+   */
+  get shots(): DragonShot[] {
+    const shots: DragonShot[] = [];
+    for (const child of this.group.getChildren()) {
+      if (!(child instanceof HomingProjectile) || !child.active) continue;
+      const body = child.body as Phaser.Physics.Arcade.Body;
+      shots.push({
+        clip: child.anims.currentAnim?.key ?? null,
+        bodyRadius: body.halfWidth,
+        rotation: child.rotation,
+        flipY: child.flipY,
+        vx: body.velocity.x,
+        vy: body.velocity.y,
+      });
+    }
+    return shots;
   }
 
   protected override tick(deltaS: number): void {

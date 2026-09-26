@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { validateSpellFields } from '../core/playerProfile';
+import { PLACEHOLDERS } from './colors';
+import { ART_BOXES } from './frames';
 import { elementOf, isRosterSpellId, SPELLS_BY_ELEMENT } from './loadout';
 import {
   BASE_FIRE_DRAGON_STATS,
   BASE_FIRE_ROSTER_STATS,
   BASE_FIRE_WAVE_STATS,
+  DRAGON_DRAW_SCALE,
   FIRE_ROSTER_CARDS,
   FIRE_ROSTER_SPELL_IDS,
   isFireRosterSpellId,
@@ -90,5 +93,23 @@ describe('fire roster presentation', () => {
   it('gives every card a distinct color', () => {
     const colors = FIRE_ROSTER_SPELL_IDS.map((id) => FIRE_ROSTER_CARDS[id].color);
     expect(new Set(colors).size).toBe(colors.length);
+  });
+});
+
+describe('fire dragon draw scale (CO-162)', () => {
+  it('draws the dragon well over a Fire Bolt and well under the boss', () => {
+    const width = ART_BOXES['fire.dragon'].w * DRAGON_DRAW_SCALE;
+    expect(width).toBeGreaterThanOrEqual(50);
+    expect(width).toBeLessThanOrEqual(64);
+    expect(width).toBeGreaterThanOrEqual(2 * ART_BOXES['fire.fly'].w);
+  });
+
+  it('keeps the 6 px hit radius exact through the scale', () => {
+    // The clip's circle is set at `radius / scale` source px, and Arcade floors
+    // the scaled width's half: both must land on whole pixels with no drift.
+    const radius = PLACEHOLDERS.proj_fire.width / 2;
+    const sourceRadius = radius / DRAGON_DRAW_SCALE;
+    expect(Number.isInteger(sourceRadius), `source radius ${sourceRadius}`).toBe(true);
+    expect(sourceRadius * 2 * DRAGON_DRAW_SCALE).toBe(radius * 2);
   });
 });

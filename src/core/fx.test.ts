@@ -16,6 +16,7 @@ import {
   chainSegmentPose,
   dustFlip,
   explosionScale,
+  flightFlipY,
   flightRotation,
   novaScale,
   spinTimeScale,
@@ -98,6 +99,17 @@ describe('flightRotation', () => {
 
   it('holds the heading when stopped', () => {
     expect(flightRotation({ x: 0, y: 0 }, 1.5)).toBe(1.5);
+  });
+});
+
+describe('flightFlipY', () => {
+  it('keeps art upright by flipping it for any heading with a leftward part', () => {
+    expect(flightFlipY(0)).toBe(false);
+    expect(flightFlipY(Math.PI / 3)).toBe(false);
+    expect(flightFlipY(-Math.PI / 3)).toBe(false);
+    expect(flightFlipY(Math.PI)).toBe(true);
+    expect(flightFlipY((2 * Math.PI) / 3)).toBe(true);
+    expect(flightFlipY(-(2 * Math.PI) / 3)).toBe(true);
   });
 });
 
