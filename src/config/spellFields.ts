@@ -30,6 +30,7 @@ export const STAT_CATEGORIES = {
   breakDamage: 'damage',
   burn: 'damage',
   bleed: 'damage',
+  pondTickDamage: 'damage',
 
   // cooldown — scaled by `cooldownMul`
   cooldown: 'cooldown',
@@ -48,6 +49,7 @@ export const STAT_CATEGORIES = {
   range: 'area',
   size: 'area',
   pullRadius: 'area',
+  pondRadius: 'area',
 
   // speed — scaled by `projectileSpeedMul`
   speed: 'speed',
@@ -62,6 +64,7 @@ export const STAT_CATEGORIES = {
   freezeDuration: 'duration',
   stunDuration: 'duration',
   staggerDuration: 'duration',
+  pondDuration: 'duration',
 
   // pierce — `pierceBonus` is added, not multiplied (#206)
   pierce: 'pierce',
@@ -77,12 +80,14 @@ export const STAT_CATEGORIES = {
   bleedChance: 'unscaled',
   chainFalloff: 'unscaled',
   aoeDamageFactor: 'unscaled',
+  aoeEdgeFactor: 'unscaled',
   knockback: 'unscaled',
   arc: 'unscaled',
   pullForce: 'unscaled',
   homingTurnRate: 'unscaled',
   hitCooldown: 'unscaled',
   tickRate: 'unscaled',
+  pondTickRate: 'unscaled',
   shieldHp: 'unscaled',
 } as const satisfies Readonly<Record<string, StatCategory>>;
 

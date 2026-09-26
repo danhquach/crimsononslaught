@@ -133,6 +133,11 @@ export interface AreaLook {
   readonly clip?: string;
   readonly ringless?: boolean;
   readonly storm?: StormLook;
+  /**
+   * Seconds over which the art fades out as the patch runs down (CO-167, the
+   * Meteor pond); absent, the art is drawn whole until the patch expires.
+   */
+  readonly fadeOutS?: number;
 }
 
 /**

@@ -13,6 +13,7 @@ import {
 } from '../config/spellFields';
 import { BASE_EARTH_ROSTER_STATS } from '../config/earthRoster';
 import { BASE_SPELL_STATS } from '../config/spells';
+import { BASE_METEOR_STATS } from '../config/strikes';
 import { resolveProfile, resolveSpellStats, validateSpellFields } from './playerProfile';
 import { createRng } from './rng';
 
@@ -194,6 +195,54 @@ describe('resolveSpellStats', () => {
     expect(out.damage).toBeCloseTo(11);
   });
 
+  // CO-167 rework spec §4: each passive reaches exactly the Meteor fields it names.
+  describe('Meteor (CO-167)', () => {
+    const at = (id: string, rank: number) =>
+      resolveSpellStats(BASE_METEOR_STATS, resolveProfile(ranks([[id, rank]])));
+
+    it('shortens the fall with Haste: 0.66 s at 5 ranks', () => {
+      const out = at('passive_haste', 5);
+      expect(out.fallDelay).toBeCloseTo(0.659, 3);
+      expect(out.cooldown).toBeCloseTo(3.2 * 0.92 ** 5, 9);
+      expect(out.pondDuration).toBe(BASE_METEOR_STATS.pondDuration);
+    });
+
+    it('grows the blast and the pond with Expanse: 98 and 63 px at 3 ranks', () => {
+      const out = at('passive_expanse', 3);
+      expect(out.aoeRadius).toBeCloseTo(98.3, 1);
+      expect(out.pondRadius).toBeCloseTo(63.2, 1);
+      expect(out.targetRange).toBeCloseTo(189 * 1.12 ** 3, 9);
+      expect(out.pondDuration).toBe(BASE_METEOR_STATS.pondDuration);
+    });
+
+    it('keeps the pond longer with Persistence: 2.28 s at 3 ranks', () => {
+      const out = at('passive_persistence', 3);
+      expect(out.pondDuration).toBeCloseTo(2.28, 2);
+      expect(out.fallDelay).toBe(BASE_METEOR_STATS.fallDelay);
+      expect(out.pondRadius).toBe(BASE_METEOR_STATS.pondRadius);
+    });
+
+    it('raises the blast and the pond tick with Power', () => {
+      const out = at('passive_power', 3);
+      expect(out.damage).toBeCloseTo(60 * 1.1 ** 3, 9);
+      expect(out.pondTickDamage).toBeCloseTo(5 * 1.1 ** 3, 9);
+    });
+
+    it('leaves the edge factor and the tick rate untouched by every passive', () => {
+      for (const id of [
+        'passive_power',
+        'passive_haste',
+        'passive_expanse',
+        'passive_persistence',
+      ]) {
+        const out = at(id, 5);
+        expect(out.aoeEdgeFactor, id).toBe(BASE_METEOR_STATS.aoeEdgeFactor);
+        expect(out.pondTickRate, id).toBe(BASE_METEOR_STATS.pondTickRate);
+        expect(out.projectiles, id).toBe(BASE_METEOR_STATS.projectiles);
+      }
+    });
+  });
+
   it('passes a field outside the category map through unscaled', () => {
     const out = resolveSpellStats({ mystery: 4 } as unknown as SpellStatBlock, PROBE);
     expect(out).toEqual({ mystery: 4 });
@@ -217,8 +266,9 @@ describe('validateSpellFields', () => {
     expect(new Set(fields).size).toBe(fields.length);
     // 45 since #143 retired Crush with Phase 1's Orbiting Boulders: `earth` is
     // Earth Spike now, and no spell multiplies damage by enemy type. 46 since
-    // Fire Wave's `arc` (#218), 47 since Earth Spike's `bleedChance` (#205).
-    expect(fields.length).toBe(47);
+    // Fire Wave's `arc` (#218), 47 since Earth Spike's `bleedChance` (#205),
+    // 52 since Meteor's edge factor and pond (CO-167).
+    expect(fields.length).toBe(52);
   });
 
   // CO-109 routes every equipped spell's block through the category map, so a

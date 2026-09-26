@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { validateSpellFields } from '../core/playerProfile';
+import { ANIMATIONS } from './animations';
 import { PLACEHOLDERS } from './colors';
 import { elementOf, isRosterSpellId, SPELLS_BY_ELEMENT } from './loadout';
 import {
   BASE_METEOR_STATS,
   BASE_STRIKE_STATS,
+  METEOR_CLIP,
+  METEOR_POND_LOOK,
   METEOR_SCATTER_PX,
   STRIKE_CARDS,
   STRIKE_SPELL_IDS,
@@ -32,15 +35,20 @@ describe('strike ids', () => {
 });
 
 describe('strike stat blocks', () => {
-  it('carries the spec §9.2 numbers for Meteor', () => {
+  it('carries the CO-167 rework spec §4 numbers for Meteor', () => {
     expect(BASE_METEOR_STATS).toEqual({
       cooldown: 3.2,
       damage: 60,
-      aoeRadius: 130,
+      aoeRadius: 70,
       aoeDamageFactor: 1,
+      aoeEdgeFactor: 0.4,
       projectiles: 1,
       targetRange: 189,
       fallDelay: 1,
+      pondRadius: 45,
+      pondDuration: 1.5,
+      pondTickDamage: 5,
+      pondTickRate: 0.5,
     });
     expect(BASE_STRIKE_STATS.fire_meteor).toBe(BASE_METEOR_STATS);
   });
@@ -60,6 +68,15 @@ describe('strike stat blocks', () => {
     expect(BASE_METEOR_STATS.aoeRadius).toBeLessThan(BASE_METEOR_STATS.targetRange);
   });
 
+  it('keeps the pond inside the blast, ticking more than once before it goes', () => {
+    const { pondRadius, aoeRadius, pondDuration, pondTickRate, aoeEdgeFactor } = BASE_METEOR_STATS;
+    expect(pondRadius).toBeGreaterThan(0);
+    expect(pondRadius).toBeLessThan(aoeRadius);
+    expect(pondDuration / pondTickRate).toBeGreaterThanOrEqual(2);
+    expect(aoeEdgeFactor).toBeGreaterThan(0);
+    expect(aoeEdgeFactor).toBeLessThan(1);
+  });
+
   it('routes every field through the category map, so passives reach them', () => {
     expect(validateSpellFields(BASE_STRIKE_STATS)).toEqual([]);
   });
@@ -76,5 +93,26 @@ describe('strike presentation', () => {
 
   it('draws the telegraph with a texture the game generates', () => {
     expect(PLACEHOLDERS[TELEGRAPH_TEXTURE]).toBeDefined();
+  });
+
+  it('draws the meteor and its pond with clips the game animates, the pond ringless', () => {
+    const names = new Set(ANIMATIONS.map((anim) => anim.name));
+    expect(names.has(METEOR_CLIP)).toBe(true);
+    expect(METEOR_POND_LOOK.clip && names.has(METEOR_POND_LOOK.clip)).toBe(true);
+    expect(METEOR_POND_LOOK.ringless).toBe(true);
+    expect(METEOR_POND_LOOK.fadeOutS).toBe(0.3);
+  });
+
+  it('describes the reworked strike on its card (CO-167 rework spec §4)', () => {
+    expect(STRIKE_CARDS.fire_meteor.description).toBe(
+      'Drops a meteor on the nearest enemy. It hits hardest at the centre and leaves a burning pool.',
+    );
+    expect(STRIKE_CARDS.fire_meteor.stats).toEqual([
+      ['Cooldown', '3.2 s'],
+      ['Damage', '60'],
+      ['Blast radius', '70'],
+      ['Falls in', '1 s'],
+      ['Pool', '1.5 s'],
+    ]);
   });
 });

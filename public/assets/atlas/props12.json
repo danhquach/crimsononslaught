@@ -1,0 +1,93 @@
+{
+  "frames": {
+    "fire.pond.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 146,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 146,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 146,
+        "h": 128
+      }
+    },
+    "fire.pond.1": {
+      "frame": {
+        "x": 148,
+        "y": 1,
+        "w": 146,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 146,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 146,
+        "h": 128
+      }
+    },
+    "fire.pond.2": {
+      "frame": {
+        "x": 295,
+        "y": 1,
+        "w": 146,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 146,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 146,
+        "h": 128
+      }
+    },
+    "fire.pond.3": {
+      "frame": {
+        "x": 442,
+        "y": 1,
+        "w": 146,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 146,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 146,
+        "h": 128
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1024,
+      "h": 256
+    },
+    "scale": "1"
+  }
+}

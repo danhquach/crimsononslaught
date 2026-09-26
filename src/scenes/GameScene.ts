@@ -83,6 +83,7 @@ import { isRelicBuffId } from '../config/relics';
 import { AREA_CARDS, AREA_SPELL_IDS, BASE_AREA_STATS, isAreaSpellId } from '../config/areas';
 import {
   BASE_STRIKE_STATS,
+  METEOR_POND_LOOK,
   STRIKE_CARDS,
   STRIKE_SPELL_IDS,
   isStrikeSpellId,
@@ -172,7 +173,7 @@ import { IceArrowSpell } from '../spells/IceArrowSpell';
 import { NovaBombSpell } from '../spells/NovaBombSpell';
 import { CompanionSpell } from '../spells/CompanionSpell';
 import { GroundAreaSpell } from '../spells/GroundAreaSpell';
-import { MeteorSpell } from '../spells/MeteorSpell';
+import { MeteorSpell, type BlastSpread } from '../spells/MeteorSpell';
 import { EarthShieldSpell } from '../spells/EarthShieldSpell';
 import { EarthSpikeSpell } from '../spells/EarthSpikeSpell';
 import { IceShieldSpell } from '../spells/IceShieldSpell';
@@ -181,7 +182,7 @@ import { RollingBoulderSpell } from '../spells/RollingBoulderSpell';
 import { TornadoSpell } from '../spells/TornadoSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
 import { AreaPool, type AreaView } from '../systems/AreaPool';
-import { TelegraphPool } from '../systems/TelegraphPool';
+import { TelegraphPool, type MeteorView } from '../systems/TelegraphPool';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { DamageNumberPool } from '../systems/DamageNumberPool';
 import { EnemyPool } from '../systems/EnemyPool';
@@ -469,26 +470,55 @@ export class GameScene extends Phaser.Scene {
 
   /**
    * Test hook (#138): the strikes in the air right now — how long each has left
-   * to fall and how far it will reach — plus what the spells casting them have
-   * committed, landed and hit, and the most one landing hit (#187). The
-   * browser suite watches a telegraph appear, hold, and land on the crowd.
+   * to fall, how far it will reach and (CO-167) where its meteor is drawn —
+   * plus what the spells casting them have committed, landed and hit, and the
+   * most one landing hit (#187). CO-167 adds the ponds on the ground, where
+   * each stands and how it is drawn, the last points strikes landed on, what
+   * the ponds have burned, and how the
+   * blast damage split between the inner and outer half of its reach. The
+   * browser suite watches a meteor fall, land on the crowd and leave a pond
+   * that burns and goes.
    */
   get strikeReport(): {
-    live: { radius: number; remainingS: number }[];
+    live: MeteorView[];
     committed: number;
     landed: number;
     hits: number;
     widest: number;
+    ponds: (AreaView & { x: number; y: number })[];
+    landedAt: { x: number; y: number }[];
+    pondsPlaced: number;
+    pondHits: number;
+    spread: BlastSpread;
   } {
     const spells = this.spells.spells.filter(
       (spell): spell is MeteorSpell => spell instanceof MeteorSpell,
     );
+    const views = this.areas.views;
+    const ponds = this.areas.areas.flatMap((area, i) => {
+      const view = views[i];
+      return view && view.clip === METEOR_POND_LOOK.clip ? [{ ...view, x: area.x, y: area.y }] : [];
+    });
+    const spread = spells.reduce<BlastSpread>(
+      (total, spell) => ({
+        innerHits: total.innerHits + spell.blastSpread.innerHits,
+        innerDamage: total.innerDamage + spell.blastSpread.innerDamage,
+        outerHits: total.outerHits + spell.blastSpread.outerHits,
+        outerDamage: total.outerDamage + spell.blastSpread.outerDamage,
+      }),
+      { innerHits: 0, innerDamage: 0, outerHits: 0, outerDamage: 0 },
+    );
     return {
-      live: this.telegraphs.telegraphs.map((t) => ({ radius: t.radius, remainingS: t.remainingS })),
+      live: [...this.telegraphs.views],
       committed: spells.reduce((total, spell) => total + spell.committed, 0),
       landed: spells.reduce((total, spell) => total + spell.landed, 0),
       hits: spells.reduce((total, spell) => total + spell.hits, 0),
       widest: spells.reduce((most, spell) => Math.max(most, spell.widest), 0),
+      ponds,
+      landedAt: spells.flatMap((spell) => spell.recentLandings.map(({ x, y }) => ({ x, y }))),
+      pondsPlaced: spells.reduce((total, spell) => total + spell.pondsPlaced, 0),
+      pondHits: spells.reduce((total, spell) => total + spell.pondHits, 0),
+      spread,
     };
   }
 
@@ -1056,6 +1086,7 @@ export class GameScene extends Phaser.Scene {
           stats as Readonly<MeteorStats>,
           damage,
           this.telegraphs,
+          this.areas,
           this.fx,
           this.rng,
         );

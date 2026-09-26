@@ -8,7 +8,7 @@ import {
   FX_DEPTH,
   MAX_LIVE_AREAS,
 } from '../config/fx';
-import { areaArtScale, areaScale } from '../core/fx';
+import { areaArtScale, areaScale, fadeOutAlpha } from '../core/fx';
 import { advanceArea, type GroundArea } from '../core/groundArea';
 import {
   sleetAlpha,
@@ -58,6 +58,8 @@ export interface AreaView {
   readonly artRadius: number | null;
   /** How far the art stands from its ring, or null with no art: 0 while it keeps up with a moving patch. */
   readonly artOffset: number | null;
+  /** How opaque the art is drawn right now (CO-167's fade), or null with no art. */
+  readonly artAlpha: number | null;
   /** Whether the ring is shown: a storm (#219) hides it and has no drawn edge. */
   readonly ringShown: boolean;
   /** An ice storm as drawn (#219), or null for a patch drawn with its ring. */
@@ -103,6 +105,8 @@ interface LiveArea {
   } | null;
   /** An ice storm (#219), drawn in place of the ring; null for the ring. */
   readonly storm: LiveStorm | null;
+  /** Seconds the art fades out over at the end of the patch's life (CO-167); absent, no fade. */
+  readonly fadeOutS: number | undefined;
   readonly onTick: AreaTick;
   readonly hooks: AreaHooks;
 }
@@ -131,6 +135,9 @@ interface LiveArea {
  * sized so the art spans the patch (#179); without the clip in the atlas the
  * ring alone still draws, so no spell waits on its art. A `ringless` look
  * (#220, Earthquake) hides the ring while its art draws.
+ *
+ * A look with `fadeOutS` (CO-167, the Meteor pond) fades its art out over the
+ * patch's last moments instead of cutting it off when the patch expires.
  *
  * A storm look (#219, Ice Storm) is drawn instead of the ring: sleet that
  * streaks across the patch on the run clock and fades out before the edge, and
@@ -197,6 +204,7 @@ export class AreaPool {
       clip: art?.clip ?? null,
       artRadius: art ? (art.box.w * Math.abs(art.sprite.scaleX)) / 2 : null,
       artOffset: art ? Math.hypot(art.sprite.x - sprite.x, art.sprite.y - sprite.y) : null,
+      artAlpha: art ? art.sprite.alpha : null,
       ringShown: sprite.visible,
       storm: storm ? stormView(area, storm) : null,
     }));
@@ -226,6 +234,7 @@ export class AreaPool {
       sprite,
       art,
       storm,
+      fadeOutS: look.fadeOutS,
       onTick,
       hooks,
     });
@@ -353,7 +362,10 @@ export class AreaPool {
       this.artGroup.killAndHide(sprite);
       return null;
     }
-    sprite.setScale(areaArtScale(area.radius, box.w));
+    // A recycled sprite may have faded out under another patch.
+    sprite
+      .setScale(areaArtScale(area.radius, box.w))
+      .setAlpha(fadeOutAlpha(area.remainingS, look.fadeOutS));
     return { sprite, clip, box };
   }
 
@@ -391,6 +403,7 @@ export class AreaPool {
         onExpire?.();
       } else {
         if (entry.storm) this.stepStorm(entry, entry.storm, elapsedS, deltaS);
+        entry.art?.sprite.setAlpha(fadeOutAlpha(step.area.remainingS, entry.fadeOutS));
         surviving.push(entry);
       }
     }
