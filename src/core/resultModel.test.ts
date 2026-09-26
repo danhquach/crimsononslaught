@@ -32,6 +32,12 @@ describe('RESULT_HEADLINES', () => {
     expect(RESULT_HEADLINES.lose.text).toBe('Defeat');
     expect(RESULT_HEADLINES.win.color).not.toBe(RESULT_HEADLINES.lose.color);
   });
+
+  it('names an ended run (#252) apart from a win or a loss', () => {
+    expect(RESULT_HEADLINES.ended.text).toBe('Run ended');
+    expect(RESULT_HEADLINES.ended.color).not.toBe(RESULT_HEADLINES.win.color);
+    expect(RESULT_HEADLINES.ended.color).not.toBe(RESULT_HEADLINES.lose.color);
+  });
 });
 
 describe('isConfirmKey', () => {

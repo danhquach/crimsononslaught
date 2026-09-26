@@ -10,8 +10,16 @@ import {
   type GamePayload,
   type LevelUpPayload,
   type Outcome,
+  type PausePayload,
   type ResultPayload,
 } from '../core/scenePayloads';
+import {
+  PAUSE_EVENT,
+  pauseView,
+  type ConfirmAction,
+  type PauseChoosePayload,
+} from '../core/pauseModel';
+import { watchStartButton, type StartButtonWatch } from './input';
 import { artFrame } from '../core/animation';
 import { BOSS_EVENT, type BossPhasePayload } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor } from '../config/sounds';
@@ -320,6 +328,10 @@ export class GameScene extends Phaser.Scene {
   private numbers!: DamageNumberPool;
   private feedback = readFeedbackSettings({});
   private shake: ShakeState = NO_SHAKE;
+  /** Game has queued its own pause under an overlay (see `pauseUnder`). */
+  private pausing = false;
+  /** Pad Start (#252): pauses the run, polled in `update`. */
+  private startButton!: StartButtonWatch;
   /** Run time left on a magnet pickup (#128); while above 0 every gem on the map drifts in. */
   private magnetMsLeft = 0;
 
@@ -620,6 +632,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.fixedStep = false;
     this.pendingLevelUps = 0;
     this.pendingRelics = 0;
+    this.pausing = false;
     this.magnetMsLeft = 0;
     this.offer = [];
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
@@ -700,7 +713,33 @@ export class GameScene extends Phaser.Scene {
       }
     };
     this.events.on(BOSS_EVENT.phase, onBossPhase);
+    // #252: Esc or pad Start pauses, and the pause screen sends back the way
+    // out it confirmed. The keyboard plugin drops its own listener on shutdown.
+    const onChoose = ({ action }: PauseChoosePayload): void => this.leaveFromPause(action);
+    this.events.on(PAUSE_EVENT.choose, onChoose);
+    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.repeat) this.openPause();
+    });
+    this.startButton = watchStartButton(this);
+    // A paused scene polls nothing, so the Start that resumed it (or one still
+    // held) is not a fresh press.
+    const onResume = (): void => {
+      this.pausing = false;
+      this.startButton.reset();
+    };
+    this.events.on(Phaser.Scenes.Events.RESUME, onResume);
+    // Losing focus pauses too, so a run is not lost in the background. The
+    // game's emitter outlives this scene; these come off on shutdown below.
+    const onFocusLost = (): void => {
+      this.openPause();
+    };
+    this.game.events.on(Phaser.Core.Events.BLUR, onFocusLost);
+    this.game.events.on(Phaser.Core.Events.HIDDEN, onFocusLost);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off(PAUSE_EVENT.choose, onChoose);
+      this.events.off(Phaser.Scenes.Events.RESUME, onResume);
+      this.game.events.off(Phaser.Core.Events.BLUR, onFocusLost);
+      this.game.events.off(Phaser.Core.Events.HIDDEN, onFocusLost);
       this.events.off(LEVEL_UP_EVENT.pick, onPick);
       this.events.off(PLAYER_EVENT.died, onDied);
       this.events.off(BOSS_EVENT.died, onBossDied);
@@ -721,6 +760,9 @@ export class GameScene extends Phaser.Scene {
    */
   update(time: number, delta: number): void {
     if (!this.payload) return;
+    // #252: before the drain, so a Start pressed on a level-up frame is not lost.
+    // The drain runs on the first update after Resume.
+    if (this.startButton.pressed() && this.openPause()) return;
     // Spec §4 step 3: XP owed from the last pickup is paid before the run moves
     // on. Draining here rather than at pickup is what sequences several levels
     // from one gem: each overlay pauses Game, and the next update after it
@@ -1496,8 +1538,7 @@ export class GameScene extends Phaser.Scene {
     this.offer = resolution.cards;
     const payload: LevelUpPayload = { offer: resolution.cards };
     this.audio.play('progress.levelUp');
-    this.scene.pause();
-    this.scene.launch(SCENE.levelUp, payload);
+    this.pauseUnder(SCENE.levelUp, payload);
     return true;
   }
 
@@ -1524,9 +1565,66 @@ export class GameScene extends Phaser.Scene {
     this.offer = cards;
     const payload: LevelUpPayload = { offer: cards };
     this.audio.play('progress.levelUp');
-    this.scene.pause();
-    this.scene.launch(SCENE.levelUp, payload);
+    this.pauseUnder(SCENE.levelUp, payload);
     return true;
+  }
+
+  /**
+   * #252: pause the run under the pause screen, showing the build as it
+   * stands. Not over a level-up or relic overlay, not twice, and not once the
+   * run is over. Returns whether it opened.
+   */
+  private openPause(): boolean {
+    if (!this.payload || this.pausing || this.run.phase === 'over') return false;
+    const view = pauseView({
+      level: this.run.level,
+      spells: this.spells.spells.map((spell) => ({
+        id: spell.id,
+        name: this.cards.get(spell.id)?.name ?? spell.id,
+      })),
+      passives: this.spells.loadout.passives,
+      relics: this.spells.loadout.relics,
+      kills: this.run.kills,
+      embers: this.run.embers,
+      elapsedMs: this.run.elapsedMs,
+    });
+    const payload: PausePayload = { view };
+    this.audio.play('ui.confirm');
+    this.pauseUnder(SCENE.pause, payload);
+    return true;
+  }
+
+  /**
+   * Pause Game under an overlay. Phaser applies both next frame, so until then
+   * `pausing` is what keeps a second overlay out (an Esc or a blur landing on
+   * the frame a level-up was queued); it clears when Game resumes.
+   */
+  private pauseUnder(
+    key: typeof SCENE.levelUp | typeof SCENE.pause,
+    payload: LevelUpPayload | PausePayload,
+  ): void {
+    this.pausing = true;
+    this.scene.pause();
+    this.scene.launch(key, payload);
+  }
+
+  /**
+   * #252: take the way out the pause screen confirmed. End run is an early
+   * `endRun`; Restart and Main menu abandon the run, so nothing is recorded or
+   * banked. Stopping Game stops neither the pause screen nor the HUD, so every
+   * way out stops both.
+   */
+  private leaveFromPause(action: ConfirmAction): void {
+    if (!this.payload) return;
+    this.scene.stop(SCENE.pause);
+    if (action === 'end') {
+      this.endRun('ended');
+      return;
+    }
+    this.scene.stop(SCENE.hud);
+    // The same payload is the same starting spell and seed, as Play again gives.
+    if (action === 'restart') this.scene.restart(this.payload);
+    else this.scene.start(SCENE.intro);
   }
 
   /**

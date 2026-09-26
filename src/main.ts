@@ -5,6 +5,7 @@ import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
 import { IntroScene } from './scenes/IntroScene';
 import { LevelUpScene } from './scenes/LevelUpScene';
+import { PauseScene } from './scenes/PauseScene';
 import { ProfileScene } from './scenes/ProfileScene';
 import { ResultScene } from './scenes/ResultScene';
 import { SettingsScene } from './scenes/SettingsScene';
@@ -39,7 +40,7 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     gamepad: true,
   },
-  // Flow: Boot -> Intro -> SpellSelect -> Game (+ Hud overlay, LevelUp overlay on level-up) -> Result -> SpellSelect.
+  // Flow: Boot -> Intro -> SpellSelect -> Game (+ Hud overlay, LevelUp overlay on level-up, Pause overlay on Esc / Start) -> Result -> SpellSelect.
   // Intro <-> Settings and Intro <-> Profile are its panels (#121); SpellSelect <-> Upgrades is the meta loop (CO-101).
   scene: [
     BootScene,
@@ -51,6 +52,7 @@ const config: Phaser.Types.Core.GameConfig = {
     GameScene,
     HudScene,
     LevelUpScene,
+    PauseScene,
     ResultScene,
     TextureDebugScene,
     CollisionDebugScene,

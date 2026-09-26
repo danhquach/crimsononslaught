@@ -155,8 +155,8 @@ describe('migrate', () => {
 });
 
 describe('recordRun', () => {
-  it('banks exactly the Embers the run collected, win or lose (#195)', () => {
-    for (const outcome of ['win', 'lose'] as const) {
+  it('banks exactly the Embers the run collected, win, lose or ended (#195, #252)', () => {
+    for (const outcome of ['win', 'lose', 'ended'] as const) {
       const before = { ...emptySave(), currency: 25 };
       const after = recordRun(before, stats, outcome, stats.embers);
       expect(after.currency - before.currency, outcome).toBe(stats.embers);
@@ -190,6 +190,13 @@ describe('recordRun', () => {
       spellCounts: { fire: 1, ice: 1 },
     });
     expect(two.currency).toBe(150);
+  });
+
+  it('counts an ended run (#252) as a run played, not a win', () => {
+    const ended = recordRun(emptySave(), stats, 'ended', 100);
+    expect(ended.profile.runs).toBe(1);
+    expect(ended.profile.wins).toBe(0);
+    expect(ended.profile.totalKills).toBe(stats.kills);
   });
 
   it('leaves the save it was given alone', () => {

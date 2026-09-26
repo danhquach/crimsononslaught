@@ -147,6 +147,45 @@ export function attachMenuInput(
   });
 }
 
+/**
+ * Start on a standard-mapping pad: the W3C Gamepad layout's button 9. Phaser
+ * has no getter for it.
+ */
+const START_BUTTON = 9;
+
+export interface StartButtonWatch {
+  /** True on the poll where Start goes down; call once a frame. */
+  pressed(): boolean;
+  /** Take a fresh baseline on the next poll, as after a stretch of not polling. */
+  reset(): void;
+}
+
+/**
+ * Pad Start as a press edge (#252: it toggles the pause screen). Like
+ * `attachMenuInput`, the first poll after a connect or a `reset` only takes a
+ * baseline, so a Start still held from the press that opened a screen does not
+ * close it again.
+ */
+export function watchStartButton(scene: Phaser.Scene): StartButtonWatch {
+  let prev: boolean | null = null;
+  return {
+    pressed: () => {
+      const pad = firstPad(scene);
+      if (!pad) {
+        prev = null;
+        return false;
+      }
+      const down = pad.buttons[START_BUTTON]?.pressed ?? false;
+      const edge = prev === false && down;
+      prev = down;
+      return edge;
+    },
+    reset: () => {
+      prev = null;
+    },
+  };
+}
+
 function readMenuState(pad: Phaser.Input.Gamepad.Gamepad): MenuInputState {
   const stick = stickVector(pad.leftStick.x, pad.leftStick.y);
   return {
