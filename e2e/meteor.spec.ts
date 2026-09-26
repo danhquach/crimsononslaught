@@ -1,20 +1,29 @@
 import { expect, test, type Page } from '@playwright/test';
 import { MAX_LIVE_TELEGRAPHS } from '../src/config/fx';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
-import { BASE_METEOR_STATS, STRIKE_SPELL_IDS } from '../src/config/strikes';
+import {
+  BASE_METEOR_STATS,
+  METEOR_CLIP,
+  METEOR_FALL_PX,
+  METEOR_POND_LOOK,
+  STRIKE_SPELL_IDS,
+} from '../src/config/strikes';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
+import type { HudScene } from '../src/scenes/HudScene';
+import { cardCenter, collectErrors, MIN_FPS, startFromIntro, waitForScene } from './game';
 
 /**
  * #138 in the browser: a run carrying Meteor, equipped through the `?loadout=`
  * test hook, in a filling arena so the strikes have a crowd to fall on.
  *
- * When a strike lands exactly, where it lands and who it reaches are
+ * When a strike lands exactly, where it lands, who it reaches and how hard are
  * `core/skyStrike.test.ts`'s. What only a real run can show is that casts reach
- * the pool, that a telegraph holds on the ground for the fall and comes off it
- * when the strike lands rather than piling up, that the landings hit live
- * enemies, that the cap holds in a scaled run, and that the frame rate survives
+ * the pool, that each strike is a meteor drawn falling along its path onto the
+ * point with nothing on the ground first (CO-167), that it comes off the pool
+ * when it lands rather than piling up, that the landings hit live enemies
+ * harder near the centre, that each leaves a pond that burns the crowd and
+ * goes, that the cap holds in a scaled run, and that the frame rate survives
  * it all (spec §11).
  */
 
@@ -41,13 +50,26 @@ const RUN_MS = 115_000;
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
 
+/**
+ * How far a meteor may be drawn from where its fall says it is, in px: the
+ * sprite is placed on the run clock's step, so only float noise separates them.
+ */
+const PATH_TOLERANCE_PX = 1;
+
 type Report = GameScene['strikeReport'];
 
-async function sample(page: Page): Promise<Report | null> {
+/**
+ * The report and the run time, read in one evaluate so both describe the same
+ * step of a running game (#198).
+ */
+async function sample(page: Page): Promise<{ report: Report; elapsedMs: number } | null> {
   return page.evaluate(async (scene) => {
     const { game } = await import('/src/main.ts');
     if (!game.scene.isActive(scene.game) && !game.scene.isPaused(scene.game)) return null;
-    return (game.scene.getScene(scene.game) as GameScene).strikeReport;
+    return {
+      report: (game.scene.getScene(scene.game) as GameScene).strikeReport,
+      elapsedMs: (game.scene.getScene(scene.hud) as HudScene).view.elapsedMs,
+    };
   }, SCENE);
 }
 
@@ -60,7 +82,9 @@ async function answerLevelUp(page: Page): Promise<void> {
   if (paused) await page.keyboard.press('1');
 }
 
-test('meteors telegraph a point, hold for the fall and land on the crowd', async ({ page }) => {
+test('meteors fall onto a point, blast the crowd and leave a pond that burns and goes', async ({
+  page,
+}) => {
   const errors = collectErrors(page);
 
   // Invulnerable, so the window is spent watching strikes rather than possibly
@@ -88,8 +112,8 @@ test('meteors telegraph a point, hold for the fall and land on the crowd', async
     await answerLevelUp(page);
     const current = await sample(page);
     if (!current) break;
-    trace.push(current);
-    runMs = (await readHud(page)).elapsedMs;
+    trace.push(current.report);
+    runMs = current.elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);
@@ -118,25 +142,89 @@ test('meteors telegraph a point, hold for the fall and land on the crowd', async
 
   const counts = trace.map((report) => report.live.length);
   const mostAtOnce = Math.max(...counts);
-  // A telegraph was seen holding on the ground at some sample: a 1 s fall at
-  // 10x run time is 100 ms of wall time, the sampling interval.
-  expect(mostAtOnce, 'telegraphs on the ground at once').toBeGreaterThan(0);
+  // A meteor was seen in the air at some sample: a 1 s fall at 10x run time is
+  // 100 ms of wall time, the sampling interval.
+  expect(mostAtOnce, 'meteors in the air at once').toBeGreaterThan(0);
   expect(mostAtOnce, 'the pool cap holds').toBeLessThanOrEqual(MAX_LIVE_TELEGRAPHS);
-  // They come off the ground: far more were committed than were ever up
-  // together, which only landings can produce.
+  // They come down: far more were committed than were ever up together, which
+  // only landings can produce.
   expect(last?.committed, 'committed vs ever up at once').toBeGreaterThan(mostAtOnce);
 
+  // CO-167: every strike in the air is the meteor itself, drawn on its path
+  // into the point, up and to the left of it and as far back as the fall has
+  // left to run — so nothing is drawn on the point until it lands. Haste may
+  // shorten a later fall, so each is held to its own `fallS`.
+  const distances: number[] = [];
   for (const [i, report] of trace.entries()) {
-    for (const telegraph of report.live) {
-      expect(telegraph.radius, `radius at sample ${i}`).toBeGreaterThanOrEqual(SMALLEST_RADIUS);
-      // A telegraph is only ever reported while it still has fall left; one at
-      // 0 would be a strike the pool failed to land.
-      expect(telegraph.remainingS, `fall left at sample ${i}`).toBeGreaterThan(0);
-      expect(telegraph.remainingS, `fall left at sample ${i}`).toBeLessThanOrEqual(
-        BASE_METEOR_STATS.fallDelay,
+    for (const meteor of report.live) {
+      const at = `sample ${i}`;
+      expect(meteor.radius, `radius at ${at}`).toBeGreaterThanOrEqual(SMALLEST_RADIUS);
+      // Only ever reported while it still has fall left; one at 0 would be a
+      // strike the pool failed to land.
+      expect(meteor.remainingS, `fall left at ${at}`).toBeGreaterThan(0);
+      expect(meteor.remainingS, `fall left at ${at}`).toBeLessThanOrEqual(meteor.fallS);
+      expect(meteor.fallS, `fall at ${at}`).toBeLessThanOrEqual(BASE_METEOR_STATS.fallDelay);
+      expect(meteor.clip, `meteor art at ${at}`).toBe(METEOR_CLIP);
+      expect(meteor.visible, `meteor shown at ${at}`).toBe(true);
+      const distance = Math.hypot(meteor.x - meteor.drawnX, meteor.y - meteor.drawnY);
+      const expected = (METEOR_FALL_PX * meteor.remainingS) / meteor.fallS;
+      expect(Math.abs(distance - expected), `meteor on its path at ${at}`).toBeLessThanOrEqual(
+        PATH_TOLERANCE_PX,
       );
+      expect(meteor.drawnX, `comes from the left at ${at}`).toBeLessThan(meteor.x);
+      expect(meteor.drawnY, `comes from above at ${at}`).toBeLessThan(meteor.y);
+      distances.push(distance);
     }
   }
+  // Seen at different points of their falls, not parked: a meteor moves.
+  expect(new Set(distances.map((d) => Math.round(d))).size, 'distinct fall points').toBeGreaterThan(
+    1,
+  );
+
+  // The blast falls off: an enemy in the inner half of the reach takes more
+  // than one in the outer half, on average (both before crits).
+  const { spread } = last ?? { spread: null };
+  expect(spread?.innerHits, 'blast hits in the inner half').toBeGreaterThan(0);
+  expect(spread?.outerHits, 'blast hits in the outer half').toBeGreaterThan(0);
+  const innerMean = (spread?.innerDamage ?? 0) / (spread?.innerHits || 1);
+  const outerMean = (spread?.outerDamage ?? 0) / (spread?.outerHits || 1);
+  expect(innerMean, 'inner vs outer blast damage').toBeGreaterThan(outerMean);
+
+  // Each landing leaves a pond on its point, drawn with its own art and no
+  // ring, that burns the crowd. A pond is matched to a meteor seen falling
+  // onto the same point, so it is the one that landing left.
+  const points = new Set(trace.flatMap((r) => r.live.map((m) => `${m.x},${m.y}`)));
+  const ponds = trace.flatMap((r) => r.ponds);
+  expect(last?.pondsPlaced, 'ponds placed').toBeGreaterThan(0);
+  expect(last?.pondsPlaced, 'ponds never outnumber landings').toBeLessThanOrEqual(
+    last?.landed ?? 0,
+  );
+  expect(ponds.length, 'pond samples').toBeGreaterThan(0);
+  for (const pond of ponds) {
+    expect(pond.clip).toBe(METEOR_POND_LOOK.clip);
+    expect(pond.ringShown, 'the pond has no ring').toBe(false);
+    expect(pond.radius).toBeGreaterThanOrEqual(BASE_METEOR_STATS.pondRadius);
+    expect(pond.remainingS, 'a pond is gone once it runs out').toBeGreaterThan(0);
+  }
+  const onPoints = ponds.filter((pond) => points.has(`${pond.x},${pond.y}`)).length;
+  expect(onPoints, 'ponds on a point a meteor was seen falling onto').toBeGreaterThan(0);
+  expect(last?.pondHits, 'enemies burned by ponds').toBeGreaterThan(0);
+  // The ponds go: far more were placed than were ever on the ground together.
+  const pondsAtOnce = Math.max(...trace.map((r) => r.ponds.length));
+  expect(last?.pondsPlaced, 'placed vs ever down at once').toBeGreaterThan(pondsAtOnce);
+  // Logged, not asserted: the 0.3 s fade is 30 ms of wall time at 10x, under
+  // the sampling interval, so a sample inside it is luck (the fade itself is
+  // `fadeOutAlpha`'s unit test).
+  const fading = ponds.filter((pond) => (pond.artAlpha ?? 1) < 1).length;
+
+  // Counts, for comparing runs (small-area sampling, CO-167).
+  console.log(
+    `meteor: committed ${last?.committed}, landed ${last?.landed}, hits ${last?.hits}, ` +
+      `widest ${last?.widest}, air samples ${distances.length}, inner ${spread?.innerHits} ` +
+      `(${innerMean.toFixed(1)}), outer ${spread?.outerHits} (${outerMean.toFixed(1)}), ` +
+      `ponds ${last?.pondsPlaced}, pond samples ${ponds.length} (on points ${onPoints}, ` +
+      `fading ${fading}, most at once ${pondsAtOnce}), pond hits ${last?.pondHits}`,
+  );
 
   // Spec §11: the strikes fall on a full arena and the run still draws.
   const arena = await page.evaluate(async (scene) => {

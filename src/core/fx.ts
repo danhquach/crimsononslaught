@@ -47,6 +47,16 @@ export function areaArtScale(radius: number, artWidth: number): number {
   return (Math.max(0, radius) * 2) / artWidth;
 }
 
+/**
+ * CO-167: how opaque a patch's art is drawn with `remainingS` of its life left
+ * and a `fadeOutS` fade: whole until the fade starts, then down linearly to 0
+ * as it expires. No fade, or a bad one, draws it whole throughout.
+ */
+export function fadeOutAlpha(remainingS: number, fadeOutS: number | undefined): number {
+  if (!(fadeOutS !== undefined && fadeOutS > 0)) return 1;
+  return Math.min(1, Math.max(0, remainingS / fadeOutS));
+}
+
 /** #138: a strike telegraph is drawn at `radius / 100`, so the ring is the blast to come. */
 export function telegraphScale(radius: number): number {
   return Math.max(0, radius) / TELEGRAPH_SCALE_RADIUS;

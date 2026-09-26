@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from './rng';
+import { BASE_METEOR_STATS, METEOR_FALL_ANGLE_DEG, METEOR_FALL_PX } from '../config/strikes';
 import {
   advanceTelegraphs,
+  blastFalloff,
   createTelegraph,
+  fallHeading,
+  fallPosition,
+  fallProgress,
+  fallRotation,
   pickImpactPoint,
   strikeTargets,
   type Telegraph,
@@ -79,6 +85,7 @@ describe('createTelegraph', () => {
       x: 10,
       y: 20,
       remainingS: DELAY,
+      fallS: DELAY,
       radius: RADIUS,
     });
   });
@@ -122,12 +129,12 @@ describe('advanceTelegraphs', () => {
 
   it('carries the committed point and reach onto the landing, at zero remaining', () => {
     const step = advanceTelegraphs([createTelegraph({ x: 40, y: -7 }, 0.2, RADIUS)], 1);
-    expect(step.landed).toEqual([{ x: 40, y: -7, remainingS: 0, radius: RADIUS }]);
+    expect(step.landed).toEqual([{ x: 40, y: -7, remainingS: 0, fallS: 0.2, radius: RADIUS }]);
   });
 
   it('counts a live telegraph down by the frame', () => {
     const step = advanceTelegraphs([createTelegraph(ORIGIN, DELAY, RADIUS)], 0.25);
-    expect(step.live).toEqual([{ ...ORIGIN, remainingS: 0.75, radius: RADIUS }]);
+    expect(step.live).toEqual([{ ...ORIGIN, remainingS: 0.75, fallS: DELAY, radius: RADIUS }]);
     expect(step.landed).toEqual([]);
   });
 
@@ -187,5 +194,108 @@ describe('strikeTargets', () => {
     expect(strikeTargets(ORIGIN, crowd, 0).map((c) => c.id)).toEqual(['centre']);
     expect(strikeTargets(ORIGIN, crowd, -1)).toEqual([]);
     expect(strikeTargets(ORIGIN, crowd, Number.NaN)).toEqual([]);
+  });
+});
+
+/** CO-167: the meteor comes in along a straight 35° path and reaches its point on landing. */
+describe('the fall', () => {
+  const IMPACT = { x: 200, y: 150 };
+  const sin = Math.sin((METEOR_FALL_ANGLE_DEG * Math.PI) / 180);
+  const cos = Math.cos((METEOR_FALL_ANGLE_DEG * Math.PI) / 180);
+
+  it('heads down and to the right, 35° off vertical, as a unit vector', () => {
+    expect(METEOR_FALL_ANGLE_DEG).toBe(35);
+    const heading = fallHeading();
+    expect(heading.x).toBeCloseTo(sin, 12);
+    expect(heading.y).toBeCloseTo(cos, 12);
+    expect(Math.hypot(heading.x, heading.y)).toBeCloseTo(1, 12);
+    expect(heading.x).toBeGreaterThan(0);
+    expect(heading.y).toBeGreaterThan(heading.x);
+  });
+
+  it('starts 300 px back along the heading, up and to the left of the point', () => {
+    expect(METEOR_FALL_PX).toBe(300);
+    const start = fallPosition(IMPACT, 0);
+    expect(start.x).toBeCloseTo(IMPACT.x - 300 * sin, 9);
+    expect(start.y).toBeCloseTo(IMPACT.y - 300 * cos, 9);
+    expect(Math.hypot(IMPACT.x - start.x, IMPACT.y - start.y)).toBeCloseTo(300, 9);
+  });
+
+  it('ends on the impact point', () => {
+    const end = fallPosition(IMPACT, 1);
+    expect(end.x).toBeCloseTo(IMPACT.x, 12);
+    expect(end.y).toBeCloseTo(IMPACT.y, 12);
+  });
+
+  it('moves along a straight line at constant speed', () => {
+    const start = fallPosition(IMPACT, 0);
+    for (const t of [0.25, 0.5, 0.75]) {
+      const at = fallPosition(IMPACT, t);
+      expect(at.x, `${t}`).toBeCloseTo(start.x + (IMPACT.x - start.x) * t, 9);
+      expect(at.y, `${t}`).toBeCloseTo(start.y + (IMPACT.y - start.y) * t, 9);
+    }
+  });
+
+  it('holds progress outside 0-1 to the ends, so it never overshoots', () => {
+    expect(fallPosition(IMPACT, 1.5)).toEqual(fallPosition(IMPACT, 1));
+    expect(fallPosition(IMPACT, -1)).toEqual(fallPosition(IMPACT, 0));
+    expect(fallPosition(IMPACT, Number.NaN)).toEqual(fallPosition(IMPACT, 1));
+  });
+
+  it('turns art drawn falling straight down by -35°, so the rock leads', () => {
+    const rotation = fallRotation();
+    expect(rotation).toBeCloseTo((-35 * Math.PI) / 180, 12);
+    // Phaser turns (x, y) by r to (x cos r - y sin r, x sin r + y cos r): the
+    // art's downward axis (0, 1) must come out along the heading.
+    const heading = fallHeading();
+    expect(-Math.sin(rotation)).toBeCloseTo(heading.x, 12);
+    expect(Math.cos(rotation)).toBeCloseTo(heading.y, 12);
+  });
+
+  it('runs progress from 0 at the cast to 1 on landing, on the run clock', () => {
+    const telegraph = createTelegraph(IMPACT, DELAY, RADIUS);
+    expect(fallProgress(telegraph)).toBe(0);
+    const [quarter] = advanceTelegraphs([telegraph], 0.25).live;
+    expect(quarter && fallProgress(quarter)).toBeCloseTo(0.25, 12);
+    const [landed] = advanceTelegraphs([telegraph], DELAY).landed;
+    expect(landed && fallProgress(landed)).toBe(1);
+    expect(fallProgress(createTelegraph(IMPACT, 0, RADIUS))).toBe(1);
+  });
+});
+
+/** CO-167: the blast hits hardest at the centre and falls off evenly to the rim. */
+describe('blastFalloff', () => {
+  const { aoeRadius, aoeEdgeFactor, damage } = BASE_METEOR_STATS;
+
+  it('is 1 at the centre and the edge factor at the rim', () => {
+    expect(blastFalloff(0, aoeRadius, aoeEdgeFactor)).toBe(1);
+    expect(blastFalloff(aoeRadius, aoeRadius, aoeEdgeFactor)).toBeCloseTo(aoeEdgeFactor, 12);
+  });
+
+  it('deals 60 at the centre and 24 at the rim at base', () => {
+    expect(damage * blastFalloff(0, aoeRadius, aoeEdgeFactor)).toBe(60);
+    expect(damage * blastFalloff(aoeRadius, aoeRadius, aoeEdgeFactor)).toBeCloseTo(24, 9);
+  });
+
+  it('falls off linearly in distance between them', () => {
+    for (const share of [0.1, 0.25, 0.5, 0.9]) {
+      expect(blastFalloff(share * aoeRadius, aoeRadius, aoeEdgeFactor), `${share}`).toBeCloseTo(
+        1 - (1 - aoeEdgeFactor) * share,
+        12,
+      );
+    }
+    expect(blastFalloff(35, 70, 0.4)).toBeCloseTo(0.7, 12);
+  });
+
+  it('deals nothing beyond the rim', () => {
+    expect(blastFalloff(aoeRadius + 0.01, aoeRadius, aoeEdgeFactor)).toBe(0);
+    expect(blastFalloff(500, aoeRadius, aoeEdgeFactor)).toBe(0);
+    expect(blastFalloff(Number.NaN, aoeRadius, aoeEdgeFactor)).toBe(0);
+  });
+
+  it('hits only the point, in full, with no reach', () => {
+    expect(blastFalloff(0, 0, aoeEdgeFactor)).toBe(1);
+    expect(blastFalloff(1, 0, aoeEdgeFactor)).toBe(0);
+    expect(blastFalloff(0, -5, aoeEdgeFactor)).toBe(0);
   });
 });

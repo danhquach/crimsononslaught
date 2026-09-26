@@ -320,24 +320,36 @@ export interface GroundAreaStats {
 }
 
 /**
- * Meteor (#138, spec §9.2): a strike committed to a ground point near a target,
- * telegraphed for `fallDelay`, landing on the whole crowd within `aoeRadius`.
+ * Meteor (#138; CO-167 rework spec §4): a strike committed to a ground point
+ * near a target, falling for `fallDelay`, landing on the whole crowd within
+ * `aoeRadius` with a blast that falls off toward the rim, and leaving a magma
+ * pond that burns whatever stands in it.
  */
 export interface MeteorStats {
   /** Seconds between casts. */
   cooldown: number;
-  /** Damage the landing deals, scaled by `aoeDamageFactor` for everything it reaches. */
+  /** Damage the landing deals at its centre, scaled by `aoeDamageFactor`. */
   damage: number;
   /** How far the landing reaches from the committed point, in px. */
   aoeRadius: number;
   /** Landing damage as a fraction of `damage`; Meteor's is Big Blast's 1 always. */
   aoeDamageFactor: number;
+  /** The share of the centre's damage the blast still deals at `aoeRadius`, 0-1. */
+  aoeEdgeFactor: number;
   /** Strikes per cast. */
   projectiles: number;
   /** How far from the player a target may be picked, in px. */
   targetRange: number;
-  /** Seconds between the cast and the landing — how long the telegraph shows. */
+  /** Seconds between the cast and the landing — how long the meteor falls. */
   fallDelay: number;
+  /** How far the pond reaches from the point, in px. */
+  pondRadius: number;
+  /** Seconds the pond stays on the ground. */
+  pondDuration: number;
+  /** Damage one pond tick deals to every enemy inside. */
+  pondTickDamage: number;
+  /** Seconds between two pond ticks. */
+  pondTickRate: number;
 }
 
 /**

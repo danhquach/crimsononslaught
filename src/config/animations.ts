@@ -140,10 +140,12 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // `docs/art/prompts/CO-123-spell-fx.md`.
   //
   // Meteor's mark is paced to the 1 s `fallDelay` in `config/strikes.ts`: four
-  // frames at 4 fps is one pulse per fall, so the ring finishes its cycle as
-  // the meteor lands rather than cutting off mid-pulse.
+  // frames at 4 fps is one pulse per fall. Nothing draws it since CO-167 put
+  // the falling body in its place; it stays in the atlas until a cleanup.
   spec('fire.meteorMark', 4, 4, LOOP),
   spec('fire.meteor', 4, 12, LOOP),
+  // Meteor's magma pond (CO-167): a slow simmer, looped for the pond's life.
+  spec('fire.pond', 4, 6, LOOP),
   // Fire Column's body and hit (CO-123). No spell draws them since Fire Wave
   // replaced the column (CO-143, #218): they are kept as a reserved background
   // prop for later, not a spell body.

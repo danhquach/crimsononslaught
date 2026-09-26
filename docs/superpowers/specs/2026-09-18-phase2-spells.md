@@ -491,6 +491,12 @@ waits (#212) rather than dropping at the player's feet. The telegraph is drawn
 above the crowd, not on the floor with the ground areas, because a warning the
 enemy cap can bury is not a warning.
 
+> **Superseded (CO-167, #258).** The Meteor paragraph above and the
+> `fire_meteor` column of the table are replaced by
+> `2026-09-26-meteor-rework-design.md`: no telegraph ring, a meteor falling
+> diagonally onto the point, a 70 px blast that falls off to 40% at its rim,
+> and a magma pond that burns the crowd. Targeting and the scatter are unchanged.
+
 ### 9.3 Ice
 
 | Spell | id | Behaviour | Needs |

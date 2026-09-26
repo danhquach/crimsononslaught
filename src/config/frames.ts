@@ -25,6 +25,7 @@ export const ATLAS_PAGES = [
   { key: 'props9', texture: 'assets/atlas/props9.png', data: 'assets/atlas/props9.json' },
   { key: 'props10', texture: 'assets/atlas/props10.png', data: 'assets/atlas/props10.json' },
   { key: 'props11', texture: 'assets/atlas/props11.png', data: 'assets/atlas/props11.json' },
+  { key: 'props12', texture: 'assets/atlas/props12.png', data: 'assets/atlas/props12.json' },
 ] as const satisfies readonly AtlasPage[];
 
 /** Texture key of an atlas page. */
@@ -354,6 +355,10 @@ export const FRAMES = {
   'fire.meteorMark.1': { w: 202, h: 212, anchorX: 101, anchorY: 106, page: 'props3' },
   'fire.meteorMark.2': { w: 202, h: 212, anchorX: 101, anchorY: 106, page: 'props3' },
   'fire.meteorMark.3': { w: 202, h: 212, anchorX: 101, anchorY: 106, page: 'props3' },
+  'fire.pond.0': { w: 146, h: 128, anchorX: 73, anchorY: 64, page: 'props12' },
+  'fire.pond.1': { w: 146, h: 128, anchorX: 73, anchorY: 64, page: 'props12' },
+  'fire.pond.2': { w: 146, h: 128, anchorX: 73, anchorY: 64, page: 'props12' },
+  'fire.pond.3': { w: 146, h: 128, anchorX: 73, anchorY: 64, page: 'props12' },
   'fire.spawn.0': { w: 24, h: 17, anchorX: 11, anchorY: 8, page: 'props' },
   'fire.spawn.1': { w: 24, h: 17, anchorX: 11, anchorY: 8, page: 'props' },
   'fire.spawn.2': { w: 24, h: 17, anchorX: 11, anchorY: 8, page: 'props' },
@@ -728,6 +733,7 @@ export const ART_BOXES = {
   'fire.fly': { x: 1, y: 1, w: 23, h: 12 },
   'fire.meteor': { x: 1, y: 1, w: 33, h: 74 },
   'fire.meteorMark': { x: 2, y: 2, w: 197, h: 190 },
+  'fire.pond': { x: 2, y: 2, w: 140, h: 123 },
   'fire.spawn': { x: 1, y: 1, w: 22, h: 15 },
   'fire.wave': { x: 1, y: 1, w: 73, h: 146 },
   'gem.drift': { x: 1, y: 1, w: 17, h: 16 },

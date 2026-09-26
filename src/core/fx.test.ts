@@ -16,6 +16,7 @@ import {
   chainSegmentPose,
   dustFlip,
   explosionScale,
+  fadeOutAlpha,
   flightFlipY,
   flightRotation,
   novaScale,
@@ -75,9 +76,18 @@ describe('effect scales (CO-082)', () => {
     expect(areaArtScale(180, 0)).toBe(0);
   });
 
+  it('fades a patch out over its last fadeOutS, and draws it whole before (CO-167)', () => {
+    expect(fadeOutAlpha(1.5, 0.3)).toBe(1);
+    expect(fadeOutAlpha(0.3, 0.3)).toBe(1);
+    expect(fadeOutAlpha(0.15, 0.3)).toBeCloseTo(0.5, 12);
+    expect(fadeOutAlpha(0, 0.3)).toBe(0);
+    expect(fadeOutAlpha(-1, 0.3)).toBe(0);
+    for (const none of [undefined, 0, -1, Number.NaN]) expect(fadeOutAlpha(0.1, none)).toBe(1);
+  });
+
   it('draws a telegraph at radius / 100, so the ring is the blast to come', () => {
     expect(telegraphScale(100)).toBe(1);
-    expect(telegraphScale(BASE_METEOR_STATS.aoeRadius)).toBeCloseTo(1.3);
+    expect(telegraphScale(BASE_METEOR_STATS.aoeRadius)).toBeCloseTo(0.7);
     expect(telegraphScale(-50)).toBe(0);
   });
 
