@@ -57,6 +57,15 @@ export const BASE_FIRE_DRAGON_STATS: Readonly<FireDragonStats> = {
   duration: 3,
 };
 
+/**
+ * The scale a dragon is drawn at in flight (CO-162), chosen rather than
+ * inherited: the `fire.dragon` art is ~111 px wide, as big as the boss at
+ * native size. Half size (~56 px) reads as a heavier shot than a Fire Bolt's
+ * 23 px without crowding the arena, and keeps the 6 px hit radius exact once
+ * `Projectile.fire` passes it through the scale (12 px at 0.5 → 6 px).
+ */
+export const DRAGON_DRAW_SCALE = 0.5;
+
 export const BASE_FIRE_ROSTER_STATS = {
   fire_column: BASE_FIRE_WAVE_STATS,
   fire_dragon: BASE_FIRE_DRAGON_STATS,

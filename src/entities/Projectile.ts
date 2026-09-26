@@ -9,9 +9,14 @@ export interface ProjectileLook {
   readonly texture: TextureKey;
   /** The clip it plays in the air (CO-082), drawn flying right; none = a still disc. */
   readonly clip?: string;
+  /**
+   * The scale the clip is drawn at; none = native. The body is passed through
+   * it, so the hit radius stays the placeholder's whatever the art's size.
+   */
+  readonly scale?: number;
 }
 
-/** Fire's fireball, on its own flight clip since CO-153: `fire.fly` stays the dragon's and the companion's shot. */
+/** Fire's fireball, on its own flight clip since CO-153: `fire.fly` stays the companion's shot. */
 const FIREBALL: ProjectileLook = { texture: 'proj_fire', clip: 'fire.ball' };
 
 /**
@@ -54,6 +59,8 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     // look this pooled shot wore last time.
     const radius = PLACEHOLDERS[look.texture].width / 2;
     clearClip(this);
+    // Scale is sticky on a pooled sprite: back to native before any look.
+    this.setScale(1);
     this.setTexture(look.texture);
     this.setOrigin(0.5, 0.5);
     this.enableBody(true, x, y, true, true);
@@ -62,7 +69,11 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.scene.physics.moveTo(this, target.x, target.y, speed);
     // Straight flight: the heading is fixed at launch, so it is set once here.
     this.setRotation(flightRotation(body.velocity, 0));
-    if (look.clip) showClip(this, look.clip, radius);
+    if (!look.clip) return;
+    // Arcade scales the body with the sprite, so the clip's body is drawn at
+    // `radius / scale`. A missing atlas keeps the native placeholder disc.
+    const scale = look.scale ?? 1;
+    if (showClip(this, look.clip, radius / scale)) this.setScale(scale);
   }
 
   /** Return to the pool: inactive, invisible, body disabled. */

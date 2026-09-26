@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { PLACEHOLDERS } from '../src/config/colors';
 import { FIRE_ROSTER_SPELL_IDS } from '../src/config/fireRoster';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { MAX_LIVE_WAVES } from '../src/core/fireWave';
+import { flightFlipY } from '../src/core/fx';
 import { MAX_LIVE_DRAGONS } from '../src/core/homing';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
@@ -16,6 +18,8 @@ import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from
  * `core/homing.ts`'s own tests cover the dragon's steering. What only a real
  * run can show is that both reach the pool, land hits on live enemies, hold
  * their caps in a scaled run, and the frame rate survives it all (spec §11).
+ * CO-162: every dragon in the air flies as its own clip, faces its heading
+ * upright, and keeps Fire's 6 px body whatever size the art is drawn at.
  */
 
 const PICKED: SpellId = 'fire';
@@ -101,6 +105,23 @@ test('Fire Wave and Fire Dragon land hits on a live crowd and hold their caps', 
         CAPS[spell.id as (typeof FIRE_ROSTER_SPELL_IDS)[number]],
       );
     }
+  }
+
+  // Read in the same evaluate as the caps, so clip, rotation and velocity come
+  // from one frame.
+  const dragons = trace.flatMap((report) =>
+    report.flatMap((spell) => (spell.id === 'fire_dragon' ? spell.shots : [])),
+  );
+  expect(dragons.length, 'dragon readings in flight').toBeGreaterThan(0);
+  for (const [i, shot] of dragons.entries()) {
+    expect(shot.clip, `dragon ${i} clip`).toBe('fire.dragon');
+    expect(shot.bodyRadius, `dragon ${i} body radius`).toBe(PLACEHOLDERS.proj_fire.width / 2);
+    const heading = Math.atan2(shot.vy, shot.vx);
+    const off = Math.abs(
+      Math.atan2(Math.sin(shot.rotation - heading), Math.cos(shot.rotation - heading)),
+    );
+    expect(off, `dragon ${i} rotation off its heading`).toBeLessThan(0.05);
+    expect(shot.flipY, `dragon ${i} upright`).toBe(flightFlipY(shot.rotation));
   }
 
   const last = trace[trace.length - 1] ?? [];

@@ -159,7 +159,7 @@ import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { LightningBoltSpell } from '../spells/LightningBoltSpell';
 import { FireballSpell } from '../spells/FireballSpell';
 import { FireWaveSpell } from '../spells/FireWaveSpell';
-import { FireDragonSpell } from '../spells/FireDragonSpell';
+import { type DragonShot, FireDragonSpell } from '../spells/FireDragonSpell';
 import { IceArrowSpell } from '../spells/IceArrowSpell';
 import { NovaBombSpell } from '../spells/NovaBombSpell';
 import { CompanionSpell } from '../spells/CompanionSpell';
@@ -472,15 +472,26 @@ export class GameScene extends Phaser.Scene {
   /**
    * Test hook (#140): Fire Wave and Fire Dragon, whichever is equipped —
    * hits each has landed and shots each has in the air right now. The browser
-   * suite watches a run land hits with both and hold their pool caps.
+   * suite watches a run land hits with both and hold their pool caps, and
+   * (CO-162) reads how each dragon in the air is drawn; a wave has no `shots`.
    */
-  get fireReport(): { id: RosterSpellId; hits: number; live: number }[] {
+  get fireReport(): {
+    id: RosterSpellId;
+    hits: number;
+    live: number;
+    shots: DragonShot[];
+  }[] {
     return this.spells.spells
       .filter(
         (spell): spell is FireWaveSpell | FireDragonSpell =>
           spell instanceof FireWaveSpell || spell instanceof FireDragonSpell,
       )
-      .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
+      .map((spell) => ({
+        id: spell.id,
+        hits: spell.hits,
+        live: spell.liveCount,
+        shots: spell instanceof FireDragonSpell ? spell.shots : [],
+      }));
   }
 
   /**
