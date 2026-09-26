@@ -75,8 +75,8 @@ describe('isPausePayload', () => {
   const view = {
     level: 4,
     spells: [
-      { id: 'fire', name: 'Fire Bolt' },
-      { id: 'ice', name: 'Ice Arrow' },
+      { id: 'fire', name: 'Fire Bolt', color: 0xff4400 },
+      { id: 'ice', name: 'Ice Arrow', color: 0x66ccff },
     ],
     passives: [power],
     relics: [{ ...power, name: 'Hourglass', abbr: 'Ho', count: 1 }],

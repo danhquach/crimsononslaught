@@ -24,10 +24,13 @@ const empty = {
 
 describe('pauseView', () => {
   it('shows an empty build as the level, the spell and the stats alone', () => {
-    const view = pauseView({ ...empty, spells: [{ id: 'fire', name: 'Fire Bolt' }] });
+    const view = pauseView({
+      ...empty,
+      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff4400 }],
+    });
     expect(view).toEqual({
       level: 1,
-      spells: [{ id: 'fire', name: 'Fire Bolt' }],
+      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff4400 }],
       passives: [],
       relics: [],
       stats: { kills: 0, embers: 0, elapsedMs: 0 },
@@ -40,8 +43,8 @@ describe('pauseView', () => {
       ...empty,
       level: 9,
       spells: [
-        { id: 'fire', name: 'Fire Bolt' },
-        { id: 'ice', name: 'Ice Arrow' },
+        { id: 'fire', name: 'Fire Bolt', color: 0xff4400 },
+        { id: 'ice', name: 'Ice Arrow', color: 0x66ccff },
       ],
       passives: new Map<PassiveId, number>([
         ['passive_vitality', 3],
@@ -142,6 +145,8 @@ describe('isPauseView', () => {
     expect(isPauseView(null)).toBe(false);
     expect(isPauseView({})).toBe(false);
     expect(isPauseView({ level: -1, spells: [], passives: [], relics: [], stats })).toBe(false);
+    const spell = { id: 'fire', name: 'Fire Bolt' };
+    expect(isPauseView({ level: 1, spells: [spell], passives: [], relics: [], stats })).toBe(false);
     expect(
       isPauseView({
         level: 1,

@@ -1745,10 +1745,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.payload || this.pausing || this.run.phase === 'over') return false;
     const view = pauseView({
       level: this.run.level,
-      spells: this.spells.spells.map((spell) => ({
-        id: spell.id,
-        name: this.cards.get(spell.id)?.name ?? spell.id,
-      })),
+      spells: this.spells.spells.map((spell) => {
+        const card = this.cards.get(spell.id);
+        return { id: spell.id, name: card?.name ?? spell.id, color: card?.color ?? 0xffffff };
+      }),
       passives: this.spells.loadout.passives,
       relics: this.spells.loadout.relics,
       kills: this.run.kills,

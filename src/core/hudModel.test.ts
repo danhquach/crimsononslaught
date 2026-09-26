@@ -26,9 +26,9 @@ const COLUMN = {
 };
 const FIRE_ROW = {
   kind: 'spell',
+  id: 'fire',
   name: 'Fire Bolt',
   label: 'Fire Bolt',
-  icon: 'icon.fire.0',
   glyph: 'FB',
   color: 0xff4400,
   ready: false,
@@ -37,9 +37,9 @@ const FIRE_ROW = {
 } as const;
 const COLUMN_ROW = {
   kind: 'spell',
+  id: 'fire_column',
   name: 'Fire Column',
   label: 'Column',
-  icon: 'icon.fire_column.0',
   glyph: 'FC',
   color: 0xffaa00,
   ready: false,
@@ -257,10 +257,10 @@ describe('slotRows', () => {
     }
   });
 
-  it('gives a spell with no icon art no icon, so its slot keeps the glyph', () => {
+  it('carries the id for the icon art and the glyph for a spell with none', () => {
     const unknown = { ...FIRE, id: 'not_a_spell', name: 'Mystery Bolt' };
     const [row] = slotRows(withLoadout(INITIAL_HUD, { spells: [unknown], passives: [] }));
-    expect(row).toMatchObject({ kind: 'spell', icon: null, glyph: 'MB' });
+    expect(row).toMatchObject({ kind: 'spell', id: 'not_a_spell', glyph: 'MB' });
   });
 
   it('reads as open, not locked, before the first loadout event lands', () => {
