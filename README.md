@@ -4,15 +4,20 @@
 **Play the latest build:** <https://danhquach.github.io/crimsononslaught/>
 
 A browser-based auto-battler "bullet heaven". You move; your spell fires on
-its own. Survive five minutes of escalating waves, then bring down the boss.
+its own. Survive twenty minutes of escalating waves, then bring down the boss.
+
+![Five spells casting at once into a late-run crowd](docs/screenshots/combat.png)
+
+| Pick a starting spell                                     | Level up: three cards, pick one                      | The boss                                 |
+| --------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------- |
+| ![Spell select screen](docs/screenshots/spell-select.png) | ![Level-up card pick](docs/screenshots/level-up.png) | ![Boss fight](docs/screenshots/boss.png) |
 
 Built with [Phaser 3](https://phaser.io/), TypeScript, and Vite.
 
 ## Status
 
 Phase 1 — design complete, implementation in progress. Tracked as GitHub
-issues under the **Phase 1** milestone. Placeholder shapes stand in for art
-until the asset pass.
+issues under the **Phase 1** milestone.
 
 ## Phase 1 at a glance
 
