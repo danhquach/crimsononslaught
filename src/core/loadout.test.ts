@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SLOT_UNLOCK_LEVELS, SPELLS_BY_ELEMENT, type RosterSpellId } from '../config/loadout';
-import { BASE_PLAYER_PROFILE, type PassiveId } from '../config/passives';
+import { BASE_PLAYER_PROFILE, PROFILE_CLAMPS, type PassiveId } from '../config/passives';
+import type { RelicBuffId } from '../config/relics';
 import {
   buildLoadout,
   canEquip,
@@ -13,6 +14,7 @@ import {
   passiveRank,
   profileOf,
   takePassive,
+  takeRelic,
   unlockedSlots,
   validateLoadoutConfig,
   type Loadout,
@@ -165,6 +167,55 @@ describe('passives', () => {
     const after = takePassive(before, 'passive_power');
     expect(before.passives.size).toBe(0);
     expect(after.passives.size).toBe(1);
+  });
+});
+
+describe('relics (#227)', () => {
+  it('stacks ranks, multiplying percentages and adding flat amounts', () => {
+    let loadout = buildLoadout('fire');
+    for (let i = 0; i < 3; i++) loadout = takeRelic(loadout, 'relic_ancient_fury');
+    loadout = takeRelic(loadout, 'relic_bloodstone');
+    loadout = takeRelic(loadout, 'relic_bloodstone');
+    expect(loadout.relics.get('relic_ancient_fury')).toBe(3);
+    const profile = profileOf(loadout);
+    expect(profile.damageMul).toBeCloseTo(1.15 ** 3, 10);
+    expect(profile.maxHp).toBe(BASE_PLAYER_PROFILE.maxHp + 60);
+  });
+
+  it('stacks with passives and permanent upgrades on the same field', () => {
+    let loadout = buildLoadout('fire', new Map([['upgrade_might', 2]]));
+    loadout = takePassive(loadout, 'passive_power');
+    loadout = takeRelic(loadout, 'relic_ancient_fury');
+    expect(profileOf(loadout).damageMul).toBeCloseTo(1.05 ** 2 * 1.1 * 1.15, 10);
+  });
+
+  it('holds the clamps on the total', () => {
+    let loadout = buildLoadout('fire');
+    for (let i = 0; i < 8; i++) {
+      loadout = takePassive(loadout, 'passive_ward');
+      loadout = takeRelic(loadout, 'relic_bulwark');
+      loadout = takeRelic(loadout, 'relic_hawk_eye');
+      loadout = takeRelic(loadout, 'relic_windstep');
+    }
+    for (let i = 0; i < 15; i++) loadout = takeRelic(loadout, 'relic_hourglass');
+    const profile = profileOf(loadout);
+    expect(profile.damageReduction).toBe(PROFILE_CLAMPS.damageReduction?.max);
+    expect(profile.moveSpeed).toBe(PROFILE_CLAMPS.moveSpeed?.max);
+    expect(profile.cooldownMul).toBe(PROFILE_CLAMPS.cooldownMul?.min);
+    // 8 x 7 % is 56 %, still under the 75 % cap.
+    expect(profile.critChance).toBeCloseTo(0.56, 10);
+  });
+
+  it('leaves the passives, and the loadout it was given, untouched', () => {
+    const before = buildLoadout('fire');
+    const after = takeRelic(before, 'relic_windstep');
+    expect(before.relics.size).toBe(0);
+    expect(after.relics.size).toBe(1);
+    expect(after.passives.size).toBe(0);
+  });
+
+  it('refuses an unknown relic buff id', () => {
+    expect(() => takeRelic(buildLoadout('fire'), 'nope' as RelicBuffId)).toThrow(/unknown relic/);
   });
 });
 
