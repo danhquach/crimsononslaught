@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { FRAMES } from '../config/frames';
+import { FRAMES, type FrameName } from '../config/frames';
 import { spellIconFrame } from '../config/spellIcons';
 import { artFrame } from '../core/animation';
 import { spellGlyph } from '../core/hudModel';
@@ -8,7 +8,18 @@ import { hasFrameArt } from './atlas';
 /** The CO-154 icon's art box: 32 px square inside its 36 px frame, what the HUD slot draws at 1x. */
 export const SPELL_ICON_ART_SIZE = 32;
 
-/** What a card knows about the spell it shows. */
+/**
+ * The art a spell's icon draws: its CO-154 frame, or `null` for a spell with
+ * no icon art or a run with no atlas, which shows its colour and letters
+ * instead. The one place that choice is made (CO-170), for the cards, the pause
+ * screen and the HUD slot alike.
+ */
+export function spellIconArt(scene: Phaser.Scene, id: string): FrameName | null {
+  const frame = spellIconFrame(id);
+  return frame && hasFrameArt(scene, frame) ? frame : null;
+}
+
+/** What an icon knows about the spell it shows. */
 export interface IconSpell {
   id: string;
   name: string;
@@ -16,7 +27,7 @@ export interface IconSpell {
 }
 
 /**
- * A spell's icon on a card (CO-155), centred on (x, y) at a whole-number
+ * A spell's icon on a card (CO-155) or the pause screen (CO-170), centred on (x, y) at a whole-number
  * `scale` of the HUD slot's size, so its nearest-neighbour pixels stay even:
  * the spell's CO-154 art, or — for a spell with no icon art, or a run with no
  * atlas — a disc in its colour with its initials, as its HUD slot falls back
@@ -30,8 +41,8 @@ export function addSpellIcon(
   scale: number,
 ): Phaser.GameObjects.GameObject[] {
   const size = SPELL_ICON_ART_SIZE * scale;
-  const frame = spellIconFrame(spell.id);
-  if (frame && hasFrameArt(scene, frame)) {
+  const frame = spellIconArt(scene, spell.id);
+  if (frame) {
     const icon = scene.add.image(x, y, FRAMES[frame].page, artFrame(frame));
     return [icon.setScale(size / Math.max(icon.width, icon.height))];
   }

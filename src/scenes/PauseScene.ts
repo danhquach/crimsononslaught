@@ -1,7 +1,4 @@
 import Phaser from 'phaser';
-import { FRAMES } from '../config/frames';
-import { spellIconFrame } from '../config/spellIcons';
-import { artFrame } from '../core/animation';
 import { PASSIVE_COLOR, RELIC_COLOR, offerColor } from '../core/offerColors';
 import {
   CONFIRM_PROMPTS,
@@ -9,7 +6,6 @@ import {
   PAUSE_ACTIONS,
   PAUSE_EVENT,
   PAUSE_LABELS,
-  abbreviate,
   itemInfo,
   needsConfirm,
   statsLine,
@@ -20,8 +16,8 @@ import {
   type PauseView,
 } from '../core/pauseModel';
 import { SCENE, isPausePayload, type PausePayload } from '../core/scenePayloads';
-import { hasFrameArt } from '../render/atlas';
 import { audioOf } from '../render/audio';
+import { SPELL_ICON_ART_SIZE, addSpellIcon } from '../render/spellIcon';
 import { attachMenuInput, watchStartButton, type MenuItem } from './input';
 
 const CRIMSON = 0xdc143c;
@@ -48,7 +44,8 @@ const STRIP_CONTENT_X = STRIP_X + 104;
 const TILE = 32;
 const TILE_PITCH = 40;
 const TILES_PER_ROW = Math.floor((STRIP_X + STRIP_WIDTH - STRIP_CONTENT_X) / TILE_PITCH);
-const SPELL_ICON_SIZE = 40;
+/** The HUD slot's size (CO-170): a whole-number scale keeps the art's pixels even. */
+const SPELL_ICON_SIZE = SPELL_ICON_ART_SIZE;
 const SPELL_PITCH = 84;
 const INFO_HINT = 'Point at a passive or relic to read it';
 
@@ -208,25 +205,16 @@ export class PauseScene extends Phaser.Scene {
     const room = STRIP_X + STRIP_WIDTH - STRIP_CONTENT_X - 8;
     const pitch = Math.min(SPELL_PITCH, room / Math.max(1, spells.length));
     const named = pitch === SPELL_PITCH;
-    spells.forEach(({ id, name }, i) => {
+    spells.forEach((spell, i) => {
       const x = STRIP_CONTENT_X + SPELL_ICON_SIZE / 2 + i * pitch;
       // CO-164: each pick's rim wears its kind's colour, as its level-up card did.
       this.add
         .circle(x, cy, SPELL_ICON_SIZE / 2 + 3, 0x000000)
-        .setStrokeStyle(2, offerColor('active', id));
-      const frame = spellIconFrame(id);
-      if (frame && hasFrameArt(this, frame)) {
-        const icon = this.add.image(x, cy, FRAMES[frame].page, artFrame(frame));
-        icon.setScale(SPELL_ICON_SIZE / Math.max(icon.width, icon.height));
-      } else {
-        // No icon art for this spell: its initials, as the HUD's slots fall back to.
-        this.add
-          .text(x, cy, abbreviate(name), { fontFamily: 'monospace', fontSize: '14px' })
-          .setOrigin(0.5);
-      }
+        .setStrokeStyle(2, offerColor('active', spell.id));
+      addSpellIcon(this, x, cy, spell, 1);
       if (!named) return;
       this.add
-        .text(x, cy + SPELL_ICON_SIZE / 2 + 12, name, {
+        .text(x, cy + SPELL_ICON_SIZE / 2 + 12, spell.name, {
           fontFamily: SERIF,
           fontSize: '12px',
           color: '#dddddd',

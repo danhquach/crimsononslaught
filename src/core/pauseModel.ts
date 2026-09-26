@@ -14,7 +14,7 @@ import { formatTimer } from './hudModel';
 /** A passive or relic buff as a tile: `count` is a passive's rank, a relic's stacks. */
 export interface PauseItem {
   name: string;
-  /** Two letters for the tile face; there is no passive or relic icon art. */
+  /** Two letters for the tile face; there is no passive or relic icon art. Spells use their own glyph. */
   abbr: string;
   description: string;
   count: number;
@@ -24,8 +24,8 @@ export interface PauseItem {
 export interface PauseView {
   /** The run's level; spells have no level of their own. */
   level: number;
-  /** The equipped spells in equip order; the id picks the icon art. */
-  spells: readonly { id: string; name: string }[];
+  /** The equipped spells in equip order; the id picks the icon art, the colour its fallback disc. */
+  spells: readonly { id: string; name: string; color: number }[];
   /** Passives in the order taken. */
   passives: readonly PauseItem[];
   /** Relic buffs in the order picked. */
@@ -35,7 +35,7 @@ export interface PauseView {
 
 export interface PauseBuild {
   level: number;
-  spells: readonly { id: string; name: string }[];
+  spells: readonly { id: string; name: string; color: number }[];
   passives: ReadonlyMap<PassiveId, number>;
   relics: ReadonlyMap<RelicBuffId, number>;
   kills: number;
@@ -61,7 +61,7 @@ function item(name: string, description: string, count: number): PauseItem {
 export function pauseView(build: PauseBuild): PauseView {
   return {
     level: build.level,
-    spells: build.spells.map(({ id, name }) => ({ id, name })),
+    spells: build.spells.map(({ id, name, color }) => ({ id, name, color })),
     passives: [...build.passives].map(([id, rank]) => {
       const passive = passiveById(id);
       return item(passive?.name ?? id, passive?.description ?? '', rank);
@@ -162,7 +162,11 @@ export function isPauseView(data: unknown): data is PauseView {
     isCount(data.level) &&
     Array.isArray(data.spells) &&
     data.spells.every(
-      (s) => isRecord(s) && typeof s.id === 'string' && typeof s.name === 'string',
+      (s) =>
+        isRecord(s) &&
+        typeof s.id === 'string' &&
+        typeof s.name === 'string' &&
+        typeof s.color === 'number',
     ) &&
     Array.isArray(data.passives) &&
     data.passives.every(isPauseItem) &&

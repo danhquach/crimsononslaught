@@ -21,6 +21,7 @@ import { onRunEvents, type RunEvent } from '../core/runEvents';
 import { SCENE } from '../core/scenePayloads';
 import { hasFrameArt } from '../render/atlas';
 import { barSlices } from '../render/barFrame';
+import { SPELL_ICON_ART_SIZE, spellIconArt } from '../render/spellIcon';
 
 const MARGIN = 16;
 const BAR_WIDTH = 240;
@@ -54,7 +55,7 @@ const SLOT_EMPTY_COLOR = 0x555555;
  * ready) still shows round it. The silhouette sits in the middle ~23 px, clear
  * of the badge, whose nearest point is 15·√2 − 8 ≈ 13 px from the centre.
  */
-const SLOT_ICON_SIZE = 32;
+const SLOT_ICON_SIZE = SPELL_ICON_ART_SIZE;
 const SLOT_WEDGE_ALPHA = 0.65;
 const SLOT_BADGE_RADIUS = 8;
 /**
@@ -305,7 +306,7 @@ class SlotIcon {
 
   set(row: Readonly<SlotRow>): void {
     const spell = row.kind === 'spell' ? row : null;
-    const art = spell?.icon && hasFrameArt(this.icon.scene, spell.icon) ? spell.icon : null;
+    const art = spell ? spellIconArt(this.icon.scene, spell.id) : null;
     this.showIcon(art);
     this.label.setText(slotLabel(row));
     this.glyph.setText(art ? '' : (spell?.glyph ?? ''));

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import type Phaser from 'phaser';
 import { SPELL_CARDS, SPELL_IDS, type SpellId } from '../src/config/spells';
+import { spellGlyph } from '../src/core/hudModel';
 import type { PausePayload, ResultPayload } from '../src/core/scenePayloads';
 import { SCENE } from '../src/core/scenePayloads';
 import type { RunState } from '../src/core/runState';
@@ -129,7 +131,8 @@ test('Esc pauses the whole run over the build, and Esc resumes it without a jump
   expect(paused.gamePaused).toBe(true);
   expect(paused.hudVisible).toBe(false);
   expect(paused.pause?.view.level).toBe(paused.level);
-  expect(paused.pause?.view.spells).toEqual([{ id: PICKED, name: SPELL_CARDS[PICKED].name }]);
+  const { name, color } = SPELL_CARDS[PICKED];
+  expect(paused.pause?.view.spells).toEqual([{ id: PICKED, name, color }]);
   expect(paused.pause?.view.stats.kills).toBe(paused.kills);
 
   // Frozen: a second of wall time moves nothing (spec: enemies, spells,
@@ -365,4 +368,96 @@ test('a gamepad pauses with Start, resumes with Start, and leaves for the main m
   // Abandoned: nothing recorded, nothing banked.
   expect(await readStoredSave(page)).toBe(storedBefore);
   expect(errors).toEqual([]);
+});
+
+/** The icons the HUD slots and the pause screen draw, read in one evaluate (CO-170). */
+interface IconSample {
+  spells: { id: string; name: string; color: number }[];
+  hudArt: string[];
+  hudTexts: string[];
+  pauseArt: { frame: string; scale: number }[];
+  /** Each pause text drawn on a filled disc, with that disc's colour. */
+  pauseGlyphs: { text: string; color: number }[];
+}
+
+function sampleIcons(page: Page): Promise<IconSample> {
+  return page.evaluate(async (scene) => {
+    const { game } = await import('/src/main.ts');
+    const pause = game.scene.getScene(scene.pause) as PauseScene;
+    const list = (key: string) => game.scene.getScene(key).children.list;
+    const icons = (key: string) =>
+      (list(key).filter((o) => o.type === 'Image') as unknown as Phaser.GameObjects.Image[]).filter(
+        (image) => image.visible && image.frame.name.startsWith('icon.'),
+      );
+    const discs = list(scene.pause).filter(
+      (o) => o.type === 'Arc' && (o as Phaser.GameObjects.Arc).isFilled,
+    ) as unknown as Phaser.GameObjects.Arc[];
+    const texts = (key: string) =>
+      list(key).filter((o) => o.type === 'Text') as unknown as Phaser.GameObjects.Text[];
+    return {
+      spells: [...(pause.view?.view.spells ?? [])],
+      hudArt: icons(scene.hud).map((image) => image.frame.name),
+      hudTexts: texts(scene.hud).map((text) => text.text),
+      pauseArt: icons(scene.pause).map((image) => ({
+        frame: image.frame.name,
+        scale: image.displayWidth / image.width,
+      })),
+      pauseGlyphs: texts(scene.pause).flatMap((text) => {
+        // The top-most filled disc under the text's centre, as it draws.
+        const disc = discs.findLast(
+          (d) => d.fillColor !== 0 && Math.hypot(d.x - text.x, d.y - text.y) < 1,
+        );
+        return disc ? [{ text: text.text, color: disc.fillColor }] : [];
+      }),
+    };
+  }, SCENE);
+}
+
+async function pauseWithLoadout(page: Page, loadout: readonly string[]): Promise<void> {
+  await page.goto(`/?seed=1&invulnerable=1&loadout=${loadout.join(',')}`);
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));
+  await page.mouse.click(x, y);
+  await waitForScene(page, SCENE.game);
+  await expect.poll(async () => (await snapshot(page)).spells.length).toBe(1 + loadout.length);
+  await frames(page, 4); // the HUD has drawn every slot
+  await page.keyboard.press('Escape');
+  await waitForPause(page, undefined);
+}
+
+const ICON_LOADOUT = ['lightning_tornado', 'earth_quake'] as const;
+
+test('the pause screen draws each spell icon as its HUD slot does, at a whole-number scale', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await pauseWithLoadout(page, ICON_LOADOUT);
+
+  const sample = await sampleIcons(page);
+  const frames = [PICKED, ...ICON_LOADOUT].map((id) => `icon.${id}.0.art`);
+  expect(sample.hudArt).toEqual(frames);
+  expect(sample.pauseArt).toEqual(frames.map((frame) => ({ frame, scale: 1 })));
+  expect(sample.pauseGlyphs).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('with no icon art, the pause screen shows the HUD slot letters on the spell colour', async ({
+  page,
+}) => {
+  // The icons' page failing takes every atlas page down with it (CO-130).
+  await page.route('**/assets/atlas/props10.png', (route) => route.abort());
+  await pauseWithLoadout(page, ICON_LOADOUT);
+
+  const sample = await sampleIcons(page);
+  expect(sample.pauseArt).toEqual([]);
+  expect(sample.spells.map((spell) => spell.id)).toEqual([PICKED, ...ICON_LOADOUT]);
+  const expected = sample.spells.map((spell) => ({
+    text: spellGlyph(spell.name),
+    color: spell.color,
+  }));
+  expect(sample.pauseGlyphs).toEqual(expected);
+  // The ticket's cases: one letter, not "To" / "Ea".
+  expect(expected.slice(1).map((glyph) => glyph.text)).toEqual(['T', 'E']);
+  for (const { text } of expected) expect(sample.hudTexts).toContain(text);
 });
