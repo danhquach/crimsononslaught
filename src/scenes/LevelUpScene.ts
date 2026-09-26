@@ -5,6 +5,7 @@ import {
   type LevelUpPickPayload,
   type OfferCard,
 } from '../core/levelUp';
+import { CARD_FILL, CARD_FILL_HOVER, cssColor, offerColor } from '../core/offerColors';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
@@ -21,9 +22,6 @@ const ICON_BAND = 50;
 const ICON_SCALE = 2;
 const CARD_GAP = 28;
 const CARD_PADDING = 14;
-const CARD_FILL = 0x1a1a1a;
-const CARD_FILL_HOVER = 0x2a2a2a;
-const CARD_STROKE = 0xdc143c;
 const BACKDROP_ALPHA = 0.65;
 
 /**
@@ -107,6 +105,9 @@ export class LevelUpScene extends Phaser.Scene {
     const innerWidth = CARD_WIDTH - CARD_PADDING * 2;
     const left = -CARD_WIDTH / 2 + CARD_PADDING;
     const top = -height / 2 + CARD_PADDING;
+    // CO-164: the kind's colour (a spell's element, a passive's, a relic's) on
+    // the border and the kind label, at rest and under hover alike.
+    const stroke = offerColor(card.kind, card.id);
     // A spell shows its icon (CO-155) between the hotkey and its name.
     const icon =
       card.kind === 'active'
@@ -114,15 +115,13 @@ export class LevelUpScene extends Phaser.Scene {
             this,
             0,
             top + 40,
-            { id: card.id, name: card.name, color: card.color ?? CARD_STROKE },
+            { id: card.id, name: card.name, color: card.color ?? stroke },
             ICON_SCALE,
           )
         : [];
     const band = icon.length > 0 ? ICON_BAND : 0;
 
-    const frame = this.add
-      .rectangle(0, 0, CARD_WIDTH, height, CARD_FILL)
-      .setStrokeStyle(2, CARD_STROKE);
+    const frame = this.add.rectangle(0, 0, CARD_WIDTH, height, CARD_FILL).setStrokeStyle(2, stroke);
     const key = this.add.text(left, top, `${hotkey}`, {
       fontFamily: 'monospace',
       fontSize: '16px',
@@ -144,7 +143,7 @@ export class LevelUpScene extends Phaser.Scene {
     const kind = this.add.text(left, top + 92 + band, KIND_LABEL[card.kind], {
       fontFamily: 'monospace',
       fontSize: '13px',
-      color: accentOf(card),
+      color: cssColor(stroke),
     });
     const description = this.add.text(left, top + 120 + band, card.description, {
       fontFamily: 'Georgia, serif',
@@ -159,7 +158,7 @@ export class LevelUpScene extends Phaser.Scene {
     // Gamepad selection reuses the hover look, so a card reads the same however
     // it was reached.
     const highlight = (on: boolean): void => {
-      frame.setFillStyle(on ? CARD_FILL_HOVER : CARD_FILL).setStrokeStyle(on ? 4 : 2, CARD_STROKE);
+      frame.setFillStyle(on ? CARD_FILL_HOVER : CARD_FILL).setStrokeStyle(on ? 4 : 2, stroke);
     };
 
     frame.setInteractive({ useHandCursor: true });
@@ -199,13 +198,4 @@ const KIND_LABEL: Readonly<Record<OfferCard['kind'], string>> = {
 function rankLabel(card: OfferCard): string {
   if (card.rank === undefined) return '';
   return card.maxRank === undefined ? `Rank ${card.rank}` : `Rank ${card.rank}/${card.maxRank}`;
-}
-
-/**
- * A spell card wears its own colour (CO-155: every roster spell's, carried on
- * the card); a passive or relic wears the menu crimson.
- */
-function accentOf(card: OfferCard): string {
-  if (card.kind !== 'active' || card.color === undefined) return '#dc143c';
-  return `#${card.color.toString(16).padStart(6, '0')}`;
 }
