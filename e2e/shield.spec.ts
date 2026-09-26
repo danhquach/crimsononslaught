@@ -55,6 +55,9 @@ interface Sample {
   max: number;
   hudPool: number;
   hudMax: number;
+  /** Both shields' running totals so far (#260). */
+  absorbed: number;
+  regrown: number;
 }
 
 /**
@@ -73,6 +76,8 @@ function sample(page: Page): Promise<Sample | null> {
       max: report.reduce((total, shield) => total + shield.max, 0),
       hudPool: hud.shield,
       hudMax: hud.shieldMax,
+      absorbed: report.reduce((total, shield) => total + shield.absorbed, 0),
+      regrown: report.reduce((total, shield) => total + shield.regrown, 0),
     };
   }, SCENE);
 }
@@ -115,10 +120,9 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   }
   expect(atStart.reduce((total, shield) => total + shield.max, 0)).toBe(TOTAL_POOL);
 
-  // Sampled through the run rather than only at the end: a pool that drained
-  // and refilled would look untouched from either end alone. The run may end
-  // inside the window — the player is standing still — so the loop stops when
-  // it does and everything below is asserted on what was actually seen.
+  // Sampled through the run so the HUD is checked against it at many points.
+  // The run may end inside the window — the player is standing still — so the
+  // loop stops when it does and everything below is asserted on what was seen.
   const trace: Sample[] = [];
   const until = Date.now() + WALL_CAP_MS;
   let runMs = 0;
@@ -132,15 +136,15 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   }
   expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(10);
 
-  const pools = trace.map((s) => s.pool);
+  // Counted by the shields themselves, so a pool that drained and refilled
+  // between two polls still shows: main CI once took 25 samples and saw no
+  // regrow among them (#260). The last sample holds the totals for the run.
+  const last = trace[trace.length - 1];
   // Contact damage really reached the pools: the arena filled and the player
   // was standing in it, so something must have been absorbed.
-  expect(Math.min(...pools), 'lowest pool seen').toBeLessThan(TOTAL_POOL);
-
-  // And the pools grew back: a sample above the one before it is something only
-  // a recharge, or a broken shield returning, can produce.
-  const regrew = pools.some((pool, i) => i > 0 && pool > (pools[i - 1] ?? pool));
-  expect(regrew, `pool never regrew across ${pools.length} samples`).toBe(true);
+  expect(last?.absorbed, 'damage the pools absorbed').toBeGreaterThan(0);
+  // And the pools grew back, by a recharge or a broken shield returning.
+  expect(last?.regrown, `pool never regrew across ${trace.length} samples`).toBeGreaterThan(0);
 
   // The HUD was told, and by the run's own numbers — it never reads GameScene.
   for (const [i, s] of trace.entries()) {

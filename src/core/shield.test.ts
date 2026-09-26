@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   absorb,
   createShield,
+  EMPTY_TALLY,
   isUp,
   rechargePerSecond,
+  tallyShield,
   tickShield,
   type ShieldRule,
   type ShieldState,
@@ -156,5 +158,52 @@ describe('tickShield', () => {
     const before: ShieldState = { pool: 40, waitS: 2 };
     tickShield(before, 1, ICE);
     expect(before).toEqual({ pool: 40, waitS: 2 });
+  });
+});
+
+describe('tallyShield', () => {
+  it('starts empty', () => {
+    expect(EMPTY_TALLY).toEqual({ absorbed: 0, regrown: 0 });
+  });
+
+  it('counts what a hit swallowed, not what passed through to the player', () => {
+    const before: ShieldState = { pool: 10, waitS: 0 };
+    const { state } = absorb(before, 25, ICE);
+    expect(tallyShield(EMPTY_TALLY, before, state)).toEqual({ absorbed: 10, regrown: 0 });
+  });
+
+  it('counts what a recharge grew back, and a broken shield returning', () => {
+    const broken = absorb({ pool: 10, waitS: 0 }, 10, ICE).state;
+    let tally = tallyShield(EMPTY_TALLY, { pool: 10, waitS: 0 }, broken);
+    let state = broken;
+    for (let i = 0; i < 90; i += 1) {
+      const next = tickShield(state, 0.1, ICE);
+      tally = tallyShield(tally, state, next);
+      state = next;
+    }
+    // 6 s of delay, then 3 s at 10 points a second.
+    expect(tally.absorbed).toBe(10);
+    expect(tally.regrown).toBeCloseTo(30, 10);
+    expect(tally.regrown).toBeCloseTo(state.pool, 10);
+  });
+
+  it('adds nothing for a step that leaves the pool where it was', () => {
+    const tally = { absorbed: 5, regrown: 3 };
+    const held: ShieldState = { pool: 40, waitS: 2 };
+    expect(tallyShield(tally, held, tickShield(held, 1, ICE))).toEqual(tally);
+    expect(tallyShield(tally, held, { pool: NaN, waitS: 0 })).toEqual(tally);
+  });
+
+  it('hands back the same tally when the pool did not move', () => {
+    const tally = { absorbed: 5, regrown: 3 };
+    const full: ShieldState = { pool: 60, waitS: 0 };
+    expect(tallyShield(tally, full, tickShield(full, 1, ICE))).toBe(tally);
+    expect(tallyShield(tally, full, { pool: 70, waitS: 0 })).not.toBe(tally);
+  });
+
+  it('never mutates the tally it was given', () => {
+    const before = { absorbed: 5, regrown: 3 };
+    tallyShield(before, { pool: 40, waitS: 0 }, { pool: 45, waitS: 0 });
+    expect(before).toEqual({ absorbed: 5, regrown: 3 });
   });
 });

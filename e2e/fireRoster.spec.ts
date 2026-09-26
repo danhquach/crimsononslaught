@@ -7,7 +7,7 @@ import { flightFlipY } from '../src/core/fx';
 import { MAX_LIVE_DRAGONS } from '../src/core/homing';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #140 in the browser: a run carrying Fire Wave (CO-143) and Fire Dragon, equipped
@@ -34,9 +34,6 @@ const RUN_MS = 100_000;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
-
-/** The floor the frame rate must hold at, the same one the other roster suites use. */
-const MIN_FPS = 20;
 
 const CAPS: Readonly<Record<(typeof FIRE_ROSTER_SPELL_IDS)[number], number>> = {
   fire_column: MAX_LIVE_WAVES,

@@ -124,3 +124,36 @@ export function tickShield(
   const pool = Math.min(rule.max, state.pool + rechargePerSecond(rule) * (deltaS - waited));
   return { pool, waitS: 0 };
 }
+
+/**
+ * Running totals over a shield's life (#260). A poll can miss a pool moving —
+ * a slow runner lands a few samples a run, and a refill can start and finish
+ * between two of them — so the shield keeps its own count for the suite.
+ */
+export interface ShieldTally {
+  /** Damage the pool has swallowed. */
+  readonly absorbed: number;
+  /** Points the pool has grown back, by recharge or by a broken shield returning. */
+  readonly regrown: number;
+}
+
+export const EMPTY_TALLY: ShieldTally = { absorbed: 0, regrown: 0 };
+
+/**
+ * Add one step of the pool, `before` to `after`, to the tally. An `absorb`
+ * only ever lowers the pool and a `tickShield` only ever raises it, so the
+ * drop is what was swallowed and the rise is what grew back. A step that
+ * leaves the pool alone hands back the same tally, so a full shield's every
+ * frame allocates nothing.
+ */
+export function tallyShield(
+  tally: ShieldTally,
+  before: Readonly<ShieldState>,
+  after: Readonly<ShieldState>,
+): ShieldTally {
+  const change = after.pool - before.pool;
+  if (!Number.isFinite(change) || change === 0) return tally;
+  return change < 0
+    ? { absorbed: tally.absorbed - change, regrown: tally.regrown }
+    : { absorbed: tally.absorbed, regrown: tally.regrown + change };
+}

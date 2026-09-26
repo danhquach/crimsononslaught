@@ -20,7 +20,10 @@ export default defineConfig({
   // second worker on the same CPU slows the run under test rather than the suite.
   workers: 1,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  // One retry on CI (#260): a check bound to wall clock can lose one slow
+  // window on a shared runner, and a retry reports that as flaky rather than
+  // failing main. None locally, so a real regression is seen at once.
+  retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     ...devices['Desktop Chrome'],
@@ -29,6 +32,8 @@ export default defineConfig({
     // `Scale.FIT` a page coordinate is a game coordinate and a test can click
     // a card where the scene draws it.
     viewport: { width: 960, height: 540 },
+    // Every attempt is traced and a failed one's trace is kept, so a flaky
+    // pass on retry still leaves the first attempt's trace to read.
     trace: 'retain-on-failure',
   },
   webServer: {

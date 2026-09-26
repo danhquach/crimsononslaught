@@ -5,7 +5,7 @@ import { MAX_LIVE_BOMBS } from '../src/core/frostNova';
 import { MAX_LIVE_ARROWS } from '../src/core/iceArrow';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #141 in the browser: an Ice run — Ice Arrow as the default, Frost Nova Bomb
@@ -31,9 +31,6 @@ const RUN_MS = 100_000;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
-
-/** The floor the frame rate must hold at, the same one the other roster suites use. */
-const MIN_FPS = 20;
 
 const CAPS: Readonly<Record<string, number>> = {
   ice: MAX_LIVE_ARROWS,

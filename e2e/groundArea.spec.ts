@@ -4,7 +4,7 @@ import { MAX_LIVE_AREAS } from '../src/config/fx';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #135 in the browser: a run carrying both ground areas, equipped through the
@@ -43,14 +43,6 @@ const SWEEP_CHUNK_MS = 1_000;
 const SWEEP_CAP_MS = 10_000;
 /** The quake-only run: long enough for three casts on a 14 s cooldown. */
 const QUAKE_RUN_MS = 150_000;
-
-/**
- * The floor the frame rate must hold at with patches on the ground, the same
- * one `multiSpell` uses: far below the 60 fps a desktop holds, because the
- * check is for a collapse — a pool thrashing, a leak, a membership test gone
- * quadratic — and not for a tuned number on a slow CI runner.
- */
-const MIN_FPS = 20;
 
 type Report = GameScene['areaReport'];
 

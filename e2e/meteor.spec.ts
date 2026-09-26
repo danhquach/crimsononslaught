@@ -4,7 +4,7 @@ import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { BASE_METEOR_STATS, STRIKE_SPELL_IDS } from '../src/config/strikes';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #138 in the browser: a run carrying Meteor, equipped through the `?loadout=`
@@ -40,9 +40,6 @@ const RUN_MS = 115_000;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
-
-/** The floor the frame rate must hold at, the same one `groundArea` uses. */
-const MIN_FPS = 20;
 
 type Report = GameScene['strikeReport'];
 
