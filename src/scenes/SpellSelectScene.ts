@@ -14,8 +14,12 @@ import { attachMenuInput, type MenuItem } from './input';
 import { addTextButton, textButtonItem } from './ui';
 
 const CARD_WIDTH = 200;
-/** CO-155: 44 px taller than before, for the icon band above the name. */
-const CARD_HEIGHT = 324;
+/**
+ * CO-155: 52 px taller than before: the 44 px icon band above the name, and 8
+ * px so the Earth card's five stat rows clear the bottom edge with the wider
+ * fonts a Linux browser falls back to.
+ */
+const CARD_HEIGHT = 332;
 /** The icon's band between the hotkey and the name: a 2x (64 px) icon and its margins. */
 const ICON_BAND = 44;
 const ICON_SCALE = 2;

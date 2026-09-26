@@ -48,7 +48,7 @@ export async function readHud(page: Page): Promise<HudModel> {
 
 /**
  * Centre of the i-th spell card in game pixels, mirroring the row layout in
- * `SpellSelectScene` (four 200 x 324 px cards, 24 px apart, top edge at
+ * `SpellSelectScene` (four 200 x 332 px cards, 24 px apart, top edge at
  * y = 150, centred on a 960 px wide canvas). The viewport matches the canvas,
  * so these are page coordinates too; a drifted layout fails the "Game started"
  * wait.
@@ -57,7 +57,7 @@ export function cardCenter(index: number): { x: number; y: number } {
   const width = 200;
   const gap = 24;
   const rowWidth = SPELL_IDS.length * width + (SPELL_IDS.length - 1) * gap;
-  return { x: (960 - rowWidth) / 2 + width / 2 + index * (width + gap), y: 150 + 324 / 2 };
+  return { x: (960 - rowWidth) / 2 + width / 2 + index * (width + gap), y: 150 + 332 / 2 };
 }
 
 /**
