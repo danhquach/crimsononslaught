@@ -20,8 +20,8 @@ import { EMPTY_OFFER_MAX_HP_BONUS } from '../config/progression';
  * What one card shows. `rank` / `maxRank` are passives and relics only: `rank`
  * is the rank the pick grants, `maxRank` the cap it counts towards — absent on
  * a passive that never caps, and on every active and relic. `color` is actives
- * only: the spell's own colour, for its card's accent and its icon's fallback
- * disc (CO-155).
+ * only: the spell's own colour, for its icon's fallback disc (CO-155). The
+ * card's border and kind label wear its kind's colour (`core/offerColors.ts`).
  */
 export interface OfferCard {
   kind: 'active' | 'passive' | 'relic';

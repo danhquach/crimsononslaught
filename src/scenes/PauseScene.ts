@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { FRAMES } from '../config/frames';
 import { spellIconFrame } from '../config/spellIcons';
 import { artFrame } from '../core/animation';
+import { PASSIVE_COLOR, RELIC_COLOR, offerColor } from '../core/offerColors';
 import {
   CONFIRM_PROMPTS,
   EMPTY_STRIP_TEXT,
@@ -209,7 +210,10 @@ export class PauseScene extends Phaser.Scene {
     const named = pitch === SPELL_PITCH;
     spells.forEach(({ id, name }, i) => {
       const x = STRIP_CONTENT_X + SPELL_ICON_SIZE / 2 + i * pitch;
-      this.add.circle(x, cy, SPELL_ICON_SIZE / 2 + 3, 0x000000).setStrokeStyle(2, 0xc9b48a);
+      // CO-164: each pick's rim wears its kind's colour, as its level-up card did.
+      this.add
+        .circle(x, cy, SPELL_ICON_SIZE / 2 + 3, 0x000000)
+        .setStrokeStyle(2, offerColor('active', id));
       const frame = spellIconFrame(id);
       if (frame && hasFrameArt(this, frame)) {
         const icon = this.add.image(x, cy, FRAMES[frame].page, artFrame(frame));
@@ -263,12 +267,12 @@ export class PauseScene extends Phaser.Scene {
     tile: PauseItem,
     show: (t: PauseItem | null) => void,
   ): void {
-    const face = this.add.rectangle(x, y, TILE, TILE, 0x241a14).setStrokeStyle(1, 0x6b4a2a);
+    const face = this.add.rectangle(x, y, TILE, TILE, 0x241a14).setStrokeStyle(1, PASSIVE_COLOR);
     this.add
       .text(x, y, tile.abbr, { fontFamily: 'monospace', fontSize: '13px', color: '#e8d8b0' })
       .setOrigin(0.5);
     this.addBadge(x + TILE / 2, y + TILE / 2, tile.count);
-    this.hoverable(face, tile, show, () => face.setStrokeStyle(1, 0x6b4a2a));
+    this.hoverable(face, tile, show, PASSIVE_COLOR);
   }
 
   /** A relic buff: a gem (a square on its point) with its letters and its stacks. */
@@ -276,12 +280,12 @@ export class PauseScene extends Phaser.Scene {
     const face = this.add
       .rectangle(x, y, 24, 24, 0x4a1030)
       .setAngle(45)
-      .setStrokeStyle(1, 0xc9b48a);
+      .setStrokeStyle(1, RELIC_COLOR);
     this.add
       .text(x, y, tile.abbr, { fontFamily: 'monospace', fontSize: '11px', color: '#ffffff' })
       .setOrigin(0.5);
     this.addBadge(x + 14, y + 12, tile.count);
-    this.hoverable(face, tile, show, () => face.setStrokeStyle(1, 0xc9b48a));
+    this.hoverable(face, tile, show, RELIC_COLOR);
   }
 
   private addBadge(x: number, y: number, count: number): void {
@@ -296,20 +300,20 @@ export class PauseScene extends Phaser.Scene {
       .setOrigin(0.5);
   }
 
-  /** Pointing at a tile brightens its rim and reads it on the info line. */
+  /** Pointing at a tile thickens its rim, in its kind's colour, and reads it on the info line. */
   private hoverable(
     face: Phaser.GameObjects.Rectangle,
     tile: PauseItem,
     show: (t: PauseItem | null) => void,
-    unlight: () => void,
+    rim: number,
   ): void {
     face.setInteractive();
     face.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      face.setStrokeStyle(2, CRIMSON);
+      face.setStrokeStyle(2, rim);
       show(tile);
     });
     face.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      unlight();
+      face.setStrokeStyle(1, rim);
       show(null);
     });
   }
