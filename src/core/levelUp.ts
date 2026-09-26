@@ -19,7 +19,9 @@ import { EMPTY_OFFER_MAX_HP_BONUS } from '../config/progression';
 /**
  * What one card shows. `rank` / `maxRank` are passives and relics only: `rank`
  * is the rank the pick grants, `maxRank` the cap it counts towards — absent on
- * a passive that never caps, and on every active and relic.
+ * a passive that never caps, and on every active and relic. `color` is actives
+ * only: the spell's own colour, for its card's accent and its icon's fallback
+ * disc (CO-155).
  */
 export interface OfferCard {
   kind: 'active' | 'passive' | 'relic';
@@ -28,6 +30,7 @@ export interface OfferCard {
   description: string;
   rank?: number;
   maxRank?: number;
+  color?: number;
 }
 
 /** Spec §7.1: offer 3 cards; fewer if fewer are eligible. */
@@ -64,6 +67,8 @@ export interface LevelUpPickPayload {
 
 const isPositiveInt = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1;
 const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+const isRgb = (v: unknown): v is number =>
+  Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 0xffffff;
 
 export function isOfferCard(data: unknown): data is OfferCard {
   if (typeof data !== 'object' || data === null) return false;
@@ -72,6 +77,8 @@ export function isOfferCard(data: unknown): data is OfferCard {
   if (!isNonEmptyString(c.id) || !isNonEmptyString(c.name) || !isNonEmptyString(c.description)) {
     return false;
   }
+  // Only an active has a colour of its own, and it is optional.
+  if (c.color !== undefined && (c.kind !== 'active' || !isRgb(c.color))) return false;
   // An active carries no rank at all; a passive always ranks, and caps only
   // when its config does; a relic always ranks and never caps.
   if (c.kind === 'active') return c.rank === undefined && c.maxRank === undefined;

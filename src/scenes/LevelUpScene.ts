@@ -6,12 +6,19 @@ import {
   type OfferCard,
 } from '../core/levelUp';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
-import { SPELL_CARDS, isSpellId } from '../config/spells';
 import { audioOf } from '../render/audio';
+import { addSpellIcon } from '../render/spellIcon';
 import { attachMenuInput, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
 const CARD_HEIGHT = 260;
+/**
+ * CO-155: a spell card's icon band above its name — a 2x (64 px) icon and its
+ * margins. An offer of spells grows every card by it; passive and relic cards
+ * keep their height and layout.
+ */
+const ICON_BAND = 50;
+const ICON_SCALE = 2;
 const CARD_GAP = 28;
 const CARD_PADDING = 14;
 const CARD_FILL = 0x1a1a1a;
@@ -80,9 +87,12 @@ export class LevelUpScene extends Phaser.Scene {
     const n = this.cards.length;
     const rowWidth = n * CARD_WIDTH + (n - 1) * CARD_GAP;
     const firstX = (width - rowWidth) / 2 + CARD_WIDTH / 2;
-    const cardY = 160 + CARD_HEIGHT / 2;
+    // One offer never mixes spells and passives (spec §7.1), so the row shares one height.
+    const cardHeight =
+      CARD_HEIGHT + (this.cards.some((card) => card.kind === 'active') ? ICON_BAND : 0);
+    const cardY = 160 + cardHeight / 2;
     const items = this.cards.map((card, i) =>
-      this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, card, i + 1),
+      this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, cardHeight, card, i + 1),
     );
     attachMenuInput(this, items);
 
@@ -93,13 +103,25 @@ export class LevelUpScene extends Phaser.Scene {
     });
   }
 
-  private addCard(x: number, y: number, card: OfferCard, hotkey: number): MenuItem {
+  private addCard(x: number, y: number, height: number, card: OfferCard, hotkey: number): MenuItem {
     const innerWidth = CARD_WIDTH - CARD_PADDING * 2;
     const left = -CARD_WIDTH / 2 + CARD_PADDING;
-    const top = -CARD_HEIGHT / 2 + CARD_PADDING;
+    const top = -height / 2 + CARD_PADDING;
+    // A spell shows its icon (CO-155) between the hotkey and its name.
+    const icon =
+      card.kind === 'active'
+        ? addSpellIcon(
+            this,
+            0,
+            top + 40,
+            { id: card.id, name: card.name, color: card.color ?? CARD_STROKE },
+            ICON_SCALE,
+          )
+        : [];
+    const band = icon.length > 0 ? ICON_BAND : 0;
 
     const frame = this.add
-      .rectangle(0, 0, CARD_WIDTH, CARD_HEIGHT, CARD_FILL)
+      .rectangle(0, 0, CARD_WIDTH, height, CARD_FILL)
       .setStrokeStyle(2, CARD_STROKE);
     const key = this.add.text(left, top, `${hotkey}`, {
       fontFamily: 'monospace',
@@ -113,18 +135,18 @@ export class LevelUpScene extends Phaser.Scene {
         color: '#aaaaaa',
       })
       .setOrigin(1, 0);
-    const name = this.add.text(left, top + 30, card.name, {
+    const name = this.add.text(left, top + 30 + band, card.name, {
       fontFamily: 'Georgia, serif',
       fontSize: '22px',
       color: '#ffffff',
       wordWrap: { width: innerWidth },
     });
-    const kind = this.add.text(left, top + 92, KIND_LABEL[card.kind], {
+    const kind = this.add.text(left, top + 92 + band, KIND_LABEL[card.kind], {
       fontFamily: 'monospace',
       fontSize: '13px',
       color: accentOf(card),
     });
-    const description = this.add.text(left, top + 120, card.description, {
+    const description = this.add.text(left, top + 120 + band, card.description, {
       fontFamily: 'Georgia, serif',
       fontSize: '15px',
       color: '#dddddd',
@@ -132,7 +154,7 @@ export class LevelUpScene extends Phaser.Scene {
       lineSpacing: 3,
     });
 
-    this.add.container(x, y, [frame, key, rank, name, kind, description]);
+    this.add.container(x, y, [frame, ...icon, key, rank, name, kind, description]);
 
     // Gamepad selection reuses the hover look, so a card reads the same however
     // it was reached.
@@ -179,8 +201,11 @@ function rankLabel(card: OfferCard): string {
   return card.maxRank === undefined ? `Rank ${card.rank}` : `Rank ${card.rank}/${card.maxRank}`;
 }
 
-/** A spell card wears its own element's colour; a passive wears the menu crimson. */
+/**
+ * A spell card wears its own colour (CO-155: every roster spell's, carried on
+ * the card); a passive or relic wears the menu crimson.
+ */
 function accentOf(card: OfferCard): string {
-  if (card.kind !== 'active' || !isSpellId(card.id)) return '#dc143c';
-  return `#${SPELL_CARDS[card.id].color.toString(16).padStart(6, '0')}`;
+  if (card.kind !== 'active' || card.color === undefined) return '#dc143c';
+  return `#${card.color.toString(16).padStart(6, '0')}`;
 }
