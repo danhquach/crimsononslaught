@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { SLOT_UNLOCK_LEVELS, type RosterSpellId } from '../config/loadout';
+import { LEVEL_UP_CHARGES } from '../config/offerActions';
 import { PASSIVES, type Passive } from '../config/passives';
-import { MAX_OFFER_SIZE } from './levelUp';
+import { MAX_OFFER_SIZE, isOfferCard, resolveLevelUp, type OfferCard } from './levelUp';
 import {
   activeCard,
+  anyPassiveCapped,
   eligiblePassives,
   levelUpOffer,
+  offerAfterBan,
+  offerPool,
   offerableActives,
   passiveCard,
   type ActiveCard,
+  type OfferInput,
 } from './levelUpOffer';
-import { buildLoadout, equip, takePassive, type Loadout } from './loadout';
-import { createRng } from './rng';
+import { buildLoadout, equip, openSlots, takePassive, type Loadout } from './loadout';
+import { createRng, type Rng } from './rng';
 
 const [SLOT_2_LEVEL, SLOT_3_LEVEL] = SLOT_UNLOCK_LEVELS;
 
@@ -265,6 +270,9 @@ describe('levelUpOffer — what the build can actually cast', () => {
         level: SLOT_3_LEVEL + 1,
         actives: [],
         passives: capped,
+        // A capped passive lets the charge cards in (#228); without them the
+        // pool is empty.
+        charges: [],
       }),
     ).toEqual([]);
   });
@@ -291,5 +299,303 @@ describe('levelUpOffer — determinism (spec §7.2)', () => {
     // Two draws off one rng advance its state, so a run is not handed the same
     // three cards every level.
     expect(second).not.toEqual(first);
+  });
+});
+
+const CHARGE_IDS = LEVEL_UP_CHARGES.map((charge) => charge.id);
+
+/** A full Fire run with Magnet at its cap (3), the first passive a run can cap. */
+const cappedLoadout = (): Loadout => {
+  let loadout = fullLoadout();
+  for (let rank = 0; rank < 3; rank++) loadout = takePassive(loadout, 'passive_magnet');
+  return loadout;
+};
+
+const PASSIVE_LEVEL = SLOT_3_LEVEL + 1;
+
+describe('levelUpOffer — seeds stay stable without #228 (#228)', () => {
+  /** The draw exactly as it stood before #228, to hold the new one to. */
+  const before = (rng: Rng, input: OfferInput): OfferCard[] => {
+    const { loadout, level, actives, carried } = input;
+    if (openSlots(loadout, level) > 0) {
+      const offerable = offerableActives(loadout, actives);
+      if (offerable.length > 0) return rng.shuffle(offerable).slice(0, 3).map(activeCard);
+    }
+    return rng
+      .shuffle(eligiblePassives(loadout, PASSIVES, carried))
+      .slice(0, 3)
+      .map((passive) => passiveCard(loadout, passive));
+  };
+
+  /** An rng that counts its draws. */
+  const counting = (seed: number): Rng & { draws: number } => {
+    const inner = createRng(seed);
+    const rng = {
+      ...inner,
+      draws: 0,
+      next: () => {
+        rng.draws += 1;
+        return inner.next();
+      },
+    };
+    rng.int = (min, max) => min + Math.floor(rng.next() * (max - min + 1));
+    rng.shuffle = <T>(arr: readonly T[]): T[] => {
+      const out = [...arr];
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = rng.int(0, i);
+        [out[i], out[j]] = [out[j] as T, out[i] as T];
+      }
+      return out;
+    };
+    return rng;
+  };
+
+  it('draws the same cards with the same number of draws when nothing is banned or capped', () => {
+    const cases: [Loadout, number][] = [
+      [buildLoadout('fire'), 1],
+      [buildLoadout('fire'), SLOT_2_LEVEL],
+      [fullLoadout(), PASSIVE_LEVEL],
+      [takePassive(takePassive(fullLoadout(), 'passive_magnet'), 'passive_vitality'), 20],
+    ];
+    for (const [loadout, level] of cases) {
+      expect(anyPassiveCapped(loadout)).toBe(false);
+      for (let seed = 1; seed <= 100; seed++) {
+        const input: OfferInput = { loadout, level, actives: FIRE_CATALOG, banned: new Set() };
+        const now = counting(seed);
+        const then = counting(seed);
+        expect(levelUpOffer(now, input), `level ${level} seed ${seed}`).toEqual(
+          before(then, input),
+        );
+        expect(now.draws).toBe(then.draws);
+      }
+    }
+  });
+});
+
+describe('levelUpOffer — bans (#228)', () => {
+  it('never draws a banned passive, and keeps drawing the rest', () => {
+    const banned = new Set(['passive_power', 'passive_haste']);
+    for (let seed = 1; seed <= 100; seed++) {
+      const offer = levelUpOffer(createRng(seed), {
+        loadout: fullLoadout(),
+        level: PASSIVE_LEVEL,
+        actives: [],
+        banned,
+      });
+      expect(offer).toHaveLength(MAX_OFFER_SIZE);
+      for (const card of offer) expect(banned.has(card.id), `seed ${seed}`).toBe(false);
+    }
+  });
+
+  it('never draws a banned spell for an open slot', () => {
+    const banned = new Set(['fire_meteor']);
+    for (let seed = 1; seed <= 50; seed++) {
+      const offer = levelUpOffer(createRng(seed), {
+        loadout: buildLoadout('fire'),
+        level: SLOT_2_LEVEL,
+        actives: FIRE_CATALOG,
+        banned,
+      });
+      expect(offer.map((c) => c.kind)).toEqual(['active', 'active', 'active']);
+      expect(offer.map((c) => c.id)).not.toContain('fire_meteor');
+    }
+  });
+
+  it('falls through to passives when every spell left is banned', () => {
+    const offer = levelUpOffer(createRng(1), {
+      loadout: buildLoadout('fire'),
+      level: SLOT_2_LEVEL,
+      actives: FIRE_CATALOG,
+      banned: new Set(FIRE_CATALOG.map((a) => a.id)),
+    });
+    expect(offer.map((c) => c.kind)).toEqual(['passive', 'passive', 'passive']);
+  });
+
+  it('shows what is left of a pool bans have thinned, and nothing once it is empty', () => {
+    const two: Passive[] = PASSIVES.slice(0, 2);
+    const input = { loadout: fullLoadout(), level: PASSIVE_LEVEL, actives: [], passives: two };
+    const [first, second] = two;
+    if (!first || !second) throw new Error('passive list changed');
+    const one = levelUpOffer(createRng(1), { ...input, banned: new Set([first.id]) });
+    expect(one.map((c) => c.id)).toEqual([second.id]);
+    const none = levelUpOffer(createRng(1), { ...input, banned: new Set([first.id, second.id]) });
+    expect(none).toEqual([]);
+    expect(resolveLevelUp(none).kind).toBe('fallback');
+  });
+
+  it('keeps a banned passive the run already holds out of the offer', () => {
+    const loadout = takePassive(fullLoadout(), 'passive_vitality');
+    for (let seed = 1; seed <= 50; seed++) {
+      const ids = levelUpOffer(createRng(seed), {
+        loadout,
+        level: PASSIVE_LEVEL,
+        actives: [],
+        banned: new Set(['passive_vitality']),
+      }).map((c) => c.id);
+      expect(ids).not.toContain('passive_vitality');
+    }
+  });
+});
+
+describe('levelUpOffer — reroll excludes the cards just shown (#228)', () => {
+  it('draws 3 cards none of which were just shown, when the pool has 3 others', () => {
+    const input = { loadout: fullLoadout(), level: PASSIVE_LEVEL, actives: [] };
+    for (let seed = 1; seed <= 100; seed++) {
+      const rng = createRng(seed);
+      const shown = levelUpOffer(rng, input);
+      const exclude = new Set(shown.map((c) => c.id));
+      const rerolled = levelUpOffer(rng, { ...input, exclude });
+      expect(rerolled).toHaveLength(MAX_OFFER_SIZE);
+      for (const card of rerolled) expect(exclude.has(card.id), `seed ${seed}`).toBe(false);
+    }
+  });
+
+  it('fills a short pool with the cards just shown, the unseen ones first', () => {
+    // Four spells for a slot: a reroll of three shows the fourth for certain.
+    for (let seed = 1; seed <= 50; seed++) {
+      const input = { loadout: buildLoadout('fire'), level: SLOT_2_LEVEL, actives: FIRE_CATALOG };
+      const rng = createRng(seed);
+      const shown = levelUpOffer(rng, input);
+      const rerolled = levelUpOffer(rng, { ...input, exclude: new Set(shown.map((c) => c.id)) });
+      const unseen = FIRE_CATALOG.find((a) => !shown.some((c) => c.id === a.id));
+      expect(rerolled).toHaveLength(MAX_OFFER_SIZE);
+      expect(rerolled[0]?.id).toBe(unseen?.id);
+      expect(new Set(rerolled.map((c) => c.id)).size).toBe(MAX_OFFER_SIZE);
+    }
+  });
+});
+
+describe('levelUpOffer — charge cards once a passive caps (#228)', () => {
+  it('keeps +1 Reroll and +1 Ban out of the pool until a passive caps', () => {
+    let loadout = fullLoadout();
+    for (let rank = 0; rank < 2; rank++) {
+      loadout = takePassive(loadout, 'passive_magnet');
+      const ids = offerPool({ loadout, level: PASSIVE_LEVEL, actives: [] }).map((c) => c.id);
+      for (const id of CHARGE_IDS) expect(ids).not.toContain(id);
+    }
+  });
+
+  it('puts both in the passive pool once one does, as valid cards that never cap', () => {
+    const pool = offerPool({ loadout: cappedLoadout(), level: PASSIVE_LEVEL, actives: [] });
+    const charges = pool.filter((c) => c.kind === 'charge');
+    expect(charges.map((c) => c.id)).toEqual(CHARGE_IDS);
+    for (const card of charges) {
+      expect(isOfferCard(card)).toBe(true);
+      expect(card.rank).toBeUndefined();
+    }
+  });
+
+  it('draws them like any other passive, never twice in one offer', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 300; seed++) {
+      const offer = levelUpOffer(createRng(seed), {
+        loadout: cappedLoadout(),
+        level: PASSIVE_LEVEL,
+        actives: [],
+      });
+      expect(new Set(offer.map((c) => c.id)).size).toBe(offer.length);
+      for (const card of offer) if (card.kind === 'charge') seen.add(card.id);
+    }
+    expect([...seen].sort()).toEqual([...CHARGE_IDS].sort());
+  });
+
+  it('never shows them in a spell offer', () => {
+    // A capped passive and an open slot: the slot's spells come first.
+    const loadout = takePassive(
+      takePassive(takePassive(buildLoadout('fire'), 'passive_magnet'), 'passive_magnet'),
+      'passive_magnet',
+    );
+    for (let seed = 1; seed <= 50; seed++) {
+      const offer = levelUpOffer(createRng(seed), {
+        loadout,
+        level: SLOT_2_LEVEL,
+        actives: FIRE_CATALOG,
+      });
+      expect(offer.every((c) => c.kind === 'active')).toBe(true);
+    }
+  });
+
+  it('can be banned like any other card', () => {
+    const [reroll] = CHARGE_IDS;
+    const ids = offerPool({
+      loadout: cappedLoadout(),
+      level: PASSIVE_LEVEL,
+      actives: [],
+      banned: new Set([reroll as string]),
+    }).map((c) => c.id);
+    expect(ids).not.toContain(reroll);
+    expect(ids).toContain(CHARGE_IDS[1]);
+  });
+});
+
+describe('offerAfterBan (#228)', () => {
+  const passiveInput = { loadout: fullLoadout(), level: PASSIVE_LEVEL, actives: [] };
+
+  it('replaces the banned card in its place and keeps the others', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const rng = createRng(seed);
+      const shown = levelUpOffer(rng, passiveInput);
+      for (const at of [0, 1, 2]) {
+        const bannedId = shown[at]?.id as string;
+        const after = offerAfterBan(
+          createRng(seed + 1000),
+          { ...passiveInput, banned: new Set([bannedId]) },
+          shown,
+          bannedId,
+        );
+        expect(after).toHaveLength(MAX_OFFER_SIZE);
+        expect(after.map((c) => c.id)).not.toContain(bannedId);
+        for (const i of [0, 1, 2].filter((i) => i !== at)) expect(after[i]).toEqual(shown[i]);
+        expect(new Set(after.map((c) => c.id)).size, `seed ${seed}`).toBe(MAX_OFFER_SIZE);
+      }
+    }
+  });
+
+  it('shrinks the offer when the pool has no other card', () => {
+    const two: Passive[] = PASSIVES.slice(0, 2);
+    const input = { ...passiveInput, passives: two };
+    const shown = levelUpOffer(createRng(1), input);
+    expect(shown).toHaveLength(2);
+    const bannedId = shown[0]?.id as string;
+    const after = offerAfterBan(
+      createRng(2),
+      { ...input, banned: new Set([bannedId]) },
+      shown,
+      bannedId,
+    );
+    expect(after).toEqual([shown[1]]);
+  });
+
+  it('gives the +10 HP fallback when the ban empties the pool', () => {
+    const one: Passive[] = PASSIVES.slice(0, 1);
+    const input = { ...passiveInput, passives: one };
+    const shown = levelUpOffer(createRng(1), input);
+    const bannedId = shown[0]?.id as string;
+    const after = offerAfterBan(
+      createRng(2),
+      { ...input, banned: new Set([bannedId]) },
+      shown,
+      bannedId,
+    );
+    expect(after).toEqual([]);
+    expect(resolveLevelUp(after).kind).toBe('fallback');
+  });
+
+  it('falls through to 3 passives when the last spell for a slot is banned', () => {
+    const [only] = FIRE_CATALOG;
+    const input = {
+      loadout: buildLoadout('fire'),
+      level: SLOT_2_LEVEL,
+      actives: [only as ActiveCard],
+    };
+    const shown = levelUpOffer(createRng(1), input);
+    expect(shown.map((c) => c.id)).toEqual([only?.id]);
+    const after = offerAfterBan(
+      createRng(2),
+      { ...input, banned: new Set([only?.id as string]) },
+      shown,
+      only?.id as string,
+    );
+    expect(after.map((c) => c.kind)).toEqual(['passive', 'passive', 'passive']);
   });
 });

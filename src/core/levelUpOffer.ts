@@ -1,4 +1,5 @@
 import type { RosterSpellId } from '../config/loadout';
+import { LEVEL_UP_CHARGES, type ChargeCard } from '../config/offerActions';
 import { PASSIVES, isPassiveId, type Passive } from '../config/passives';
 import type { SpellStatField } from '../config/spellFields';
 import { MAX_OFFER_SIZE, type OfferCard } from './levelUp';
@@ -29,6 +30,14 @@ import type { Rng } from './rng';
  * leaves state 1 with an empty pool, the offer falls through to passives rather
  * than to the +10 HP fallback: the slot stays open for a later level, and the
  * run still gets an upgrade out of the level it earned.
+ *
+ * #228 adds the run's bans and its rerolls. A banned card is out of both pools
+ * for the rest of the run, so banning every spell left falls through to
+ * passives the same way. Once any passive is at `maxRank`, the level-up charge
+ * cards (+1 Reroll, +1 Ban) join the passive pool for good; they never join a
+ * spell offer. None of this draws anything a run that never rerolls or bans,
+ * and has no passive capped, did not draw before, so its seed replays the
+ * same offers.
  *
  * Pure TS, no Phaser import.
  */
@@ -89,26 +98,90 @@ export interface OfferInput {
    */
   carried?: ReadonlySet<SpellStatField>;
   passives?: readonly Passive[];
+  /** Card ids banned this run (#228); never drawn. */
+  banned?: ReadonlySet<string>;
+  /**
+   * The cards just shown, for a reroll (#228). They are drawn only once the
+   * rest of the pool has run out, so a short pool still fills the offer.
+   */
+  exclude?: ReadonlySet<string>;
+  /** The charge cards a capped passive lets into the passive pool (#228). */
+  charges?: readonly ChargeCard[];
   size?: number;
+}
+
+const NONE: ReadonlySet<string> = new Set();
+
+/**
+ * Every card this level-up could show, in config order: the unbanned actives
+ * for an open slot while there are any, else the unbanned eligible passives
+ * and, once a passive caps, the unbanned charge cards.
+ */
+export function offerPool(input: OfferInput): OfferCard[] {
+  const { loadout, level, actives, carried, passives = PASSIVES } = input;
+  const { charges = LEVEL_UP_CHARGES, banned = NONE } = input;
+  const open = (card: { id: string }): boolean => !banned.has(card.id);
+
+  if (openSlots(loadout, level) > 0) {
+    const offerable = offerableActives(loadout, actives).filter(open);
+    if (offerable.length > 0) return offerable.map(activeCard);
+  }
+
+  const pool = eligiblePassives(loadout, passives, carried)
+    .filter(open)
+    .map((passive) => passiveCard(loadout, passive));
+  if (anyPassiveCapped(loadout, passives)) pool.push(...charges.filter(open).map(chargeCard));
+  return pool;
 }
 
 /**
  * Draw one level-up's cards. Up to `size` distinct cards, drawn through the
  * run's seeded RNG, so the same seed replays the same offers in the same order.
+ * With nothing to `exclude` it is one shuffle of the pool, as before #228.
  */
 export function levelUpOffer(rng: Rng, input: OfferInput): OfferCard[] {
-  const { loadout, level, actives, carried, passives = PASSIVES, size = MAX_OFFER_SIZE } = input;
+  const { exclude = NONE, size = MAX_OFFER_SIZE } = input;
   if (size <= 0) return [];
+  const pool = offerPool(input);
+  const fresh = pool.filter((card) => !exclude.has(card.id));
+  const seen = pool.filter((card) => exclude.has(card.id));
+  return [...rng.shuffle(fresh), ...rng.shuffle(seen)].slice(0, size);
+}
 
-  if (openSlots(loadout, level) > 0) {
-    const offerable = offerableActives(loadout, actives);
-    if (offerable.length > 0) return rng.shuffle(offerable).slice(0, size).map(activeCard);
-  }
+/**
+ * The offer once `bannedId` is banned (#228), which `input.banned` must
+ * already hold. The other cards keep their places and the banned card's goes
+ * to a fresh draw from the pool, when it has a card not already shown. A ban
+ * that empties the offer — its last spell, say — draws a whole new offer from
+ * the pool that follows, passives. An empty result is the +10 max HP fallback.
+ */
+export function offerAfterBan(
+  rng: Rng,
+  input: OfferInput,
+  shown: readonly OfferCard[],
+  bannedId: string,
+): OfferCard[] {
+  const { size = MAX_OFFER_SIZE } = input;
+  const pool = offerPool(input);
+  const inPool = new Set(pool.map((card) => card.id));
+  const kept = shown.filter((card) => card.id !== bannedId && inPool.has(card.id));
+  const keptIds = new Set(kept.map((card) => card.id));
+  const drawn = rng
+    .shuffle(pool.filter((card) => !keptIds.has(card.id)))
+    .slice(0, Math.max(0, size - kept.length));
+  const at = shown.findIndex((card) => card.id === bannedId);
+  kept.splice(at < 0 ? kept.length : at, 0, ...drawn);
+  return kept;
+}
 
-  return rng
-    .shuffle(eligiblePassives(loadout, passives, carried))
-    .slice(0, size)
-    .map((passive) => passiveCard(loadout, passive));
+/** True once any passive in `passives` is at its `maxRank` (#228). */
+export function anyPassiveCapped(
+  loadout: Loadout,
+  passives: readonly Passive[] = PASSIVES,
+): boolean {
+  return passives.some(
+    (passive) => passive.maxRank !== undefined && rankOf(loadout, passive.id) >= passive.maxRank,
+  );
 }
 
 /** The card for equipping a spell: no rank, since a slot is filled once. */
@@ -134,6 +207,11 @@ export function passiveCard(loadout: Loadout, passive: Passive): OfferCard {
   };
   if (passive.maxRank !== undefined) card.maxRank = passive.maxRank;
   return card;
+}
+
+/** The card for a charge (#228): no rank, since it never caps. */
+export function chargeCard(charge: ChargeCard): OfferCard {
+  return { kind: 'charge', id: charge.id, name: charge.name, description: charge.description };
 }
 
 function rankOf(loadout: Loadout, passiveId: string): number {

@@ -162,4 +162,12 @@ describe('isLevelUpPayload', () => {
     expect(isLevelUpPayload({ offer: [{ ...passive, rank: 0 }] })).toBe(false);
     expect(isLevelUpPayload({ offer: [{ ...active, kind: 'perk' }] })).toBe(false);
   });
+
+  it('accepts reroll and ban counts of 0 or more, and rejects anything else (#228)', () => {
+    expect(isLevelUpPayload({ offer: [passive], actions: { rerolls: 3, bans: 1 } })).toBe(true);
+    expect(isLevelUpPayload({ offer: [passive], actions: { rerolls: 0, bans: 0 } })).toBe(true);
+    expect(isLevelUpPayload({ offer: [passive], actions: { rerolls: -1, bans: 0 } })).toBe(false);
+    expect(isLevelUpPayload({ offer: [passive], actions: { rerolls: 1.5, bans: 0 } })).toBe(false);
+    expect(isLevelUpPayload({ offer: [passive], actions: { rerolls: 1 } })).toBe(false);
+  });
 });

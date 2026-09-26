@@ -1,5 +1,6 @@
 import { isSpellId, type SpellId } from '../config/spells';
 import { MAX_OFFER_SIZE, isOfferCard, type OfferCard } from './levelUp';
+import type { OfferActionCounts } from './offerActions';
 import { isPauseAction, isPauseView, type ConfirmAction, type PauseView } from './pauseModel';
 
 /**
@@ -69,9 +70,15 @@ export interface GamePayload {
   seed: number;
 }
 
-/** `Game -> LevelUp` (launched over the paused Game). Never empty: Game handles the empty-offer path itself. */
+/**
+ * `Game -> LevelUp` (launched over the paused Game). Never empty: Game handles
+ * the empty-offer path itself. `actions` is a level-up's Reroll and Ban counts
+ * (#228), which put the Reroll, Skip and Ban buttons on the overlay; a relic's
+ * offer has none.
+ */
 export interface LevelUpPayload {
   offer: readonly OfferCard[];
+  actions?: OfferActionCounts;
 }
 
 /**
@@ -130,8 +137,14 @@ export function isLevelUpPayload(data: unknown): data is LevelUpPayload {
     Array.isArray(data.offer) &&
     data.offer.length >= 1 &&
     data.offer.length <= MAX_OFFER_SIZE &&
-    data.offer.every(isOfferCard)
+    data.offer.every(isOfferCard) &&
+    (data.actions === undefined || isActionCounts(data.actions))
   );
+}
+
+function isActionCounts(data: unknown): data is OfferActionCounts {
+  const isCount = (v: unknown): boolean => Number.isInteger(v) && (v as number) >= 0;
+  return isRecord(data) && isCount(data.rerolls) && isCount(data.bans);
 }
 
 export function isPausePayload(data: unknown): data is PausePayload {

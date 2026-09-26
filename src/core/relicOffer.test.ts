@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_PLAYER_PROFILE, PROFILE_CLAMPS, type PlayerProfile } from '../config/passives';
+import { RELIC_CHARGES } from '../config/offerActions';
 import { RELIC_BUFFS, type RelicBuff, type RelicBuffId } from '../config/relics';
 import { MAX_OFFER_SIZE, isOfferCard } from './levelUp';
 import { levelUpOffer } from './levelUpOffer';
@@ -22,7 +23,7 @@ const buff = (id: string, weight: number, over: Partial<RelicBuff> = {}): RelicB
 });
 
 describe('relicOffer (#227)', () => {
-  it('offers 3 distinct relic buffs, each a valid card at its next rank', () => {
+  it('offers 3 distinct cards, each a valid card, a buff at its next rank', () => {
     let loadout = buildLoadout('fire');
     loadout = takeRelic(takeRelic(loadout, 'relic_hourglass'), 'relic_hourglass');
     for (let seed = 1; seed <= 200; seed++) {
@@ -31,8 +32,8 @@ describe('relicOffer (#227)', () => {
       expect(new Set(offer.map((card) => card.id)).size, `seed ${seed}`).toBe(MAX_OFFER_SIZE);
       for (const card of offer) {
         expect(isOfferCard(card)).toBe(true);
-        expect(card.kind).toBe('relic');
-        expect(card.rank).toBe(card.id === 'relic_hourglass' ? 3 : 1);
+        expect(['relic', 'charge']).toContain(card.kind);
+        if (card.kind === 'relic') expect(card.rank).toBe(card.id === 'relic_hourglass' ? 3 : 1);
       }
     }
   });
@@ -75,9 +76,9 @@ describe('relicOffer (#227)', () => {
   it('shows what is left when fewer than 3 buffs can be offered', () => {
     const profile = profileOf(buildLoadout('fire'));
     const buffs = [buff('a', 1), buff('b', 1)];
-    const offer = relicOffer(createRng(1), { ranks: new Map(), profile, buffs });
+    const offer = relicOffer(createRng(1), { ranks: new Map(), profile, buffs, charges: [] });
     expect(offer.map((c) => c.id).sort()).toEqual(['a', 'b']);
-    const none = relicOffer(createRng(1), { ranks: new Map(), profile, buffs: [] });
+    const none = relicOffer(createRng(1), { ranks: new Map(), profile, buffs: [], charges: [] });
     expect(none).toEqual([]);
   });
 
@@ -88,6 +89,41 @@ describe('relicOffer (#227)', () => {
     const levelUps = (loadout: Loadout) =>
       levelUpOffer(createRng(7), { loadout, level: 1, actives: [] });
     expect(levelUps(withRelics)).toEqual(levelUps(plain));
+  });
+});
+
+describe('relicOffer — reroll and ban charges (#228)', () => {
+  const CHARGE_IDS = RELIC_CHARGES.map((c) => c.id);
+
+  it('always has +2 Rerolls and +1 Ban in the pool, as charge cards', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 300; seed++) {
+      for (const card of offerFor(buildLoadout('fire'), seed)) {
+        if (card.kind === 'charge') seen.add(card.name);
+      }
+    }
+    expect([...seen].sort()).toEqual(['+1 Ban', '+2 Rerolls']);
+  });
+
+  it('draws each at 0.4x a buff', () => {
+    const profile = profileOf(buildLoadout('fire'));
+    const buffs = [buff('a', 1), buff('b', 1)];
+    const rng = createRng(5);
+    const counts = new Map<string, number>();
+    const draws = 20_000;
+    for (let i = 0; i < draws; i++) {
+      const [first] = relicOffer(rng, { ranks: new Map(), profile, buffs, size: 1 });
+      counts.set(first?.id ?? '', (counts.get(first?.id ?? '') ?? 0) + 1);
+    }
+    const total = 2 + 0.4 * CHARGE_IDS.length;
+    for (const id of CHARGE_IDS) expect((counts.get(id) ?? 0) / draws).toBeCloseTo(0.4 / total, 1);
+    expect((counts.get('a') ?? 0) / draws).toBeCloseTo(1 / total, 1);
+  });
+
+  it('still offers them when every buff is at its cap', () => {
+    const profile = profileOf(buildLoadout('fire'));
+    const offer = relicOffer(createRng(1), { ranks: new Map(), profile, buffs: [] });
+    expect(offer.map((c) => c.id).sort()).toEqual([...CHARGE_IDS].sort());
   });
 });
 

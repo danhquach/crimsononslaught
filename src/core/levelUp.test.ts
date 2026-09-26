@@ -95,6 +95,18 @@ describe('isOfferCard', () => {
     expect(isOfferCard({ ...relic, maxRank: 5 })).toBe(false);
   });
 
+  it('accepts a charge, which carries no rank and no colour (#228)', () => {
+    const charge: OfferCard = {
+      kind: 'charge',
+      id: 'charge_levelup_ban',
+      name: '+1 Ban',
+      description: 'One more ban.',
+    };
+    expect(isOfferCard(charge)).toBe(true);
+    expect(isOfferCard({ ...charge, rank: 1 })).toBe(false);
+    expect(isOfferCard({ ...charge, color: 0xffffff })).toBe(false);
+  });
+
   it('accepts an active, which carries no rank at all', () => {
     expect(isOfferCard(active('fire_meteor'))).toBe(true);
     expect(isOfferCard({ ...active('fire_meteor'), rank: 1 })).toBe(false);
@@ -138,6 +150,7 @@ describe('isOfferCard', () => {
 
 describe('LEVEL_UP_EVENT', () => {
   it('is namespaced away from Phaser scene events and run events', () => {
-    expect(LEVEL_UP_EVENT.pick).toMatch(/^levelup:/);
+    for (const name of Object.values(LEVEL_UP_EVENT)) expect(name).toMatch(/^levelup:/);
+    expect(new Set(Object.values(LEVEL_UP_EVENT)).size).toBe(4);
   });
 });

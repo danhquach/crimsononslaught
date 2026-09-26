@@ -11,7 +11,8 @@ import { EMPTY_OFFER_MAX_HP_BONUS } from '../config/progression';
  * A card is either an **active** (a spell for an open slot) or a **passive** (a
  * rank of a global passive); one offer never mixes the two (spec §7.1). A
  * relic's offer (#227, `core/relicOffer.ts`) uses the same overlay with
- * **relic** cards, a rank of a relic buff.
+ * **relic** cards, a rank of a relic buff. A **charge** card (#228) adds to the
+ * run's rerolls or bans; it can turn up in either offer.
  *
  * Pure TS, no Phaser import.
  */
@@ -19,12 +20,13 @@ import { EMPTY_OFFER_MAX_HP_BONUS } from '../config/progression';
 /**
  * What one card shows. `rank` / `maxRank` are passives and relics only: `rank`
  * is the rank the pick grants, `maxRank` the cap it counts towards — absent on
- * a passive that never caps, and on every active and relic. `color` is actives
- * only: the spell's own colour, for its icon's fallback disc (CO-155). The
- * card's border and kind label wear its kind's colour (`core/offerColors.ts`).
+ * a passive that never caps, and on every active, relic and charge. `color` is
+ * actives only: the spell's own colour, for its icon's fallback disc (CO-155).
+ * The card's border and kind label wear its kind's colour
+ * (`core/offerColors.ts`).
  */
 export interface OfferCard {
-  kind: 'active' | 'passive' | 'relic';
+  kind: 'active' | 'passive' | 'relic' | 'charge';
   id: string;
   name: string;
   description: string;
@@ -56,11 +58,20 @@ export function offerIndexForKey(key: string, cardCount: number): number | undef
   return index < cardCount ? index : undefined;
 }
 
-/** Emitter event names for the overlay -> Game direction, namespaced like `run:*`. */
+/**
+ * Emitter event names for the overlay -> Game direction, namespaced like
+ * `run:*`. The overlay only asks (#228): Game checks each against the offer
+ * and the run's counts, then redraws and relaunches the overlay (`reroll`,
+ * `ban`) or lets it close (`pick`, `skip`).
+ */
 export const LEVEL_UP_EVENT = {
   pick: 'levelup:pick',
+  reroll: 'levelup:reroll',
+  skip: 'levelup:skip',
+  ban: 'levelup:ban',
 } as const;
 
+/** `pick` and `ban`: the card acted on. */
 export interface LevelUpPickPayload {
   offerId: string;
 }
@@ -73,15 +84,19 @@ const isRgb = (v: unknown): v is number =>
 export function isOfferCard(data: unknown): data is OfferCard {
   if (typeof data !== 'object' || data === null) return false;
   const c = data as Record<string, unknown>;
-  if (c.kind !== 'active' && c.kind !== 'passive' && c.kind !== 'relic') return false;
+  if (c.kind !== 'active' && c.kind !== 'passive' && c.kind !== 'relic' && c.kind !== 'charge') {
+    return false;
+  }
   if (!isNonEmptyString(c.id) || !isNonEmptyString(c.name) || !isNonEmptyString(c.description)) {
     return false;
   }
   // Only an active has a colour of its own, and it is optional.
   if (c.color !== undefined && (c.kind !== 'active' || !isRgb(c.color))) return false;
-  // An active carries no rank at all; a passive always ranks, and caps only
-  // when its config does; a relic always ranks and never caps.
-  if (c.kind === 'active') return c.rank === undefined && c.maxRank === undefined;
+  // An active or a charge carries no rank at all; a passive always ranks, and
+  // caps only when its config does; a relic always ranks and never caps.
+  if (c.kind === 'active' || c.kind === 'charge') {
+    return c.rank === undefined && c.maxRank === undefined;
+  }
   if (!isPositiveInt(c.rank)) return false;
   if (c.kind === 'relic') return c.maxRank === undefined;
   return c.maxRank === undefined || (isPositiveInt(c.maxRank) && c.rank <= c.maxRank);

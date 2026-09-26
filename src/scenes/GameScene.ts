@@ -30,7 +30,21 @@ import {
   type LevelUpPickPayload,
   type OfferCard,
 } from '../core/levelUp';
-import { levelUpOffer, type ActiveCard } from '../core/levelUpOffer';
+import {
+  levelUpOffer,
+  offerAfterBan,
+  type ActiveCard,
+  type OfferInput,
+} from '../core/levelUpOffer';
+import {
+  countsOf,
+  grantCharge,
+  skipOffer,
+  spendBan,
+  spendReroll,
+  startingActions,
+  type OfferActions,
+} from '../core/offerActions';
 import { relicOffer } from '../core/relicOffer';
 import { PLAYER_EVENT } from '../core/health';
 import {
@@ -79,6 +93,7 @@ import {
   passiveById,
   type PlayerProfile,
 } from '../config/passives';
+import { chargeById } from '../config/offerActions';
 import { isRelicBuffId } from '../config/relics';
 import { AREA_CARDS, AREA_SPELL_IDS, BASE_AREA_STATS, isAreaSpellId } from '../config/areas';
 import {
@@ -321,6 +336,10 @@ export class GameScene extends Phaser.Scene {
   private pendingRelics = 0;
   /** The cards the open overlay is showing; a pick is only honoured against these. */
   private offer: readonly OfferCard[] = [];
+  /** Whether `offer` is a level-up's: Reroll, Skip and Ban (#228) answer only those. */
+  private offerIsLevelUp = false;
+  /** #228: the run's rerolls, bans and banned cards; fresh every run. */
+  private offerActions: OfferActions = startingActions();
   /** `?invulnerable=1` (test hook): contact damage is dropped before it reaches the player. */
   private invulnerable = false;
   /** The game's one audio layer (CO-102); every cue in the run goes through it. */
@@ -676,6 +695,8 @@ export class GameScene extends Phaser.Scene {
     this.pausing = false;
     this.magnetMsLeft = 0;
     this.offer = [];
+    this.offerIsLevelUp = false;
+    this.offerActions = startingActions();
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
     this.audio = audioOf(this);
     this.feedback = readFeedbackSettings(this.save().settings);
@@ -733,6 +754,12 @@ export class GameScene extends Phaser.Scene {
 
     const onPick = (pick: LevelUpPickPayload): void => this.applyPick(pick.offerId);
     this.events.on(LEVEL_UP_EVENT.pick, onPick);
+    const onReroll = (): void => this.rerollOffer();
+    this.events.on(LEVEL_UP_EVENT.reroll, onReroll);
+    const onSkip = (): void => this.skipLevelUp();
+    this.events.on(LEVEL_UP_EVENT.skip, onSkip);
+    const onBan = (ban: LevelUpPickPayload): void => this.banCard(ban.offerId);
+    this.events.on(LEVEL_UP_EVENT.ban, onBan);
     // Spec §4 step 4: the player reaching 0 HP is the losing end of the run.
     const onDied = (): void => this.endRun('lose');
     this.events.once(PLAYER_EVENT.died, onDied);
@@ -782,6 +809,9 @@ export class GameScene extends Phaser.Scene {
       this.game.events.off(Phaser.Core.Events.BLUR, onFocusLost);
       this.game.events.off(Phaser.Core.Events.HIDDEN, onFocusLost);
       this.events.off(LEVEL_UP_EVENT.pick, onPick);
+      this.events.off(LEVEL_UP_EVENT.reroll, onReroll);
+      this.events.off(LEVEL_UP_EVENT.skip, onSkip);
+      this.events.off(LEVEL_UP_EVENT.ban, onBan);
       this.events.off(PLAYER_EVENT.died, onDied);
       this.events.off(BOSS_EVENT.died, onBossDied);
       this.events.off(RUN_EVENT.phase, onPhase);
@@ -1569,22 +1599,113 @@ export class GameScene extends Phaser.Scene {
    * Returns whether the overlay was launched (and Game paused).
    */
   private openLevelUp(): boolean {
-    const offer = levelUpOffer(this.rng, {
+    return this.showLevelUp(levelUpOffer(this.rng, this.offerInput()), true);
+  }
+
+  /** What a level-up draws from right now, the run's bans (#228) included. */
+  private offerInput(): OfferInput {
+    return {
       loadout: this.spells.loadout,
       level: this.run.level,
       actives: this.activeCatalog(),
       carried: this.spells.carriedStats,
-    });
+      banned: this.offerActions.banned,
+    };
+  }
+
+  /**
+   * Put a level-up offer on the overlay with the run's Reroll and Ban counts,
+   * or pay the +10 max HP for an empty one. A fresh offer pauses Game under
+   * the overlay; a redrawn one (#228) relaunches the overlay already over it.
+   * Returns whether the overlay shows the offer.
+   */
+  private showLevelUp(offer: readonly OfferCard[], fresh: boolean): boolean {
     const resolution = resolveLevelUp(offer);
     if (resolution.kind === 'fallback') {
       this.player.grantMaxHp(resolution.maxHpBonus);
       return false;
     }
     this.offer = resolution.cards;
-    const payload: LevelUpPayload = { offer: resolution.cards };
+    this.offerIsLevelUp = true;
+    const payload: LevelUpPayload = {
+      offer: resolution.cards,
+      actions: countsOf(this.offerActions),
+    };
+    if (!fresh) {
+      this.scene.launch(SCENE.levelUp, payload);
+      return true;
+    }
     this.audio.play('progress.levelUp');
     this.pauseUnder(SCENE.levelUp, payload);
     return true;
+  }
+
+  /**
+   * #228: spend a reroll on a fresh draw that leaves out the cards just shown
+   * while the pool has others. Game is authoritative: a reroll it cannot pay
+   * for shows the same offer again rather than leave the overlay waiting.
+   */
+  private rerollOffer(): void {
+    const spent = this.offerIsLevelUp ? spendReroll(this.offerActions) : undefined;
+    if (!spent) {
+      if (this.offer.length > 0) console.warn('[Game] ignoring reroll');
+      this.reshowOffer();
+      return;
+    }
+    this.offerActions = spent;
+    const exclude = new Set(this.offer.map((card) => card.id));
+    this.redrawLevelUp(levelUpOffer(this.rng, { ...this.offerInput(), exclude }));
+  }
+
+  /**
+   * #228: ban a card of the open level-up for the rest of the run and redraw
+   * its place. A card not on the offer, or a ban the run has not got, is
+   * refused like a stale pick.
+   */
+  private banCard(offerId: string): void {
+    const onOffer = this.offerIsLevelUp && this.offer.some((card) => card.id === offerId);
+    const spent = onOffer ? spendBan(this.offerActions, offerId) : undefined;
+    if (!spent) {
+      if (this.offer.length > 0) console.warn(`[Game] ignoring ban of "${offerId}"`);
+      this.reshowOffer();
+      return;
+    }
+    this.offerActions = spent;
+    this.redrawLevelUp(offerAfterBan(this.rng, this.offerInput(), this.offer, offerId));
+  }
+
+  /**
+   * Show a redrawn offer on the open overlay. One a ban emptied has paid the
+   * +10 max HP instead, so the overlay closes and the run goes on.
+   */
+  private redrawLevelUp(offer: readonly OfferCard[]): void {
+    if (this.showLevelUp(offer, false)) return;
+    this.offer = [];
+    this.offerIsLevelUp = false;
+    this.scene.stop(SCENE.levelUp);
+    this.scene.resume();
+  }
+
+  /** Relaunch the open overlay unchanged after a refused request; nothing when none is open. */
+  private reshowOffer(): void {
+    if (this.offer.length === 0) return;
+    const payload: LevelUpPayload = { offer: this.offer };
+    if (this.offerIsLevelUp) payload.actions = countsOf(this.offerActions);
+    this.scene.launch(SCENE.levelUp, payload);
+  }
+
+  /**
+   * #228: Skip takes nothing and pays +1 reroll; the overlay has closed
+   * itself. An open slot stays open, so the next level-up offers it again.
+   */
+  private skipLevelUp(): void {
+    if (!this.offerIsLevelUp) {
+      console.warn('[Game] ignoring skip with no level-up open');
+      return;
+    }
+    this.offerActions = skipOffer(this.offerActions);
+    this.offer = [];
+    this.offerIsLevelUp = false;
   }
 
   /**
@@ -1608,6 +1729,7 @@ export class GameScene extends Phaser.Scene {
     });
     if (cards.length === 0) return false;
     this.offer = cards;
+    this.offerIsLevelUp = false;
     const payload: LevelUpPayload = { offer: cards };
     this.audio.play('progress.levelUp');
     this.pauseUnder(SCENE.levelUp, payload);
@@ -1680,8 +1802,17 @@ export class GameScene extends Phaser.Scene {
   private applyPick(offerId: string): void {
     const card = this.offer.find((c) => c.id === offerId);
     this.offer = [];
+    this.offerIsLevelUp = false;
     if (!card) {
       console.warn(`[Game] ignoring pick of unoffered card "${offerId}"`);
+      return;
+    }
+    // A charge (#228) adds to the run's rerolls or bans; it is no perk.
+    if (card.kind === 'charge') {
+      const charge = chargeById(card.id);
+      if (!charge) return;
+      this.offerActions = grantCharge(this.offerActions, charge);
+      this.audio.play('progress.perk');
       return;
     }
     if (card.kind === 'relic') {

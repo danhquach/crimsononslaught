@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ELEMENTS, ROSTER_SPELL_IDS, elementOf } from '../config/loadout';
+import { LEVEL_UP_CHARGES, RELIC_CHARGES } from '../config/offerActions';
 import { PASSIVES } from '../config/passives';
 import { RELIC_BUFFS } from '../config/relics';
 import { SPELL_CARDS } from '../config/spells';
 import {
   CARD_FILL,
   CARD_FILL_HOVER,
+  CHARGE_COLOR,
   FALLBACK_COLOR,
   PASSIVE_COLOR,
   RELIC_COLOR,
@@ -41,6 +43,12 @@ describe('offerColor', () => {
     for (const { id } of RELIC_BUFFS) expect(offerColor('relic', id), id).toBe(RELIC_COLOR);
   });
 
+  it('gives every reroll and ban charge the charge colour (#228)', () => {
+    for (const { id } of [...LEVEL_UP_CHARGES, ...RELIC_CHARGES]) {
+      expect(offerColor('charge', id), id).toBe(CHARGE_COLOR);
+    }
+  });
+
   it("gives every roster spell its element's colour, not its own", () => {
     for (const id of ROSTER_SPELL_IDS) {
       const element = elementOf(id);
@@ -57,6 +65,7 @@ describe('offerColor', () => {
     const palette: [string, number][] = [
       ['passive', PASSIVE_COLOR],
       ['relic', RELIC_COLOR],
+      ['charge', CHARGE_COLOR],
       ['crimson', FALLBACK_COLOR],
       ...ELEMENTS.map((element): [string, number] => [element, SPELL_CARDS[element].color]),
     ];
@@ -67,8 +76,8 @@ describe('offerColor', () => {
     }
   });
 
-  it('keeps both kind colours at 3:1 contrast or better on the card, hovered or not', () => {
-    for (const color of [PASSIVE_COLOR, RELIC_COLOR]) {
+  it('keeps the kind colours at 3:1 contrast or better on the card, hovered or not', () => {
+    for (const color of [PASSIVE_COLOR, RELIC_COLOR, CHARGE_COLOR]) {
       for (const fill of [CARD_FILL, CARD_FILL_HOVER]) {
         expect(contrast(color, fill), cssColor(color)).toBeGreaterThanOrEqual(3);
       }
