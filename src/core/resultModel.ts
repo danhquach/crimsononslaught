@@ -20,6 +20,11 @@ export interface ResultHeadline {
 export const RESULT_HEADLINES: Readonly<Record<Outcome, ResultHeadline>> = {
   win: { text: 'Victory', color: '#ffd700', subtitle: 'The boss falls and the onslaught ends.' },
   lose: { text: 'Defeat', color: '#dc143c', subtitle: 'The crimson tide overran you.' },
+  ended: {
+    text: 'Run ended',
+    color: '#cccccc',
+    subtitle: 'You left the field with what you gathered.',
+  },
 };
 
 /** `[label, value]`, shown in order. */

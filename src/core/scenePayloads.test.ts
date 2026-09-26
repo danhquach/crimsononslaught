@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isGamePayload,
   isLevelUpPayload,
+  isPausePayload,
   isResultPayload,
   isRunStats,
   type ResultPayload,
@@ -68,10 +69,48 @@ describe('isRunStats', () => {
   });
 });
 
+describe('isPausePayload', () => {
+  const power = { name: 'Power', abbr: 'Po', description: 'More damage.', count: 2 };
+  const stats = { kills: 12, embers: 3, elapsedMs: 61_000 };
+  const view = {
+    level: 4,
+    spells: [
+      { id: 'fire', name: 'Fire Bolt' },
+      { id: 'ice', name: 'Ice Arrow' },
+    ],
+    passives: [power],
+    relics: [{ ...power, name: 'Hourglass', abbr: 'Ho', count: 1 }],
+    stats,
+  };
+  const empty = { level: 1, spells: [], passives: [], relics: [], stats };
+
+  it('accepts a view, with or without an action to confirm', () => {
+    expect(isPausePayload({ view })).toBe(true);
+    expect(isPausePayload({ view: empty })).toBe(true);
+    for (const confirm of ['restart', 'end', 'menu']) {
+      expect(isPausePayload({ view, confirm }), confirm).toBe(true);
+    }
+  });
+
+  it('rejects a missing or malformed view, and Resume as a confirmation', () => {
+    expect(isPausePayload(undefined)).toBe(false);
+    expect(isPausePayload({})).toBe(false);
+    expect(isPausePayload({ view, confirm: 'resume' })).toBe(false);
+    expect(isPausePayload({ view, confirm: 'quit' })).toBe(false);
+    expect(isPausePayload({ view: { ...view, level: 1.5 } })).toBe(false);
+    expect(isPausePayload({ view: { ...view, spells: ['Fire Bolt'] } })).toBe(false);
+    expect(isPausePayload({ view: { ...view, passives: [{ name: 'Power' }] } })).toBe(false);
+    expect(isPausePayload({ view: { ...view, relics: [{ ...power, count: -1 }] } })).toBe(false);
+    expect(isPausePayload({ view: { ...view, stats: undefined } })).toBe(false);
+    expect(isPausePayload({ view: { ...view, stats: { ...stats, elapsedMs: NaN } } })).toBe(false);
+  });
+});
+
 describe('isResultPayload', () => {
-  it('accepts win and lose with valid stats', () => {
+  it('accepts win, lose and an ended run with valid stats', () => {
     expect(isResultPayload(result)).toBe(true);
     expect(isResultPayload({ ...result, outcome: 'lose' })).toBe(true);
+    expect(isResultPayload({ ...result, outcome: 'ended' })).toBe(true);
   });
 
   it('rejects missing payload, unknown outcome, or bad stats', () => {

@@ -1,5 +1,6 @@
 import { isSpellId, type SpellId } from '../config/spells';
 import { MAX_OFFER_SIZE, isOfferCard, type OfferCard } from './levelUp';
+import { isPauseAction, isPauseView, type ConfirmAction, type PauseView } from './pauseModel';
 
 /**
  * Typed payloads carried across scene transitions (spec §7: transitions always
@@ -19,6 +20,7 @@ export const SCENE = {
   game: 'Game',
   hud: 'Hud',
   levelUp: 'LevelUp',
+  pause: 'Pause',
   result: 'Result',
   upgrades: 'Upgrades',
   textureDebug: 'TextureDebug',
@@ -72,7 +74,20 @@ export interface LevelUpPayload {
   offer: readonly OfferCard[];
 }
 
-export type Outcome = 'win' | 'lose';
+/**
+ * `Game -> Pause` (launched over the paused Game, #252). With `confirm` the
+ * screen asks about that action instead of showing the menu; it restarts
+ * itself with it rather than swapping its menu in place.
+ */
+export interface PausePayload {
+  view: PauseView;
+  confirm?: ConfirmAction;
+}
+
+/** `ended`: the player ended the run from the pause screen (#252), keeping what it earned. */
+export type Outcome = 'win' | 'lose' | 'ended';
+
+const OUTCOMES: readonly string[] = ['win', 'lose', 'ended'] satisfies Outcome[];
 
 /** Summary shown on the result screen (see `core/resultModel.ts`). CO-030's RunState supplies real values. */
 export interface RunStats {
@@ -119,6 +134,14 @@ export function isLevelUpPayload(data: unknown): data is LevelUpPayload {
   );
 }
 
+export function isPausePayload(data: unknown): data is PausePayload {
+  return (
+    isRecord(data) &&
+    isPauseView(data.view) &&
+    (data.confirm === undefined || (isPauseAction(data.confirm) && data.confirm !== 'resume'))
+  );
+}
+
 export function isRunStats(data: unknown): data is RunStats {
   return (
     isRecord(data) &&
@@ -137,7 +160,8 @@ export function isRunStats(data: unknown): data is RunStats {
 export function isResultPayload(data: unknown): data is ResultPayload {
   return (
     isRecord(data) &&
-    (data.outcome === 'win' || data.outcome === 'lose') &&
+    typeof data.outcome === 'string' &&
+    OUTCOMES.includes(data.outcome) &&
     isRunStats(data.stats) &&
     isFiniteNumber(data.earned) &&
     isFiniteNumber(data.balance)
