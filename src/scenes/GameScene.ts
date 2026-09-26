@@ -473,7 +473,8 @@ export class GameScene extends Phaser.Scene {
    * to fall, how far it will reach and (CO-167) where its meteor is drawn —
    * plus what the spells casting them have committed, landed and hit, and the
    * most one landing hit (#187). CO-167 adds the ponds on the ground, where
-   * each stands and how it is drawn, what the ponds have burned, and how the
+   * each stands and how it is drawn, the last points strikes landed on, what
+   * the ponds have burned, and how the
    * blast damage split between the inner and outer half of its reach. The
    * browser suite watches a meteor fall, land on the crowd and leave a pond
    * that burns and goes.
@@ -485,6 +486,7 @@ export class GameScene extends Phaser.Scene {
     hits: number;
     widest: number;
     ponds: (AreaView & { x: number; y: number })[];
+    landedAt: { x: number; y: number }[];
     pondsPlaced: number;
     pondHits: number;
     spread: BlastSpread;
@@ -513,6 +515,7 @@ export class GameScene extends Phaser.Scene {
       hits: spells.reduce((total, spell) => total + spell.hits, 0),
       widest: spells.reduce((most, spell) => Math.max(most, spell.widest), 0),
       ponds,
+      landedAt: spells.flatMap((spell) => spell.recentLandings.map(({ x, y }) => ({ x, y }))),
       pondsPlaced: spells.reduce((total, spell) => total + spell.pondsPlaced, 0),
       pondHits: spells.reduce((total, spell) => total + spell.pondHits, 0),
       spread,

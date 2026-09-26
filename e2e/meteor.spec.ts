@@ -120,6 +120,25 @@ test('meteors fall onto a point, blast the crowd and leave a pond that burns and
   expect(runMs, 'run time the window covered').toBeGreaterThanOrEqual(RUN_MS);
 
   const last = trace[trace.length - 1];
+  // A pond sampled on a point its own report says a strike landed on: the
+  // landing that left it is always among the recent ones read with it.
+  const onLanding = (report: Report) =>
+    report.ponds.filter((pond) => report.landedAt.some((p) => p.x === pond.x && p.y === pond.y))
+      .length;
+  const pondSamples = trace.reduce((total, r) => total + r.ponds.length, 0);
+  const onPoints = trace.reduce((total, r) => total + onLanding(r), 0);
+  const fading = trace.flatMap((r) => r.ponds).filter((pond) => (pond.artAlpha ?? 1) < 1).length;
+  const pondsAtOnce = Math.max(...trace.map((r) => r.ponds.length));
+  // Counts, for comparing runs (small-area sampling, CO-167). Logged before any
+  // check, so a failing run still shows them.
+  console.log(
+    `meteor: committed ${last?.committed}, landed ${last?.landed}, hits ${last?.hits}, ` +
+      `widest ${last?.widest}, air samples ${trace.reduce((t, r) => t + r.live.length, 0)}, ` +
+      `inner ${last?.spread.innerHits}, outer ${last?.spread.outerHits}, ` +
+      `ponds ${last?.pondsPlaced}, pond samples ${pondSamples} (on a landing ${onPoints}, ` +
+      `fading ${fading}, most at once ${pondsAtOnce}), pond hits ${last?.pondHits}`,
+  );
+
   // A 4 s cooldown over ~115 s of run: many strikes committed.
   expect(last?.committed, 'strikes committed over the run').toBeGreaterThan(10);
   // Every strike lands, one fall after it is committed; only the one in the
@@ -191,9 +210,9 @@ test('meteors fall onto a point, blast the crowd and leave a pond that burns and
   expect(innerMean, 'inner vs outer blast damage').toBeGreaterThan(outerMean);
 
   // Each landing leaves a pond on its point, drawn with its own art and no
-  // ring, that burns the crowd. A pond is matched to a meteor seen falling
-  // onto the same point, so it is the one that landing left.
-  const points = new Set(trace.flatMap((r) => r.live.map((m) => `${m.x},${m.y}`)));
+  // ring, that burns the crowd. Every pond sampled stands exactly on a point a
+  // strike landed on (#262's first CI run: matching ponds to meteors seen in
+  // the air instead found none, since at 10 fps a strike is up for one frame).
   const ponds = trace.flatMap((r) => r.ponds);
   expect(last?.pondsPlaced, 'ponds placed').toBeGreaterThan(0);
   expect(last?.pondsPlaced, 'ponds never outnumber landings').toBeLessThanOrEqual(
@@ -206,25 +225,13 @@ test('meteors fall onto a point, blast the crowd and leave a pond that burns and
     expect(pond.radius).toBeGreaterThanOrEqual(BASE_METEOR_STATS.pondRadius);
     expect(pond.remainingS, 'a pond is gone once it runs out').toBeGreaterThan(0);
   }
-  const onPoints = ponds.filter((pond) => points.has(`${pond.x},${pond.y}`)).length;
-  expect(onPoints, 'ponds on a point a meteor was seen falling onto').toBeGreaterThan(0);
+  expect(onPoints, 'ponds on a point a strike landed on').toBe(pondSamples);
   expect(last?.pondHits, 'enemies burned by ponds').toBeGreaterThan(0);
   // The ponds go: far more were placed than were ever on the ground together.
-  const pondsAtOnce = Math.max(...trace.map((r) => r.ponds.length));
-  expect(last?.pondsPlaced, 'placed vs ever down at once').toBeGreaterThan(pondsAtOnce);
-  // Logged, not asserted: the 0.3 s fade is 30 ms of wall time at 10x, under
+  // The fade is only logged above: 0.3 s is 30 ms of wall time at 10x, under
   // the sampling interval, so a sample inside it is luck (the fade itself is
   // `fadeOutAlpha`'s unit test).
-  const fading = ponds.filter((pond) => (pond.artAlpha ?? 1) < 1).length;
-
-  // Counts, for comparing runs (small-area sampling, CO-167).
-  console.log(
-    `meteor: committed ${last?.committed}, landed ${last?.landed}, hits ${last?.hits}, ` +
-      `widest ${last?.widest}, air samples ${distances.length}, inner ${spread?.innerHits} ` +
-      `(${innerMean.toFixed(1)}), outer ${spread?.outerHits} (${outerMean.toFixed(1)}), ` +
-      `ponds ${last?.pondsPlaced}, pond samples ${ponds.length} (on points ${onPoints}, ` +
-      `fading ${fading}, most at once ${pondsAtOnce}), pond hits ${last?.pondHits}`,
-  );
+  expect(last?.pondsPlaced, 'placed vs ever down at once').toBeGreaterThan(pondsAtOnce);
 
   // Spec §11: the strikes fall on a full arena and the run still draws.
   const arena = await page.evaluate(async (scene) => {

@@ -19,6 +19,9 @@ import type { FxPool } from '../systems/FxPool';
 import type { TelegraphPool } from '../systems/TelegraphPool';
 import type { DamageSink } from './DamageSink';
 
+/** Test hook (CO-167): how many recent landing points the spell remembers. */
+const RECENT_LANDINGS = 8;
+
 /** Everything one strike will ever use, read once at its cast (spec §6.2). */
 interface StrikeSnapshot {
   /** The blast at the centre: `damage × aoeDamageFactor`. */
@@ -83,6 +86,12 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
   private pondBurns = 0;
   /** Test hook (CO-167): where blast damage landed across the crowd. */
   private spread: BlastSpread = { innerHits: 0, innerDamage: 0, outerHits: 0, outerDamage: 0 };
+  /**
+   * Test hook (CO-167): the last few points strikes landed on, newest last. A
+   * pond outlives only the landing that left it, so the one under any live pond
+   * is here whatever the browser suite happened to sample.
+   */
+  private landedAt: Vec2[] = [];
 
   constructor(
     id: StrikeSpellId,
@@ -133,6 +142,11 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
   /** Enemies burned by pond ticks so far: one per enemy per tick. */
   get pondHits(): number {
     return this.pondBurns;
+  }
+
+  /** The last points strikes landed on, newest last. */
+  get recentLandings(): readonly Readonly<Vec2>[] {
+    return this.landedAt;
   }
 
   /** Blast damage dealt near the centre and near the rim so far, before crits. */
@@ -193,6 +207,7 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
   private land(telegraph: Readonly<Telegraph>, strike: StrikeSnapshot): void {
     const { radius } = telegraph;
     this.landings += 1;
+    this.landedAt = [...this.landedAt, { x: telegraph.x, y: telegraph.y }].slice(-RECENT_LANDINGS);
     this.fx.burst('fire.explode', telegraph.x, telegraph.y, {
       scale: areaArtScale(radius, ART_BOXES['fire.explode'].w),
     });
