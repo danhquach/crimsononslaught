@@ -1790,6 +1790,49 @@
           { "anim": "earth_companion", "cols": [5, 5], "centred": true }
         ]
       ]
+    },
+    {
+      "key": "hud",
+      "ticket": "CO-156",
+      "file": "CO-156/hud_bar_hp.png",
+      "page": 11,
+      "cols": 2,
+      "rows": 1,
+      "sheetCell": 448,
+      "maxMagenta": 24,
+      "rowSpecs": [[{ "anim": "hpFrame", "cols": [1, 1] }, { "anim": "hpMark", "cols": [2, 2] }]]
+    },
+    {
+      "key": "hud",
+      "ticket": "CO-156",
+      "file": "CO-156/hud_bar_shield.png",
+      "page": 11,
+      "cols": 2,
+      "rows": 1,
+      "sheetCell": 448,
+      "maxMagenta": 24,
+      "rowSpecs": [[{ "anim": "shieldFrame", "cols": [1, 1] }, { "anim": "shieldMark", "cols": [2, 2] }]]
+    },
+    {
+      "key": "hud",
+      "ticket": "CO-156",
+      "file": "CO-156/hud_bar_xp.png",
+      "page": 11,
+      "cols": 2,
+      "rows": 1,
+      "sheetCell": 448,
+      "maxMagenta": 24,
+      "rowSpecs": [[{ "anim": "xpFrame", "cols": [1, 1] }, { "anim": "xpMark", "cols": [2, 2] }]]
+    },
+    {
+      "key": "hud",
+      "ticket": "CO-156",
+      "file": "CO-156/hud_bar_boss.png",
+      "page": 11,
+      "cols": 2,
+      "rows": 1,
+      "sheetCell": 448,
+      "rowSpecs": [[{ "anim": "bossFrame", "cols": [1, 1] }, { "anim": "bossMark", "cols": [2, 2] }]]
     }
   ]
 }

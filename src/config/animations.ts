@@ -246,6 +246,13 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // HUD slot icons (CO-154): one still per roster spell, drawn by HudScene
   // straight from the atlas, never played.
   ...ROSTER_SPELL_IDS.map((id) => spec(`icon.${id}`, 1, 1, ONCE)),
+
+  // HUD bar frames and their end marks (CO-156): stills, never played; each
+  // frame is cut into caps and a middle by `render/barFrame.ts`.
+  ...(['hp', 'shield', 'xp', 'boss'] as const).flatMap((bar) => [
+    spec(`hud.${bar}Frame`, 1, 1, ONCE),
+    spec(`hud.${bar}Mark`, 1, 1, ONCE),
+  ]),
 ];
 
 /**
