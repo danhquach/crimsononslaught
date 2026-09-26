@@ -1,6 +1,8 @@
+import { RELIC_CHARGES, type ChargeCard } from '../config/offerActions';
 import { PROFILE_CLAMPS, type PlayerProfile } from '../config/passives';
 import { RELIC_BUFFS, type RelicBuff } from '../config/relics';
 import { MAX_OFFER_SIZE, type OfferCard } from './levelUp';
+import { chargeCard } from './levelUpOffer';
 import type { Rng } from './rng';
 
 /**
@@ -10,7 +12,8 @@ import type { Rng } from './rng';
  * Up to `size` distinct buffs, drawn by weight without replacement, so one
  * offer never shows a buff twice and a short pool shows what is left. A buff
  * whose field is already at its `PROFILE_CLAMPS` bound is left out: a pick
- * that can change nothing is no pick.
+ * that can change nothing is no pick. The relic charge cards (#228: +2
+ * Rerolls, +1 Ban) are always in the pool, at their own lower weight.
  *
  * The caller passes an RNG of the relic offers' own stream, so a relic's draw
  * never moves a seed's level-up offers or its drops.
@@ -25,15 +28,23 @@ export interface RelicOfferInput {
   /** The profile as it stands, with every source applied and clamped. */
   profile: Readonly<PlayerProfile>;
   buffs?: readonly RelicBuff[];
+  charges?: readonly ChargeCard[];
   size?: number;
 }
 
 export function relicOffer(rng: Rng, input: RelicOfferInput): OfferCard[] {
-  const { ranks, profile, buffs = RELIC_BUFFS, size = MAX_OFFER_SIZE } = input;
-  const eligible = buffs.filter((buff) => !atCap(buff, profile));
-  return weightedSample(rng, eligible, (buff) => buff.weight, size).map((buff) =>
-    relicCard(buff, (ranks.get(buff.id) ?? 0) + 1),
-  );
+  const { ranks, profile, buffs = RELIC_BUFFS, charges = RELIC_CHARGES } = input;
+  const { size = MAX_OFFER_SIZE } = input;
+  const pool = [
+    ...buffs
+      .filter((buff) => !atCap(buff, profile))
+      .map((buff) => ({
+        weight: buff.weight,
+        card: relicCard(buff, (ranks.get(buff.id) ?? 0) + 1),
+      })),
+    ...charges.map((charge) => ({ weight: charge.weight, card: chargeCard(charge) })),
+  ];
+  return weightedSample(rng, pool, (entry) => entry.weight, size).map((entry) => entry.card);
 }
 
 /**

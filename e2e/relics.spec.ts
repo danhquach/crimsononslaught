@@ -34,6 +34,8 @@ interface Inner {
 
 interface Overlay {
   cards: OfferCard[];
+  /** True for a relic's offer: it carries no Reroll or Ban counts, a level-up's does (#228). */
+  relicOffer: boolean;
   profile: PlayerProfile;
   relics: [string, number][];
   report: GameScene['pickupReport'];
@@ -53,11 +55,12 @@ async function overlay(page: Page): Promise<Overlay | null> {
   return page.evaluate(async (scene) => {
     const { game } = await import('/src/main.ts');
     if (!game.scene.isActive(scene.levelUp)) return null;
-    const levelUp = game.scene.getScene(scene.levelUp) as unknown as { cards: OfferCard[] };
+    const { view } = game.scene.getScene(scene.levelUp) as LevelUpScene;
     const run = game.scene.getScene(scene.game) as GameScene;
     const { spells } = run as unknown as Inner;
     return {
-      cards: levelUp.cards,
+      cards: [...view.cards],
+      relicOffer: view.actions === undefined,
       profile: spells.profile,
       relics: [...spells.loadout.relics],
       report: run.pickupReport,
@@ -72,7 +75,7 @@ async function waitForRelicOffer(page: Page): Promise<Overlay> {
     .poll(
       async () => {
         const open = await overlay(page);
-        if (open?.cards.every((card) => card.kind === 'relic')) found = open;
+        if (open?.relicOffer) found = open;
         else if (open) await page.keyboard.press('1');
         return found !== null;
       },
@@ -82,7 +85,9 @@ async function waitForRelicOffer(page: Page): Promise<Overlay> {
   return found as unknown as Overlay;
 }
 
-test('touching a relic offers 3 relic buffs, and the pick changes the stat', async ({ page }) => {
+test('touching a relic offers 3 relic cards, and a buff pick changes the stat', async ({
+  page,
+}) => {
   const errors = collectErrors(page);
   await startRun(page);
 
@@ -103,21 +108,23 @@ test('touching a relic offers 3 relic buffs, and the pick changes the stat', asy
 
   const offer = await waitForRelicOffer(page);
   expect(offer.cards).toHaveLength(3);
-  expect(new Set(offer.cards.map((c) => c.id)).size, 'three different buffs').toBe(3);
+  expect(new Set(offer.cards.map((c) => c.id)).size, 'three different cards').toBe(3);
+  // A relic's offer can hold a reroll or ban charge (#228), never a passive or spell.
+  for (const card of offer.cards) expect(['relic', 'charge']).toContain(card.kind);
   expect(offer.relics, 'nothing taken before the pick').toEqual([]);
   expect(offer.report.relics, 'the relic is counted').toBe(1);
   expect(offer.report.live.relic, 'the relic left the floor').toBe(RELIC_COUNT - 1);
   const texts = await sceneTexts(page, SCENE.levelUp);
   expect(texts).toContain('Relic found!');
 
-  const [first] = offer.cards;
-  const buff = relicBuffById(first?.id ?? '');
-  if (!buff) throw new Error(`card "${first?.id}" is no relic buff`);
+  const at = offer.cards.findIndex((card) => card.kind === 'relic');
+  const buff = relicBuffById(offer.cards[at]?.id ?? '');
+  if (!buff) throw new Error('the relic offer holds no relic buff');
   const before = offer.profile[buff.field];
   const expected = buff.op === 'mul' ? before * buff.amount : before + buff.amount;
 
   // The key is handled on the overlay's next frame, not inside `press`.
-  await page.keyboard.press('1');
+  await page.keyboard.press(`${at + 1}`);
   let after = { profile: offer.profile, relics: offer.relics };
   await expect
     .poll(
@@ -149,8 +156,7 @@ test('a relic and a level-up owed on the same frame are both offered', async ({ 
     const seen: string[] = [];
     (window as unknown as { overlays: string[] }).overlays = seen;
     levelUp.events.on('create', () => {
-      const { cards } = levelUp as unknown as { cards: OfferCard[] };
-      seen.push(cards.every((c) => c.kind === 'relic') ? 'relic' : 'levelUp');
+      seen.push(levelUp.view.actions === undefined ? 'relic' : 'levelUp');
     });
     const inner = game.scene.getScene(scene.game) as unknown as Inner;
     inner.pendingLevelUps += 1;
