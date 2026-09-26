@@ -11,6 +11,15 @@ import type { HudScene } from '../src/scenes/HudScene';
  * source file for type-checking).
  */
 
+/**
+ * The floor `game.loop.actualFps` must hold at in every suite that reads it.
+ * A desktop holds 60 fps and the check is for a collapse — a pool thrashing, a
+ * leak, a membership test gone quadratic — not a tuned number. The CI runner
+ * draws about 10 fps (#94, see `forceFrameLength`), so there the floor only
+ * catches a stalled loop (#260).
+ */
+export const MIN_FPS = process.env.CI ? 5 : 20;
+
 export function isSceneActive(page: Page, key: string): Promise<boolean> {
   return page.evaluate(async (sceneKey) => {
     const { game } = await import('/src/main.ts');

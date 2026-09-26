@@ -399,13 +399,24 @@ export class GameScene extends Phaser.Scene {
   /**
    * Test hook (#134): each shield equipped right now and what its pool holds.
    * The browser suite watches a real run drain one, break it and see it back.
+   * `absorbed` and `regrown` are the shield's own running totals (#260), so
+   * the suite need not catch a refill between two polls.
    */
-  get shieldReport(): { id: RosterSpellId; pool: number; max: number; up: boolean }[] {
+  get shieldReport(): {
+    id: RosterSpellId;
+    pool: number;
+    max: number;
+    up: boolean;
+    absorbed: number;
+    regrown: number;
+  }[] {
     return this.shieldSpells().map((spell) => ({
       id: spell.id,
       pool: spell.pool,
       max: spell.maxPool,
       up: spell.up,
+      absorbed: spell.tally.absorbed,
+      regrown: spell.tally.regrown,
     }));
   }
 

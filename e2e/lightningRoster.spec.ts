@@ -7,7 +7,7 @@ import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import { MAX_LIVE_BOLTS } from '../src/core/lightningBolt';
 import { MAX_SEGMENTS } from '../src/spells/ChainLightningSpell';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #142 in the browser: a Lightning run — Lightning Bolt as the default, Chain
@@ -54,9 +54,6 @@ const START_AT_S = 180;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
-
-/** The floor the frame rate must hold at, the same one the other roster suites use. */
-const MIN_FPS = 20;
 
 /** What `live` counts for each spell, and the cap it may never pass. */
 const CAPS: Readonly<Record<string, number>> = {

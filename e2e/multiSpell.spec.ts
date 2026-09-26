@@ -3,7 +3,7 @@ import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * CO-109 in the browser: a run casting three actives at once, each on its own
@@ -28,15 +28,6 @@ const EXTRA = ['ice', 'lightning'] as const;
 const RUN_MS = 150_000;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
-
-/**
- * The floor the frame rate must hold at with all three casting. Measured
- * headless at seed 1 over a whole run: 60 fps with three actives as with one,
- * at `?timeScale=10` and at the ceiling, peaking around 45 live enemies. The
- * floor is set far below that because a CI runner is slower than a desktop and
- * the check is for a collapse — a pool thrashing, a leak — not a tuned number.
- */
-const MIN_FPS = 20;
 
 /**
  * Play until the HUD's timer reads `runMs` or the wall clock reaches `until`,

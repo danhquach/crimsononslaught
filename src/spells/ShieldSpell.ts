@@ -4,10 +4,13 @@ import type { SpellStatsBySpell } from '../core/spellStats';
 import {
   absorb,
   createShield,
+  EMPTY_TALLY,
   isUp,
+  tallyShield,
   tickShield,
   type ShieldRule,
   type ShieldState,
+  type ShieldTally,
 } from '../core/shield';
 
 /**
@@ -29,6 +32,8 @@ import {
  */
 export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
   private state: ShieldState;
+  /** Test hook (#260): what the pool has swallowed and grown back, across the run. */
+  private tallied: ShieldTally = EMPTY_TALLY;
 
   constructor(id: S, stats: SpellStatsBySpell[S]) {
     super(id, stats);
@@ -53,6 +58,15 @@ export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
   }
 
   /**
+   * Damage absorbed and points regrown so far. A refill can come and go
+   * between two polls on a slow runner, so the browser suite counts it here
+   * rather than sampling the pool.
+   */
+  get tally(): ShieldTally {
+    return this.tallied;
+  }
+
+  /**
    * Put one hit on the player through this shield and return what is left for
    * their HP. Called from `GameScene`'s one player-intake path, before
    * `Player.takeDamage` (spec §6.2: a shield absorbs before `damageReduction`,
@@ -60,6 +74,7 @@ export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
    */
   absorbDamage(amount: number): number {
     const result = absorb(this.state, amount, this.rule);
+    this.tallied = tallyShield(this.tallied, this.state, result.state);
     this.state = result.state;
     // `broke` is true only on the transition to 0, so overlapping contacts in
     // one frame play one break rather than one each.
@@ -80,7 +95,9 @@ export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
   }
 
   protected override tick(deltaS: number): void {
-    this.state = tickShield(this.state, deltaS, this.rule);
+    const next = tickShield(this.state, deltaS, this.rule);
+    this.tallied = tallyShield(this.tallied, this.state, next);
+    this.state = next;
   }
 
   /** Never called: a shield has no cooldown, it is simply up or recharging. */

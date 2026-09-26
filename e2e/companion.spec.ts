@@ -3,7 +3,7 @@ import { COMPANION_FX, isCompanionSpellId } from '../src/config/companions';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
 
 /**
  * #133 in the browser: a run with all four companions — two ranged allies that
@@ -42,9 +42,6 @@ const WALL_CAP_MS = 40_000;
  * allowance is well above that and far below a companion that had come loose.
  */
 const LEASH_SLACK = 40;
-
-/** The floor the frame rate must hold at, as `multiSpell.spec.ts` sets it. */
-const MIN_FPS = 20;
 
 /**
  * Play until the HUD's timer reads `runMs` or the wall clock reaches `until`,
