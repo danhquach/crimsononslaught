@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
-import { FRAMES, type FrameName } from '../config/frames';
+import { ART_BOXES, FRAMES, type FrameName } from '../config/frames';
+import { BAR_ART, type BarArt } from '../config/hud';
 import { CURRENCY_NAME } from '../config/meta';
 import { artFrame } from '../core/animation';
 import {
@@ -18,7 +19,8 @@ import {
 } from '../core/hudModel';
 import { onRunEvents, type RunEvent } from '../core/runEvents';
 import { SCENE } from '../core/scenePayloads';
-import { hasIconArt } from '../render/spellIcon';
+import { hasFrameArt } from '../render/atlas';
+import { barSlices } from '../render/barFrame';
 
 const MARGIN = 16;
 const BAR_WIDTH = 240;
@@ -63,6 +65,21 @@ const SLOT_BADGE_OFFSET = 15;
 const SLOT_LABEL_STYLE = { ...LABEL_STYLE, fontSize: '11px', strokeThickness: 3 } as const;
 const SLOT_GLYPH_STYLE = { ...LABEL_STYLE, fontSize: '13px', strokeThickness: 2 } as const;
 const SLOT_BADGE_STYLE = { ...LABEL_STYLE, fontSize: '10px', strokeThickness: 0 } as const;
+/**
+ * CO-156: the framed bars' layout. The top-left frames are indented so the
+ * widest mark, the heart, hangs off their left end inside the margin, and are
+ * narrower than the flat bars by that indent so every label keeps its place.
+ * Each row clears the marks above it. The boss bar sits under the whole stack,
+ * so the shield and XP labels never run into it.
+ */
+const FRAMED_X = MARGIN + 24;
+const FRAMED_WIDTH = BAR_WIDTH - 24;
+const FRAMED_SHIELD_Y = MARGIN + 31;
+const FRAMED_XP_Y = MARGIN + 54;
+const FRAMED_BOSS_Y = 96;
+const BOSS_WIDTH = 400;
+/** How far toward white the glint row along the top of a framed fill is, 0 to 1. */
+const FILL_GLINT = 0.4;
 
 /** Background + fill + label; `set` drives the fill by fraction so callers never touch pixels. */
 class Bar {
@@ -106,6 +123,91 @@ class Bar {
     this.fill.setVisible(visible);
     this.label.setVisible(visible);
   }
+}
+
+/**
+ * CO-156: a bar in its pixel-art frame. Draw order: the dark trough, the fill
+ * sized to it, then the frame, whose hollow inside is clear so the fill shows
+ * through, then the end mark and the label. The caps are drawn at native size
+ * and only the plain middle is tiled to `width`, so neither end ever stretches.
+ * `set` and `setVisible` behave as `Bar`'s do, so `render` drives both alike.
+ *
+ * `x`, `y` and `width` are the frame's art box on screen. The mark hangs off
+ * the left end, its right edge on the trough's left, so it never covers the
+ * fill; it is centred on the trough's height.
+ */
+class FramedBar {
+  private readonly parts: (Phaser.GameObjects.Components.Visible & Phaser.GameObjects.GameObject)[];
+  private readonly fill: Phaser.GameObjects.Rectangle;
+  private readonly glint: Phaser.GameObjects.Rectangle;
+  private readonly label: Phaser.GameObjects.Text;
+
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    width: number,
+    art: BarArt,
+    color: number,
+  ) {
+    const box = artBox(art.frame);
+    const { left, top, right, bottom } = art.trough;
+    const troughX = x + left;
+    const troughY = y + top;
+    const troughW = width - left - right;
+    const troughH = box.h - top - bottom;
+    const bg = scene.add.rectangle(troughX, troughY, troughW, troughH, BAR_BG).setOrigin(0, 0);
+    this.fill = scene.add.rectangle(troughX, troughY, troughW, troughH, color).setOrigin(0, 0);
+    // The concept's glass tube: one lighter row along the top of what is filled.
+    this.glint = scene.add
+      .rectangle(troughX, troughY, troughW, 1, towardWhite(color, FILL_GLINT))
+      .setOrigin(0, 0);
+
+    const slices = barSlices(scene, art);
+    const middleW = width - art.capLeft - art.capRight;
+    const frame = [
+      scene.add.image(x, y, slices.page, slices.left),
+      scene.add.tileSprite(x + art.capLeft, y, middleW, box.h, slices.page, slices.middle),
+      scene.add.image(x + width - art.capRight, y, slices.page, slices.right),
+    ].map((piece) => piece.setOrigin(0, 0));
+
+    const markBox = artBox(art.mark);
+    const mark = scene.add
+      .image(
+        troughX - markBox.w,
+        troughY + Math.round((troughH - markBox.h) / 2),
+        FRAMES[art.mark].page,
+        artFrame(art.mark),
+      )
+      .setOrigin(0, 0);
+
+    this.label = scene.add.text(x + width + 8, y + box.h / 2, '', LABEL_STYLE).setOrigin(0, 0.5);
+    this.parts = [bg, this.fill, this.glint, ...frame, mark, this.label];
+  }
+
+  set(fraction01: number, text: string): void {
+    this.fill.setScale(fraction01, 1);
+    this.glint.setScale(fraction01, 1);
+    this.label.setText(text);
+  }
+
+  setVisible(visible: boolean): void {
+    for (const part of this.parts) part.setVisible(visible);
+  }
+}
+
+/** `color` mixed `amount` of the way toward white, channel by channel. */
+function towardWhite(color: number, amount: number): number {
+  const channel = (shift: number): number => {
+    const c = (color >> shift) & 0xff;
+    return Math.round(c + (255 - c) * amount) << shift;
+  };
+  return channel(16) | channel(8) | channel(0);
+}
+
+/** The art box of `frame`'s clip: where its art sits inside the frame's clear margin. */
+function artBox(frame: FrameName): Readonly<{ w: number; h: number }> {
+  return ART_BOXES[frame.slice(0, frame.lastIndexOf('.')) as keyof typeof ART_BOXES];
 }
 
 /**
@@ -203,7 +305,7 @@ class SlotIcon {
 
   set(row: Readonly<SlotRow>): void {
     const spell = row.kind === 'spell' ? row : null;
-    const art = spell?.icon && hasIconArt(this.icon.scene, spell.icon) ? spell.icon : null;
+    const art = spell?.icon && hasFrameArt(this.icon.scene, spell.icon) ? spell.icon : null;
     this.showIcon(art);
     this.label.setText(slotLabel(row));
     this.glyph.setText(art ? '' : (spell?.glyph ?? ''));
@@ -256,10 +358,11 @@ export class HudScene extends Phaser.Scene {
   private timerText!: Phaser.GameObjects.Text;
   private killsText!: Phaser.GameObjects.Text;
   private embersText!: Phaser.GameObjects.Text;
-  private hpBar!: Bar;
-  private shieldBar!: Bar;
-  private xpBar!: Bar;
-  private bossBar!: Bar;
+  private hpBar!: Bar | FramedBar;
+  private shieldBar!: Bar | FramedBar;
+  private xpBar!: Bar | FramedBar;
+  private bossBar!: Bar | FramedBar;
+  private look: 'art' | 'flat' = 'flat';
   private slotIcons: SlotIcon[] = [];
   private passivesText!: Phaser.GameObjects.Text;
 
@@ -272,13 +375,48 @@ export class HudScene extends Phaser.Scene {
     return this.model;
   }
 
+  /**
+   * Whether the bars are drawn in their pixel-art frames (CO-156) or, with no
+   * atlas, as the flat placeholder bars; read by the browser suite.
+   */
+  get barLook(): 'art' | 'flat' {
+    return this.look;
+  }
+
   create(): void {
     this.model = INITIAL_HUD;
     const { width } = this.scale;
 
-    this.hpBar = new Bar(this, MARGIN, MARGIN, BAR_WIDTH, 18, HP_COLOR);
-    this.shieldBar = new Bar(this, MARGIN, MARGIN + 22, BAR_WIDTH, 8, SHIELD_COLOR);
-    this.xpBar = new Bar(this, MARGIN, MARGIN + 34, BAR_WIDTH, 10, XP_COLOR);
+    // The atlas installs every page or none, so one bar's art stands for all four.
+    const art = Object.values(BAR_ART).every(
+      (bar) => hasFrameArt(this, bar.frame) && hasFrameArt(this, bar.mark),
+    );
+    this.look = art ? 'art' : 'flat';
+    if (art) {
+      this.hpBar = new FramedBar(this, FRAMED_X, MARGIN, FRAMED_WIDTH, BAR_ART.hp, HP_COLOR);
+      this.shieldBar = new FramedBar(
+        this,
+        FRAMED_X,
+        FRAMED_SHIELD_Y,
+        FRAMED_WIDTH,
+        BAR_ART.shield,
+        SHIELD_COLOR,
+      );
+      this.xpBar = new FramedBar(this, FRAMED_X, FRAMED_XP_Y, FRAMED_WIDTH, BAR_ART.xp, XP_COLOR);
+      this.bossBar = new FramedBar(
+        this,
+        width / 2 - BOSS_WIDTH / 2,
+        FRAMED_BOSS_Y,
+        BOSS_WIDTH,
+        BAR_ART.boss,
+        BOSS_COLOR,
+      );
+    } else {
+      this.hpBar = new Bar(this, MARGIN, MARGIN, BAR_WIDTH, 18, HP_COLOR);
+      this.shieldBar = new Bar(this, MARGIN, MARGIN + 22, BAR_WIDTH, 8, SHIELD_COLOR);
+      this.xpBar = new Bar(this, MARGIN, MARGIN + 34, BAR_WIDTH, 10, XP_COLOR);
+      this.bossBar = new Bar(this, width / 2 - 200, 56, 400, 14, BOSS_COLOR);
+    }
     this.timerText = this.add
       .text(width / 2, MARGIN - 4, '', { ...LABEL_STYLE, fontSize: '28px' })
       .setOrigin(0.5, 0);
@@ -286,7 +424,6 @@ export class HudScene extends Phaser.Scene {
     this.embersText = this.add
       .text(width - MARGIN, MARGIN + 20, '', { ...LABEL_STYLE, color: EMBERS_COLOR })
       .setOrigin(1, 0);
-    this.bossBar = new Bar(this, width / 2 - 200, 56, 400, 14, BOSS_COLOR);
     this.slotIcons = [];
     this.passivesText = this.add
       .text(width - MARGIN, MARGIN + 44, '', { ...LABEL_STYLE, align: 'right' })

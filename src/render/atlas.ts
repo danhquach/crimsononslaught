@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { ANIMATIONS, STATIC_FRAMES } from '../config/animations';
 import { TEXTURE_KEYS } from '../config/colors';
-import { ART_BOXES, ATLAS_PAGES, FRAMES, FRAME_NAMES } from '../config/frames';
+import { ART_BOXES, ATLAS_PAGES, FRAMES, FRAME_NAMES, type FrameName } from '../config/frames';
 import { artFrame } from '../core/animation';
 
 /**
@@ -94,4 +94,16 @@ export function installAtlas(scene: Phaser.Scene): string[] {
   }
 
   return aliased;
+}
+
+/**
+ * Whether `frame` can be drawn as art: true only once `installAtlas` has run,
+ * which it does for every page or none. A page that loaded while another did
+ * not still exists, so checking the page alone would draw art in a run where
+ * every other entity is a placeholder (CO-130). Used by the HUD's slot icons
+ * (CO-154) and bar frames (CO-156).
+ */
+export function hasFrameArt(scene: Phaser.Scene, frame: FrameName): boolean {
+  const { page } = FRAMES[frame];
+  return scene.textures.exists(page) && scene.textures.get(page).has(artFrame(frame));
 }
