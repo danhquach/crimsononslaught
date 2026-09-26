@@ -3,6 +3,7 @@ import { SLOT_UNLOCK_LEVELS, type RosterSpellId } from '../config/loadout';
 import { PASSIVES, type Passive } from '../config/passives';
 import { MAX_OFFER_SIZE } from './levelUp';
 import {
+  activeCard,
   eligiblePassives,
   levelUpOffer,
   offerableActives,
@@ -86,6 +87,21 @@ describe('levelUpOffer — actives while a slot is open (spec §7.1)', () => {
         'ice_blizzard',
       );
     }
+  });
+
+  it('carries each active’s colour onto its card, and none when it has none (CO-155)', () => {
+    const colored = FIRE_CATALOG.map((active, i) => ({ ...active, color: 0x100 * (i + 1) }));
+    const offer = levelUpOffer(createRng(1), {
+      loadout: buildLoadout('fire'),
+      level: SLOT_2_LEVEL,
+      actives: colored,
+    });
+    for (const card of offer) {
+      expect(card.color).toBe(colored.find((active) => active.id === card.id)?.color);
+    }
+    expect(
+      activeCard({ id: 'fire_meteor', name: 'Meteor', description: 'Falls.' }),
+    ).not.toHaveProperty('color');
   });
 
   it('draws three distinct actives', () => {

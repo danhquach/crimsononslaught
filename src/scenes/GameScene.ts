@@ -1139,10 +1139,13 @@ export class GameScene extends Phaser.Scene {
     const casting = new Set<string>(this.equippedSpellIds);
     return this.rosterCards()
       .filter((card) => !casting.has(card.id))
-      .map(({ id, name, description }) => ({ id, name, description }));
+      .map(({ id, name, description, color }) => ({ id, name, description, color }));
   }
 
-  /** Every roster spell's card: its name and line for a level-up, its colour for the HUD (#144). */
+  /**
+   * Every roster spell's card: its name and line for a level-up, its colour for
+   * the HUD (#144) and for its level-up card (CO-155).
+   */
   private rosterCards(): (ActiveCard & { color: number })[] {
     return [
       ...ROSTER_SPELL_IDS.filter(isSpellId).map((id) => ({

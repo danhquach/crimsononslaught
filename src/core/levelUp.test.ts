@@ -101,6 +101,18 @@ describe('isOfferCard', () => {
     expect(isOfferCard({ ...active('fire_meteor'), maxRank: 3 })).toBe(false);
   });
 
+  it('accepts a colour on an active only, as a 24-bit integer (CO-155)', () => {
+    expect(isOfferCard({ ...active('fire_meteor'), color: 0xff4500 })).toBe(true);
+    expect(isOfferCard({ ...active('fire_meteor'), color: 0 })).toBe(true);
+    expect(isOfferCard({ ...active('fire_meteor'), color: 0xffffff })).toBe(true);
+    expect(isOfferCard({ ...active('fire_meteor'), color: 0x1000000 })).toBe(false);
+    expect(isOfferCard({ ...active('fire_meteor'), color: -1 })).toBe(false);
+    expect(isOfferCard({ ...active('fire_meteor'), color: 1.5 })).toBe(false);
+    expect(isOfferCard({ ...active('fire_meteor'), color: '#ff4500' })).toBe(false);
+    expect(isOfferCard({ ...passive('passive_power'), color: 0xff4500 })).toBe(false);
+    expect(isOfferCard({ ...uncapped('passive_haste', 2), color: 0xff4500 })).toBe(false);
+  });
+
   it('rejects each missing field', () => {
     for (const key of Object.keys(valid)) {
       const partial: Record<string, unknown> = { ...valid };

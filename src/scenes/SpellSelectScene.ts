@@ -9,19 +9,24 @@ import {
 } from '../core/scenePayloads';
 import { emptySave, isSave } from '../core/save';
 import { audioOf } from '../render/audio';
+import { addSpellIcon } from '../render/spellIcon';
 import { attachMenuInput, type MenuItem } from './input';
 import { addTextButton, textButtonItem } from './ui';
 
 const CARD_WIDTH = 200;
-const CARD_HEIGHT = 280;
+/** CO-155: 44 px taller than before, for the icon band above the name. */
+const CARD_HEIGHT = 324;
+/** The icon's band between the hotkey and the name: a 2x (64 px) icon and its margins. */
+const ICON_BAND = 44;
+const ICON_SCALE = 2;
 const CARD_GAP = 24;
 const CARD_PADDING = 14;
 const CARD_FILL = 0x1a1a1a;
 const CARD_FILL_HOVER = 0x2a2a2a;
 
 /**
- * Spell select: one card per spell (name, color, one-line description, base
- * stats). Click a card, press its number key (1–4), or move the gamepad
+ * Spell select: one card per spell (icon, name, color, one-line description,
+ * base stats). Click a card, press its number key (1–4), or move the gamepad
  * selection and confirm with A, to start Game with a full `GamePayload`.
  *
  * Also the door to the permanent upgrades (CO-101): the balance and an
@@ -120,13 +125,20 @@ export class SpellSelectScene extends Phaser.Scene {
       fontSize: '16px',
       color: '#888888',
     });
-    const name = this.add.text(left, top + 40, card.name, {
+    const icon = addSpellIcon(
+      this,
+      0,
+      top + 42,
+      { id: spellId, name: card.name, color: card.color },
+      ICON_SCALE,
+    );
+    const name = this.add.text(left, top + 40 + ICON_BAND, card.name, {
       fontFamily: 'Georgia, serif',
       fontSize: '22px',
       color: colorHex,
       wordWrap: { width: innerWidth },
     });
-    const description = this.add.text(left, top + 100, card.description, {
+    const description = this.add.text(left, top + 100 + ICON_BAND, card.description, {
       fontFamily: 'Georgia, serif',
       fontSize: '14px',
       color: '#dddddd',
@@ -134,19 +146,29 @@ export class SpellSelectScene extends Phaser.Scene {
       lineSpacing: 2,
     });
     const statStyle = { fontFamily: 'monospace', fontSize: '13px', lineSpacing: 4 };
-    const statLabels = this.add.text(left, top + 176, card.stats.map(([l]) => l).join('\n'), {
+    const statTop = top + 176 + ICON_BAND;
+    const statLabels = this.add.text(left, statTop, card.stats.map(([l]) => l).join('\n'), {
       ...statStyle,
       color: '#aaaaaa',
     });
     const statValues = this.add
-      .text(left + innerWidth, top + 176, card.stats.map(([, v]) => v).join('\n'), {
+      .text(left + innerWidth, statTop, card.stats.map(([, v]) => v).join('\n'), {
         ...statStyle,
         color: '#eeeeee',
         align: 'right',
       })
       .setOrigin(1, 0);
 
-    this.add.container(x, y, [frame, swatch, key, name, description, statLabels, statValues]);
+    this.add.container(x, y, [
+      frame,
+      swatch,
+      key,
+      ...icon,
+      name,
+      description,
+      statLabels,
+      statValues,
+    ]);
 
     // Gamepad selection reuses the hover look, so a card reads the same however
     // it was reached.

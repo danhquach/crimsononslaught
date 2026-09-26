@@ -38,6 +38,7 @@ export interface ActiveCard {
   id: RosterSpellId;
   name: string;
   description: string;
+  color?: number;
 }
 
 /** The actives this build can cast, in any order. */
@@ -112,12 +113,14 @@ export function levelUpOffer(rng: Rng, input: OfferInput): OfferCard[] {
 
 /** The card for equipping a spell: no rank, since a slot is filled once. */
 export function activeCard(active: ActiveCard): OfferCard {
-  return {
+  const card: OfferCard = {
     kind: 'active',
     id: active.id,
     name: active.name,
     description: active.description,
   };
+  if (active.color !== undefined) card.color = active.color;
+  return card;
 }
 
 /** The card for the next rank of a passive; `maxRank` is absent when it never caps. */
