@@ -804,7 +804,13 @@ export class GameScene extends Phaser.Scene {
     };
     this.game.events.on(Phaser.Core.Events.BLUR, onFocusLost);
     this.game.events.on(Phaser.Core.Events.HIDDEN, onFocusLost);
+    // #273: nothing is saved until Result, so while a run is live, leaving the
+    // page (reload, back, close) asks first. Every way out of the run shuts
+    // Game down, which drops the guard; Restart arms it again here.
+    const onBeforeUnload = (event: BeforeUnloadEvent): void => event.preventDefault();
+    window.addEventListener('beforeunload', onBeforeUnload);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
       this.events.off(PAUSE_EVENT.choose, onChoose);
       this.events.off(Phaser.Scenes.Events.RESUME, onResume);
       this.game.events.off(Phaser.Core.Events.BLUR, onFocusLost);
