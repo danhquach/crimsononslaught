@@ -76,6 +76,7 @@ test('the keyboard opens Profile and Esc comes back, from SpellSelect too', asyn
   const errors = collectErrors(page);
   const played: Save = emptySave();
   played.profile = {
+    name: 'Test_Player',
     runs: 3,
     wins: 1,
     bestTimeMs: 125_000,

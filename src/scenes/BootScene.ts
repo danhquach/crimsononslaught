@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { resolveSeed } from '../core/rng';
+import { ensurePlayerName, PLAYER_NAME_STREAM } from '../core/playerName';
+import { createRng, deriveSeed, resolveSeed } from '../core/rng';
 import {
   resolveEnemyFilter,
   resolveInvulnerable,
@@ -59,12 +60,21 @@ export class BootScene extends Phaser.Scene {
     // Saved progress (CO-101): parsed once here, then lives in the registry.
     // A save this build cannot read is reset and overwritten rather than left
     // to fail the same way on every boot; the player is told on Intro.
+    //
+    // A profile with no usable name (a first launch, a save from before names,
+    // a reset) is given one here and stored at once, so it does not change on
+    // the next reload (CO-165). The name draws from a clock-seeded stream of
+    // its own, never the run seed: `?seed=` replays the same run whether or
+    // not a profile exists, and two seeded browsers are not given one name.
     const parsed = parseSave(loadSaveJson());
-    if (parsed.status === 'reset') {
+    if (parsed.status === 'reset')
       console.warn(`[save] stored save was unreadable (${parsed.reason}); starting fresh`);
-      storeSaveJson(serializeSave(parsed.save));
-    }
-    this.registry.set(SAVE_REGISTRY_KEY, parsed.save);
+    const save = ensurePlayerName(
+      parsed.save,
+      createRng(deriveSeed(Date.now(), PLAYER_NAME_STREAM)),
+    );
+    if (parsed.status === 'reset' || save !== parsed.save) storeSaveJson(serializeSave(save));
+    this.registry.set(SAVE_REGISTRY_KEY, save);
     this.registry.set(SAVE_RESET_REGISTRY_KEY, parsed.status === 'reset');
 
     // Sound (CO-102): the clips are checked like the atlas, and the one
@@ -73,12 +83,12 @@ export class BootScene extends Phaser.Scene {
     // — a run may have been recorded since boot — and stored at once, so a
     // mute survives a reload without waiting for the run to end.
     warnIfSoundsMissing(this);
-    installAudio(this, parsed.save.settings, (settings) => {
+    installAudio(this, save.settings, (settings) => {
       const current: unknown = this.registry.get(SAVE_REGISTRY_KEY);
-      const base = isSave(current) ? current : parsed.save;
-      const save = { ...base, settings: writeAudioSettings(base.settings, settings) };
-      this.registry.set(SAVE_REGISTRY_KEY, save);
-      if (!storeSaveJson(serializeSave(save))) console.warn('[save] could not store settings');
+      const base = isSave(current) ? current : save;
+      const updated = { ...base, settings: writeAudioSettings(base.settings, settings) };
+      this.registry.set(SAVE_REGISTRY_KEY, updated);
+      if (!storeSaveJson(serializeSave(updated))) console.warn('[save] could not store settings');
     });
 
     // Run seed: `?seed=<int>` reproduces a run; otherwise a fresh one per page

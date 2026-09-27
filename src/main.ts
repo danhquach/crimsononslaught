@@ -40,6 +40,13 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     gamepad: true,
   },
+  // A container for real DOM elements over the canvas: Profile's name field
+  // (CO-165) is an `<input>`, so a touch player gets a soft keyboard, and
+  // typing gets a caret, selection and paste. The container ignores the
+  // pointer, so clicks still reach the canvas.
+  dom: {
+    createContainer: true,
+  },
   // Flow: Boot -> Intro -> SpellSelect -> Game (+ Hud overlay, LevelUp overlay on level-up, Pause overlay on Esc / Start) -> Result -> SpellSelect.
   // Intro <-> Settings and Intro <-> Profile are its panels (#121); SpellSelect <-> Upgrades is the meta loop (CO-101).
   scene: [

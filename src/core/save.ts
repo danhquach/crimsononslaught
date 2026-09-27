@@ -16,10 +16,15 @@ import type { Outcome, RunStats } from './scenePayloads';
  */
 
 /** Bump when the shape changes, and add a step to `MIGRATIONS` that lifts the previous shape. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** Lifetime totals, aggregated from each run's `RunStats` on Result. */
 export interface SaveProfile {
+  /**
+   * The player's name (CO-165). Empty only between parsing and Boot, which
+   * fills it in with `ensurePlayerName`: a migration and `emptySave` stay pure.
+   */
+  name: string;
   runs: number;
   wins: number;
   bestTimeMs: number;
@@ -44,7 +49,15 @@ export interface Save {
 export function emptySave(): Save {
   return {
     version: SAVE_VERSION,
-    profile: { runs: 0, wins: 0, bestTimeMs: 0, bestLevel: 0, totalKills: 0, spellCounts: {} },
+    profile: {
+      name: '',
+      runs: 0,
+      wins: 0,
+      bestTimeMs: 0,
+      bestLevel: 0,
+      totalKills: 0,
+      spellCounts: {},
+    },
     currency: 0,
     upgrades: {},
     settings: {},
@@ -58,8 +71,13 @@ export function emptySave(): Save {
  */
 export type MigrationStep = (old: Record<string, unknown>) => Record<string, unknown>;
 
-/** No migrations yet: version 1 is the first shape. */
-export const MIGRATIONS: Readonly<Record<number, MigrationStep>> = {};
+/**
+ * 1 -> 2 (CO-165): the profile gains a `name`, left empty for Boot to fill. A
+ * profile that is not an object is passed through for `isSave` to refuse.
+ */
+export const MIGRATIONS: Readonly<Record<number, MigrationStep>> = {
+  1: (old) => (isRecord(old.profile) ? { ...old, profile: { ...old.profile, name: '' } } : old),
+};
 
 /** `empty`: nothing stored. `reset`: something was stored and could not be used; `reason` says why. */
 export type ParseStatus = 'ok' | 'empty' | 'reset';
@@ -141,6 +159,7 @@ export function recordRun(save: Save, stats: RunStats, outcome: Outcome, earned:
   return {
     ...save,
     profile: {
+      ...profile,
       runs: profile.runs + 1,
       wins: profile.wins + (outcome === 'win' ? 1 : 0),
       bestTimeMs: Math.max(profile.bestTimeMs, stats.timeSurvivedMs),
@@ -170,6 +189,7 @@ function isCountRecord(value: unknown): value is Record<string, number> {
 function isSaveProfile(value: unknown): value is SaveProfile {
   return (
     isRecord(value) &&
+    typeof value.name === 'string' &&
     isCount(value.runs) &&
     isCount(value.wins) &&
     isFiniteNonNegative(value.bestTimeMs) &&

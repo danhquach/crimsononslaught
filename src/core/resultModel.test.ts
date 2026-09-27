@@ -145,6 +145,7 @@ describe('profileRows', () => {
 
   it('formats the lifetime totals like the result screen formats a run', () => {
     const profile = {
+      name: 'Test_Player',
       runs: 12,
       wins: 2,
       bestTimeMs: 272_400,
