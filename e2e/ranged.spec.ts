@@ -42,10 +42,15 @@ interface Sample {
   hudMaxHp: number;
 }
 
-/** The run's shot report and the HUD's HP, read in one evaluate so they agree. */
-function sample(page: Page): Promise<Sample | null> {
+/**
+ * The run's shot report and the HUD's HP, read in one evaluate so they agree.
+ * `paused` when an overlay went up since `answerLevelUp` looked; null once
+ * the run has ended.
+ */
+function sample(page: Page): Promise<Sample | 'paused' | null> {
   return page.evaluate(async (keys) => {
     const { game } = await import('/src/main.ts');
+    if (game.scene.isPaused(keys.game)) return 'paused' as const;
     if (!game.scene.isActive(keys.game)) return null;
     const report = (game.scene.getScene(keys.game) as GameScene).enemyShotReport;
     const hud = (game.scene.getScene(keys.hud) as HudScene).view;
@@ -85,6 +90,7 @@ test('ranged enemies shoot a standing player and the hits cost HP', async ({ pag
   while (runMs < START_AT_S * 1000 + RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
+    if (current === 'paused') continue;
     if (!current) {
       runLeft = true;
       break;

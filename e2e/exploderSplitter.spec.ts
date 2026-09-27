@@ -35,10 +35,15 @@ interface Sample extends Report {
   hudMaxHp: number;
 }
 
-/** The run's report and the HUD's HP, read in one evaluate so they agree. */
-function sample(page: Page): Promise<Sample | null> {
+/**
+ * The run's report and the HUD's HP, read in one evaluate so they agree.
+ * `paused` when an overlay went up since `answerLevelUp` looked; null once
+ * the run has ended.
+ */
+function sample(page: Page): Promise<Sample | 'paused' | null> {
   return page.evaluate(async (keys) => {
     const { game } = await import('/src/main.ts');
+    if (game.scene.isPaused(keys.game)) return 'paused' as const;
     if (!game.scene.isActive(keys.game)) return null;
     const report = (game.scene.getScene(keys.game) as GameScene).blastSplitReport;
     const hud = (game.scene.getScene(keys.hud) as HudScene).view;
@@ -58,14 +63,16 @@ async function answerLevelUp(page: Page): Promise<void> {
 /**
  * Start a run at `startAt` with only `enemies` spawning, then sample until
  * `done` holds or the window runs out. `left` is true when the run ended first.
+ * `extra` is appended to the query string.
  */
 async function watch(
   page: Page,
   startAt: number,
   enemies: string,
   done: (trace: readonly Sample[]) => boolean,
+  extra = '',
 ): Promise<{ trace: Sample[]; left: boolean }> {
-  await page.goto(`/?seed=1&timeScale=10&startAt=${startAt}&enemies=${enemies}`);
+  await page.goto(`/?seed=1&timeScale=10&startAt=${startAt}&enemies=${enemies}${extra}`);
   await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));
@@ -78,6 +85,7 @@ async function watch(
   while (runMs < startAt * 1000 + RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
+    if (current === 'paused') continue;
     if (!current) return { trace, left: true };
     trace.push(current);
     runMs = current.elapsedMs;
@@ -119,11 +127,19 @@ test('a splitter killed in the arena leaves splitlings behind', async ({ page })
   const errors = collectErrors(page);
   // 10:00, the first row with splitters in it. Stop once children have landed
   // and both the splitter and a splitling have been seen on their own sheets.
-  const { trace, left } = await watch(page, 600, 'splitter', (t) => {
-    const clips = clipsSeen(t);
-    const last = t[t.length - 1];
-    return (last?.children ?? 0) > 0 && clips.has('splitter.move') && clips.has('splitling.move');
-  });
+  // Invulnerable: a level-1 player standing in a 10:00 crowd can die before a
+  // splitling is sampled (main CI, #282), and nothing here needs it hurt.
+  const { trace, left } = await watch(
+    page,
+    600,
+    'splitter',
+    (t) => {
+      const clips = clipsSeen(t);
+      const last = t[t.length - 1];
+      return (last?.children ?? 0) > 0 && clips.has('splitter.move') && clips.has('splitling.move');
+    },
+    '&invulnerable=1',
+  );
   const last = trace[trace.length - 1];
   const most = (pick: (s: Sample) => number): number => Math.max(0, ...trace.map(pick));
   console.log(
