@@ -42,12 +42,12 @@ export class GemPool {
   }
 
   /**
-   * Drop one death's worth of gems at (x, y) — 1, or 3 for a tank (spec §5).
-   * Multi-gem drops are spread on a small circle so they are all reachable
-   * without overlapping. Returns how many were actually placed.
+   * Drop one death's worth of gems at (x, y) — 1, or 3 for a tank (spec §5),
+   * or `count` when given (an elite's, #126). Multi-gem drops are spread on a
+   * small circle so they are all reachable without overlapping. Returns how
+   * many were actually placed.
    */
-  dropFor(type: EnemyType, x: number, y: number): number {
-    const count = gemDropCount(type);
+  dropFor(type: EnemyType, x: number, y: number, count = gemDropCount(type)): number {
     let placed = 0;
     for (let i = 0; i < count; i++) {
       // A single gem lands exactly on the death spot; a group rings it.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TEXTURE_KEYS } from './colors';
 import {
   CONTACT_DAMAGE_INTERVAL_MS,
+  ELITE,
   ENEMY_ARCHETYPES,
   ENEMY_TYPES,
   MAX_LIVE_ENEMIES,
@@ -132,5 +133,15 @@ describe('live enemy cap', () => {
 describe('contact damage interval', () => {
   it('is the spec §5 cadence of once per 0.5 s per enemy', () => {
     expect(CONTACT_DAMAGE_INTERVAL_MS).toBe(500);
+  });
+});
+
+describe('elite stats (#126)', () => {
+  it('makes an elite tougher, harder-hitting and richer than its crowd', () => {
+    expect(ELITE).toEqual({ hpMul: 8, damageMul: 1.5, gemMul: 3 });
+    expect(ELITE.hpMul).toBeGreaterThan(1);
+    expect(ELITE.damageMul).toBeGreaterThanOrEqual(1);
+    expect(Number.isInteger(ELITE.gemMul)).toBe(true);
+    expect(ELITE.gemMul).toBeGreaterThan(1);
   });
 });

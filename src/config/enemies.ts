@@ -138,6 +138,22 @@ export const RANGED_ATTACK: Readonly<RangedAttack> = {
 export const MAX_LIVE_ENEMY_SHOTS = 60;
 
 /**
+ * #126: a champion of a regular type. It spawns with its wave's multipliers
+ * times these, so an elite is `hpMul` times as tough as its crowd and hits
+ * `damageMul` times as hard — contact, shot and blast alike. It drops
+ * `gemMul` times its type's gems and always rolls for a chest. Speed and
+ * body radius are its type's own. The numbers are starting values for the
+ * tuning round.
+ */
+export interface EliteStats {
+  hpMul: number;
+  damageMul: number;
+  gemMul: number;
+}
+
+export const ELITE: Readonly<EliteStats> = { hpMul: 8, damageMul: 1.5, gemMul: 3 };
+
+/**
  * Spec §5: a hard cap of 300 live enemies. The spawn director (CO-025) can ask
  * for more; requests past the cap are dropped rather than queued, so a slow
  * frame can never snowball into an unbounded crowd.

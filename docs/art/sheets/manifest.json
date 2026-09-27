@@ -1967,6 +1967,16 @@
           { "anim": "spawn", "cols": [4, 6] }
         ]
       ]
+    },
+    {
+      "key": "status",
+      "ticket": "CO-104",
+      "file": "CO-104/elite_mark.png",
+      "page": 16,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 352,
+      "rowSpecs": [[{ "anim": "elite", "cols": [1, 4], "centred": true }]]
     }
   ]
 }

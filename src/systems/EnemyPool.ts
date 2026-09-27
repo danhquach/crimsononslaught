@@ -50,13 +50,15 @@ export class EnemyPool {
 
   /**
    * Spawn one enemy, or `null` when the live cap is already reached. `scale` is
-   * the spawning wave's multipliers (#127); the archetype row as written by default.
+   * the spawning wave's multipliers (#127); the archetype row as written by
+   * default. `elite` spawns it as its type's champion (#126).
    */
   spawn(
     type: EnemyType,
     x: number,
     y: number,
     scale: Readonly<WaveScale> = UNSCALED,
+    elite = false,
   ): Enemy | null {
     // A boss killed since the last update walk is still a dead member here,
     // and `group.get` hands out the first dead member whatever its class.
@@ -64,7 +66,7 @@ export class EnemyPool {
     if (!canSpawn(this.liveCount)) return null;
     const enemy = this.group.get(x, y) as Enemy | null;
     if (!enemy) return null;
-    enemy.spawn(type, x, y, scale);
+    enemy.spawn(type, x, y, scale, elite);
     return enemy;
   }
 

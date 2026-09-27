@@ -1,0 +1,93 @@
+{
+  "frames": {
+    "status.elite.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 72,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 72,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 72,
+        "h": 46
+      }
+    },
+    "status.elite.1": {
+      "frame": {
+        "x": 74,
+        "y": 1,
+        "w": 72,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 72,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 72,
+        "h": 46
+      }
+    },
+    "status.elite.2": {
+      "frame": {
+        "x": 147,
+        "y": 1,
+        "w": 72,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 72,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 72,
+        "h": 46
+      }
+    },
+    "status.elite.3": {
+      "frame": {
+        "x": 220,
+        "y": 1,
+        "w": 72,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 72,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 72,
+        "h": 46
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 512,
+      "h": 64
+    },
+    "scale": "1"
+  }
+}

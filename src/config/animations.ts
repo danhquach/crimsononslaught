@@ -226,6 +226,9 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // overlay it used to borrow.
   spec('status.stagger', 4, 10, LOOP),
   spec('status.bleed', 4, 8, LOOP),
+  // The mark under an elite (#126): a rune circle that shimmers slowly, so it
+  // reads as a marker on the floor rather than an effect going off.
+  spec('status.elite', 4, 6, LOOP),
 
   // Companions (CO-124). Four elemental creatures on the hero's own sheet
   // layout, so `facings` applies unchanged. Move runs at the hero's walk rate
