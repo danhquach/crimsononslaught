@@ -15,7 +15,8 @@
     "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json && eslint . && prettier --check .",
     "format": "prettier --write .",
     "art:cut": "node scripts/cut-sheets.mjs",
-    "audio:gen": "node scripts/gen-audio.mjs"
+    "audio:gen": "node scripts/gen-audio.mjs",
+    "audio:cut": "node scripts/cut-audio.mjs"
   },
   "dependencies": {
     "phaser": "~3.88.2"
