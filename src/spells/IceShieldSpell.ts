@@ -82,7 +82,7 @@ export class IceShieldSpell extends ShieldSpell<'ice_shield'> {
       this.shattered += 1;
       this.fx.burst('ice.shatter', enemy.x, enemy.y);
       enemy.applyFrost({ slowPct, slowDuration, freeze: false });
-      this.damage(enemy, breakDamage);
+      this.damage(enemy, breakDamage, 'hit', { x, y });
     }
   }
 }

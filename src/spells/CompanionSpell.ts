@@ -273,7 +273,7 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   private strike(target: Enemy): void {
     if (!inReach(this.position, target, target.bodyRadius, COMPANION_REACH)) return;
     this.startAttack(target);
-    this.onCompanionHit(target);
+    this.onCompanionHit(target, this.position);
   }
 
   private onShotHit(enemy: Enemy, hitbox: SpellHitbox): void {
@@ -281,15 +281,15 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     // with an enemy something else already killed, flies on.
     if (!(hitbox instanceof Projectile) || !hitbox.active || !enemy.active) return;
     hitbox.despawn();
-    this.onCompanionHit(enemy);
+    this.onCompanionHit(enemy, hitbox);
   }
 
   /**
    * What one companion attack costs the enemy it lands on: `damage`, plus the
    * element's own mark — Fire's burn, Ice's chill, Lightning's stagger (#139),
-   * Earth's shove.
+   * Earth's shove. `from` is where it struck from: the ally's swing or its shot.
    */
-  private onCompanionHit(enemy: Enemy): void {
+  private onCompanionHit(enemy: Enemy, from: Readonly<Vec2>): void {
     const { damage, burn, burnDuration, slowPct, slowDuration, staggerDuration, knockback } =
       this.companionStats;
     this.landed += 1;
@@ -301,7 +301,7 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     // The shove is measured before the blow, so a killing hit drops its gems
     // where the enemy stood rather than where it would have been thrown.
     const push = knockback ? knockbackVector(this.position, enemy, knockback, this.caster) : null;
-    this.damage(enemy, damage);
+    this.damage(enemy, damage, 'hit', from);
     if (!push || !enemy.active) return;
     enemy.knockBack(push);
     this.fx.burst('earth.dust', enemy.x, enemy.y + enemy.bodyRadius, { flipX: dustFlip(push) });

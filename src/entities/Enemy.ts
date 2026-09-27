@@ -1,5 +1,11 @@
 import Phaser from 'phaser';
-import { ENEMY_ARCHETYPES, ENEMY_HURT_MS, RANGED_ATTACK, type EnemyType } from '../config/enemies';
+import {
+  ENEMY_ARCHETYPES,
+  ENEMY_HURT_MS,
+  RANGED_ATTACK,
+  SHIELD_GUARD,
+  type EnemyType,
+} from '../config/enemies';
 import { HIT_FLASH_MS, HIT_FLASH_TINT } from '../config/hitFeedback';
 import { BURN_DURATION } from '../config/spells';
 import {
@@ -35,6 +41,7 @@ import {
 } from '../core/frostNova';
 import { tickBoulderCooldown, tryBoulderHit } from '../core/orbitingBoulders';
 import { inFireDistance, rangedVelocity, tickFireCooldown } from '../core/rangedEnemy';
+import { shieldedDamageFactor, shieldedStep } from '../core/shielded';
 import {
   NO_BLEED,
   applyBleed,
@@ -66,7 +73,9 @@ export interface EnemyStats {
  * the same way. A boulder can hit it at most once per 0.4 s and shove it
  * (CO-047); that window drains with the chase too. A ranged enemy (#126)
  * keeps its distance instead of closing in, and its fire timer runs with the
- * chase; the shot it owes is taken by `EnemyPool` and flown by the run.
+ * chase; the shot it owes is taken by `EnemyPool` and flown by the run. A
+ * shielded enemy (#126) walks the way it faces and turns slowly, and a hit on
+ * its front lands at `guardFactor`.
  *
  * Pooled — never constructed per spawn. `systems/EnemyPool.ts` owns the pool and
  * calls `spawn` / `despawn`; an inactive enemy has its body disabled, so it costs
@@ -96,6 +105,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private fireCooldownMs = 0;
   /** A shot is owed this step; `EnemyPool` takes it through `takeShot`. */
   private shotOwed = false;
+  /** #126, shielded only: the way it faces, in radians; `NaN` until its first step. */
+  private heading = Number.NaN;
   private burn: BurnState = { ...NO_BURN };
   private bleed: BleedState = { ...NO_BLEED };
   private frost: FrostState = { ...NO_FROST };
@@ -213,6 +224,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.hp = stats.hp;
     this.contactCooldownMs = 0;
     this.shotOwed = false;
+    this.heading = Number.NaN;
     this.burn = { ...NO_BURN };
     this.bleed = { ...NO_BLEED };
     this.frost = { ...NO_FROST };
@@ -309,7 +321,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       staggerSpeedFactor(this.staggerS);
     const { x, y } = this.move(this.steer(deltaS, target, speedFactor), speedFactor, deltaS);
     this.setVelocity(x, y);
-    this.facing = facingFromVector({ x, y }, this.facing);
+    // A shielded enemy shows the way it faces, which a shove does not turn.
+    const faced = this.kind === 'shielded' ? this.headingVector() : { x, y };
+    this.facing = facingFromVector(faced, this.facing);
     // The fast enemy's sheet is drawn facing up; it turns to its heading.
     if (this.kind === 'fast') this.setRotation(headingRotation({ x, y }, this.rotation));
     // A ranged enemy faces the player it shoots at, backing off or holding
@@ -343,6 +357,19 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   protected steer(deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
     const speed = ENEMY_ARCHETYPES[this.kind].speed * speedFactor;
+    if (this.kind === 'shielded') {
+      const step = shieldedStep(
+        this.heading,
+        this,
+        target,
+        SHIELD_GUARD,
+        speed,
+        speedFactor,
+        deltaS,
+      );
+      this.heading = step.heading;
+      return step.velocity;
+    }
     if (this.kind !== 'ranged') return chaseVelocity(this, target, speed);
     // #126: backing off must not walk it out of the arena, where the player
     // cannot follow; one still out on the spawn ring may only come in.
@@ -361,6 +388,22 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     const next = tickFireCooldown(this.fireCooldownMs, deltaMs, fireIntervalMs, canFire);
     this.fireCooldownMs = next.cooldownMs;
     if (next.fire) this.shotOwed = true;
+  }
+
+  /** #126: the way a shielded enemy faces, as a unit vector; none before its first step. */
+  private headingVector(): Vec2 {
+    if (Number.isNaN(this.heading)) return { x: 0, y: 0 };
+    return { x: Math.cos(this.heading), y: Math.sin(this.heading) };
+  }
+
+  /**
+   * #126: the share of a hit from `from` that lands. A shielded enemy's front
+   * takes `SHIELD_GUARD.factor`; every other hit, and every other enemy, takes
+   * it all.
+   */
+  guardFactor(from?: Readonly<Vec2>): number {
+    if (this.kind !== 'shielded') return 1;
+    return shieldedDamageFactor(this.heading, this, from, SHIELD_GUARD);
   }
 
   /** #126: `true` once per shot the fire timer owes; the pool hands it to the run to fire. */

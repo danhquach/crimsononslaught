@@ -128,7 +128,7 @@ export class RollingBoulderSpell extends Spell<'earth_boulder'> {
     const push = knockbackVector(hitbox, enemy, knockback, this.caster);
     this.landed += 1;
     this.fx.burst('earth.impact', enemy.x, enemy.y);
-    this.damage(enemy, damage);
+    this.damage(enemy, damage, 'hit', hitbox);
     // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
     if (enemy.active) {
       enemy.knockBack(push);

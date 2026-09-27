@@ -101,12 +101,13 @@ export class IceArrowSpell extends Spell<'ice'> {
     // An arrow is spent on its first hit; a later overlap the same frame, or
     // one with an enemy something else already killed, flies on.
     if (!(hitbox instanceof Projectile) || !hitbox.active || !enemy.active) return;
+    const from = { x: hitbox.x, y: hitbox.y };
     hitbox.despawn();
     this.landed += 1;
     this.fx.burst('ice.shatter', enemy.x, enemy.y);
     // Status before damage, the convention every Ice hit keeps: a killing
     // arrow has still chilled the enemy while it was there to take it.
     enemy.applyFrost(arrowFrost(this.stats));
-    this.damage(enemy, this.stats.damage);
+    this.damage(enemy, this.stats.damage, 'hit', from);
   }
 }

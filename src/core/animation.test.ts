@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ANIMATIONS, FACINGS } from '../config/animations';
+import { ANIMATIONS, FACINGS, type Facing } from '../config/animations';
 import { BOSS } from '../config/boss';
 import { ENEMY_ARCHETYPES, ENEMY_TYPES } from '../config/enemies';
 import { FRAMES, FRAME_NAMES, type FrameName } from '../config/frames';
@@ -115,6 +115,19 @@ describe('enemyAnimation', () => {
     expect(
       enemyAnimation({ kind: 'tank', phase: 'spawn', facing: 'left', velocityX: 0 }).name,
     ).toBe('tank.spawn');
+  });
+
+  it('walks and flinches the shielded enemy per facing, mirroring right to face left (#126)', () => {
+    const shielded = (phase: 'move' | 'hurt' | 'death' | 'spawn', facing: Facing) =>
+      enemyAnimation({ kind: 'shielded', phase, facing, velocityX: -1 });
+    expect(shielded('move', 'down')).toEqual({ name: 'shielded.walk.down', flipX: false });
+    expect(shielded('move', 'up')).toEqual({ name: 'shielded.walk.up', flipX: false });
+    expect(shielded('move', 'right')).toEqual({ name: 'shielded.walk.right', flipX: false });
+    expect(shielded('move', 'left')).toEqual({ name: 'shielded.walk.right', flipX: true });
+    expect(shielded('hurt', 'left')).toEqual({ name: 'shielded.hurt.right', flipX: true });
+    expect(shielded('hurt', 'up')).toEqual({ name: 'shielded.hurt.up', flipX: false });
+    expect(shielded('death', 'left')).toEqual({ name: 'shielded.death', flipX: false });
+    expect(shielded('spawn', 'left')).toEqual({ name: 'shielded.spawn', flipX: false });
   });
 
   it('flips only the swarm and the ranged enemy, and only toward the left', () => {

@@ -33,6 +33,8 @@ const WITH_RANGED: readonly EnemyType[] = [...MELEE, 'ranged'];
 /** #126: exploders join at 8:00, splitters at 10:00. Splitlings only ever come from a splitter. */
 const WITH_EXPLODER: readonly EnemyType[] = [...WITH_RANGED, 'exploder'];
 const WITH_SPLITTER: readonly EnemyType[] = [...WITH_EXPLODER, 'splitter'];
+/** #126: shielded enemies join at 12:00. */
+const WITH_SHIELDED: readonly EnemyType[] = [...WITH_SPLITTER, 'shielded'];
 
 /**
  * #127: a 20-minute run in two-minute rows. Later rows spawn faster and
@@ -46,10 +48,10 @@ export const WAVES: readonly [Wave, ...Wave[]] = [
   { startTime: 360, types: WITH_RANGED, spawnsPerSecond: 3, hpMul: 1.6, damageMul: 1.3 },
   { startTime: 480, types: WITH_EXPLODER, spawnsPerSecond: 3.5, hpMul: 1.8, damageMul: 1.4 },
   { startTime: 600, types: WITH_SPLITTER, spawnsPerSecond: 4, hpMul: 2, damageMul: 1.5 },
-  { startTime: 720, types: WITH_SPLITTER, spawnsPerSecond: 4.5, hpMul: 2.2, damageMul: 1.6 },
-  { startTime: 840, types: WITH_SPLITTER, spawnsPerSecond: 5, hpMul: 2.4, damageMul: 1.7 },
-  { startTime: 960, types: WITH_SPLITTER, spawnsPerSecond: 5.5, hpMul: 2.6, damageMul: 1.8 },
-  { startTime: 1080, types: WITH_SPLITTER, spawnsPerSecond: 6, hpMul: 2.8, damageMul: 1.9 },
+  { startTime: 720, types: WITH_SHIELDED, spawnsPerSecond: 4.5, hpMul: 2.2, damageMul: 1.6 },
+  { startTime: 840, types: WITH_SHIELDED, spawnsPerSecond: 5, hpMul: 2.4, damageMul: 1.7 },
+  { startTime: 960, types: WITH_SHIELDED, spawnsPerSecond: 5.5, hpMul: 2.6, damageMul: 1.8 },
+  { startTime: 1080, types: WITH_SHIELDED, spawnsPerSecond: 6, hpMul: 2.8, damageMul: 1.9 },
   { startTime: 1200, types: [], spawnsPerSecond: 0, hpMul: 1, damageMul: 1 },
 ];
 

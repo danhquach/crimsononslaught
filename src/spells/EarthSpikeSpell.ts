@@ -133,7 +133,7 @@ export class EarthSpikeSpell extends Spell<'earth'> {
     // Status before damage, so a killing spike has still marked the enemy
     // while it was there.
     if (bleed > 0) enemy.applyBleed(bleed, bleedDurationS);
-    this.damage(enemy, damage);
+    this.damage(enemy, damage, 'hit', hitbox);
     // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
     if (enemy.active) {
       enemy.knockBack(push);

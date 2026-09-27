@@ -132,7 +132,7 @@ export class EarthShieldSpell extends ShieldSpell<'earth_shield'> {
     const { damage, knockback } = this.stats;
     const push = knockbackVector(hitbox, enemy, knockback, this.caster);
     this.fx.burst('earth.impact', enemy.x, enemy.y);
-    this.damage(enemy, damage);
+    this.damage(enemy, damage, 'hit', hitbox);
     // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
     if (!enemy.active) return;
     enemy.knockBack(push);

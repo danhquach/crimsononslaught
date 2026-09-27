@@ -106,8 +106,8 @@ export interface Clip {
 }
 
 /**
- * Every type but the tank has one clip per phase; the tank walks and flinches
- * per facing (its sheet calls moving `walk`). The swarm and #126's types are
+ * Every type but the tank and the shielded enemy has one clip per phase; those
+ * two walk and flinch per facing (their sheets call moving `walk`). The swarm and #126's types are
  * drawn facing right and mirror themselves to face left; the fast enemy turns
  * to its heading instead, and the tank and boss have every side drawn.
  */
@@ -125,6 +125,12 @@ export function enemyAnimation(pose: Readonly<EnemyPose>): Clip {
     if (phase === 'move') return { name: `tank.walk.${facing}`, flipX: false };
     if (phase === 'hurt') return { name: `tank.hurt.${facing}`, flipX: false };
     return { name: `tank.${phase}`, flipX: false };
+  }
+  if (kind === 'shielded' && (phase === 'move' || phase === 'hurt')) {
+    // #126: drawn facing down, up and right; left is the right side mirrored.
+    const drawn = facing === 'left' ? 'right' : facing;
+    const anim = phase === 'move' ? 'walk' : 'hurt';
+    return { name: `shielded.${anim}.${drawn}`, flipX: facing === 'left' };
   }
   return { name: `${kind}.${phase}`, flipX: MIRRORED.has(kind) && velocityX < 0 };
 }

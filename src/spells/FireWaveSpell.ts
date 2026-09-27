@@ -122,7 +122,7 @@ export class FireWaveSpell extends Spell<'fire_column'> {
         this.fx.burst('fire.explode', enemy.x, enemy.y, { scale: HIT_BURST_SCALE });
         // Status before damage, so a killing hit has still marked the enemy.
         enemy.applyBurn(burn, burnDuration);
-        this.damage(enemy, damage);
+        this.damage(enemy, damage, 'hit', wave.origin);
         // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
         if (enemy.active) enemy.knockBack(push);
       }

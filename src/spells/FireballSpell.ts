@@ -100,6 +100,7 @@ export class FireballSpell extends Spell<'fire'> {
     // A shot is spent on its first hit; a later overlap the same frame, or one
     // with an enemy something else already killed, flies on.
     if (!(hitbox instanceof Projectile) || !hitbox.active || !enemy.active) return;
+    const from = { x: hitbox.x, y: hitbox.y };
     hitbox.despawn();
 
     const { damage, aoeRadius } = this.stats;
@@ -109,9 +110,11 @@ export class FireballSpell extends Spell<'fire'> {
     const blast = explosionDamage(this.stats);
     this.fx.burst('fire.explode', enemy.x, enemy.y, { scale: explosionScale(aoeRadius) });
 
-    this.damage(enemy, damage);
+    // The blast spreads from where the shot struck.
+    const centre = { x: enemy.x, y: enemy.y };
+    this.damage(enemy, damage, 'hit', from);
     for (const other of splash) {
-      this.damage(other, blast);
+      this.damage(other, blast, 'hit', centre);
     }
   }
 }

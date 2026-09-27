@@ -330,6 +330,8 @@ export class GameScene extends Phaser.Scene {
   private splits: Split[] = [];
   /** Test hook (#126): blasts set off, blasts that reached the player and the HP they took, children spawned and dropped. */
   private blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
+  /** Test hook (#126): hits on shielded enemies, on the shield and past it, and the damage the shield took off. */
+  private guardTally = { blocked: 0, full: 0, blockedRaw: 0, blockedDealt: 0 };
   private spawns!: SpawnDirector;
   private gems!: GemPool;
   /** Embers, consumables and relics (#195): everything on the floor but gems. */
@@ -456,6 +458,31 @@ export class GameScene extends Phaser.Scene {
       if (key) clips.add(key);
     }
     return { live, ...this.blastSplitTally, clips: [...clips].sort() };
+  }
+
+  /**
+   * Test hook (#126): shielded enemies alive, the hits that landed on a shield
+   * and past one (burns and bleeds, which have no direction, are not counted),
+   * and the clips they are playing. The browser suite checks a player's own
+   * shots meet the shield and each shielded enemy draws from its own sheet.
+   */
+  get guardReport(): {
+    live: number;
+    blocked: number;
+    full: number;
+    blockedRaw: number;
+    blockedDealt: number;
+    clips: string[];
+  } {
+    let live = 0;
+    const clips = new Set<string>();
+    for (const enemy of this.enemies.live) {
+      if (enemy.enemyType !== 'shielded') continue;
+      live += 1;
+      const key = enemy.anims.currentAnim?.key;
+      if (key) clips.add(key);
+    }
+    return { live, ...this.guardTally, clips: [...clips].sort() };
   }
 
   /** Test hook: enemies alive in the arena, the bound `overlayCount` must respect. */
@@ -797,6 +824,7 @@ export class GameScene extends Phaser.Scene {
     this.shotHpLost = 0;
     this.splits = [];
     this.blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
+    this.guardTally = { blocked: 0, full: 0, blockedRaw: 0, blockedDealt: 0 };
     this.spawns = new SpawnDirector(
       this.cameras.main,
       this.enemies,
@@ -1072,8 +1100,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
-    const damage = (enemy: Enemy, amount: number, kind?: HitKind): void =>
-      this.damageEnemy(enemy, amount, kind);
+    const damage = (enemy: Enemy, amount: number, kind?: HitKind, from?: Readonly<Vec2>): void =>
+      this.damageEnemy(enemy, amount, kind, from);
     switch (spellId) {
       case 'fire':
         return new FireballSpell(
@@ -1613,14 +1641,26 @@ export class GameScene extends Phaser.Scene {
    * A `hit` rolls for a crit first (spec §6, #125); a `tick` or `dot` never
    * does. What the hit then looks like — its number, the flash, the freeze —
    * is `showHit`'s, and reads the outcome without touching it.
+   *
+   * A hit from `from` on a shielded enemy's front (#126) lands at the shield's
+   * factor; a `dot` has no direction and always lands in full.
    */
-  private damageEnemy(enemy: Enemy, amount: number, kind: HitKind = 'hit'): void {
+  private damageEnemy(
+    enemy: Enemy,
+    amount: number,
+    kind: HitKind = 'hit',
+    from?: Readonly<Vec2>,
+  ): void {
     if (!enemy.active) return;
     const { x, y, enemyType } = enemy;
     const boss = enemy instanceof Boss;
     const { critChance, critMultiplier } = this.spells.profile;
     const crit = kind === 'hit' && rollCrit(this.critRng, critChance);
-    const dealt = crit ? critDamage(amount, critMultiplier) : amount;
+    const struck = crit ? critDamage(amount, critMultiplier) : amount;
+    const guard = kind === 'dot' ? 1 : enemy.guardFactor(from);
+    const dealt = struck * guard;
+    if (enemyType === 'shielded' && kind !== 'dot' && !enemy.isDying)
+      this.tallyGuard(struck, dealt, guard);
     // A dying enemy takes nothing, so it shows nothing.
     if (!enemy.isDying) this.showHit(enemy, dealt, kind, crit);
     if (!enemy.takeDamage(dealt)) {
@@ -1644,6 +1684,18 @@ export class GameScene extends Phaser.Scene {
     if (ENEMY_ARCHETYPES[enemyType].loot === false) return;
     this.gems.dropFor(enemyType, x, y);
     this.dropPickups(enemyType, x, y);
+  }
+
+  /** #126: count a hit on a shielded enemy for `guardReport`. */
+  private tallyGuard(struck: number, dealt: number, guard: number): void {
+    const tally = this.guardTally;
+    if (guard >= 1) {
+      tally.full += 1;
+      return;
+    }
+    tally.blocked += 1;
+    tally.blockedRaw += struck;
+    tally.blockedDealt += dealt;
   }
 
   /**
