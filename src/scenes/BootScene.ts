@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import { resolveSeed } from '../core/rng';
 import {
+  resolveEnemyFilter,
   resolveInvulnerable,
   resolveLoadout,
   resolveStartAt,
   resolveTimeScale,
 } from '../core/runState';
 import {
+  ENEMIES_REGISTRY_KEY,
   INVULNERABLE_REGISTRY_KEY,
   LOADOUT_REGISTRY_KEY,
   SAVE_REGISTRY_KEY,
@@ -108,6 +110,12 @@ export class BootScene extends Phaser.Scene {
     const loadout = resolveLoadout(location.search);
     this.registry.set(LOADOUT_REGISTRY_KEY, loadout);
     if (loadout.length > 0) console.info(`[run] loadout=${loadout.join(',')}`);
+
+    // `?enemies=ranged` lets only those types spawn (#126), so a browser check
+    // can watch one type without the crowd around it.
+    const enemies = resolveEnemyFilter(location.search);
+    this.registry.set(ENEMIES_REGISTRY_KEY, enemies);
+    if (enemies.length > 0) console.info(`[run] enemies=${enemies.join(',')}`);
 
     const debug = new URLSearchParams(location.search).get('debug');
     if (debug === 'textures') {

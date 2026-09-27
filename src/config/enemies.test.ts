@@ -9,8 +9,8 @@ import {
 } from './enemies';
 
 describe('enemy types', () => {
-  it('lists the three regular enemies from the spec', () => {
-    expect(ENEMY_TYPES).toEqual(['swarm', 'fast', 'tank']);
+  it('lists the regular enemies: the spec’s three, then #126’s', () => {
+    expect(ENEMY_TYPES).toEqual(['swarm', 'fast', 'tank', 'ranged']);
   });
 
   it('isEnemyType accepts only known types', () => {
@@ -47,6 +47,13 @@ describe('enemy archetypes', () => {
       contactDamage: 15,
       radius: 20,
       texture: 'enemy_tank',
+    });
+    expect(ENEMY_ARCHETYPES.ranged).toEqual({
+      hp: 12,
+      speed: 80,
+      contactDamage: 3,
+      radius: 11,
+      texture: 'enemy_ranged',
     });
   });
 

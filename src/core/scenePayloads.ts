@@ -44,6 +44,9 @@ export const INVULNERABLE_REGISTRY_KEY = 'invulnerable';
 /** `?startAt=` in ms (#127), resolved in Boot; Game starts its run clock there. */
 export const START_AT_REGISTRY_KEY = 'startAt';
 
+/** `?enemies=` (#126), resolved in Boot: the only types Game lets spawn; empty is all. */
+export const ENEMIES_REGISTRY_KEY = 'enemies';
+
 /**
  * Registry key under which Boot stores the extra actives of the `?loadout=`
  * test hook (default none). Like `?timeScale=` it is a hook, not part of the

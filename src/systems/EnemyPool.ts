@@ -99,16 +99,20 @@ export class EnemyPool {
   /**
    * Step every live enemy toward `target`. Damage-over-time owed this frame —
    * burn (CO-044) and bleed (#139) — is handed to `onDamage` so the run applies
-   * it and its kills count.
+   * it and its kills count. A shot a ranged enemy owes (#126) is handed to
+   * `onFire` before that, so an enemy its burn kills this step still gets its
+   * shot away; `onFire` must not add to or take from this group.
    */
   update(
     deltaMs: number,
     target: Readonly<Vec2>,
     onDamage?: (enemy: Enemy, amount: number) => void,
+    onFire?: (enemy: Enemy, target: Readonly<Vec2>) => void,
   ): void {
     for (const child of this.group.getChildren()) {
       if (!(child instanceof Enemy) || !child.active) continue;
       const dot = child.chase(deltaMs, target);
+      if (child.takeShot()) onFire?.(child, target);
       if (dot > 0) onDamage?.(child, dot);
     }
     this.releaseDeadBoss();

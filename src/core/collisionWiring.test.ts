@@ -39,9 +39,9 @@ describe('collision wiring (CO-032)', () => {
     expect(sources[OWNER]).toMatch(REGISTRATION);
   });
 
-  it('registers every run-wide pair there, the floor pickups included (#195)', () => {
+  it('registers every run-wide pair there, the floor pickups and enemy shots included', () => {
     const owner = sources[OWNER] ?? '';
-    for (const target of ['enemies.group', 'gems.group', 'pickups.group']) {
+    for (const target of ['enemies.group', 'enemyShots.group', 'gems.group', 'pickups.group']) {
       expect(owner, target).toMatch(
         new RegExp(`physics\\.add\\.overlap\\(player, ${target.replace('.', '\\.')}`),
       );

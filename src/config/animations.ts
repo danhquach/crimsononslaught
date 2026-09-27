@@ -89,6 +89,14 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('tank.death', 6, 8, ONCE),
   spec('tank.spawn', 4, 8, ONCE),
 
+  // Ranged enemy (CO-104, #126), authored facing right; the engine mirrors it
+  // to face the player. Its shot is drawn flying right and turned to its heading.
+  spec('ranged.move', 4, 8, LOOP),
+  spec('ranged.hurt', 1, 10, ONCE),
+  spec('ranged.death', 4, 12, ONCE),
+  spec('ranged.spawn', 4, 10, ONCE),
+  spec('ranged.shot', 4, 12, LOOP),
+
   // Boss (CO-074). Telegraph and charge are paced to the 0.8 s / 0.6 s phases
   // in `boss.ts`, so the art lands with the state change rather than drifting.
   ...facings('boss.walk', 4, 6, LOOP),
@@ -277,6 +285,7 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   enemy_swarm: 'swarm.move.0',
   enemy_fast: 'fast.move.0',
   enemy_tank: 'tank.walk.down.0',
+  enemy_ranged: 'ranged.move.0',
   boss: 'boss.walk.down.0',
   gem: 'gem.idle.0',
   proj_fire: 'fire.fly.0',
@@ -303,4 +312,6 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   pickup_magnet: 'pickupMagnet.idle.0',
   pickup_bomb: 'pickupBomb.idle.0',
   pickup_chest: 'pickupChest.idle.0',
+  // #126: the ranged enemy's shot, the pink glob drawn flying right.
+  proj_enemy: 'ranged.shot.0',
 };

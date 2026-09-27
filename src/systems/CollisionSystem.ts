@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { Enemy } from '../entities/Enemy';
+import { EnemyShot } from '../entities/EnemyShot';
 import { Pickup } from '../entities/Pickup';
 import { XpGem } from '../entities/XpGem';
 import type { EnemyPool } from './EnemyPool';
+import type { EnemyShotPool } from './EnemyShotPool';
 import type { GemPool } from './GemPool';
 import type { PickupPool } from './PickupPool';
 
@@ -17,6 +19,8 @@ export type SpellHitbox = Phaser.Types.Physics.Arcade.GameObjectWithBody;
 export interface CollisionHandlers {
   /** An enemy is touching the player (spec §5: contact damage). */
   readonly onEnemyContact: (enemy: Enemy) => void;
+  /** A ranged enemy's shot is touching the player (#126). */
+  readonly onEnemyShot: (shot: EnemyShot) => void;
   /** The player is touching a gem (spec §5: gems are XP on touch). */
   readonly onGemPickup: (gem: XpGem) => void;
   /** The player is touching an Ember, a consumable or a relic (#195). */
@@ -27,8 +31,9 @@ export interface CollisionHandlers {
 export type SpellHitHandler = (enemy: Enemy, hitbox: SpellHitbox) => void;
 
 /**
- * The one place overlaps are registered (spec §9). Enemy <-> player,
- * gem <-> player and pickup <-> player (#195) are wired on construction;
+ * The one place overlaps are registered (spec §9). Enemy <-> player, enemy
+ * shot <-> player (#126), gem <-> player and pickup <-> player (#195) are
+ * wired on construction;
  * spell <-> enemy is wired per spell group through `addSpellGroup`, because
  * spells create their groups as they are cast (Epic D) rather than at the
  * start of the run.
@@ -49,6 +54,7 @@ export class CollisionSystem {
     scene: Phaser.Scene,
     player: Phaser.Physics.Arcade.Sprite,
     enemies: EnemyPool,
+    enemyShots: EnemyShotPool,
     gems: GemPool,
     pickups: PickupPool,
     handlers: CollisionHandlers,
@@ -59,6 +65,9 @@ export class CollisionSystem {
 
     this.scene.physics.add.overlap(player, enemies.group, (_player, enemy) => {
       if (enemy instanceof Enemy) this.handlers.onEnemyContact(enemy);
+    });
+    this.scene.physics.add.overlap(player, enemyShots.group, (_player, shot) => {
+      if (shot instanceof EnemyShot) this.handlers.onEnemyShot(shot);
     });
     this.scene.physics.add.overlap(player, gems.group, (_player, gem) => {
       if (gem instanceof XpGem) this.handlers.onGemPickup(gem);

@@ -31,6 +31,7 @@ describe('pickup tunables', () => {
       swarm: { chance: 0.2, value: 1 },
       fast: { chance: 0.2, value: 1 },
       tank: { chance: 1, value: 3 },
+      ranged: { chance: 0.3, value: 1 },
     });
     expect(BOSS_EMBERS).toBe(100);
     expect(CONSUMABLE_CHANCE).toBe(0.003);

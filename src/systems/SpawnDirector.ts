@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { EnemyType } from '../config/enemies';
 import type { Rng } from '../core/rng';
 import { planSpawns, type Size } from '../core/spawnDirector';
 import type { EnemyPool } from './EnemyPool';
@@ -18,13 +19,22 @@ export class SpawnDirector {
   private readonly pool: EnemyPool;
   private readonly rng: Rng;
   private readonly world: Size;
+  /** `?enemies=` (#126): the only types let in; empty lets every type in. */
+  private readonly only: ReadonlySet<EnemyType>;
   private carry = 0;
 
-  constructor(camera: Phaser.Cameras.Scene2D.Camera, pool: EnemyPool, rng: Rng, world: Size) {
+  constructor(
+    camera: Phaser.Cameras.Scene2D.Camera,
+    pool: EnemyPool,
+    rng: Rng,
+    world: Size,
+    only: readonly EnemyType[] = [],
+  ) {
     this.camera = camera;
     this.pool = pool;
     this.rng = rng;
     this.world = world;
+    this.only = new Set(only);
   }
 
   /**
@@ -48,6 +58,8 @@ export class SpawnDirector {
     });
     this.carry = plan.carry;
     for (const request of plan.spawns) {
+      // Dropped after the plan drew it, so the filter never shifts the RNG.
+      if (this.only.size > 0 && !this.only.has(request.type)) continue;
       this.pool.spawn(request.type, request.x, request.y, request.scale);
     }
   }

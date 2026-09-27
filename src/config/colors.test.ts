@@ -7,6 +7,9 @@ const SPEC_KEYS = [
   'enemy_swarm',
   'enemy_fast',
   'enemy_tank',
+  // #126: the ranged enemy and its shot.
+  'enemy_ranged',
+  'proj_enemy',
   'boss',
   'gem',
   'proj_fire',
@@ -33,6 +36,43 @@ const SPEC_KEYS = [
   'pickup_bomb',
   'pickup_chest',
 ];
+
+/** Hue of a 24-bit colour in degrees, 0–360. */
+function hue(color: number): number {
+  const r = ((color >> 16) & 0xff) / 255;
+  const g = ((color >> 8) & 0xff) / 255;
+  const b = (color & 0xff) / 255;
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (d === 0) return 0;
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+
+describe('enemy shot vs player shots (#126)', () => {
+  /** Everything the player's side fires or swings: what an enemy shot must never look like. */
+  const PLAYER_SHOTS = [
+    'proj_fire',
+    'proj_ice',
+    'proj_bolt',
+    'proj_spike',
+    'fx_bolt',
+    'boulder',
+  ] as const;
+
+  it('sits at least 60° of hue away from every player shot', () => {
+    const enemy = hue(PLACEHOLDERS.proj_enemy.color);
+    for (const key of PLAYER_SHOTS) {
+      const gap = Math.abs(enemy - hue(PLACEHOLDERS[key].color));
+      expect(Math.min(gap, 360 - gap), key).toBeGreaterThanOrEqual(60);
+    }
+  });
+
+  it('has a shape no player shot has', () => {
+    const shapes = PLAYER_SHOTS.map((key) => PLACEHOLDERS[key].shape);
+    expect(shapes).not.toContain(PLACEHOLDERS.proj_enemy.shape);
+  });
+});
 
 describe('placeholder texture config', () => {
   it('defines exactly the texture keys from the spec', () => {
