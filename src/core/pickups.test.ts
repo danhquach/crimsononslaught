@@ -41,15 +41,19 @@ function counting(seed: number): { rng: Rng; draws: () => number } {
 
 describe('rollDrops', () => {
   it('drops Embers at each type’s rate and worth', () => {
+    // Checked in plain code and asserted once per type, since an `expect` per roll
+    // grew with every enemy type and timed out on CI (CO-176).
     const rng = createRng(deriveSeed(1, 'pickups'));
     for (const type of ENEMY_TYPES) {
       const { chance, value } = EMBER_DROPS[type];
       let dropped = 0;
+      const wrong = new Set<number>();
       for (let i = 0; i < ROLLS; i++) {
         const { embers } = rollDrops(rng, type);
-        expect([0, value]).toContain(embers);
+        if (embers !== 0 && embers !== value) wrong.add(embers);
         if (embers > 0) dropped++;
       }
+      expect([...wrong], type).toEqual([]);
       expect(dropped / ROLLS, type).toBeCloseTo(chance, 1);
     }
   });
