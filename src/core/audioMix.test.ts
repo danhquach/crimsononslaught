@@ -101,6 +101,19 @@ describe('settings round trip', () => {
     ).toEqual({ ...loud, sfx: 0 });
   });
 
+  it('a hostile saved music volume is defaulted or clamped before it drives a track (CO-157)', () => {
+    const music = (value: unknown): number =>
+      readAudioSettings({ [AUDIO_SETTING_KEYS.music]: value as number }).music;
+    expect(music('loud')).toBe(1);
+    expect(music(Number.NaN)).toBe(1);
+    expect(music(Number.POSITIVE_INFINITY)).toBe(1);
+    expect(music({ valueOf: () => 0.5 })).toBe(1);
+    expect(music(-3)).toBe(0);
+    expect(music(5)).toBe(1);
+    expect(music(1e308)).toBe(1);
+    expect(music(0.25)).toBe(0.25);
+  });
+
   it('writes then reads back the same settings and keeps other keys', () => {
     const audio: AudioSettings = { master: 0.4, sfx: 0.9, music: 0, muted: true };
     const written = writeAudioSettings({ theme: 'dark' }, audio);

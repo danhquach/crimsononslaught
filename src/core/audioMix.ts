@@ -11,7 +11,7 @@ import type { SaveSettings } from './save';
  * Pure TS, no Phaser import.
  */
 
-/** Gains in [0, 1]; `music` is reserved for a later music layer. */
+/** Gains in [0, 1]; `sfx` scales the effects, `music` the tracks (CO-157). */
 export interface AudioSettings {
   master: number;
   sfx: number;

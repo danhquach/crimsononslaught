@@ -41,6 +41,8 @@ export class ResultScene extends Phaser.Scene {
 
   create(): void {
     this.restarted = false;
+    // Win, loss or an early end: the run's track fades out here (CO-157).
+    audioOf(this).stopMusic();
     if (!this.payload) {
       console.warn('[Result] started without a valid payload; returning to SpellSelect');
       this.scene.start(SCENE.spellSelect);

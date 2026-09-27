@@ -1,8 +1,9 @@
 /**
- * Tiny additive synth for the sound effects (CO-102). Pure functions over
- * plain arrays of samples in [-1, 1]; `wavBytes` packs them as 16-bit mono
- * PCM. No dependencies, no clock, no `Math.random`: the noise source is a
- * seeded LCG so `npm run audio:gen` writes byte-identical files every run.
+ * Tiny additive synth for the sound effects (CO-102) and the music tracks
+ * (CO-157). Pure functions over plain arrays of samples in [-1, 1];
+ * `wavBytes` packs them as 16-bit mono PCM. No dependencies, no clock, no
+ * `Math.random`: the noise source is a seeded LCG so `npm run audio:gen`
+ * writes byte-identical files every run.
  */
 
 export const SAMPLE_RATE = 22050;
@@ -29,8 +30,43 @@ export function sweep(seconds, fromHz, toHz, rate = SAMPLE_RATE, shape = Math.si
   return out;
 }
 
+/**
+ * A steady tone at `hz` built from `partials`, each `[ratio, gain]` of the
+ * fundamental, scaled so the gains sum to 1 (CO-157): an organ's drawbars, a
+ * string's saw-like overtones. `vibratoHz` and `vibrato` (a fraction of the
+ * pitch) add a slow wobble, integrated into the phase so it never clicks.
+ */
+export function additive(
+  seconds,
+  hz,
+  partials,
+  { vibratoHz = 0, vibrato = 0 } = {},
+  rate = SAMPLE_RATE,
+) {
+  const n = samplesFor(seconds, rate);
+  const out = new Array(n).fill(0);
+  const total = partials.reduce((sum, [, gain]) => sum + gain, 0) || 1;
+  for (const [ratio, gain] of partials) {
+    let phase = 0;
+    for (let i = 0; i < n; i += 1) {
+      out[i] += (Math.sin(phase) * gain) / total;
+      const wobble = 1 + vibrato * Math.sin((2 * Math.PI * vibratoHz * i) / rate);
+      phase += (2 * Math.PI * hz * ratio * wobble) / rate;
+    }
+  }
+  return out;
+}
+
 /** A square wave built on `sweep`'s phase, for the harsher voices. */
 export const square = (phase) => (Math.sin(phase) >= 0 ? 1 : -1);
+
+/** A triangle wave built on `sweep`'s phase: a soft, round bass (CO-157). */
+export const triangle = (phase) => (2 / Math.PI) * Math.asin(Math.sin(phase));
+
+/** The frequency of MIDI note `note`: 69 is A4 at 440 Hz, 60 middle C. */
+export function midiHz(note) {
+  return 440 * 2 ** ((note - 69) / 12);
+}
 
 /**
  * White noise from a 32-bit LCG (Numerical Recipes constants), then one-pole
@@ -64,6 +100,53 @@ export function envelope(samples, attackS, rate = SAMPLE_RATE) {
     samples[i] *= rise * fall;
   }
   return samples;
+}
+
+/**
+ * Sustained envelope for a held note (CO-157): linear rise over `attackS`,
+ * flat, then a linear fall to exactly 0 over the last `releaseS`, so a note
+ * never ends on a step. Applied in place and returned.
+ */
+export function hold(samples, attackS, releaseS, rate = SAMPLE_RATE) {
+  const n = samples.length;
+  const attack = Math.max(1, samplesFor(attackS, rate));
+  const release = Math.max(1, samplesFor(releaseS, rate));
+  for (let i = 0; i < n; i += 1) {
+    const rise = Math.min(1, i / attack);
+    const fall = Math.min(1, (n - 1 - i) / release);
+    samples[i] *= Math.max(0, Math.min(rise, fall));
+  }
+  return samples;
+}
+
+/** One-pole low-pass at `cutoffHz`, to take the edge off a square voice. A new clip. */
+export function lowpass(samples, cutoffHz, rate = SAMPLE_RATE) {
+  const alpha = Math.min(1, (2 * Math.PI * cutoffHz) / rate);
+  const out = new Array(samples.length);
+  let last = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    last += alpha * (samples[i] - last);
+    out[i] = last;
+  }
+  return out;
+}
+
+/**
+ * A loop exactly `seconds` long (CO-157), with each event `[atSeconds, clip,
+ * gain]` mixed in from its start. A clip that runs past the end carries on
+ * from the start, the way it would sound on the next time round, so the seam
+ * is as continuous as any other point of the loop and it plays without a gap
+ * or a click.
+ */
+export function loopMix(seconds, events, rate = SAMPLE_RATE) {
+  const n = samplesFor(seconds, rate);
+  const out = new Array(n).fill(0);
+  if (n === 0) return out;
+  for (const [at, samples, gain = 1] of events) {
+    const start = samplesFor(at, rate) % n;
+    for (let i = 0; i < samples.length; i += 1) out[(start + i) % n] += samples[i] * gain;
+  }
+  return out;
 }
 
 /** Sample-wise sum of clips, the shortest padded with silence; each scaled by its gain. */

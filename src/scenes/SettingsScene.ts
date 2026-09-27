@@ -15,12 +15,13 @@ const TOGGLE_WIDTH = 120;
 const SMALL_BUTTON = { fontSize: '22px', padding: { x: 12, y: 6 } } as const;
 
 type FeedbackToggle = 'numbers' | 'hitStop' | 'shake';
+type VolumeChannel = 'master' | 'music';
 
 /**
- * Settings panel (#121), reached from Intro and back to it. Master volume and
- * mute go through the game's `Audio`, which Boot already persists on every
- * change; the hit-feedback switches (#125) are written into the save here,
- * registry and storage at once. So every change holds for the rest of the
+ * Settings panel (#121), reached from Intro and back to it. The master and
+ * music volumes and mute go through the game's `Audio`, which Boot already
+ * persists on every change; the hit-feedback switches (#125) are written into
+ * the save here, registry and storage at once. So every change holds for the rest of the
  * session and the next one, and a run started after it plays with it.
  *
  * Hit-stop and shake are stored as strengths in [0, 1]; the panel switches
@@ -40,6 +41,8 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   create(): void {
+    // The menu track carries across every menu screen (CO-157); asking again is a no-op.
+    audioOf(this).playMusic('music.menu');
     this.leaving = false;
     this.labels.length = 0;
     const { width, height } = this.scale;
@@ -56,30 +59,36 @@ export class SettingsScene extends Phaser.Scene {
     const items: MenuItem[] = [];
     const controlX = width / 2 + 120;
 
-    // Master volume: − value +.
-    const volumeY = ROW_TOP;
-    this.addLabel(width / 2, volumeY, 'Master volume');
-    const nudge = (direction: 1 | -1): void => {
-      audio.setSettings({ master: stepVolume(audio.settings.master, direction) });
-      audio.play('ui.move');
-      this.refresh();
-    };
-    const down = addTextButton(this, controlX - 70, volumeY, '−', () => nudge(-1), SMALL_BUTTON);
-    const volume = this.add
-      .text(controlX, volumeY, '', { fontFamily: 'monospace', fontSize: '22px', color: '#eeeeee' })
-      .setOrigin(0.5);
-    const up = addTextButton(this, controlX + 70, volumeY, '+', () => nudge(1), SMALL_BUTTON);
-    this.labels.push(() => volume.setText(`${Math.round(audio.settings.master * 100)}%`));
-    items.push(
-      textButtonItem(down, () => nudge(-1)),
-      textButtonItem(up, () => nudge(1)),
-    );
+    // Volumes: − value +. Music (CO-157) scales only the tracks, master both.
+    const volumeRows: readonly (readonly [VolumeChannel, string])[] = [
+      ['master', 'Master volume'],
+      ['music', 'Music volume'],
+    ];
+    volumeRows.forEach(([channel, label], i) => {
+      const y = ROW_TOP + i * ROW_HEIGHT;
+      this.addLabel(width / 2, y, label);
+      const nudge = (direction: 1 | -1): void => {
+        audio.setSettings({ [channel]: stepVolume(audio.settings[channel], direction) });
+        audio.play('ui.move');
+        this.refresh();
+      };
+      const down = addTextButton(this, controlX - 70, y, '−', () => nudge(-1), SMALL_BUTTON);
+      const volume = this.add
+        .text(controlX, y, '', { fontFamily: 'monospace', fontSize: '22px', color: '#eeeeee' })
+        .setOrigin(0.5);
+      const up = addTextButton(this, controlX + 70, y, '+', () => nudge(1), SMALL_BUTTON);
+      this.labels.push(() => volume.setText(`${Math.round(audio.settings[channel] * 100)}%`));
+      items.push(
+        textButtonItem(down, () => nudge(-1)),
+        textButtonItem(up, () => nudge(1)),
+      );
+    });
 
     // Mute: the same switch as `M`, so the label follows a key press too.
     items.push(
       this.addToggle(
         width / 2,
-        ROW_TOP + ROW_HEIGHT,
+        ROW_TOP + volumeRows.length * ROW_HEIGHT,
         'Sound',
         () => !audio.settings.muted,
         () => audio.toggleMute(),
@@ -95,7 +104,7 @@ export class SettingsScene extends Phaser.Scene {
       items.push(
         this.addToggle(
           width / 2,
-          ROW_TOP + (i + 2) * ROW_HEIGHT,
+          ROW_TOP + (i + volumeRows.length + 1) * ROW_HEIGHT,
           label,
           () => isOn(readFeedbackSettings(this.save.settings), key),
           () => this.toggleFeedback(key),
