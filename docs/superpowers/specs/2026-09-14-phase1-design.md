@@ -42,7 +42,7 @@ browser smoke).
 Gold / meta shop, additional characters, spell evolutions, chests (since added
 by #128, see the 20-minute run spec §4.2), sound and
 music, real art, mobile / touch controls (gamepad IS in scope), saves, multiple arenas, ranged or
-elite enemies (since added by #126: ranged, exploder, splitter and shielded; elites to follow),
+elite enemies (since added by #126: ranged, exploder, splitter and shielded, and elites on their own schedule),
 settings menu.
 
 The loadout overhaul — multiple active spells, passives, and the full roster per

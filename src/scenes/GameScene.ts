@@ -60,6 +60,7 @@ import {
 import { planProps } from '../core/arenaDressing';
 import { membersOf } from '../core/groundArea';
 import { scaleDamage, type WaveScale } from '../core/enemy';
+import { eliteGemCount } from '../core/elites';
 import { blastReaches } from '../core/exploder';
 import { explosionScale } from '../core/fx';
 import type { Vec2 } from '../core/input';
@@ -221,6 +222,7 @@ import { FxPool } from '../systems/FxPool';
 import { GemPool } from '../systems/GemPool';
 import { PickupPool } from '../systems/PickupPool';
 import { OverlayPool } from '../systems/OverlayPool';
+import { EliteMarkPool } from '../systems/EliteMarkPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
@@ -279,6 +281,12 @@ const AREA_FX_STREAM = 'areaFx';
 const RELIC_OFFER_STREAM = 'relicOffers';
 
 /**
+ * Where an elite lands draws from a stream of its own (#126), so the elites
+ * never move a seed's crowd, offers or drops.
+ */
+const ELITE_STREAM = 'elites';
+
+/**
  * Where a death's Ember and consumable land, from the death spot, so neither
  * hides under the gem that lands on the spot itself. Well inside the pickup
  * radius, so walking over the gem takes them too.
@@ -333,6 +341,8 @@ export class GameScene extends Phaser.Scene {
   private blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
   /** Test hook (#126): hits on shielded enemies, on the shield and past it, and the damage the shield took off. */
   private guardTally = { blocked: 0, full: 0, blockedRaw: 0, blockedDealt: 0 };
+  /** Test hook (#126): elites killed this run. */
+  private elitesKilled = 0;
   private spawns!: SpawnDirector;
   private gems!: GemPool;
   /** Embers, consumables and relics (#195): everything on the floor but gems. */
@@ -340,6 +350,8 @@ export class GameScene extends Phaser.Scene {
   /** Spell effects (CO-082): one-shot bursts, and the status overlays that follow enemies. */
   private fx!: FxPool;
   private overlays!: OverlayPool;
+  /** #126: the mark under every live elite. */
+  private eliteMarks!: EliteMarkPool;
   /** Persistent ground areas (#135): every patch on the ground, whichever spell placed it. */
   private areas!: AreaPool;
   /** Sky strikes in the air (#138): every telegraph counting down, whichever spell cast it. */
@@ -484,6 +496,34 @@ export class GameScene extends Phaser.Scene {
       if (key) clips.add(key);
     }
     return { live, ...this.guardTally, clips: [...clips].sort() };
+  }
+
+  /**
+   * Test hook (#126): elites alive — their types and HP left — how many have
+   * been placed, are waiting for room at the cap, and have been killed, the
+   * run time the first landed at, and
+   * the marks out with the clips they play. The browser suite checks an elite
+   * lands on schedule, is marked while it lives and pays out when it dies.
+   */
+  get eliteReport(): {
+    live: { type: EnemyType; hp: number }[];
+    spawned: number;
+    waiting: number;
+    firstAt: number | null;
+    killed: number;
+    marks: number;
+    markClips: string[];
+  } {
+    const live = this.enemies.live
+      .filter((enemy) => enemy.isElite)
+      .map((enemy) => ({ type: enemy.enemyType, hp: enemy.remainingHp }));
+    return {
+      live,
+      ...this.spawns.eliteCounts,
+      killed: this.elitesKilled,
+      marks: this.eliteMarks.count,
+      markClips: this.eliteMarks.clips,
+    };
   }
 
   /** Test hook: enemies alive in the arena, the bound `overlayCount` must respect. */
@@ -826,10 +866,12 @@ export class GameScene extends Phaser.Scene {
     this.splits = [];
     this.blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
     this.guardTally = { blocked: 0, full: 0, blockedRaw: 0, blockedDealt: 0 };
+    this.elitesKilled = 0;
     this.spawns = new SpawnDirector(
       this.cameras.main,
       this.enemies,
       this.rng,
+      createRng(deriveSeed(seed, ELITE_STREAM)),
       { width: WORLD_WIDTH, height: WORLD_HEIGHT },
       this.enemyFilter(),
     );
@@ -842,6 +884,7 @@ export class GameScene extends Phaser.Scene {
     };
     this.numbers = new DamageNumberPool(this);
     this.overlays = new OverlayPool(this);
+    this.eliteMarks = new EliteMarkPool(this);
     this.areas = new AreaPool(this, createRng(deriveSeed(seed, AREA_FX_STREAM)));
     this.telegraphs = new TelegraphPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
@@ -1073,6 +1116,7 @@ export class GameScene extends Phaser.Scene {
     // After the bodies have settled, so an overlay sits on where its host is
     // drawn this frame; one not in the live set — status over, host dead — is freed.
     this.overlays.update(this.enemies.live);
+    this.eliteMarks.update(this.enemies.live);
     this.numbers.update(step.deltaMs);
   }
 
@@ -1621,9 +1665,9 @@ export class GameScene extends Phaser.Scene {
    * to the run instead, and so is one the pool fails to place, so no Ember is
    * ever lost.
    */
-  private dropPickups(type: EnemyType, x: number, y: number): void {
-    // Elites are #126's; until they land no death rolls for a chest.
-    const plan = planDrop(rollDrops(this.pickupRng, type, false), this.pickups.liveDrops);
+  private dropPickups(type: EnemyType, x: number, y: number, elite: boolean): void {
+    // #126: an elite rolls for a chest in place of the regular consumable.
+    const plan = planDrop(rollDrops(this.pickupRng, type, elite), this.pickups.liveDrops);
     let credit = plan.credit;
     if (plan.ember > 0) {
       const placed = this.pickups.dropEmber(x + EMBER_OFFSET.x, y + EMBER_OFFSET.y, plan.ember);
@@ -1658,7 +1702,7 @@ export class GameScene extends Phaser.Scene {
     from?: Readonly<Vec2>,
   ): void {
     if (!enemy.active) return;
-    const { x, y, enemyType } = enemy;
+    const { x, y, enemyType, isElite } = enemy;
     const boss = enemy instanceof Boss;
     const { critChance, critMultiplier } = this.spells.profile;
     const crit = kind === 'hit' && rollCrit(this.critRng, critChance);
@@ -1686,10 +1730,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.onDeath(enemy, x, y);
+    if (isElite) this.elitesKilled += 1;
     // #126: a splitter's children drop nothing, or splitters become farms.
     if (ENEMY_ARCHETYPES[enemyType].loot === false) return;
-    this.gems.dropFor(enemyType, x, y);
-    this.dropPickups(enemyType, x, y);
+    // #126: an elite drops `ELITE.gemMul` times its type's gems, and a chest.
+    this.gems.dropFor(enemyType, x, y, isElite ? eliteGemCount(enemyType) : undefined);
+    this.dropPickups(enemyType, x, y, isElite);
   }
 
   /** #126: count a hit on a shielded enemy for `guardReport`. */
@@ -1711,7 +1757,9 @@ export class GameScene extends Phaser.Scene {
    * the physics step.
    */
   private onDeath(enemy: Enemy, x: number, y: number): void {
-    if (enemy.enemyType === 'exploder') this.detonate(x, y, enemy.waveScale);
+    // An elite exploder's blast hits as hard as the elite does (#126); a
+    // splitter's children are its crowd's, elite or not.
+    if (enemy.enemyType === 'exploder') this.detonate(x, y, enemy.hitScale);
     else if (enemy.enemyType === 'splitter') {
       const { child, count, spread } = SPLITTER_SPLIT;
       this.splits.push({ type: child, at: { x, y }, count, spread, scale: enemy.waveScale });

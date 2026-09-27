@@ -176,8 +176,10 @@ tunables are in `config/pickups.ts`, the rules in `core/pickups.ts`.
 
 - The kind is read off the same draw as the 0.3% roll, so a roll is still two
   draws on the pickups stream and a seed's Embers do not move.
-- Elites are #126's. Until they land, every death rolls as a regular one, so
-  no chest drops. The boss drops no chest: its 100 Embers are credited on the
+- Elites (#126) enter on `ELITE_SCHEDULE` in `config/waves.ts`. An elite's
+  roll is the same two draws, with the consumable draw read as a chest
+  (`ELITE_CHEST_CHANCE`, always); it also drops `ELITE.gemMul` times its
+  type's gems. The boss drops no chest: its 100 Embers are credited on the
   kill (above).
 - A chest pays Embers rather than a level-up, whose offer would draw from the
   run's RNG and move every later offer of the seed.

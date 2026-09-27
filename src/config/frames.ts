@@ -29,6 +29,7 @@ export const ATLAS_PAGES = [
   { key: 'props13', texture: 'assets/atlas/props13.png', data: 'assets/atlas/props13.json' },
   { key: 'props14', texture: 'assets/atlas/props14.png', data: 'assets/atlas/props14.json' },
   { key: 'props15', texture: 'assets/atlas/props15.png', data: 'assets/atlas/props15.json' },
+  { key: 'props16', texture: 'assets/atlas/props16.png', data: 'assets/atlas/props16.json' },
 ] as const satisfies readonly AtlasPage[];
 
 /** Texture key of an atlas page. */
@@ -648,6 +649,10 @@ export const FRAMES = {
   'status.bleed.1': { w: 14, h: 22, anchorX: 9, anchorY: 12, page: 'props4' },
   'status.bleed.2': { w: 14, h: 22, anchorX: 9, anchorY: 12, page: 'props4' },
   'status.bleed.3': { w: 14, h: 22, anchorX: 9, anchorY: 12, page: 'props4' },
+  'status.elite.0': { w: 72, h: 46, anchorX: 36, anchorY: 23, page: 'props16' },
+  'status.elite.1': { w: 72, h: 46, anchorX: 36, anchorY: 23, page: 'props16' },
+  'status.elite.2': { w: 72, h: 46, anchorX: 36, anchorY: 23, page: 'props16' },
+  'status.elite.3': { w: 72, h: 46, anchorX: 36, anchorY: 23, page: 'props16' },
   'status.stagger.0': { w: 39, h: 21, anchorX: 21, anchorY: 13, page: 'props4' },
   'status.stagger.1': { w: 39, h: 21, anchorX: 21, anchorY: 13, page: 'props4' },
   'status.stagger.2': { w: 39, h: 21, anchorX: 21, anchorY: 13, page: 'props4' },
@@ -917,6 +922,7 @@ export const ART_BOXES = {
   'splitter.move': { x: 1, y: 1, w: 37, h: 31 },
   'splitter.spawn': { x: 1, y: 1, w: 32, h: 27 },
   'status.bleed': { x: 1, y: 1, w: 12, h: 20 },
+  'status.elite': { x: 2, y: 2, w: 68, h: 41 },
   'status.stagger': { x: 1, y: 1, w: 37, h: 19 },
   'swarm.death': { x: 1, y: 1, w: 20, h: 20 },
   'swarm.hurt': { x: 1, y: 1, w: 18, h: 13 },

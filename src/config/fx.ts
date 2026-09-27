@@ -137,6 +137,20 @@ export const AREA_SLEET_DEPTH = 4.5;
  */
 export const PROP_DEPTH = -1.5;
 
+/**
+ * The mark under an elite (#126) lies on the ground at its feet: over the
+ * ground areas, so a patch never hides one, and under every enemy, so it never
+ * covers the elite's own sprite or its status overlay.
+ */
+export const ELITE_MARK_DEPTH = -0.5;
+
+/**
+ * #126: the clip the mark under an elite loops, and how wide it is drawn: its
+ * art spans `span` times its host's body diameter, so a tank's is as plain as
+ * a swarm's.
+ */
+export const ELITE_MARK = { clip: 'status.elite', span: 2.4 } as const;
+
 /** The arena floor, under everything the run puts on it. */
 export const ARENA_DEPTH = -2;
 

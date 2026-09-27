@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ENEMY_TYPES, SPLITTER_SPLIT, isEnemyType } from './enemies';
-import { BOSS_START_TIME, SPAWN_RING_MARGIN, WAVES } from './waves';
+import { ENEMY_ARCHETYPES, ENEMY_TYPES, SPLITTER_SPLIT, isEnemyType } from './enemies';
+import { activeWave } from '../core/waveSchedule';
+import { BOSS_START_TIME, ELITE_SCHEDULE, SPAWN_RING_MARGIN, WAVES } from './waves';
 
 describe('wave table', () => {
   it('matches the 20-minute schedule (#127)', () => {
@@ -80,6 +81,38 @@ describe('wave table', () => {
     expect(WAVES.filter((wave) => wave.startTime === BOSS_START_TIME)).toEqual([
       { startTime: BOSS_START_TIME, types: [], spawnsPerSecond: 0, hpMul: 1, damageMul: 1 },
     ]);
+  });
+});
+
+describe('elite schedule (#126)', () => {
+  it('fields nine elites across the run', () => {
+    expect(ELITE_SCHEDULE).toEqual([
+      { at: 150, type: 'fast' },
+      { at: 300, type: 'tank' },
+      { at: 420, type: 'ranged' },
+      { at: 540, type: 'exploder' },
+      { at: 660, type: 'splitter' },
+      { at: 780, type: 'shielded' },
+      { at: 900, type: 'tank' },
+      { at: 1020, type: 'ranged' },
+      { at: 1140, type: 'shielded' },
+    ]);
+  });
+
+  it('is ascending, and every elite lands before the boss', () => {
+    for (let i = 0; i < ELITE_SCHEDULE.length; i += 1) {
+      const { at } = ELITE_SCHEDULE[i]!;
+      expect(at, String(at)).toBeGreaterThan(i === 0 ? 0 : ELITE_SCHEDULE[i - 1]!.at);
+      expect(at, String(at)).toBeLessThan(BOSS_START_TIME);
+    }
+  });
+
+  it('champions only a type already in the crowd it lands in, and one that drops loot', () => {
+    for (const { at, type } of ELITE_SCHEDULE) {
+      expect(isEnemyType(type), type).toBe(true);
+      expect(activeWave(at).types, `${type} at ${at}`).toContain(type);
+      expect(ENEMY_ARCHETYPES[type].loot, type).toBeUndefined();
+    }
   });
 });
 

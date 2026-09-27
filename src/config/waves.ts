@@ -55,6 +55,30 @@ export const WAVES: readonly [Wave, ...Wave[]] = [
   { startTime: 1200, types: [], spawnsPerSecond: 0, hpMul: 1, damageMul: 1 },
 ];
 
+/** One elite (#126): the run time it is due at, in seconds, and its type. */
+export interface EliteEntry {
+  at: number;
+  type: EnemyType;
+}
+
+/**
+ * #126: when each elite enters the run, and as what. Kept apart from `WAVES`
+ * so the wave rows keep their shape. Ascending, before the boss, and each
+ * type is already in the crowd of the row the elite lands in, so an elite is
+ * a champion of something the player has met.
+ */
+export const ELITE_SCHEDULE: readonly EliteEntry[] = [
+  { at: 150, type: 'fast' },
+  { at: 300, type: 'tank' },
+  { at: 420, type: 'ranged' },
+  { at: 540, type: 'exploder' },
+  { at: 660, type: 'splitter' },
+  { at: 780, type: 'shielded' },
+  { at: 900, type: 'tank' },
+  { at: 1020, type: 'ranged' },
+  { at: 1140, type: 'shielded' },
+];
+
 /**
  * The boss spawns at 20:00 (#127) and regular spawning stops. It is the last
  * row of the table above, named here so the run state (CO-030) and the

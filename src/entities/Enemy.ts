@@ -29,6 +29,7 @@ import {
   type WaveScale,
 } from '../core/enemy';
 import { applyStun, stunSpeedFactor, tickStun } from '../core/chainLightning';
+import { eliteScale } from '../core/elites';
 import { NO_BURN, applyBurn, hasBurn, tickBurn, type BurnState } from '../core/fireball';
 import {
   NO_FROST,
@@ -99,6 +100,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private contact = ENEMY_ARCHETYPES.swarm.contactDamage;
   /** The spawning wave's multipliers (#127), kept so a splitter's children (#126) inherit them. */
   private wave: Readonly<WaveScale> = UNSCALED;
+  /** #126: a champion of its type, spawned at `eliteScale` of its wave. */
+  private elite = false;
   private contactCooldownMs = 0;
   /** #126, ranged only: a shot's damage as the spawning wave scaled it, and the time to the next. */
   private shot = RANGED_ATTACK.shotDamage;
@@ -144,6 +147,20 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** #126: the multipliers of the wave that spawned it. */
   get waveScale(): Readonly<WaveScale> {
     return this.wave;
+  }
+
+  /** #126: an elite — tougher, harder-hitting, marked, and it pays out a chest. */
+  get isElite(): boolean {
+    return this.elite;
+  }
+
+  /**
+   * #126: the multipliers its own damage is scaled by: its wave's, or an
+   * elite's on top. An exploder's blast reads this; a splitter's children
+   * read `waveScale`, so an elite's children are its crowd's.
+   */
+  get hitScale(): Readonly<WaveScale> {
+    return this.elite ? eliteScale(this.wave) : this.wave;
   }
 
   /** #126: what one of its shots deals, scaled by the wave that spawned it. */
@@ -203,15 +220,24 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   /**
    * Take this pooled object out of the pool as `type`, alive and at (x, y),
-   * with hp and contact damage scaled by the wave that spawned it (#127).
+   * with hp and contact damage scaled by the wave that spawned it (#127) —
+   * and by `ELITE` on top for an elite (#126).
    */
-  spawn(type: EnemyType, x: number, y: number, scale: Readonly<WaveScale> = UNSCALED): void {
+  spawn(
+    type: EnemyType,
+    x: number,
+    y: number,
+    scale: Readonly<WaveScale> = UNSCALED,
+    elite = false,
+  ): void {
     this.kind = type;
     this.wave = scale;
-    const stats = scaleArchetype(ENEMY_ARCHETYPES[type], scale);
+    const hit = elite ? eliteScale(scale) : scale;
+    const stats = scaleArchetype(ENEMY_ARCHETYPES[type], hit);
     this.contact = stats.contactDamage;
-    this.shot = scaleDamage(RANGED_ATTACK.shotDamage, scale.damageMul);
+    this.shot = scaleDamage(RANGED_ATTACK.shotDamage, hit.damageMul);
     this.arise(stats, x, y);
+    this.elite = elite;
     // A full interval before the first shot; it drains on the walk in.
     this.fireCooldownMs = RANGED_ATTACK.fireIntervalMs;
   }
@@ -222,6 +248,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   protected arise(stats: Readonly<EnemyStats>, x: number, y: number): void {
     this.hp = stats.hp;
+    this.elite = false;
     this.contactCooldownMs = 0;
     this.shotOwed = false;
     this.heading = Number.NaN;
