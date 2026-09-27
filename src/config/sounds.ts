@@ -9,8 +9,9 @@
  *
  * The clips themselves are synthesized by `npm run audio:gen`
  * (`scripts/gen-audio.mjs`), which reads `SOUND_KEYS` off this file so a key
- * without a clip fails the script rather than the run. Licences are recorded
- * in `public/assets/audio/CREDITS.md`.
+ * without a clip fails the script rather than the run. A few are sourced
+ * recordings cut by `npm run audio:cut` instead (CO-177). Licences are
+ * recorded in `public/assets/audio/CREDITS.md`.
  */
 
 import type { ConsumableKind } from './pickups';
@@ -81,12 +82,16 @@ const clip = (key: SoundKey, volume: number, minGapMs: number, maxConcurrent = 1
  * one event and needs no cap beyond one per window.
  */
 export const SOUNDS: Readonly<Record<SoundKey, SoundDef>> = {
-  'cast.fire': clip('cast.fire', 0.5, 90, 2),
+  // The sourced whoosh (CO-177) is twice the old blip's length and louder on
+  // average, so it plays quieter: a capped stream of casts stays under clipping.
+  'cast.fire': clip('cast.fire', 0.28, 90, 2),
   'cast.ice': clip('cast.ice', 0.5, 90, 2),
   'cast.lightning': clip('cast.lightning', 0.45, 90, 2),
   'cast.earth': clip('cast.earth', 0.55, 90, 2),
   'enemy.hurt': clip('enemy.hurt', 0.35, 80, 3),
-  'enemy.death': clip('enemy.death', 0.45, 80, 3),
+  // The sourced hit (CO-177) rings twice as long as the old blip: two starts
+  // per window, not three, keep a wave of deaths under clipping.
+  'enemy.death': clip('enemy.death', 0.45, 80, 2),
   'player.hurt': clip('player.hurt', 0.7, 100),
   'player.lowHealth': clip('player.lowHealth', 0.6, 2000),
   'player.death': clip('player.death', 0.9, 500),
