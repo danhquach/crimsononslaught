@@ -28,6 +28,7 @@ describe('emptySave', () => {
     const save = emptySave();
     expect(save.version).toBe(SAVE_VERSION);
     expect(save.profile).toEqual({
+      name: '',
       runs: 0,
       wins: 0,
       bestTimeMs: 0,
@@ -154,6 +155,52 @@ describe('migrate', () => {
   });
 });
 
+describe('version 1 saves (CO-165)', () => {
+  // Written out by hand: `emptySave()` is version 2 now.
+  const v1 = {
+    version: 1,
+    profile: {
+      runs: 3,
+      wins: 1,
+      bestTimeMs: 125_000,
+      bestLevel: 9,
+      totalKills: 1500,
+      spellCounts: { fire: 1, ice: 2 },
+    },
+    currency: 500,
+    upgrades: { upgrade_vigor: 1 },
+    settings: { volume: 0.5 },
+  };
+
+  it('lifts to version 2 with every counter, Ember, upgrade and setting kept and an empty name', () => {
+    expect(SAVE_VERSION).toBe(2);
+    expect(parseSave(JSON.stringify(v1))).toEqual({
+      save: { ...v1, version: 2, profile: { ...v1.profile, name: '' } },
+      status: 'ok',
+    });
+  });
+
+  it('refuses a version 2 save with no name, and one whose name is not a string', () => {
+    const { profile, ...rest } = v1;
+    expect(parseSave(JSON.stringify({ ...rest, version: 2, profile })).status).toBe('reset');
+    expect(
+      parseSave(JSON.stringify({ ...rest, version: 2, profile: { ...profile, name: 7 } })).status,
+    ).toBe('reset');
+  });
+
+  it('refuses a version 1 save whose profile is not an object', () => {
+    expect(parseSave(JSON.stringify({ ...v1, profile: 'nope' }))).toEqual({
+      save: emptySave(),
+      status: 'reset',
+      reason: 'wrong shape',
+    });
+  });
+
+  it('still refuses a version newer than this build', () => {
+    expect(parseSave(JSON.stringify({ ...v1, version: 3 })).status).toBe('reset');
+  });
+});
+
 describe('recordRun', () => {
   it('banks exactly the Embers the run collected, win, lose or ended (#195, #252)', () => {
     for (const outcome of ['win', 'lose', 'ended'] as const) {
@@ -166,6 +213,7 @@ describe('recordRun', () => {
   it('folds a run into the counters, bests and spell tally', () => {
     const one = recordRun(emptySave(), stats, 'lose', 100);
     expect(one.profile).toEqual({
+      name: '',
       runs: 1,
       wins: 0,
       bestTimeMs: 272_400,
@@ -182,6 +230,7 @@ describe('recordRun', () => {
       50,
     );
     expect(two.profile).toEqual({
+      name: '',
       runs: 2,
       wins: 1,
       bestTimeMs: 300_000,
@@ -190,6 +239,11 @@ describe('recordRun', () => {
       spellCounts: { fire: 1, ice: 1 },
     });
     expect(two.currency).toBe(150);
+  });
+
+  it('keeps the player name (CO-165)', () => {
+    const named = { ...emptySave(), profile: { ...emptySave().profile, name: 'Test_Player' } };
+    expect(recordRun(named, stats, 'win', 10).profile.name).toBe('Test_Player');
   });
 
   it('counts an ended run (#252) as a run played, not a win', () => {

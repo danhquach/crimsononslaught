@@ -41,7 +41,11 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     gamepad: true,
   },
-  // The Help screen's feedback form (#226) is real DOM inputs over the canvas.
+  // A container for real DOM elements over the canvas: the Help screen's
+  // feedback form (#226) and Profile's name field (CO-165) are real inputs, so
+  // a touch player gets a soft keyboard, and typing gets a caret, selection
+  // and paste. The container ignores the pointer, so clicks still reach the
+  // canvas.
   dom: {
     createContainer: true,
   },

@@ -31,6 +31,10 @@ async function seedStorage(page: Page, json: string): Promise<void> {
   );
 }
 
+function withName(save: Save, name: string): Save {
+  return { ...save, profile: { ...save.profile, name } };
+}
+
 function readStorage(page: Page): Promise<string | null> {
   return page.evaluate((key) => localStorage.getItem(key), SAVE_STORAGE_KEY);
 }
@@ -65,7 +69,10 @@ test('a corrupt save is reset with a warning and the game still boots', async ({
   expect(warnings.some((w) => w.startsWith('[save] stored save was unreadable'))).toBe(true);
   expect(errors).toEqual([]);
   // The bad entry is overwritten with a fresh save, so the next boot is quiet.
-  expect(JSON.parse((await readStorage(page)) ?? 'null')).toEqual(emptySave());
+  // The fresh profile is given a generated name, never left blank (CO-165).
+  const stored = JSON.parse((await readStorage(page)) ?? 'null') as Save;
+  expect(stored.profile.name).toMatch(/^Player\d{9}$/);
+  expect(stored).toEqual(withName(emptySave(), stored.profile.name));
 });
 
 test('a bought upgrade persists across a reload and changes the next run', async ({ page }) => {
@@ -106,8 +113,12 @@ test('a bought upgrade persists across a reload and changes the next run', async
   expect(errors).toEqual([]);
 });
 
-test('wiping progress leaves an empty save in storage', async ({ page }) => {
-  const funded: Save = { ...emptySave(), currency: 500, upgrades: { upgrade_fleet: 1 } };
+test('wiping progress leaves an empty save in storage, keeping the name', async ({ page }) => {
+  const funded: Save = {
+    ...withName(emptySave(), 'Test_Player'),
+    currency: 500,
+    upgrades: { upgrade_fleet: 1 },
+  };
   funded.profile.runs = 3;
   await seedStorage(page, JSON.stringify(funded));
 
@@ -120,6 +131,8 @@ test('wiping progress leaves an empty save in storage', async ({ page }) => {
     (game.scene.getScene(key) as UpgradesScene).wipe();
   }, SCENE.upgrades);
 
-  await expect.poll(() => readSave(page)).toEqual(emptySave());
-  expect(JSON.parse((await readStorage(page)) ?? 'null')).toEqual(emptySave());
+  // A wipe clears progress, not who is playing (CO-165).
+  const wiped = withName(emptySave(), 'Test_Player');
+  await expect.poll(() => readSave(page)).toEqual(wiped);
+  expect(JSON.parse((await readStorage(page)) ?? 'null')).toEqual(wiped);
 });

@@ -92,9 +92,14 @@ export class UpgradesScene extends Phaser.Scene {
     return true;
   }
 
-  /** Wipe every trace of progress and start a fresh save. The button asks twice; this does not. */
+  /**
+   * Wipe every trace of progress and start a fresh save. The button asks twice;
+   * this does not. The player name is kept (CO-165): a wipe clears progress,
+   * not who is playing.
+   */
   wipe(): void {
-    this.commit(emptySave());
+    const fresh = emptySave();
+    this.commit({ ...fresh, profile: { ...fresh.profile, name: this.save.profile.name } });
   }
 
   private addRow(upgrade: Upgrade, save: Save, y: number): MenuItem {
