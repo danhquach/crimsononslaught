@@ -25,6 +25,8 @@ interface CardSample {
   frame: Box;
   parts: Box[];
   glyphs: string[];
+  /** Spell select's stat rows: the space between each label and its value. */
+  statRows: { label: string; gap: number; char: number }[];
 }
 
 /** Each card container a scene is showing, as its icons and the boxes of its parts. */
@@ -42,9 +44,6 @@ function sampleCards(page: Page, key: string): Promise<CardSample[]> {
       top: Math.min(...boxes.map((b) => b.top)),
       bottom: Math.max(...boxes.map((b) => b.bottom)),
     });
-    // Spell select's stat columns: the only multi-line monospace texts on a card.
-    const isStat = (text: Phaser.GameObjects.Text): boolean =>
-      text.style.fontFamily === 'monospace' && text.text.includes('\n');
     return game.scene
       .getScene(sceneKey)
       .children.list.filter((child) => child.type === 'Container')
@@ -55,7 +54,8 @@ function sampleCards(page: Page, key: string): Promise<CardSample[]> {
         ) as unknown as Phaser.GameObjects.Image[];
         const texts = list.filter((o) => o.type === 'Text') as unknown as Phaser.GameObjects.Text[];
         const frame = list[0] as Phaser.GameObjects.Rectangle;
-        const stats = texts.filter(isStat);
+        const labels = texts.filter((text) => text.name === 'statLabel');
+        const values = texts.filter((text) => text.name === 'statValue');
         // No icon art: the icon is a disc with the glyph on it, one box here.
         const discs = list.filter((o) => o.type === 'Arc') as unknown as Phaser.GameObjects.Arc[];
         const glyphs =
@@ -70,7 +70,7 @@ function sampleCards(page: Page, key: string): Promise<CardSample[]> {
           parts: [
             ...images.map((image) => box(image.frame.name, image)),
             ...texts
-              .filter((text) => text.text !== '' && !isStat(text) && !glyphs.includes(text))
+              .filter((text) => text.text !== '' && !glyphs.includes(text))
               .map((text) => box(text.text, text)),
             ...(discs.length > 0
               ? [
@@ -80,19 +80,13 @@ function sampleCards(page: Page, key: string): Promise<CardSample[]> {
                   ]),
                 ]
               : []),
-            // The stat labels and values are two columns of one table: each row
-            // fits, but the widest label and widest value may sit on different
-            // rows, so the pair is one box here.
-            ...(stats.length > 0
-              ? [
-                  union(
-                    'stats',
-                    stats.map((text) => box(text.text, text)),
-                  ),
-                ]
-              : []),
           ],
           glyphs: texts.map((text) => text.text),
+          statRows: labels.map((label, i) => ({
+            label: label.text,
+            gap: (values[i]?.getBounds().left ?? -Infinity) - label.getBounds().right,
+            char: label.width / label.text.length,
+          })),
         };
       });
   }, key);
@@ -116,6 +110,14 @@ function expectLaidOut(card: CardSample): void {
   }
 }
 
+/** CO-169: every stat row keeps at least one character between its label and value. */
+function expectStatGaps(card: CardSample): void {
+  expect(card.statRows.length).toBeGreaterThan(0);
+  for (const row of card.statRows) {
+    expect(row.gap, `${row.label} row gap`).toBeGreaterThanOrEqual(row.char);
+  }
+}
+
 test('each spell-select card shows its spell icon, clear of its text, and still picks', async ({
   page,
 }) => {
@@ -128,6 +130,7 @@ test('each spell-select card shows its spell icon, clear of its text, and still 
   expect(cards.map((card) => card.icons)).toEqual(
     SPELL_IDS.map((id) => [{ frame: `icon.${id}.0.art`, width: 64, interactive: false }]),
   );
+  cards.forEach(expectStatGaps);
   cards.forEach(expectLaidOut);
 
   const { x, y } = cardCenter(SPELL_IDS.indexOf('ice'));
@@ -192,6 +195,7 @@ test('with no icon art, each spell-select card shows its colour-and-letters glyp
   expect(cards.map((card) => card.icons)).toEqual(SPELL_IDS.map(() => []));
   for (const card of cards) {
     expect(card.glyphs.some((text) => /^[A-Z]{1,2}$/.test(text))).toBe(true);
+    expectStatGaps(card);
     expectLaidOut(card);
   }
 });
