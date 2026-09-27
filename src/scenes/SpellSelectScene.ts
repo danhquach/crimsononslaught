@@ -149,30 +149,30 @@ export class SpellSelectScene extends Phaser.Scene {
       wordWrap: { width: innerWidth },
       lineSpacing: 2,
     });
-    const statStyle = { fontFamily: 'monospace', fontSize: '13px', lineSpacing: 4 };
-    const statTop = top + 176 + ICON_BAND;
-    const statLabels = this.add.text(left, statTop, card.stats.map(([l]) => l).join('\n'), {
-      ...statStyle,
-      color: '#aaaaaa',
+    // One label/value pair per row, so a value too long for its row shrinks on
+    // its own and keeps at least one character clear of its label (CO-169).
+    let rowTop = top + 176 + ICON_BAND;
+    const stats = card.stats.flatMap(([l, v]) => {
+      const label = this.add
+        .text(left, rowTop, l, { fontFamily: 'monospace', fontSize: '13px', color: '#aaaaaa' })
+        .setName('statLabel');
+      const value = this.add
+        .text(left + innerWidth, rowTop + label.height / 2, v, {
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          color: '#eeeeee',
+        })
+        .setOrigin(1, 0.5)
+        .setName('statValue');
+      const gap = label.width / l.length;
+      for (let size = 12; label.width + gap + value.width > innerWidth && size >= 9; size--) {
+        value.setFontSize(size);
+      }
+      rowTop += label.height + 4;
+      return [label, value];
     });
-    const statValues = this.add
-      .text(left + innerWidth, statTop, card.stats.map(([, v]) => v).join('\n'), {
-        ...statStyle,
-        color: '#eeeeee',
-        align: 'right',
-      })
-      .setOrigin(1, 0);
 
-    this.add.container(x, y, [
-      frame,
-      swatch,
-      key,
-      ...icon,
-      name,
-      description,
-      statLabels,
-      statValues,
-    ]);
+    this.add.container(x, y, [frame, swatch, key, ...icon, name, description, ...stats]);
 
     // Gamepad selection reuses the hover look, so a card reads the same however
     // it was reached.
