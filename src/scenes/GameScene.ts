@@ -59,7 +59,11 @@ import {
 } from '../core/pickups';
 import { planProps } from '../core/arenaDressing';
 import { membersOf } from '../core/groundArea';
+import { scaleDamage, type WaveScale } from '../core/enemy';
+import { blastReaches } from '../core/exploder';
+import { explosionScale } from '../core/fx';
 import type { Vec2 } from '../core/input';
+import { flushSplits, type Split } from '../core/splitter';
 import { createRng, deriveSeed, type Rng } from '../core/rng';
 import { RUN_EVENT, emitRunEvent, type RunEventPayloads } from '../core/runEvents';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
@@ -115,7 +119,14 @@ import {
 } from '../config/arena';
 import { FRAMES } from '../config/frames';
 import { ARENA_DEPTH, PROP_DEPTH } from '../config/fx';
-import { MAX_LIVE_ENEMY_SHOTS, isEnemyType, type EnemyType } from '../config/enemies';
+import {
+  ENEMY_ARCHETYPES,
+  EXPLODER_BLAST,
+  MAX_LIVE_ENEMY_SHOTS,
+  SPLITTER_SPLIT,
+  isEnemyType,
+  type EnemyType,
+} from '../config/enemies';
 import {
   BOMB_DAMAGE,
   BOSS_EMBERS,
@@ -315,6 +326,10 @@ export class GameScene extends Phaser.Scene {
   /** Test hook (#126): shots that have touched the player, and the HP they took. */
   private shotHits = 0;
   private shotHpLost = 0;
+  /** #126: splits owed by splitters killed this step; spawned after the physics step. */
+  private splits: Split[] = [];
+  /** Test hook (#126): blasts set off, blasts that reached the player and the HP they took, children spawned and dropped. */
+  private blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
   private spawns!: SpawnDirector;
   private gems!: GemPool;
   /** Embers, consumables and relics (#195): everything on the floor but gems. */
@@ -414,6 +429,33 @@ export class GameScene extends Phaser.Scene {
       hpLost: this.shotHpLost,
       clips: [...clips].sort(),
     };
+  }
+
+  /**
+   * Test hook (#126): exploders, splitters and splitlings alive, the run's
+   * blast and split tallies, and the clips those three types are playing. The
+   * browser suite checks a blast hurts, a split leaves its children, and each
+   * draws from its own sheet.
+   */
+  get blastSplitReport(): {
+    live: Record<'exploder' | 'splitter' | 'splitling', number>;
+    blasts: number;
+    blastHits: number;
+    blastHpLost: number;
+    children: number;
+    dropped: number;
+    clips: string[];
+  } {
+    const live = { exploder: 0, splitter: 0, splitling: 0 };
+    const clips = new Set<string>();
+    for (const enemy of this.enemies.live) {
+      const type = enemy.enemyType;
+      if (type !== 'exploder' && type !== 'splitter' && type !== 'splitling') continue;
+      live[type] += 1;
+      const key = enemy.anims.currentAnim?.key;
+      if (key) clips.add(key);
+    }
+    return { live, ...this.blastSplitTally, clips: [...clips].sort() };
   }
 
   /** Test hook: enemies alive in the arena, the bound `overlayCount` must respect. */
@@ -753,6 +795,8 @@ export class GameScene extends Phaser.Scene {
     this.enemyShots = new EnemyShotPool(this);
     this.shotHits = 0;
     this.shotHpLost = 0;
+    this.splits = [];
+    this.blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
     this.spawns = new SpawnDirector(
       this.cameras.main,
       this.enemies,
@@ -994,6 +1038,9 @@ export class GameScene extends Phaser.Scene {
     this.telegraphs.update(step.deltaMs);
     this.physics.world.update(time, step.deltaMs);
     this.physics.world.postUpdate();
+    // #126: a splitter killed this step leaves its children now — never inside
+    // the enemy walk or an overlap callback, which iterate the group it joins.
+    this.releaseSplits();
     // After the bodies have settled, so an overlay sits on where its host is
     // drawn this frame; one not in the live set — status over, host dead — is freed.
     this.overlays.update(this.enemies.live);
@@ -1331,7 +1378,15 @@ export class GameScene extends Phaser.Scene {
    * own invulnerability window (CO-021) gates the damage on top of that.
    */
   private onEnemyContact(enemy: Enemy): void {
-    if (!enemy.active || this.invulnerable) return;
+    if (!enemy.active) return;
+    // #126: an exploder that reaches the player goes off rather than biting:
+    // killed through the one damage path, its death sets off the blast. Even
+    // under `?invulnerable=1`, so it does not sit on the player unexploded.
+    if (enemy.enemyType === 'exploder') {
+      this.damageEnemy(enemy, enemy.remainingHp, 'tick');
+      return;
+    }
+    if (this.invulnerable) return;
     if (!enemy.tryContact()) return;
     this.hurtPlayer(enemy.contactDamage);
   }
@@ -1574,8 +1629,48 @@ export class GameScene extends Phaser.Scene {
       this.run.addEmbers(BOSS_EMBERS);
       return;
     }
+    this.onDeath(enemy, x, y);
+    // #126: a splitter's children drop nothing, or splitters become farms.
+    if (ENEMY_ARCHETYPES[enemyType].loot === false) return;
     this.gems.dropFor(enemyType, x, y);
     this.dropPickups(enemyType, x, y);
+  }
+
+  /**
+   * #126: what a death sets off where the enemy stood. An exploder's blast
+   * lands now (it only ever hurts the player, so it cannot kill anything in
+   * the walk that called this); a splitter's children are queued for after
+   * the physics step.
+   */
+  private onDeath(enemy: Enemy, x: number, y: number): void {
+    if (enemy.enemyType === 'exploder') this.detonate(x, y, enemy.waveScale);
+    else if (enemy.enemyType === 'splitter') {
+      const { child, count, spread } = SPLITTER_SPLIT;
+      this.splits.push({ type: child, at: { x, y }, count, spread, scale: enemy.waveScale });
+    }
+  }
+
+  /** #126: an exploder's blast, drawn and felt: the player takes it if they stand in it. */
+  private detonate(x: number, y: number, scale: Readonly<WaveScale>): void {
+    const { radius, damage } = EXPLODER_BLAST;
+    this.fx.burst('fire.explode', x, y, { scale: explosionScale(radius) });
+    const tally = this.blastSplitTally;
+    // Every blast set off, near the player or not; `blastHits` counts those that reached them.
+    tally.blasts += 1;
+    if (!blastReaches({ x, y }, this.player, radius)) return;
+    tally.blastHits += 1;
+    tally.blastHpLost += this.hurtPlayer(scaleDamage(damage, scale.damageMul));
+  }
+
+  /** #126: spawn the children every split this step owes; one past the live cap is dropped. */
+  private releaseSplits(): void {
+    if (this.splits.length === 0) return;
+    const { spawned, dropped } = flushSplits(
+      this.splits,
+      (type, at, scale) => this.enemies.spawn(type, at.x, at.y, scale) !== null,
+    );
+    this.blastSplitTally.children += spawned;
+    this.blastSplitTally.dropped += dropped;
   }
 
   /**

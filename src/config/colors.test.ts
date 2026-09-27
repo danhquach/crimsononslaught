@@ -10,6 +10,10 @@ const SPEC_KEYS = [
   // #126: the ranged enemy and its shot.
   'enemy_ranged',
   'proj_enemy',
+  // #126: the exploder, the splitter and its child.
+  'enemy_exploder',
+  'enemy_splitter',
+  'enemy_splitling',
   'boss',
   'gem',
   'proj_fire',

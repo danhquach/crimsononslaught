@@ -37,25 +37,22 @@ export interface PickupHelpRow {
 
 const RARE_DROP = 'rare drop from a regular kill';
 
-/** `a`, `a and b`, `a, b and c`. */
-function listOf(words: readonly string[]): string {
-  if (words.length <= 1) return words.join('');
-  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
-}
-
-/** "some swarm and fast kills; every tank kill (worth 3); 100 from the boss", from `EMBER_DROPS`. */
+/**
+ * "every tank kill (worth 3); some other kills; 100 from the boss", from
+ * `EMBER_DROPS`. The types that only sometimes drop one are not named: #126
+ * made them five, more than one line of the screen holds.
+ */
 function emberSource(): string {
   const types = Object.keys(EMBER_DROPS) as EnemyType[];
   const worth = (type: EnemyType): string => {
     const { value } = EMBER_DROPS[type];
     return value > 1 ? ` (worth ${value})` : '';
   };
-  const parts: string[] = [];
-  const some = types.filter((type) => EMBER_DROPS[type].chance < 1);
-  if (some.length > 0) parts.push(`some ${listOf(some)} kills`);
-  for (const type of types.filter((t) => EMBER_DROPS[t].chance >= 1)) {
-    parts.push(`every ${type} kill${worth(type)}`);
-  }
+  const parts = types
+    .filter((t) => EMBER_DROPS[t].chance >= 1)
+    .map((type) => `every ${type} kill${worth(type)}`);
+  const some = types.some((t) => EMBER_DROPS[t].chance > 0 && EMBER_DROPS[t].chance < 1);
+  if (some) parts.push(parts.length > 0 ? 'some other kills' : 'some kills');
   parts.push(`${BOSS_EMBERS} from the boss`);
   return parts.join('; ');
 }

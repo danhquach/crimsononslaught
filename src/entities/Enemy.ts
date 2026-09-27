@@ -16,6 +16,7 @@ import {
   chaseVelocity,
   damageEnemy,
   scaleArchetype,
+  scaleDamage,
   tickContactCooldown,
   tryContact,
   type Vec2,
@@ -33,12 +34,7 @@ import {
   type FrostState,
 } from '../core/frostNova';
 import { tickBoulderCooldown, tryBoulderHit } from '../core/orbitingBoulders';
-import {
-  inFireDistance,
-  rangedVelocity,
-  scaledShotDamage,
-  tickFireCooldown,
-} from '../core/rangedEnemy';
+import { inFireDistance, rangedVelocity, tickFireCooldown } from '../core/rangedEnemy';
 import {
   NO_BLEED,
   applyBleed,
@@ -92,6 +88,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private hp = 0;
   /** Contact damage as the spawning wave scaled it (#127); the boss has its own. */
   private contact = ENEMY_ARCHETYPES.swarm.contactDamage;
+  /** The spawning wave's multipliers (#127), kept so a splitter's children (#126) inherit them. */
+  private wave: Readonly<WaveScale> = UNSCALED;
   private contactCooldownMs = 0;
   /** #126, ranged only: a shot's damage as the spawning wave scaled it, and the time to the next. */
   private shot = RANGED_ATTACK.shotDamage;
@@ -130,6 +128,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   get contactDamage(): number {
     return this.contact;
+  }
+
+  /** #126: the multipliers of the wave that spawned it. */
+  get waveScale(): Readonly<WaveScale> {
+    return this.wave;
   }
 
   /** #126: what one of its shots deals, scaled by the wave that spawned it. */
@@ -193,9 +196,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   spawn(type: EnemyType, x: number, y: number, scale: Readonly<WaveScale> = UNSCALED): void {
     this.kind = type;
+    this.wave = scale;
     const stats = scaleArchetype(ENEMY_ARCHETYPES[type], scale);
     this.contact = stats.contactDamage;
-    this.shot = scaledShotDamage(RANGED_ATTACK.shotDamage, scale.damageMul);
+    this.shot = scaleDamage(RANGED_ATTACK.shotDamage, scale.damageMul);
     this.arise(stats, x, y);
     // A full interval before the first shot; it drains on the walk in.
     this.fireCooldownMs = RANGED_ATTACK.fireIntervalMs;

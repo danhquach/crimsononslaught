@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { RANGED_ATTACK } from '../config/enemies';
 import { PLAYER_SPEED } from '../config/player';
-import { inFireDistance, rangedVelocity, scaledShotDamage, tickFireCooldown } from './rangedEnemy';
+import { scaleDamage } from './enemy';
+import { inFireDistance, rangedVelocity, tickFireCooldown } from './rangedEnemy';
 
 const KEEP = { keepDistance: 200, band: 40 };
 
@@ -89,12 +90,12 @@ describe('inFireDistance', () => {
   });
 });
 
-describe('scaledShotDamage', () => {
+describe('scaleDamage', () => {
   it('multiplies and rounds, never below 1', () => {
-    expect(scaledShotDamage(5, 1)).toBe(5);
-    expect(scaledShotDamage(5, 1.3)).toBe(7);
-    expect(scaledShotDamage(5, 1.9)).toBe(10);
-    expect(scaledShotDamage(1, 0.1)).toBe(1);
+    expect(scaleDamage(5, 1)).toBe(5);
+    expect(scaleDamage(5, 1.3)).toBe(7);
+    expect(scaleDamage(5, 1.9)).toBe(10);
+    expect(scaleDamage(1, 0.1)).toBe(1);
   });
 });
 

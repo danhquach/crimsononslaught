@@ -1893,6 +1893,52 @@
       "rows": 1,
       "sheetCell": 220,
       "rowSpecs": [[{ "anim": "shot", "cols": [1, 4], "centred": true }]]
+    },
+    {
+      "key": "exploder",
+      "ticket": "CO-104",
+      "file": "CO-104/enemy_exploder.png",
+      "page": 14,
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 168,
+      "maxMagenta": 20,
+      "rowSpecs": [
+        [{ "anim": "move", "cols": [1, 4] }],
+        [{ "anim": "hurt", "cols": [1, 1] }],
+        [{ "anim": "death", "cols": [1, 4] }],
+        [{ "anim": "spawn", "cols": [1, 4] }]
+      ]
+    },
+    {
+      "key": "splitter",
+      "ticket": "CO-104",
+      "file": "CO-104/enemy_splitter.png",
+      "page": 14,
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 184,
+      "rowSpecs": [
+        [{ "anim": "move", "cols": [1, 4] }],
+        [{ "anim": "hurt", "cols": [1, 1] }],
+        [{ "anim": "death", "cols": [1, 4] }],
+        [{ "anim": "spawn", "cols": [1, 4] }]
+      ]
+    },
+    {
+      "key": "splitling",
+      "ticket": "CO-104",
+      "file": "CO-104/enemy_splitling.png",
+      "page": 14,
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 108,
+      "rowSpecs": [
+        [{ "anim": "move", "cols": [1, 4] }],
+        [{ "anim": "hurt", "cols": [1, 1] }],
+        [{ "anim": "death", "cols": [1, 4] }],
+        [{ "anim": "spawn", "cols": [1, 4] }]
+      ]
     }
   ]
 }

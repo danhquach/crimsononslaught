@@ -34,6 +34,10 @@ export const EMBER_DROPS: Readonly<Record<EnemyType, EmberDrop>> = {
   tank: { chance: 1, value: 3 },
   // #126: worth a little more than a swarm; the player walks into its fire to get it.
   ranged: { chance: 0.3, value: 1 },
+  exploder: { chance: 0.25, value: 1 },
+  splitter: { chance: 0.5, value: 1 },
+  // Drops nothing (`loot: false`); the row is here because every type has one.
+  splitling: { chance: 0, value: 1 },
 };
 
 /** Spec §4: the boss pays this on the killing blow, credited to the run rather than dropped. */

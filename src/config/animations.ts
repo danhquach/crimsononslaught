@@ -97,6 +97,22 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('ranged.spawn', 4, 10, ONCE),
   spec('ranged.shot', 4, 12, LOOP),
 
+  // Exploder, splitter and its splitling (CO-104, #126), each authored facing
+  // right and mirrored to face left. The exploder's death is its own burst;
+  // the blast's `fire.explode` plays over it at the blast's size.
+  spec('exploder.move', 4, 10, LOOP),
+  spec('exploder.hurt', 1, 10, ONCE),
+  spec('exploder.death', 4, 12, ONCE),
+  spec('exploder.spawn', 4, 10, ONCE),
+  spec('splitter.move', 4, 6, LOOP),
+  spec('splitter.hurt', 1, 10, ONCE),
+  spec('splitter.death', 4, 12, ONCE),
+  spec('splitter.spawn', 4, 8, ONCE),
+  spec('splitling.move', 4, 10, LOOP),
+  spec('splitling.hurt', 1, 10, ONCE),
+  spec('splitling.death', 4, 12, ONCE),
+  spec('splitling.spawn', 4, 12, ONCE),
+
   // Boss (CO-074). Telegraph and charge are paced to the 0.8 s / 0.6 s phases
   // in `boss.ts`, so the art lands with the state change rather than drifting.
   ...facings('boss.walk', 4, 6, LOOP),
@@ -286,6 +302,9 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   enemy_fast: 'fast.move.0',
   enemy_tank: 'tank.walk.down.0',
   enemy_ranged: 'ranged.move.0',
+  enemy_exploder: 'exploder.move.0',
+  enemy_splitter: 'splitter.move.0',
+  enemy_splitling: 'splitling.move.0',
   boss: 'boss.walk.down.0',
   gem: 'gem.idle.0',
   proj_fire: 'fire.fly.0',
