@@ -23,6 +23,7 @@ import { watchStartButton, type StartButtonWatch } from './input';
 import { artFrame } from '../core/animation';
 import { BOSS_EVENT, type BossPhasePayload } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor } from '../config/sounds';
+import { hasFrameArt } from '../render/atlas';
 import { audioOf, type Audio } from '../render/audio';
 import {
   LEVEL_UP_EVENT,
@@ -1408,8 +1409,10 @@ export class GameScene extends Phaser.Scene {
    * everything else on the floor. The placeholder arena has none.
    */
   private scatterProps(seed: number, relics: readonly Vec2[]): void {
+    // The atlas installs every page or none (CO-130): props need the install,
+    // not just their own page, or they draw beside placeholder entities (CO-166).
+    if (!hasFrameArt(this, ARENA_PROP_FRAMES[0])) return;
     const page = FRAMES[ARENA_PROP_FRAMES[0]].page;
-    if (!this.textures.exists(page)) return;
     const props = planProps(
       createRng(deriveSeed(seed, ARENA_STREAM)),
       { width: WORLD_WIDTH, height: WORLD_HEIGHT },
@@ -1542,8 +1545,10 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     const cx = WORLD_WIDTH / 2;
     const cy = WORLD_HEIGHT / 2;
-    const page = FRAMES[ARENA_GROUND_FRAME].page;
-    if (this.textures.exists(page)) {
+    // The installed art frames, not the page: a page that loaded while another
+    // did not has no `.art` frames, and the tile would repeat the whole page (CO-166).
+    if (hasFrameArt(this, ARENA_GROUND_FRAME) && hasFrameArt(this, ARENA_EDGE_FRAME)) {
+      const page = FRAMES[ARENA_GROUND_FRAME].page;
       // One TileSprite each: a single quad however far the tile repeats. Each
       // repeats its tile's art alone, never the frame's margin, which would
       // otherwise show as a grid of seams (CO-127).

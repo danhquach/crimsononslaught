@@ -101,7 +101,7 @@ export function installAtlas(scene: Phaser.Scene): string[] {
  * which it does for every page or none. A page that loaded while another did
  * not still exists, so checking the page alone would draw art in a run where
  * every other entity is a placeholder (CO-130). Used by the HUD's slot icons
- * (CO-154) and bar frames (CO-156).
+ * (CO-154), bar frames (CO-156) and the arena floor and props (CO-166).
  */
 export function hasFrameArt(scene: Phaser.Scene, frame: FrameName): boolean {
   const { page } = FRAMES[frame];
