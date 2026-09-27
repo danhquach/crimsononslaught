@@ -70,7 +70,12 @@
     "            Off by default, because plenty of art is purple on purpose.",
     "            The CO-079 boulder needs it (CO-146): its stone carries under",
     "            20 of excess and its fringe 30 or more, so 20 clears the one",
-    "            and leaves the other."
+    "            and leaves the other. The hero, Tank, Fast, Swarm, Lightning",
+    "            strike and Blizzard sheets use 20 too (CO-171).",
+    "keepPink    a row segment of a maxMagenta sheet only. Its frames keep any",
+    "            pixel whose green is at least half its red and blue, so the",
+    "            cap takes the fringe off art drawn in pink and leaves the pink.",
+    "            The hero's ghost and its fading wisp need it (CO-171)."
   ],
   "sheets": [
     {
@@ -80,6 +85,7 @@
       "cols": 6,
       "rows": 4,
       "sheetCell": 192,
+      "maxMagenta": 20,
       "rowSpecs": [
         [
           {
@@ -162,6 +168,7 @@
       "cols": 6,
       "rows": 2,
       "sheetCell": 192,
+      "maxMagenta": 20,
       "rowSpecs": [
         [
           {
@@ -202,8 +209,16 @@
             "anim": "death",
             "cols": [
               1,
-              6
+              4
             ]
+          },
+          {
+            "anim": "death",
+            "cols": [
+              5,
+              6
+            ],
+            "keepPink": true
           }
         ]
       ]
@@ -215,6 +230,7 @@
       "cols": 6,
       "rows": 4,
       "sheetCell": 128,
+      "maxMagenta": 20,
       "rowSpecs": [
         [
           {
@@ -261,6 +277,7 @@
       "cols": 6,
       "rows": 4,
       "sheetCell": 128,
+      "maxMagenta": 20,
       "rowSpecs": [
         [
           {
@@ -310,6 +327,7 @@
       "cols": 4,
       "rows": 4,
       "sheetCell": 192,
+      "maxMagenta": 20,
       "rowSpecs": [
         [
           {
@@ -360,6 +378,7 @@
       "cols": 6,
       "rows": 3,
       "sheetCell": 192,
+      "maxMagenta": 20,
       "rowSpecs": [
         [
           {
@@ -807,6 +826,7 @@
       "cols": 4,
       "rows": 2,
       "sheetCell": 256,
+      "maxMagenta": 20,
       "rowSpecs": [
         [
           {
@@ -1133,6 +1153,7 @@
       "cols": 2,
       "rows": 2,
       "sheetCell": 768,
+      "maxMagenta": 20,
       "rowSpecs": [
         [
           {
