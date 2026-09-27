@@ -73,17 +73,26 @@ test('ranged enemies shoot a standing player and the hits cost HP', async ({ pag
   await page.mouse.click(x, y);
   await waitForScene(page, SCENE.game);
 
-  // Stop at the first shot that took HP; the rest of the run proves nothing more.
+  // Stop once a shot has taken HP and a glob has been seen in flight; the rest
+  // of the run proves nothing more. Clips are read per sample, so a shot can
+  // fly and land between two of them: the first hit alone came 3 samples in on
+  // CI, with no glob seen on one run (#277).
   const trace: Sample[] = [];
   const until = Date.now() + WALL_CAP_MS;
   let runMs = 0;
+  let runLeft = false;
+  let shotSeen = false;
   while (runMs < START_AT_S * 1000 + RUN_MS && Date.now() < until) {
     await answerLevelUp(page);
     const current = await sample(page);
-    if (!current) break;
+    if (!current) {
+      runLeft = true;
+      break;
+    }
     trace.push(current);
     runMs = current.elapsedMs;
-    if (current.hpLost > 0) break;
+    shotSeen ||= current.clips.includes('ranged.shot');
+    if (current.hpLost > 0 && shotSeen) break;
     await page.waitForTimeout(SAMPLE_MS);
   }
   const last = trace[trace.length - 1];
@@ -93,7 +102,8 @@ test('ranged enemies shoot a standing player and the hits cost HP', async ({ pag
       `most shots ${most((t) => t.live)}; hits ${last?.hits}, hp lost ${last?.hpLost}, hud ${last?.hudHp}; ` +
       `clips ${[...new Set(trace.flatMap((t) => t.clips))].join(',')}`,
   );
-  expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(3);
+  expect(runLeft, 'the run was still live when sampling stopped').toBe(false);
+  expect(trace.length, 'samples taken while the run was live').toBeGreaterThan(0);
 
   expect(
     most((t) => t.ranged),
