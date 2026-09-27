@@ -107,9 +107,10 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   await waitForScene(page, SCENE.spellSelect);
 
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));
+  // Before the click, so the shields' equip cues (CO-158) are logged.
+  await recordSounds(page);
   await page.mouse.click(x, y);
   await waitForScene(page, SCENE.game);
-  await recordSounds(page);
 
   const equipped = await page.evaluate(async (gameKey) => {
     const { game } = await import('/src/main.ts');
@@ -165,6 +166,17 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   const hurtFrames = new Set(log.filter((r) => r.key === 'player.hurt').map((r) => r.frame));
   const soakedFrames = log.filter((r) => r.key === 'shield.hit' && !hurtFrames.has(r.frame));
   expect(soakedFrames.length, 'steps with a soaked hit and no hurt cue').toBeGreaterThan(0);
+
+  // CO-158: each shield cued as it was equipped, before any hit, and again only
+  // as it came back from a break, never per tick. Both share `shield.break`.
+  const breaks = log.filter((r) => r.key === 'shield.break').length;
+  for (const id of EXTRA) {
+    const cues = log.filter((r) => r.key === `cast.${id}`);
+    expect(cues.length, `${id} equip cue`).toBeGreaterThanOrEqual(1);
+    const firstCue = log.findIndex((r) => r.key === `cast.${id}`);
+    expect(firstCue, `${id} cues before the first hit`).toBeLessThan(firstHit);
+    expect(cues.length, `${id} cues: equip plus one per reform`).toBeLessThanOrEqual(1 + breaks);
+  }
 
   // The HUD was told, and by the run's own numbers — it never reads GameScene.
   for (const [i, s] of trace.entries()) {

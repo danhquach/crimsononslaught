@@ -139,9 +139,10 @@ export function anyWithin(
 export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
   readonly id: S;
   /**
-   * Told after every cast the scheduler pays out (CO-102: the cast cue). A
-   * listener, not a participant: it runs after `cast()` and returns nothing, so
-   * it cannot change what the cast did or when the next one lands.
+   * Told after every cast the scheduler pays out (CO-102: the cast cue), and by
+   * a spell with no cast when it comes up: a shield reforming from empty
+   * (CO-158). A listener, not a participant: it runs after the step and returns
+   * nothing, so it cannot change what the cast did or when the next one lands.
    */
   onCast: (() => void) | null = null;
   private currentStats: SpellStatsBySpell[S];

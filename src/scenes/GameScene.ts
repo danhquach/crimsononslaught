@@ -207,6 +207,7 @@ import { EarthShieldSpell } from '../spells/EarthShieldSpell';
 import { EarthSpikeSpell } from '../spells/EarthSpikeSpell';
 import { IceShieldSpell } from '../spells/IceShieldSpell';
 import { LightningSwordSpell } from '../spells/LightningSwordSpell';
+import { OrbitingBodySpell } from '../spells/OrbitingBodySpell';
 import { RollingBoulderSpell } from '../spells/RollingBoulderSpell';
 import { TornadoSpell } from '../spells/TornadoSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
@@ -1093,9 +1094,14 @@ export class GameScene extends Phaser.Scene {
   private createSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
     const spell = this.buildSpell(spellId, stats);
     // The cast cue (CO-102) hangs off the spell's own cast hook: one site for
-    // every spell, and nothing the spell does waits on it.
+    // every spell, and nothing the spell does waits on it. Its own cue since
+    // CO-158, or its element's.
     const cue = castSoundFor(spellId);
-    if (spell && cue) spell.onCast = () => this.audio.play(cue);
+    if (!spell || !cue) return spell;
+    spell.onCast = () => this.audio.play(cue);
+    // An always-on spell never casts, so it cues as it comes up: here on equip,
+    // and a shield again each time it reforms.
+    if (spell instanceof ShieldSpell || spell instanceof OrbitingBodySpell) this.audio.play(cue);
     return spell;
   }
 

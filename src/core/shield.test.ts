@@ -5,6 +5,7 @@ import {
   EMPTY_TALLY,
   isUp,
   rechargePerSecond,
+  reformed,
   tallyShield,
   tickShield,
   type ShieldRule,
@@ -158,6 +159,35 @@ describe('tickShield', () => {
     const before: ShieldState = { pool: 40, waitS: 2 };
     tickShield(before, 1, ICE);
     expect(before).toEqual({ pool: 40, waitS: 2 });
+  });
+});
+
+describe('reformed (CO-158)', () => {
+  it('is true once, on the step a broken shield comes back', () => {
+    const broken = absorb({ pool: 10, waitS: 0 }, 10, ICE).state;
+    let state = broken;
+    let cues = 0;
+    // Delay, reform, then a full refill and a second standing full.
+    for (let i = 0; i < 200; i += 1) {
+      const next = tickShield(state, 0.1, ICE);
+      if (reformed(state, next)) cues += 1;
+      state = next;
+    }
+    expect(state.pool).toBe(ICE.max);
+    expect(cues).toBe(1);
+  });
+
+  it('is false for a dented shield topping up, a full one, and a hit', () => {
+    const dented: ShieldState = { pool: 20, waitS: 0 };
+    const full = createShield(ICE);
+    expect(reformed(dented, tickShield(dented, 1, ICE))).toBe(false);
+    expect(reformed(full, tickShield(full, 1, ICE))).toBe(false);
+    expect(reformed(full, absorb(full, 100, ICE).state)).toBe(false);
+  });
+
+  it('is false while a broken shield is still waiting', () => {
+    const broken: ShieldState = { pool: 0, waitS: 6 };
+    expect(reformed(broken, tickShield(broken, 1, ICE))).toBe(false);
   });
 });
 

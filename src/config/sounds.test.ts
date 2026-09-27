@@ -40,16 +40,36 @@ describe('SOUNDS', () => {
 });
 
 describe('castSoundFor', () => {
-  it('gives every roster spell its element cue', () => {
+  it('gives every roster spell its own cue (CO-158)', () => {
     for (const id of ROSTER_SPELL_IDS) {
       const key = castSoundFor(id);
-      expect(key, id).toBe(`cast.${id.split('_')[0]}`);
-      expect(isSoundKey(key)).toBe(true);
+      expect(key, id).toBe(`cast.${id}`);
+      expect(isSoundKey(key), id).toBe(true);
     }
+    expect(new Set(ROSTER_SPELL_IDS.map(castSoundFor)).size).toBe(ROSTER_SPELL_IDS.length);
+    expect(ROSTER_SPELL_IDS).toHaveLength(20);
+  });
+
+  it('falls back to the element cue for a spell with none of its own', () => {
+    expect(castSoundFor('fire_unknown')).toBe('cast.fire');
+    expect(castSoundFor('earth_new_thing')).toBe('cast.earth');
   });
 
   it('is undefined for an id no element owns', () => {
     expect(castSoundFor('void_bolt')).toBeUndefined();
+    expect(castSoundFor('nope')).toBeUndefined();
+    expect(castSoundFor('')).toBeUndefined();
+  });
+
+  it('never hands a cast cue a non-cast key', () => {
+    expect(castSoundFor('enemy.hurt')).toBeUndefined();
+  });
+
+  it('every cast cue stays capped at a few starts per short window', () => {
+    for (const key of SOUND_KEYS.filter((k) => k.startsWith('cast.'))) {
+      expect(SOUNDS[key].maxConcurrent, key).toBeLessThanOrEqual(2);
+      expect(SOUNDS[key].minGapMs, key).toBeGreaterThanOrEqual(90);
+    }
   });
 });
 
