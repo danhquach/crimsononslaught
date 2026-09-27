@@ -157,6 +157,27 @@ describe('capMagenta', () => {
     capMagenta(clear, 20);
     expect([...clear.data]).toEqual([...MAGENTA, 0]);
   });
+
+  it('with keepPink, leaves pink but still takes the purple off a dark rim', () => {
+    // The ghost's pink, green well over half its red and blue, beside a rim.
+    const art = image(
+      2,
+      1,
+      (x) =>
+        [
+          [236, 138, 177, 255],
+          [145, 36, 126, 255],
+        ][x],
+    );
+    capMagenta(art, 20, true);
+    expect([...art.data]).toEqual([236, 138, 177, 255, 145 - 70, 36, 126 - 70, 255]);
+  });
+
+  it('without keepPink, pulls pink back like any other magenta', () => {
+    const pink = image(1, 1, () => [236, 138, 177, 255]);
+    capMagenta(pink, 20);
+    expect([...pink.data]).toEqual([236 - 19, 138, 177 - 19, 255]);
+  });
 });
 
 describe('capMagentaIndices', () => {
@@ -179,6 +200,14 @@ describe('capMagentaIndices', () => {
     const indices = new Uint8Array([1, 3, 1]);
     capMagentaIndices(img, palette, indices, { x: 1, y: 0, w: 2, h: 1 }, 20);
     expect([...indices]).toEqual([1, 3, 2]);
+  });
+
+  it('with keepPink, leaves a pixel on a pink entry where it is', () => {
+    const pinkPalette = [...palette, [236, 138, 177, 255]];
+    const img = image(1, 1, () => [236, 138, 177, 255]);
+    const indices = new Uint8Array([4]);
+    capMagentaIndices(img, pinkPalette, indices, { x: 0, y: 0, w: 1, h: 1 }, 20, true);
+    expect([...indices]).toEqual([4]);
   });
 });
 
@@ -619,6 +648,18 @@ describe('quantize', () => {
     expect(quantize(img, 8).palette.length).toBeLessThanOrEqual(8);
   });
 
+  it('gives a large flat area its own entry however many noisy colours it shares with', () => {
+    // 64 one-pixel greys (JPEG noise in an outline), a robe of 100 white
+    // pixels, and a little ice blue. Splitting by colour count would spend all
+    // three entries on the greys and fold the robe into the blue (CO-171).
+    const robe = [230, 232, 229, 255];
+    const img = image(174, 1, (x) =>
+      x < 64 ? [x, x, x, 255] : x < 164 ? robe : [180, 210, 255, 255],
+    );
+    const { palette, indices } = quantize(img, 3);
+    expect(palette[indices[100]]).toEqual(robe);
+  });
+
   it('produces the same palette every run, so the atlas stays byte-identical', () => {
     const img = image(16, 16, (x, y) => [x * 16, y * 16, (x * y) % 256, 255]);
     expect(quantize(img, 8)).toEqual(quantize(img, 8));
@@ -667,6 +708,25 @@ describe('expandRow', () => {
     expect(on.frames.every((f) => f.centred)).toBe(true);
     const off = expandRow('ice', [{ anim: 'slow', cols: [1, 2] }], 6);
     expect(off.frames.every((f) => f.centred === false)).toBe(true);
+  });
+
+  it('carries keepPink onto every frame of the segment, and defaults it off', () => {
+    const { frames } = expandRow(
+      'hero',
+      [
+        { anim: 'death', cols: [1, 4] },
+        { anim: 'death', cols: [5, 6], keepPink: true },
+      ],
+      6,
+    );
+    expect(frames.map((f) => [f.name, f.keepPink])).toEqual([
+      ['hero.death.0', false],
+      ['hero.death.1', false],
+      ['hero.death.2', false],
+      ['hero.death.3', false],
+      ['hero.death.4', true],
+      ['hero.death.5', true],
+    ]);
   });
 
   it('rejects a segment outside the grid or one that overlaps another', () => {

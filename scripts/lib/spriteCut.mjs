@@ -226,16 +226,26 @@ export function keyCell(img, rect, key, tol0, tol1) {
  * the stone is, so `softAlpha` keeps it solid and `despill` has no coverage to
  * undo. Taking the excess off red and blue alike keeps the pixel's alpha and
  * its darkness, and art whose own tint stays under `cap` is left alone.
+ *
+ * With `keepPink`, so is pink: a pixel whose green is at least half its red
+ * and blue (CO-171). The hero's ghost is drawn pink, well over any cap the
+ * fringe needs, while the fringe itself has next to no green.
  */
-export function capMagenta(img, cap) {
+export function capMagenta(img, cap, keepPink = false) {
   for (let i = 0; i < img.data.length; i += 4) {
     if (img.data[i + 3] === 0) continue;
+    if (!isMagenta(img.data[i], img.data[i + 1], img.data[i + 2], cap, keepPink)) continue;
     const excess = Math.min(img.data[i], img.data[i + 2]) - img.data[i + 1] - cap;
-    if (excess <= 0) continue;
     img.data[i] -= excess;
     img.data[i + 2] -= excess;
   }
   return img;
+}
+
+/** True when a colour breaks `capMagenta`'s cap, and so would be pulled back. */
+export function isMagenta(r, g, b, cap, keepPink = false) {
+  const low = Math.min(r, b);
+  return low - g > cap && !(keepPink && g * 2 >= low);
 }
 
 /**
@@ -250,8 +260,8 @@ export function capMagenta(img, cap) {
  * entry matches. Matching from the pixel's own colour rather than from that
  * entry is what keeps a dark rim pixel dark.
  */
-export function capMagentaIndices(img, palette, indices, rect, cap) {
-  const over = (c) => c[3] >= 8 && Math.min(c[0], c[2]) - c[1] > cap;
+export function capMagentaIndices(img, palette, indices, rect, cap, keepPink = false) {
+  const over = (c) => c[3] >= 8 && isMagenta(c[0], c[1], c[2], cap, keepPink);
   const nearest = new Map();
   for (let y = rect.y; y < rect.y + rect.h; y += 1) {
     for (let x = rect.x; x < rect.x + rect.w; x += 1) {
@@ -629,6 +639,7 @@ export function expandRow(sheetKey, rowSpecs, cols, startIndex = {}) {
         name: `${sheetKey}.${anim}.${index}`,
         allowEdge: seg.allowEdge ?? [],
         centred: seg.centred ?? false,
+        keepPink: seg.keepPink ?? false,
       });
     }
   }
@@ -666,12 +677,17 @@ export function quantize(img, maxColors = 256) {
   let boxes = [entries];
   while (boxes.length < maxColors) {
     let target = -1;
-    let widest = -1;
+    let bestScore = -1;
+    // Split where the most pixels would sit furthest from their entry, and at
+    // the median pixel rather than the median colour (CO-171). Counting colours
+    // spent the palette on JPEG noise in dark outlines, which has thousands of
+    // distinct values, and left the hero's robe to share an entry with ice.
     boxes.forEach((box, i) => {
       if (box.length < 2) return;
       const [, range] = widestChannel(box);
-      if (range > widest) {
-        widest = range;
+      const score = range * pixelCount(box);
+      if (score > bestScore) {
+        bestScore = score;
         target = i;
       }
     });
@@ -680,7 +696,11 @@ export function quantize(img, maxColors = 256) {
     const box = boxes[target];
     const [channel] = widestChannel(box);
     box.sort((p, q) => p.c[channel] - q.c[channel] || byColour(p, q));
-    const half = Math.floor(box.length / 2);
+    const total = pixelCount(box);
+    let half = 1;
+    for (let seen = box[0].count; half < box.length - 1 && seen * 2 < total; half += 1) {
+      seen += box[half].count;
+    }
     boxes.splice(target, 1, box.slice(0, half), box.slice(half));
   }
 
@@ -718,6 +738,10 @@ export function quantize(img, maxColors = 256) {
   }
 
   return { palette, indices };
+}
+
+function pixelCount(box) {
+  return box.reduce((s, e) => s + e.count, 0);
 }
 
 function byColour(p, q) {

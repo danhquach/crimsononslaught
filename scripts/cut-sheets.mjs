@@ -123,7 +123,7 @@ function cutSheet(sheet) {
     // share one crop. The key is sampled per cell, not per sheet, because
     // hero_states is a different mauve on each row, and sampled inset so a
     // ruled line cannot poison it.
-    const cellOf = (col) => {
+    const cellOf = (col, keepPink = false) => {
       const cell = cells[row * sheet.cols + col];
       const whole = { x: 0, y: 0, w: cell.w, h: cell.h };
       if (opaque) return { cell, keyed: opaqueCell(img, cell), local: whole };
@@ -134,7 +134,7 @@ function cutSheet(sheet) {
       const kept = trimBorderLines(img, cell, key, TOL_KEYED, TOL_SOLID);
       const local = { x: kept.x - cell.x, y: kept.y - cell.y, w: kept.w, h: kept.h };
       const keyed = clearOutside(keyCell(img, cell, key, TOL_KEYED, TOL_SOLID), local);
-      if (sheet.maxMagenta !== undefined) capMagenta(keyed, sheet.maxMagenta);
+      if (sheet.maxMagenta !== undefined) capMagenta(keyed, sheet.maxMagenta, keepPink);
       return { cell, keyed, local };
     };
     const where = (col) => `${sheet.file} row ${row + 1} col ${col + 1}`;
@@ -149,7 +149,7 @@ function cutSheet(sheet) {
     }
 
     for (const f of frames) {
-      const { cell, keyed, local } = cellOf(f.col);
+      const { cell, keyed, local } = cellOf(f.col, f.keepPink);
       const bounds = opaqueBounds(keyed);
       if (!bounds) {
         fail(`${where(f.col)}: declared frame ${f.name} but the cell is empty`);
@@ -236,6 +236,7 @@ function cutSheet(sheet) {
         artW,
         artH,
         maxMagenta: sheet.maxMagenta,
+        keepPink: c.keepPink,
       });
     }
   }
@@ -273,6 +274,7 @@ function writePage(page, frames) {
       indices,
       { x: p.x, y: p.y, w: p.width, h: p.height },
       p.maxMagenta,
+      p.keepPink,
     );
   }
 
