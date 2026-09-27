@@ -18,6 +18,14 @@ except these sourced clips (CO-177):
 | `progress.gem.wav`     | Double-Chime 8-Bit Coin Pickup 13 (`retro-game-coin-13`)         | [SFXMint](https://sfxmint.com/sounds/retro-game-coin-13)            | CC0 1.0 |
 | `progress.levelUp.wav` | Ascending Arpeggio 8-Bit Power-Up 25 (`retro-game-power-up-25`)  | [SFXMint](https://sfxmint.com/sounds/retro-game-power-up-25)        | CC0 1.0 |
 
+The four other fire spells' cast cues (`cast.fire_meteor.wav`,
+`cast.fire_column.wav`, `cast.fire_companion.wav`, `cast.fire_dragon.wav`,
+CO-158) are generated in-repo on top of `cast.fire.wav`: `audio:gen` reads the
+committed cut, replays it faster or slower and mixes synthesized layers over
+it. The CC0 source puts no condition on that; the result is under the
+repository licence like the other generated clips. Re-cutting `cast.fire.wav`
+means running `audio:gen` again.
+
 Regenerating is deterministic: the same recipes write byte-identical files, and
 `audio:gen` never writes the sourced clips. To re-cut those, download each
 original WAV from `https://sfxmint.com/dl/<slug>.wav` into one directory and

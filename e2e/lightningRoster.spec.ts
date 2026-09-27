@@ -7,7 +7,18 @@ import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import { MAX_LIVE_BOLTS } from '../src/core/lightningBolt';
 import { MAX_SEGMENTS } from '../src/spells/ChainLightningSpell';
-import { cardCenter, collectErrors, MIN_FPS, readHud, startFromIntro, waitForScene } from './game';
+import { SOUNDS, castSoundFor } from '../src/config/sounds';
+import {
+  busiestWindow,
+  cardCenter,
+  collectErrors,
+  MIN_FPS,
+  readHud,
+  readSounds,
+  recordSounds,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * #142 in the browser: a Lightning run — Lightning Bolt as the default, Chain
@@ -103,6 +114,9 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
   await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
 
+  // Before the click: the `?loadout=` extras are equipped as the run's scene
+  // is built, and the sword's one cue plays then (CO-158).
+  await recordSounds(page);
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));
   await page.mouse.click(x, y);
   await waitForScene(page, SCENE.game);
@@ -164,6 +178,26 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
     expect(spell, `${id} still equipped at the end`).toBeDefined();
     expect(spell?.hits, `${id} hits landed over the run`).toBeGreaterThan(0);
   }
+
+  // CO-158: each spell asked for its own cast cue, held to its window in this
+  // scaled run. The sword never casts: it asked once, as it was equipped.
+  const log = await readSounds(page);
+  for (const id of [PICKED, ...EXTRA]) {
+    const key = castSoundFor(id);
+    expect(key, `${id} cue`).toBe(`cast.${id}`);
+    if (!key) continue;
+    expect(
+      log.some((r) => r.key === key),
+      `${key} asked for`,
+    ).toBe(true);
+    expect(busiestWindow(log, key), `${key} starts in one window`).toBeLessThanOrEqual(
+      SOUNDS[key].maxConcurrent,
+    );
+  }
+  expect(
+    log.filter((r) => r.key === 'cast.lightning_sword'),
+    'the sword cues once, on equip',
+  ).toHaveLength(1);
 
   const hud = await readHud(page);
   expect(hud.kills, 'kills over the run').toBeGreaterThan(0);

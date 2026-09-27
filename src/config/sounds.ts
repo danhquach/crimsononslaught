@@ -24,6 +24,22 @@ export const SOUND_KEYS = [
   'cast.ice',
   'cast.lightning',
   'cast.earth',
+  'cast.fire_meteor',
+  'cast.fire_column',
+  'cast.fire_companion',
+  'cast.fire_dragon',
+  'cast.ice_nova_bomb',
+  'cast.ice_shield',
+  'cast.ice_companion',
+  'cast.ice_blizzard',
+  'cast.lightning_chain',
+  'cast.lightning_tornado',
+  'cast.lightning_companion',
+  'cast.lightning_sword',
+  'cast.earth_boulder',
+  'cast.earth_shield',
+  'cast.earth_quake',
+  'cast.earth_companion',
   'enemy.hurt',
   'enemy.death',
   'player.hurt',
@@ -88,6 +104,32 @@ export const SOUNDS: Readonly<Record<SoundKey, SoundDef>> = {
   'cast.ice': clip('cast.ice', 0.5, 90, 2),
   'cast.lightning': clip('cast.lightning', 0.45, 90, 2),
   'cast.earth': clip('cast.earth', 0.55, 90, 2),
+  // Every spell has its own cue since CO-158, and a window is per key, so three
+  // spells of one element no longer share one ledger: each plays quieter than
+  // its element's default and takes one start per window. Each window is
+  // shorter than its spell's fastest cast in a 1x run (base cadence at the 0.35
+  // cooldown floor: 0.28 s for a companion, 1.1 s for Meteor), so it only bites
+  // a scaled run; the longest clips take the widest windows so a flood of them
+  // stays under clipping (`scripts/lib/castAudio.test.mjs`).
+  'cast.fire_meteor': clip('cast.fire_meteor', 0.3, 400),
+  'cast.fire_column': clip('cast.fire_column', 0.28, 300),
+  'cast.fire_companion': clip('cast.fire_companion', 0.25, 150),
+  'cast.fire_dragon': clip('cast.fire_dragon', 0.3, 300),
+  'cast.ice_nova_bomb': clip('cast.ice_nova_bomb', 0.4, 120),
+  'cast.ice_companion': clip('cast.ice_companion', 0.35, 150),
+  'cast.ice_blizzard': clip('cast.ice_blizzard', 0.4, 400),
+  'cast.lightning_chain': clip('cast.lightning_chain', 0.4, 120),
+  'cast.lightning_tornado': clip('cast.lightning_tornado', 0.4, 400),
+  'cast.lightning_companion': clip('cast.lightning_companion', 0.35, 150),
+  'cast.earth_boulder': clip('cast.earth_boulder', 0.45, 200),
+  'cast.earth_quake': clip('cast.earth_quake', 0.5, 400),
+  'cast.earth_companion': clip('cast.earth_companion', 0.4, 150),
+  // Always-on spells cue when they come up: on equip, and a shield again each
+  // time it reforms from empty. An equip lands on the frame `progress.perk`
+  // plays, so these sit under it.
+  'cast.ice_shield': clip('cast.ice_shield', 0.35, 200),
+  'cast.lightning_sword': clip('cast.lightning_sword', 0.35, 200),
+  'cast.earth_shield': clip('cast.earth_shield', 0.4, 200),
   'enemy.hurt': clip('enemy.hurt', 0.35, 80, 3),
   // The sourced hit (CO-177) rings twice as long as the old blip: two starts
   // per window, not three, keep a wave of deaths under clipping.
@@ -156,22 +198,16 @@ export function consumableSoundFor(kind: ConsumableKind): SoundKey {
 }
 
 /**
- * The cast cue for a spell: its element's. Roster ids are `<element>` or
+ * The cast cue for a spell: its own, `cast.<spellId>` (CO-158), or its
+ * element's when it has none, so a spell added to the roster without a clip is
+ * never silent. A default spell keeps its element's id, so `cast.fire` is both
+ * Fire Bolt's cue and the fire fallback. Roster ids are `<element>` or
  * `<element>_<name>` (Phase 2 spec §3), so the prefix is the element.
  * `undefined` for an id no element owns, which then casts silently.
  */
 export function castSoundFor(spellId: string): SoundKey | undefined {
-  const element = spellId.split('_')[0];
-  switch (element) {
-    case 'fire':
-      return 'cast.fire';
-    case 'ice':
-      return 'cast.ice';
-    case 'lightning':
-      return 'cast.lightning';
-    case 'earth':
-      return 'cast.earth';
-    default:
-      return undefined;
-  }
+  const own = `cast.${spellId}`;
+  if (isSoundKey(own)) return own;
+  const element = `cast.${spellId.split('_')[0]}`;
+  return isSoundKey(element) ? element : undefined;
 }

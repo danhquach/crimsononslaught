@@ -6,6 +6,8 @@ import {
   mix,
   noise,
   normalize,
+  readWav,
+  resample,
   samplesFor,
   sweep,
   wavBytes,
@@ -53,5 +55,26 @@ describe('synth', () => {
     expect(view.getUint32(40, true)).toBe(6);
     expect(view.getInt16(46, true)).toBe(32767);
     expect(view.getInt16(48, true)).toBe(-32767);
+  });
+
+  it('readWav reads back what wavBytes wrote, and refuses anything else', () => {
+    const clip = [0, 0.5, -0.25, 1, -1];
+    const back = readWav(wavBytes(clip));
+    expect(back).toHaveLength(clip.length);
+    for (const [i, s] of clip.entries()) expect(back[i]).toBeCloseTo(s, 4);
+    expect(() => readWav(new Uint8Array(10))).toThrow();
+    const stereo = wavBytes(clip);
+    new DataView(stereo.buffer).setUint16(22, 2, true);
+    expect(() => readWav(stereo)).toThrow();
+  });
+
+  it('resample speeds a clip up or slows it down by the ratio, interpolating', () => {
+    const ramp = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    expect(resample(ramp, 1)).toEqual(ramp);
+    expect(resample(ramp, 2)).toEqual([0, 2, 4, 6, 8]);
+    expect(resample(ramp, 0.5)).toHaveLength(17);
+    expect(resample(ramp, 0.5)[3]).toBe(1.5);
+    expect(resample([], 2)).toEqual([]);
+    expect(resample(ramp, 0)).toEqual([]);
   });
 });

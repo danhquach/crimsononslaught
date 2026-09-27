@@ -6,6 +6,7 @@ import {
   createShield,
   EMPTY_TALLY,
   isUp,
+  reformed,
   tallyShield,
   tickShield,
   type ShieldRule,
@@ -96,8 +97,12 @@ export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
 
   protected override tick(deltaS: number): void {
     const next = tickShield(this.state, deltaS, this.rule);
+    const cameUp = reformed(this.state, next);
     this.tallied = tallyShield(this.tallied, this.state, next);
     this.state = next;
+    // The shield's cast cue (CO-158): it has no cast, so it cues as it comes
+    // back from empty. `GameScene` plays the one on equip.
+    if (cameUp) this.onCast?.();
   }
 
   /** Never called: a shield has no cooldown, it is simply up or recharging. */

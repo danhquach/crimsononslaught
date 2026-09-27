@@ -117,3 +117,44 @@ export function wavBytes(samples, rate = SAMPLE_RATE) {
   }
   return new Uint8Array(buffer);
 }
+
+/**
+ * The samples of a 16-bit mono PCM WAV as `wavBytes` writes it (44-byte
+ * header, `data` straight after `fmt `), in [-1, 1]. What lets a recipe build
+ * on a clip already in the repo (CO-158); anything else throws.
+ */
+export function readWav(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const ascii = (offset) =>
+    String.fromCharCode(...[0, 1, 2, 3].map((i) => view.getUint8(offset + i)));
+  if (
+    bytes.byteLength < 44 ||
+    ascii(0) !== 'RIFF' ||
+    ascii(36) !== 'data' ||
+    view.getUint16(22, true) !== 1 ||
+    view.getUint16(34, true) !== 16
+  ) {
+    throw new Error('not a 16-bit mono WAV with a 44-byte header');
+  }
+  const n = Math.floor(Math.min(view.getUint32(40, true), bytes.byteLength - 44) / 2);
+  const out = new Array(n);
+  for (let i = 0; i < n; i += 1) out[i] = view.getInt16(44 + i * 2, true) / 32767;
+  return out;
+}
+
+/**
+ * Play a clip `ratio` times as fast, tape-style: above 1 it is shorter and
+ * higher, below 1 longer and lower. Linear interpolation between samples.
+ */
+export function resample(samples, ratio) {
+  if (!(ratio > 0) || samples.length === 0) return [];
+  const n = Math.max(1, Math.floor((samples.length - 1) / ratio) + 1);
+  const out = new Array(n);
+  for (let i = 0; i < n; i += 1) {
+    const at = i * ratio;
+    const lo = Math.floor(at);
+    const hi = Math.min(samples.length - 1, lo + 1);
+    out[i] = samples[lo] + (samples[hi] - samples[lo]) * (at - lo);
+  }
+  return out;
+}

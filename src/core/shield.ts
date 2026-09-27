@@ -58,6 +58,16 @@ export function isUp(state: Readonly<ShieldState>): boolean {
 }
 
 /**
+ * Whether one step took the shield from broken to standing: what plays its
+ * "came up" cue (CO-158). Only a step that starts at an empty pool counts, so a
+ * shield topping up a dented pool, or standing full, never cues. It reads the
+ * two states and changes neither, so asking cannot move the run.
+ */
+export function reformed(before: Readonly<ShieldState>, after: Readonly<ShieldState>): boolean {
+  return !isUp(before) && isUp(after);
+}
+
+/**
  * Points the pool regains per second while it is recharging. A rule with no
  * pool or no delay never recharges rather than dividing by zero; such a config
  * is caught at boot (spec §12).
