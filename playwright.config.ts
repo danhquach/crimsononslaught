@@ -10,6 +10,9 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const PORT = 5177;
 
+/** Not a real key: the e2e server's feedback form posts to a routed URL. */
+export const E2E_FEEDBACK_KEY = 'e2e-not-a-real-key';
+
 export default defineConfig({
   testDir: 'e2e',
   // A smoke test waits 10 s of real time on top of boot; give it room.
@@ -41,5 +44,8 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
     timeout: 60_000,
+    // A stand-in feedback key (#226), so the Help screen's form is available;
+    // the suite routes the service's URL and never sends to it.
+    env: { VITE_FEEDBACK_ACCESS_KEY: E2E_FEEDBACK_KEY },
   },
 });

@@ -17,6 +17,7 @@ export const SCENE = {
   intro: 'Intro',
   settings: 'Settings',
   profile: 'Profile',
+  help: 'Help',
   spellSelect: 'SpellSelect',
   game: 'Game',
   hud: 'Hud',
@@ -94,6 +95,16 @@ export interface PausePayload {
   confirm?: ConfirmAction;
 }
 
+/** What the Help screen shows (#226): a tab, or the About tab's feedback form. */
+export const HELP_VIEWS = ['pickups', 'about', 'feedback'] as const;
+
+export type HelpView = (typeof HELP_VIEWS)[number];
+
+/** `Intro -> Help`, and Help restarting itself on another view. Left out, Help opens on Pickups. */
+export interface HelpPayload {
+  view: HelpView;
+}
+
 /** `ended`: the player ended the run from the pause screen (#252), keeping what it earned. */
 export type Outcome = 'win' | 'lose' | 'ended';
 
@@ -156,6 +167,10 @@ export function isPausePayload(data: unknown): data is PausePayload {
     isPauseView(data.view) &&
     (data.confirm === undefined || (isPauseAction(data.confirm) && data.confirm !== 'resume'))
   );
+}
+
+export function isHelpPayload(data: unknown): data is HelpPayload {
+  return isRecord(data) && (HELP_VIEWS as readonly unknown[]).includes(data.view);
 }
 
 export function isRunStats(data: unknown): data is RunStats {

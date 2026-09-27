@@ -26,6 +26,10 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+        env:
+          # The Help screen's feedback form (#226). Public by design once it is in
+          # the bundle; empty on a fork's PR, where the form says it is unavailable.
+          VITE_FEEDBACK_ACCESS_KEY: ${{ secrets.FEEDBACK_ACCESS_KEY }}
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Browser smoke tests
