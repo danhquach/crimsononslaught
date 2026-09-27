@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { CollisionDebugScene } from './scenes/CollisionDebugScene';
 import { GameScene } from './scenes/GameScene';
+import { HelpScene } from './scenes/HelpScene';
 import { HudScene } from './scenes/HudScene';
 import { IntroScene } from './scenes/IntroScene';
 import { LevelUpScene } from './scenes/LevelUpScene';
@@ -40,20 +41,22 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     gamepad: true,
   },
-  // A container for real DOM elements over the canvas: Profile's name field
-  // (CO-165) is an `<input>`, so a touch player gets a soft keyboard, and
-  // typing gets a caret, selection and paste. The container ignores the
-  // pointer, so clicks still reach the canvas.
+  // A container for real DOM elements over the canvas: the Help screen's
+  // feedback form (#226) and Profile's name field (CO-165) are real inputs, so
+  // a touch player gets a soft keyboard, and typing gets a caret, selection
+  // and paste. The container ignores the pointer, so clicks still reach the
+  // canvas.
   dom: {
     createContainer: true,
   },
   // Flow: Boot -> Intro -> SpellSelect -> Game (+ Hud overlay, LevelUp overlay on level-up, Pause overlay on Esc / Start) -> Result -> SpellSelect.
-  // Intro <-> Settings and Intro <-> Profile are its panels (#121); SpellSelect <-> Upgrades is the meta loop (CO-101).
+  // Intro <-> Settings, Intro <-> Profile (#121) and Intro <-> Help (#226) are its panels; SpellSelect <-> Upgrades is the meta loop (CO-101).
   scene: [
     BootScene,
     IntroScene,
     SettingsScene,
     ProfileScene,
+    HelpScene,
     SpellSelectScene,
     UpgradesScene,
     GameScene,

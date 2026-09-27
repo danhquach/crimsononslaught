@@ -58,7 +58,8 @@ async function saves(page: Page): Promise<{ registry: Save; stored: Save | null 
 async function openProfile(page: Page): Promise<void> {
   await waitForScene(page, SCENE.intro);
   await page.keyboard.press('ArrowUp'); // reveals Start
-  await page.keyboard.press('ArrowUp'); // wraps to Profile
+  await page.keyboard.press('ArrowUp'); // wraps to Help
+  await page.keyboard.press('ArrowUp'); // Profile
   await page.keyboard.press('Enter');
   await waitForScene(page, SCENE.profile);
 }

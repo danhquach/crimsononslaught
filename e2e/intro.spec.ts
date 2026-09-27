@@ -11,11 +11,11 @@ import { cardCenter, collectErrors, sceneTexts, startFromIntro, waitForScene } f
  * The front door (#121): boot lands on Intro; Start Game leads to the same run
  * SpellSelect always started; Settings and Profile open and come back; mouse,
  * keyboard and a gamepad all drive the menus. Button positions mirror
- * `IntroScene` (entries 68 px apart from y = 280) and `SettingsScene` (rows
+ * `IntroScene` (entries 58 px apart from y = 240, #226) and `SettingsScene` (rows
  * 58 px apart from y = 140, switches 120 px right of centre).
  */
 
-const INTRO_ENTRY = { start: { x: 480, y: 280 }, settings: { x: 480, y: 348 } } as const;
+const INTRO_ENTRY = { start: { x: 480, y: 240 }, settings: { x: 480, y: 298 } } as const;
 const SHAKE_SWITCH = { x: 600, y: 140 + 4 * 58 };
 
 /** Seed storage on an empty store only, so what the game writes survives a reload. */
@@ -55,7 +55,7 @@ test('boots to Intro, and Start Game plays the run SpellSelect always started', 
   await page.goto('/?seed=7');
   await waitForScene(page, SCENE.intro);
   expect(await sceneTexts(page, SCENE.intro)).toEqual(
-    expect.arrayContaining(['Crimson Onslaught', 'Start Game', 'Settings', 'Profile']),
+    expect.arrayContaining(['Crimson Onslaught', 'Start Game', 'Settings', 'Profile', 'Help']),
   );
 
   await page.mouse.click(INTRO_ENTRY.start.x, INTRO_ENTRY.start.y);
@@ -110,7 +110,8 @@ test('Profile says so before the first run', async ({ page }) => {
   await page.goto('/?seed=1');
   await waitForScene(page, SCENE.intro);
   await page.keyboard.press('ArrowUp'); // reveals Start
-  await page.keyboard.press('ArrowUp'); // wraps to Profile
+  await page.keyboard.press('ArrowUp'); // wraps to Help
+  await page.keyboard.press('ArrowUp'); // Profile
   await page.keyboard.press('Enter');
   await waitForScene(page, SCENE.profile);
   expect(await sceneTexts(page, SCENE.profile)).toContain('No runs recorded yet.');

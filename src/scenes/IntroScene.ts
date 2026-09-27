@@ -4,15 +4,16 @@ import { audioOf } from '../render/audio';
 import { attachMenuInput } from './input';
 import { addTextButton, textButtonItem } from './ui';
 
-const MENU_TOP = 280;
-const MENU_GAP = 68;
+// Four entries (#226) end above the save-reset notice at `height - 72`.
+const MENU_TOP = 240;
+const MENU_GAP = 58;
 const BUTTON_WIDTH = 280;
 
 /**
- * The front door (#121): the title and a three-entry menu. Start Game goes to
+ * The front door (#121): the title and a four-entry menu. Start Game goes to
  * SpellSelect, which starts the run exactly as it did when it was the first
- * screen — the seed is Boot's, read from the registry there. Settings and
- * Profile are panels that come back here.
+ * screen — the seed is Boot's, read from the registry there. Settings,
+ * Profile and Help (#226) are panels that come back here.
  *
  * Click, arrow keys and Enter, or a gamepad all drive the menu; Enter with
  * nothing highlighted starts a game. A save Boot had to reset is announced
@@ -41,6 +42,7 @@ export class IntroScene extends Phaser.Scene {
       ['Start Game', SCENE.spellSelect],
       ['Settings', SCENE.settings],
       ['Profile', SCENE.profile],
+      ['Help', SCENE.help],
     ];
     const items = entries.map(([label, scene], i) => {
       const go = (): void => this.go(scene);

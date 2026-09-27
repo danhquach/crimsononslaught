@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  HELP_VIEWS,
   isGamePayload,
+  isHelpPayload,
   isLevelUpPayload,
   isPausePayload,
   isResultPayload,
@@ -66,6 +68,18 @@ describe('isRunStats', () => {
     expect(isRunStats({ ...stats, embers: '17' })).toBe(false);
     expect(isRunStats({ ...stats, consumables: null })).toBe(false);
     expect(isRunStats({ ...stats, relics: NaN })).toBe(false);
+  });
+});
+
+describe('isHelpPayload', () => {
+  it('accepts every Help view', () => {
+    for (const view of HELP_VIEWS) expect(isHelpPayload({ view }), view).toBe(true);
+  });
+
+  it('rejects a missing or unknown view', () => {
+    expect(isHelpPayload(undefined)).toBe(false);
+    expect(isHelpPayload({})).toBe(false);
+    expect(isHelpPayload({ view: 'spells' })).toBe(false);
   });
 });
 
