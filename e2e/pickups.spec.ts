@@ -1,10 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 import { MAX_LIVE_PICKUPS, RELIC_COUNT } from '../src/config/pickups';
+import { SOUNDS } from '../src/config/sounds';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
-import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
+import {
+  busiestWindow,
+  cardCenter,
+  collectErrors,
+  readSounds,
+  recordSounds,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * #195 in the browser: the relics are on the floor when the run starts, and
@@ -73,6 +82,7 @@ test('relics lie in the arena at start and collected Embers count up on the HUD'
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));
   await page.mouse.click(x, y);
   await waitForScene(page, SCENE.game);
+  await recordSounds(page);
 
   const first = await sample(page);
   expect(first?.report.live.relic, 'relics on the floor at start').toBe(RELIC_COUNT);
@@ -110,5 +120,14 @@ test('relics lie in the arena at start and collected Embers count up on the HUD'
   expect(trace.map((t) => t.report.drops)).toEqual(floor);
   // Nobody steers, so the player never walks the 400 px out to a relic.
   expect(last?.report.live.relic).toBe(RELIC_COUNT);
+
+  // CO-159: the Embers collected asked for their cue, capped per window, and
+  // the relics nobody touched asked for none.
+  const log = await readSounds(page);
+  expect(log.filter((r) => r.key === 'pickup.ember').length, 'Ember cues').toBeGreaterThan(0);
+  expect(busiestWindow(log, 'pickup.ember'), 'Ember starts in one window').toBeLessThanOrEqual(
+    SOUNDS['pickup.ember'].maxConcurrent,
+  );
+  expect(log.filter((r) => r.key === 'pickup.relic')).toEqual([]);
   expect(errors).toEqual([]);
 });

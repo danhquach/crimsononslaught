@@ -11,7 +11,15 @@ import type { Player } from '../src/entities/Player';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { LevelUpScene } from '../src/scenes/LevelUpScene';
 import type { PickupPool } from '../src/systems/PickupPool';
-import { cardCenter, collectErrors, sceneTexts, startFromIntro, waitForScene } from './game';
+import {
+  cardCenter,
+  collectErrors,
+  readSounds,
+  recordSounds,
+  sceneTexts,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * #227 in the browser: touching a relic pauses the run under the level-up
@@ -90,6 +98,7 @@ test('touching a relic offers 3 relic cards, and a buff pick changes the stat', 
 }) => {
   const errors = collectErrors(page);
   await startRun(page);
+  await recordSounds(page);
 
   // Put the player on the nearest relic.
   await page.evaluate(async (key) => {
@@ -116,6 +125,9 @@ test('touching a relic offers 3 relic cards, and a buff pick changes the stat', 
   expect(offer.report.live.relic, 'the relic left the floor').toBe(RELIC_COUNT - 1);
   const texts = await sceneTexts(page, SCENE.levelUp);
   expect(texts).toContain('Relic found!');
+  // CO-159: the touch asked for the relic's own cue.
+  const relicCues = (await readSounds(page)).filter((r) => r.key === 'pickup.relic');
+  expect(relicCues, 'relic cues').toHaveLength(1);
 
   const at = offer.cards.findIndex((card) => card.kind === 'relic');
   const buff = relicBuffById(offer.cards[at]?.id ?? '');

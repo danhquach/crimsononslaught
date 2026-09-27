@@ -4,7 +4,15 @@ import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import {
+  cardCenter,
+  collectErrors,
+  readHud,
+  readSounds,
+  recordSounds,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * #134 in the browser: a run carrying both shields, equipped through the
@@ -101,6 +109,7 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));
   await page.mouse.click(x, y);
   await waitForScene(page, SCENE.game);
+  await recordSounds(page);
 
   const equipped = await page.evaluate(async (gameKey) => {
     const { game } = await import('/src/main.ts');
@@ -145,6 +154,17 @@ test('shields soak real contact damage and grow back over a run', async ({ page 
   expect(last?.absorbed, 'damage the pools absorbed').toBeGreaterThan(0);
   // And the pools grew back, by a recharge or a broken shield returning.
   expect(last?.regrown, `pool never regrew across ${trace.length} samples`).toBeGreaterThan(0);
+
+  // CO-159: the pools asked for their hit cue, and for a break once one fell.
+  // A hit they soaked whole cost no HP, so its step asked for no hurt cue.
+  const log = await readSounds(page);
+  const firstHit = log.findIndex((r) => r.key === 'shield.hit');
+  const firstBreak = log.findIndex((r) => r.key === 'shield.break');
+  expect(firstHit, 'a shield hit cue').toBeGreaterThanOrEqual(0);
+  expect(firstBreak, 'a shield break cue').toBeGreaterThan(firstHit);
+  const hurtFrames = new Set(log.filter((r) => r.key === 'player.hurt').map((r) => r.frame));
+  const soakedFrames = log.filter((r) => r.key === 'shield.hit' && !hurtFrames.has(r.frame));
+  expect(soakedFrames.length, 'steps with a soaked hit and no hurt cue').toBeGreaterThan(0);
 
   // The HUD was told, and by the run's own numbers — it never reads GameScene.
   for (const [i, s] of trace.entries()) {

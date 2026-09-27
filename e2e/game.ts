@@ -1,7 +1,9 @@
 import { expect, type Page } from '@playwright/test';
+import { SOUNDS, type SoundKey } from '../src/config/sounds';
 import { SPELL_IDS } from '../src/config/spells';
 import type { HudModel } from '../src/core/hudModel';
-import { SCENE } from '../src/core/scenePayloads';
+import { AUDIO_REGISTRY_KEY, SCENE } from '../src/core/scenePayloads';
+import type { Audio } from '../src/render/audio';
 import type { HudScene } from '../src/scenes/HudScene';
 
 /**
@@ -106,4 +108,56 @@ export function sceneTexts(page: Page, key: string): Promise<string[]> {
       .children.list.filter((child) => child.type === 'Text')
       .map((child) => (child as unknown as { text: string }).text);
   }, key);
+}
+
+/** One cue the game asked `Audio` for, as `recordSounds` logs it. */
+export interface SoundRequest {
+  key: SoundKey;
+  /** Whether a sound started: the dedupe window, mute and a locked context all drop one. */
+  started: boolean;
+  atMs: number;
+  /** `game.loop.frame` at the request, so cues from one step can be told apart. */
+  frame: number;
+}
+
+/**
+ * Log every cue the game asks for from here on (CO-159) by wrapping `play` on
+ * the one `Audio` in the registry, which every scene shares. Idempotent.
+ */
+export async function recordSounds(page: Page): Promise<void> {
+  await page.evaluate(async (registryKey) => {
+    const { game } = await import('/src/main.ts');
+    const audio = game.registry.get(registryKey) as Audio & { soundLog?: SoundRequest[] };
+    if (audio.soundLog) return;
+    const log: SoundRequest[] = [];
+    audio.soundLog = log;
+    const play = audio.play.bind(audio);
+    audio.play = (key) => {
+      const started = play(key);
+      log.push({ key, started, atMs: performance.now(), frame: game.loop.frame });
+      return started;
+    };
+  }, AUDIO_REGISTRY_KEY);
+}
+
+/** Everything `recordSounds` has logged so far, oldest first. */
+export function readSounds(page: Page): Promise<SoundRequest[]> {
+  return page.evaluate(async (registryKey) => {
+    const { game } = await import('/src/main.ts');
+    const audio = game.registry.get(registryKey) as Audio & { soundLog?: SoundRequest[] };
+    return [...(audio.soundLog ?? [])];
+  }, AUDIO_REGISTRY_KEY);
+}
+
+/**
+ * The most starts of `key` that any one of its dedupe windows held. Windows
+ * are measured 1 ms short, since the log's clock is read just after `Audio`'s.
+ */
+export function busiestWindow(log: readonly SoundRequest[], key: SoundKey): number {
+  const starts = log.filter((r) => r.key === key && r.started).map((r) => r.atMs);
+  const window = SOUNDS[key].minGapMs - 1;
+  return Math.max(
+    0,
+    ...starts.map((at) => starts.filter((t) => t >= at && t - at < window).length),
+  );
 }

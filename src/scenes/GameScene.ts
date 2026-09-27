@@ -23,7 +23,7 @@ import {
 import { watchStartButton, type StartButtonWatch } from './input';
 import { artFrame } from '../core/animation';
 import { BOSS_EVENT, type BossPhasePayload } from '../core/boss';
-import { LOW_HEALTH_RATIO, castSoundFor } from '../config/sounds';
+import { LOW_HEALTH_RATIO, castSoundFor, consumableSoundFor } from '../config/sounds';
 import { hasFrameArt } from '../render/atlas';
 import { audioOf, type Audio } from '../render/audio';
 import {
@@ -1441,12 +1441,17 @@ export class GameScene extends Phaser.Scene {
    * Each shield takes what it can in equip order, so a run carrying two of them
    * — only the `?loadout=` hook can, an element owns one — spends the first
    * before the second rather than splitting the hit between them.
+   *
+   * A shield that was up plays its hit, or its break if this hit took it down
+   * (CO-159). The cue reads `up` either side of the hit and changes nothing.
    */
   private absorbOnShields(amount: number): number {
     let left = amount;
     for (const shield of this.shieldSpells()) {
       if (left <= 0) break;
+      const wasUp = shield.up;
       left = shield.absorbDamage(left);
+      if (wasUp) this.audio.play(shield.up ? 'shield.hit' : 'shield.break');
     }
     return left;
   }
@@ -1470,10 +1475,13 @@ export class GameScene extends Phaser.Scene {
     const collected = this.pickups.collect(pickup);
     if (!collected) return;
     if (collected.kind === 'ember') {
+      this.audio.play('pickup.ember');
       this.run.addEmbers(collected.value);
     } else if (collected.kind === 'consumable') {
+      this.audio.play(consumableSoundFor(collected.consumable));
       this.onConsumable(collected.consumable);
     } else {
+      this.audio.play('pickup.relic');
       this.onRelic();
     }
   }
@@ -1490,6 +1498,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'magnet':
         this.magnetMsLeft = MAGNET_DURATION_MS;
+        this.audio.play('pickup.magnetPull');
         break;
       case 'bomb':
         this.detonateBomb();
@@ -1511,6 +1520,7 @@ export class GameScene extends Phaser.Scene {
    * spared: a screen clear is not a boss kill.
    */
   private detonateBomb(): void {
+    this.audio.play('pickup.bombBlast');
     for (const enemy of this.bombTargets()) this.damageEnemy(enemy, BOMB_DAMAGE, 'tick');
     this.shakeFor('explosion');
   }

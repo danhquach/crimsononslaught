@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ROSTER_SPELL_IDS } from './loadout';
+import { CONSUMABLE_KINDS } from './pickups';
 import {
   AUDIO_DIR,
   AUDIO_SETTING_KEYS,
@@ -8,6 +9,7 @@ import {
   SOUNDS,
   SOUND_KEYS,
   castSoundFor,
+  consumableSoundFor,
   isSoundKey,
 } from './sounds';
 
@@ -48,6 +50,32 @@ describe('castSoundFor', () => {
 
   it('is undefined for an id no element owns', () => {
     expect(castSoundFor('void_bolt')).toBeUndefined();
+  });
+});
+
+describe('consumableSoundFor', () => {
+  it('gives every consumable its own pickup cue', () => {
+    const keys = CONSUMABLE_KINDS.map(consumableSoundFor);
+    for (const [i, kind] of CONSUMABLE_KINDS.entries()) {
+      expect(keys[i], kind).toBe(`pickup.${kind}`);
+      expect(isSoundKey(keys[i]), kind).toBe(true);
+    }
+    expect(new Set(keys).size).toBe(CONSUMABLE_KINDS.length);
+  });
+});
+
+describe('pickup and shield cues (CO-159)', () => {
+  it('a shield hit is its own clip, not the player hurt one', () => {
+    expect(SOUNDS['shield.hit'].files).not.toEqual(SOUNDS['player.hurt'].files);
+  });
+
+  it('burst-prone pickups stay capped at a few starts per short window', () => {
+    for (const key of ['progress.gem', 'pickup.ember', 'shield.hit'] as const) {
+      expect(SOUNDS[key].maxConcurrent, key).toBeLessThanOrEqual(2);
+      expect(SOUNDS[key].minGapMs, key).toBeGreaterThanOrEqual(60);
+    }
+    for (const key of ['pickup.magnetPull', 'pickup.bombBlast', 'shield.break'] as const)
+      expect(SOUNDS[key].maxConcurrent, key).toBe(1);
   });
 });
 
