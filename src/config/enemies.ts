@@ -16,6 +16,7 @@ export const ENEMY_TYPES = [
   'exploder',
   'splitter',
   'splitling',
+  'shielded',
 ] as const;
 
 export type EnemyType = (typeof ENEMY_TYPES)[number];
@@ -60,7 +61,25 @@ export const ENEMY_ARCHETYPES: Readonly<Record<EnemyType, EnemyArchetype>> = {
     texture: 'enemy_splitling',
     loot: false,
   },
+  // #126: slow and sturdy, and a shield in front takes most of what hits it there (`SHIELD_GUARD`).
+  shielded: { hp: 30, speed: 55, contactDamage: 8, radius: 14, texture: 'enemy_shielded' },
 };
+
+/**
+ * #126: how a shielded enemy fights. A hit arriving within `arcDeg / 2` of the
+ * way it faces lands on the shield and deals `factor` of its damage; from the
+ * flank or behind it lands in full, as does a burn or bleed, which has no
+ * direction. It walks the way it faces and turns at most `turnRateDeg` per
+ * second, slower than a player walking round it can circle, so the player can
+ * always get behind it.
+ */
+export interface ShieldGuard {
+  arcDeg: number;
+  factor: number;
+  turnRateDeg: number;
+}
+
+export const SHIELD_GUARD: Readonly<ShieldGuard> = { arcDeg: 120, factor: 0.25, turnRateDeg: 30 };
 
 /**
  * #126: an exploder detonates when it touches the player or when it dies,

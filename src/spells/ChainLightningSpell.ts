@@ -136,13 +136,17 @@ export class ChainLightningSpell extends Spell<'lightning_chain'> {
       }
     }
     for (const bolt of bolts) {
+      // Each link strikes from the one before it; the first from the caster.
+      let from: Readonly<Vec2> = { x: this.caster.x, y: this.caster.y };
       for (const { target, damage } of bolt) {
+        const at = { x: target.x, y: target.y };
         this.landed += 1;
         // Status before damage, so a killing bolt has still marked the enemy
         // while it was there; the stun roll draws once per enemy struck.
         target.applyStagger(stats.staggerDuration);
         if (rollStun(this.rng, stats.stunChance)) target.applyStun(stats.stunDuration);
-        this.damage(target, damage);
+        this.damage(target, damage, 'hit', from);
+        from = at;
       }
     }
   }

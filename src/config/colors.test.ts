@@ -14,6 +14,8 @@ const SPEC_KEYS = [
   'enemy_exploder',
   'enemy_splitter',
   'enemy_splitling',
+  // #126: the shielded enemy.
+  'enemy_shielded',
   'boss',
   'gem',
   'proj_fire',

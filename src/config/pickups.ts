@@ -38,6 +38,8 @@ export const EMBER_DROPS: Readonly<Record<EnemyType, EmberDrop>> = {
   splitter: { chance: 0.5, value: 1 },
   // Drops nothing (`loot: false`); the row is here because every type has one.
   splitling: { chance: 0, value: 1 },
+  // #126: sturdy and slow to kill head-on, so it pays like a splitter.
+  shielded: { chance: 0.5, value: 1 },
 };
 
 /** Spec §4: the boss pays this on the killing blow, credited to the run rather than dropped. */

@@ -129,7 +129,7 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
       if (!enemy.active) continue;
       this.landed += 1;
       enemy.applyFrost(bombFrost(stats, this.rng));
-      this.damage(enemy, stats.damage);
+      this.damage(enemy, stats.damage, 'hit', origin);
     }
     this.fx.burst('ice.nova', origin.x, origin.y, { scale: novaScale(stats.radius) });
   }

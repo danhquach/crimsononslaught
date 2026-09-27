@@ -5,6 +5,7 @@ import {
   ENEMY_ARCHETYPES,
   ENEMY_TYPES,
   MAX_LIVE_ENEMIES,
+  SHIELD_GUARD,
   isEnemyType,
 } from './enemies';
 
@@ -18,6 +19,7 @@ describe('enemy types', () => {
       'exploder',
       'splitter',
       'splitling',
+      'shielded',
     ]);
   });
 
@@ -85,6 +87,14 @@ describe('enemy archetypes', () => {
       texture: 'enemy_splitling',
       loot: false,
     });
+    expect(ENEMY_ARCHETYPES.shielded).toEqual({
+      hp: 30,
+      speed: 55,
+      contactDamage: 8,
+      radius: 14,
+      texture: 'enemy_shielded',
+    });
+    expect(SHIELD_GUARD).toEqual({ arcDeg: 120, factor: 0.25, turnRateDeg: 30 });
   });
 
   it('drops loot from every type but the splitter’s child (#126)', () => {

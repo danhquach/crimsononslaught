@@ -16,6 +16,7 @@ export const TEXTURE_KEYS = [
   'enemy_exploder',
   'enemy_splitter',
   'enemy_splitling',
+  'enemy_shielded',
   'boss',
   'gem',
   'proj_fire',
@@ -64,6 +65,8 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   enemy_exploder: { shape: 'triangle', color: 0xffca28, width: 22, height: 22 },
   enemy_splitter: { shape: 'circle', color: 0x827717, width: 30, height: 30 },
   enemy_splitling: { shape: 'circle', color: 0xafb42b, width: 13, height: 13 },
+  // #126: a bronze block, smaller than the tank's, for the shield it walks behind.
+  enemy_shielded: { shape: 'rect', color: 0xc8923a, width: 26, height: 26 },
   boss: { shape: 'ring', color: 0x9c27b0, width: 80, height: 80, thickness: 10 },
   gem: { shape: 'diamond', color: 0x69f0ae, width: 12, height: 16 },
   proj_fire: { shape: 'circle', color: 0xff6d00, width: 12, height: 12 },

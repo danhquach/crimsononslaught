@@ -30,8 +30,9 @@ issues under the **Phase 1** milestone.
   area, crit, survivability — for the rest of the run.
 - Enemy archetypes on a time-based spawn schedule: swarm, fast and tank, then
   ranged enemies from 6:00 that keep their distance and shoot, exploders from
-  8:00 that blow up on the player, and splitters from 10:00 that burst into
-  three splitlings.
+  8:00 that blow up on the player, splitters from 10:00 that burst into
+  three splitlings, and shielded enemies from 12:00 that block hits on their
+  front and turn too slowly to stop a player getting behind them.
 - Seeded runs: `?seed=<n>` reproduces a run exactly; `?timeScale=<n>` speeds
   it up for testing; `?invulnerable=1` drops every hit so an unattended run
   reaches the boss; `?enemies=ranged,tank` lets only those types spawn.

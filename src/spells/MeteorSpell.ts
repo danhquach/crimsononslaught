@@ -218,7 +218,7 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
       const dealt = strike.blast * blastFalloff(distance, radius, strike.edgeFactor);
       this.struck += 1;
       this.recordSpread(distance <= radius / 2, dealt);
-      this.damage(enemy, dealt);
+      this.damage(enemy, dealt, 'hit', telegraph);
     }
     const pond = createArea(telegraph, {
       radius: strike.pondRadius,
@@ -235,7 +235,7 @@ export class MeteorSpell extends Spell<StrikeSpellId> {
   private burn(pond: Readonly<GroundArea>, tickDamage: number): void {
     for (const enemy of membersOf(pond, this.enemies.live)) {
       this.pondBurns += 1;
-      this.damage(enemy, tickDamage, 'tick');
+      this.damage(enemy, tickDamage, 'tick', pond);
     }
   }
 

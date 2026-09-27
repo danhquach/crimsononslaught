@@ -113,6 +113,18 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('splitling.death', 4, 12, ONCE),
   spec('splitling.spawn', 4, 12, ONCE),
 
+  // Shielded enemy (CO-104, #126): walks and flinches facing down, up and
+  // right, and mirrors right to face left; the shield is on the side it faces.
+  // Its death and spawn share the sheet's last row, three frames each.
+  spec('shielded.walk.down', 4, 6, LOOP),
+  spec('shielded.walk.up', 4, 6, LOOP),
+  spec('shielded.walk.right', 4, 6, LOOP),
+  spec('shielded.hurt.down', 1, 10, ONCE),
+  spec('shielded.hurt.up', 1, 10, ONCE),
+  spec('shielded.hurt.right', 1, 10, ONCE),
+  spec('shielded.death', 3, 8, ONCE),
+  spec('shielded.spawn', 3, 8, ONCE),
+
   // Boss (CO-074). Telegraph and charge are paced to the 0.8 s / 0.6 s phases
   // in `boss.ts`, so the art lands with the state change rather than drifting.
   ...facings('boss.walk', 4, 6, LOOP),
@@ -305,6 +317,7 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   enemy_exploder: 'exploder.move.0',
   enemy_splitter: 'splitter.move.0',
   enemy_splitling: 'splitling.move.0',
+  enemy_shielded: 'shielded.walk.down.0',
   boss: 'boss.walk.down.0',
   gem: 'gem.idle.0',
   proj_fire: 'fire.fly.0',

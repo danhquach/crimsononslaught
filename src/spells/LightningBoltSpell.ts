@@ -97,6 +97,8 @@ export class LightningBoltSpell extends Spell<'lightning'> {
         flight.aim.y = flight.target.y;
       }
       const { sprite } = flight;
+      // Where it flies in from, since on arrival it sits on the target.
+      const from = { x: sprite.x, y: sprite.y };
       const step = boltStep(sprite, flight.aim, BOLT_SPEED, deltaS);
       const heading = { x: step.x - sprite.x, y: step.y - sprite.y };
       sprite.setPosition(step.x, step.y).setRotation(flightRotation(heading, sprite.rotation));
@@ -105,7 +107,7 @@ export class LightningBoltSpell extends Spell<'lightning'> {
       sprite.setVisible(false);
       sprite.anims.stop();
       this.spare.push(sprite);
-      if (flight.live) this.strike(flight.target);
+      if (flight.live) this.strike(flight.target, from);
     }
   }
 
@@ -134,15 +136,18 @@ export class LightningBoltSpell extends Spell<'lightning'> {
     this.flights.push({ sprite, target, aim: { x: target.x, y: target.y }, live: true });
   }
 
-  /** The bolt lands: bursts on the enemy, then status before damage, as every Lightning hit does. */
-  private strike(target: Enemy): void {
+  /**
+   * The bolt lands: bursts on the enemy, then status before damage, as every
+   * Lightning hit does. `from` is the last point of its flight.
+   */
+  private strike(target: Enemy, from: Readonly<Vec2>): void {
     const stats: BoltStats = this.stats;
     this.landed += 1;
     this.fx.burst('lightning.strike', target.x, target.y);
     this.fx.burst('lightning.impact', target.x, target.y);
     target.applyStagger(stats.staggerDuration);
     if (rollStun(this.rng, stats.stunChance)) target.applyStun(stats.stunDuration);
-    this.damage(target, stats.damage);
+    this.damage(target, stats.damage, 'hit', from);
   }
 
   private makeSprite(): Phaser.GameObjects.Sprite {

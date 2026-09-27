@@ -72,7 +72,7 @@ export class LightningSwordSpell extends OrbitingBodySpell<'lightning_sword'> {
     body.setRotation(bladeRotation(angle));
   }
 
-  protected onHit(enemy: Enemy): void {
+  protected onHit(enemy: Enemy, body: Boulder): void {
     const { hitCooldown } = this.stats;
     const result = tryHit(this.hitWindows.get(enemy) ?? 0, hitCooldown);
     this.hitWindows.set(enemy, result.remainingS);
@@ -84,6 +84,6 @@ export class LightningSwordSpell extends OrbitingBodySpell<'lightning_sword'> {
     // Status before damage, the convention every on-hit effect follows: a
     // killing cut has still staggered the enemy while it was there to take it.
     enemy.applyStagger(cut.staggerS);
-    this.damage(enemy, cut.damage);
+    this.damage(enemy, cut.damage, 'hit', body);
   }
 }

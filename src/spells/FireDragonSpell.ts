@@ -143,6 +143,7 @@ export class FireDragonSpell extends Spell<'fire_dragon'> {
     // A shot is spent on its first hit; a later overlap the same frame, or one
     // with an enemy something else already killed, flies on.
     if (!(hitbox instanceof HomingProjectile) || !hitbox.active || !enemy.active) return;
+    const from = { x: hitbox.x, y: hitbox.y };
     hitbox.despawn();
 
     const { damage, aoeRadius, aoeDamageFactor } = this.stats;
@@ -150,7 +151,9 @@ export class FireDragonSpell extends Spell<'fire_dragon'> {
     const blast = damage * aoeDamageFactor;
     this.landed += 1;
     this.fx.burst('fire.explode', enemy.x, enemy.y, { scale: explosionScale(aoeRadius) });
-    this.damage(enemy, damage);
-    for (const other of splash) this.damage(other, blast);
+    // The blast spreads from where the dragon struck.
+    const centre = { x: enemy.x, y: enemy.y };
+    this.damage(enemy, damage, 'hit', from);
+    for (const other of splash) this.damage(other, blast, 'hit', centre);
   }
 }

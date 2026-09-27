@@ -5,17 +5,19 @@ import { BOSS_START_TIME, SPAWN_RING_MARGIN, WAVES } from './waves';
 describe('wave table', () => {
   it('matches the 20-minute schedule (#127)', () => {
     const melee = ['swarm', 'fast', 'tank'];
-    // #126: ranged enemies join at 6:00, exploders at 8:00, splitters at 10:00.
+    // #126: ranged enemies join at 6:00, exploders at 8:00, splitters at 10:00,
+    // shielded enemies at 12:00.
     const ranged = [...melee, 'ranged'];
     const exploder = [...ranged, 'exploder'];
-    const all = [...exploder, 'splitter'];
+    const splitter = [...exploder, 'splitter'];
+    const all = [...splitter, 'shielded'];
     expect(WAVES).toEqual([
       { startTime: 0, types: ['swarm'], spawnsPerSecond: 1.5, hpMul: 1, damageMul: 1 },
       { startTime: 120, types: ['swarm', 'fast'], spawnsPerSecond: 2, hpMul: 1.2, damageMul: 1.1 },
       { startTime: 240, types: melee, spawnsPerSecond: 2.5, hpMul: 1.4, damageMul: 1.2 },
       { startTime: 360, types: ranged, spawnsPerSecond: 3, hpMul: 1.6, damageMul: 1.3 },
       { startTime: 480, types: exploder, spawnsPerSecond: 3.5, hpMul: 1.8, damageMul: 1.4 },
-      { startTime: 600, types: all, spawnsPerSecond: 4, hpMul: 2, damageMul: 1.5 },
+      { startTime: 600, types: splitter, spawnsPerSecond: 4, hpMul: 2, damageMul: 1.5 },
       { startTime: 720, types: all, spawnsPerSecond: 4.5, hpMul: 2.2, damageMul: 1.6 },
       { startTime: 840, types: all, spawnsPerSecond: 5, hpMul: 2.4, damageMul: 1.7 },
       { startTime: 960, types: all, spawnsPerSecond: 5.5, hpMul: 2.6, damageMul: 1.8 },

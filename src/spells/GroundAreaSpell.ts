@@ -145,7 +145,7 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
         enemy.applyStagger(staggerS);
         this.staggered += 1;
       }
-      this.damage(enemy, tickDamage, 'tick');
+      this.damage(enemy, tickDamage, 'tick', area);
     }
   }
 }
