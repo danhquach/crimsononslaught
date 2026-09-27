@@ -47,6 +47,8 @@ export class ProfileScene extends Phaser.Scene {
   }
 
   create(): void {
+    // The menu track carries across every menu screen (CO-157); asking again is a no-op.
+    audioOf(this).playMusic('music.menu');
     this.leaving = false;
     this.editing = false;
     const { width, height } = this.scale;

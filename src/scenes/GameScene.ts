@@ -812,6 +812,9 @@ export class GameScene extends Phaser.Scene {
     this.offerActions = startingActions();
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
     this.audio = audioOf(this);
+    // Wall-clock fade from the game loop (CO-157): a level-up or the pause
+    // screen pauses this scene, never the track.
+    this.audio.startRunMusic();
     this.feedback = readFeedbackSettings(this.save().settings);
     this.shake = NO_SHAKE;
 
@@ -1781,6 +1784,7 @@ export class GameScene extends Phaser.Scene {
     );
     this.enemies.spawnBoss(point.x, point.y);
     this.audio.play('boss.spawn');
+    this.audio.startBossMusic();
   }
 
   /**

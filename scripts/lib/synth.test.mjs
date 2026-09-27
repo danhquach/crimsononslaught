@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   SAMPLE_RATE,
+  additive,
   concat,
   envelope,
+  hold,
+  loopMix,
+  lowpass,
+  midiHz,
   mix,
   noise,
   normalize,
@@ -10,6 +15,7 @@ import {
   resample,
   samplesFor,
   sweep,
+  triangle,
   wavBytes,
 } from './synth.mjs';
 
@@ -76,5 +82,57 @@ describe('synth', () => {
     expect(resample(ramp, 0.5)[3]).toBe(1.5);
     expect(resample([], 2)).toEqual([]);
     expect(resample(ramp, 0)).toEqual([]);
+  });
+
+  it('midiHz puts A4 at 440 Hz and an octave at twice the frequency', () => {
+    expect(midiHz(69)).toBe(440);
+    expect(midiHz(81)).toBe(880);
+    expect(midiHz(60)).toBeCloseTo(261.63, 2);
+  });
+
+  it('triangle stays within [-1, 1] and peaks where the sine does', () => {
+    expect(triangle(Math.PI / 2)).toBeCloseTo(1, 9);
+    expect(triangle(-Math.PI / 2)).toBeCloseTo(-1, 9);
+    expect(triangle(0)).toBe(0);
+  });
+
+  it('hold rises, holds flat and falls to exactly 0', () => {
+    const clip = hold(new Array(2205).fill(1), 0.01, 0.02);
+    expect(clip[0]).toBe(0);
+    expect(clip[1000]).toBe(1);
+    expect(clip[clip.length - 1]).toBe(0);
+  });
+
+  it('lowpass keeps a steady level and softens a step', () => {
+    const out = lowpass(new Array(2000).fill(1), 500);
+    expect(out[0]).toBeGreaterThan(0);
+    expect(out[0]).toBeLessThan(0.5);
+    expect(out[out.length - 1]).toBeCloseTo(1, 6);
+  });
+
+  it('loopMix is exactly the asked length and folds a tail back onto the start', () => {
+    const n = samplesFor(1);
+    const out = loopMix(1, [
+      [0, [1, 1], 0.5],
+      [(n - 1) / SAMPLE_RATE, [2, 3, 4], 1],
+    ]);
+    expect(out).toHaveLength(n);
+    expect(out.slice(0, 3)).toEqual([0.5 + 3, 0.5 + 4, 0]);
+    expect(out[n - 1]).toBe(2);
+    expect(loopMix(0, [[0, [1], 1]])).toEqual([]);
+  });
+
+  it('additive is the asked length, sums its partials to a peak of 1, and wobbles only with vibrato', () => {
+    const plain = additive(0.1, 441, [[1, 1]]);
+    expect(plain).toHaveLength(samplesFor(0.1));
+    expect(plain).toEqual(sweep(0.1, 441, 441));
+    const organ = additive(0.1, 220, [
+      [1, 1],
+      [2, 1],
+    ]);
+    expect(Math.max(...organ.map(Math.abs))).toBeLessThanOrEqual(1);
+    expect(additive(0.1, 220, [[1, 1]], { vibratoHz: 5, vibrato: 0.01 })).not.toEqual(
+      additive(0.1, 220, [[1, 1]]),
+    );
   });
 });

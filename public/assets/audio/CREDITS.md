@@ -3,11 +3,13 @@
 Every clip in this directory but the four sourced ones below is synthesized by
 `npm run audio:gen` (`scripts/gen-audio.mjs` with `scripts/lib/synth.mjs`):
 sine and square sweeps, seeded noise and simple envelopes, written as 16-bit
-mono WAV at 22 050 Hz.
+mono WAV at 22 050 Hz. The five music loops (CO-157) are written as notes on a
+beat grid in `scripts/lib/music.mjs` and rendered with the same synth.
 
 | File                                                                                                                    | Source                          | Licence                                 |
 | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------- | --------------------------------------- |
 | `cast.*.wav`, `enemy.*.wav`, `player.*.wav`, `progress.*.wav`, `pickup.*.wav`, `shield.*.wav`, `boss.*.wav`, `ui.*.wav` | Generated in-repo, this project | MIT, same as the repository (`LICENSE`) |
+| `music.*.wav` (the menu track, two run tracks and two boss tracks)                                                      | Generated in-repo, this project | MIT, same as the repository (`LICENSE`) |
 
 except these sourced clips (CO-177):
 

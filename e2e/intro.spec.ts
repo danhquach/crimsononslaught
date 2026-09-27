@@ -16,7 +16,7 @@ import { cardCenter, collectErrors, sceneTexts, startFromIntro, waitForScene } f
  */
 
 const INTRO_ENTRY = { start: { x: 480, y: 240 }, settings: { x: 480, y: 298 } } as const;
-const SHAKE_SWITCH = { x: 600, y: 140 + 4 * 58 };
+const SHAKE_SWITCH = { x: 600, y: 140 + 5 * 58 };
 
 /** Seed storage on an empty store only, so what the game writes survives a reload. */
 async function seedStorage(page: Page, save: Save): Promise<void> {

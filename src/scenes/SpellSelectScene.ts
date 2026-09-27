@@ -46,6 +46,8 @@ export class SpellSelectScene extends Phaser.Scene {
   }
 
   create(): void {
+    // The menu track carries across every menu screen (CO-157); asking again is a no-op.
+    audioOf(this).playMusic('music.menu');
     this.started = false;
     const { width, height } = this.scale;
     this.seed = this.registry.get(SEED_REGISTRY_KEY) as number;

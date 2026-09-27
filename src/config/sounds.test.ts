@@ -6,6 +6,11 @@ import {
   AUDIO_SETTING_KEYS,
   DEFAULT_AUDIO_SETTINGS,
   LOW_HEALTH_RATIO,
+  MUSIC,
+  MUSIC_FADE_MS,
+  MUSIC_KEYS,
+  BOSS_TRACKS,
+  RUN_TRACKS,
   SOUNDS,
   SOUND_KEYS,
   castSoundFor,
@@ -36,6 +41,35 @@ describe('SOUNDS', () => {
     expect(isSoundKey('ui.move')).toBe(true);
     expect(isSoundKey('ui.nope')).toBe(false);
     expect(isSoundKey(3)).toBe(false);
+  });
+});
+
+describe('MUSIC (CO-157)', () => {
+  it('has one definition per track, each a wav under the audio dir with a sane gain', () => {
+    expect(Object.keys(MUSIC).sort()).toEqual([...MUSIC_KEYS].sort());
+    for (const key of MUSIC_KEYS) {
+      expect(MUSIC[key].files, key).toEqual([`${AUDIO_DIR}/${key}.wav`]);
+      expect(MUSIC[key].volume, key).toBeGreaterThan(0);
+      expect(MUSIC[key].volume, key).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('no track shares a key with an effect, so neither list can shadow the other', () => {
+    for (const key of MUSIC_KEYS) expect(isSoundKey(key), key).toBe(false);
+  });
+
+  it('a run has two run tracks and two boss tracks to draw from, all distinct tracks', () => {
+    expect(RUN_TRACKS).toHaveLength(2);
+    expect(BOSS_TRACKS).toHaveLength(2);
+    const drawn = [...RUN_TRACKS, ...BOSS_TRACKS];
+    expect(new Set(drawn).size).toBe(drawn.length);
+    for (const key of drawn) expect(MUSIC_KEYS, key).toContain(key);
+    expect(drawn).not.toContain('music.menu');
+  });
+
+  it('fades over about a second', () => {
+    expect(MUSIC_FADE_MS).toBeGreaterThanOrEqual(500);
+    expect(MUSIC_FADE_MS).toBeLessThanOrEqual(1500);
   });
 });
 

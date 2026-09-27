@@ -2,7 +2,8 @@
 /**
  * Synthesize the sound effects (CO-102). `npm run audio:gen`.
  *
- *   out  public/assets/audio/<key>.wav   one clip per `SOUND_KEYS` entry
+ *   out  public/assets/audio/<key>.wav   one clip per `SOUND_KEYS` entry,
+ *                                        one loop per `MUSIC_KEYS` entry (CO-157)
  *
  * Every clip but the sourced ones is generated from the recipes below with
  * `lib/synth.mjs`, so it is original work under the repository licence (see
@@ -13,12 +14,14 @@
  * never writes them; `npm run audio:cut` does.
  * The key list is the one `src/config/sounds.ts` ships. Each key needs a
  * recipe or a sourced clip, never both, and every recipe or sourced clip needs
- * a key, or the run fails, so the lists cannot drift.
+ * a key, or the run fails, so the lists cannot drift. The music tracks are
+ * checked the same way against `lib/music.mjs`.
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MUSIC_RECIPES } from './lib/music.mjs';
 import { SOURCED } from './lib/sourcedAudio.mjs';
 import {
   concat,
@@ -213,11 +216,14 @@ export const RECIPES = {
   'ui.back': () => ping(0.1, 660, 440),
 };
 
-/** The keys `src/config/sounds.ts` declares, read off the `SOUND_KEYS` literal. */
-export function configuredKeys() {
+/**
+ * The keys `src/config/sounds.ts` declares, read off the `SOUND_KEYS` literal,
+ * or another key list's (`MUSIC_KEYS`).
+ */
+export function configuredKeys(list = 'SOUND_KEYS') {
   const source = readFileSync(CONFIG, 'utf8');
-  const block = source.match(/SOUND_KEYS = \[([\s\S]*?)\] as const/);
-  if (!block) throw new Error(`could not find SOUND_KEYS in ${CONFIG}`);
+  const block = source.match(new RegExp(`${list} = \\[([\\s\\S]*?)\\] as const`));
+  if (!block) throw new Error(`could not find ${list} in ${CONFIG}`);
   return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 }
 
@@ -233,6 +239,12 @@ export function keyProblems(keys, recipeKeys, sourcedKeys) {
 function main() {
   const keys = configuredKeys();
   const problems = keyProblems(keys, Object.keys(RECIPES), Object.keys(SOURCED));
+  const music = keyProblems(configuredKeys('MUSIC_KEYS'), Object.keys(MUSIC_RECIPES), []);
+  if (music.noClip.length || music.noKey.length) {
+    console.error(`music keys without a recipe: ${music.noClip.join(', ') || 'none'}`);
+    console.error(`music recipes without a key: ${music.noKey.join(', ') || 'none'}`);
+    process.exit(1);
+  }
   if (problems.noClip.length || problems.both.length || problems.noKey.length) {
     console.error(
       `keys without a recipe or a sourced clip: ${problems.noClip.join(', ') || 'none'}`,
@@ -249,8 +261,15 @@ function main() {
     writeFileSync(join(OUT_DIR, `${key}.wav`), wav);
     bytes += wav.length;
   }
+  let musicBytes = 0;
+  for (const [key, recipe] of Object.entries(MUSIC_RECIPES)) {
+    const wav = wavBytes(normalize(recipe.render(recipe)));
+    writeFileSync(join(OUT_DIR, `${key}.wav`), wav);
+    musicBytes += wav.length;
+  }
   console.log(
-    `wrote ${Object.keys(RECIPES).length} clips (${(bytes / 1024).toFixed(0)} KiB) to public/assets/audio; ` +
+    `wrote ${Object.keys(RECIPES).length} clips (${(bytes / 1024).toFixed(0)} KiB) and ` +
+      `${Object.keys(MUSIC_RECIPES).length} tracks (${(musicBytes / 1024).toFixed(0)} KiB) to public/assets/audio; ` +
       `left ${Object.keys(SOURCED).length} sourced clips alone`,
   );
 }
