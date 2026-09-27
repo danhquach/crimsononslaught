@@ -6,6 +6,7 @@ import {
   type ConsumableKind,
 } from '../src/config/pickups';
 import { PLAYER_MAX_HP } from '../src/config/player';
+import { SOUNDS } from '../src/config/sounds';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
 import type { Player } from '../src/entities/Player';
@@ -13,7 +14,16 @@ import type { EnemyPool } from '../src/systems/EnemyPool';
 import type { GemPool } from '../src/systems/GemPool';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
-import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
+import {
+  busiestWindow,
+  cardCenter,
+  collectErrors,
+  readSounds,
+  recordSounds,
+  startFromIntro,
+  waitForScene,
+  type SoundRequest,
+} from './game';
 
 /**
  * #128 in the browser: each consumable, dropped at the player's feet through
@@ -49,6 +59,12 @@ async function startRun(page: Page, query: string): Promise<void> {
   const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));
   await page.mouse.click(x, y);
   await waitForScene(page, SCENE.game);
+  await recordSounds(page);
+}
+
+/** How many times each of `keys` was asked for (CO-159). */
+function counts(log: readonly SoundRequest[], keys: readonly string[]): Record<string, number> {
+  return Object.fromEntries(keys.map((k) => [k, log.filter((r) => r.key === k).length]));
 }
 
 /** The run's report and the HUD in one `evaluate`, so they are the same instant. */
@@ -154,6 +170,10 @@ test('a health pickup heals, capped at the maximum, and a chest pays Embers', as
   expect(paid.report.embers - beforeChest.embers).toBeGreaterThanOrEqual(CHEST_EMBERS);
   expect(paid.report.embers - beforeChest.embers).toBeLessThan(CHEST_EMBERS + 10);
   expect(paid.hudEmbers).toBe(paid.report.embers);
+
+  // CO-159: each pickup asked for its own cue.
+  const sounds = counts(await readSounds(page), ['pickup.health', 'pickup.chest']);
+  expect(sounds).toEqual({ 'pickup.health': 2, 'pickup.chest': 1 });
   expect(errors).toEqual([]);
 });
 
@@ -185,6 +205,19 @@ test('a magnet pulls in the gems lying round the arena', async ({ page }) => {
   const fewest = Math.min(...live.map((t) => t.report.gems));
   expect(fewest, `gems left of ${before.gems}`).toBeLessThanOrEqual(before.gems / 4);
   expect(trace[trace.length - 1]?.report.magnetMsLeft, 'the magnet ran out').toBe(0);
+
+  // CO-159: the grab and the pull each ask once; the gems it pulls in ask one
+  // each, and the dedupe window keeps what starts to its cap.
+  const log = await readSounds(page);
+  expect(counts(log, ['pickup.magnet', 'pickup.magnetPull'])).toEqual({
+    'pickup.magnet': 1,
+    'pickup.magnetPull': 1,
+  });
+  const gemCues = log.filter((r) => r.key === 'progress.gem');
+  expect(gemCues.length, 'gem cues asked for').toBeGreaterThan(0);
+  expect(busiestWindow(log, 'progress.gem'), 'gem starts in one window').toBeLessThanOrEqual(
+    SOUNDS['progress.gem'].maxConcurrent,
+  );
   expect(errors).toEqual([]);
 });
 
@@ -198,5 +231,12 @@ test('a bomb kills every regular enemy on screen', async ({ page }) => {
   // enemy may walk off the edge in that step, so allow a little either way.
   expect(after.report.kills - before.kills).toBeGreaterThanOrEqual(before.onScreen - 2);
   expect(after.report.onScreen, 'the screen after the blast').toBeLessThan(before.onScreen / 2);
+
+  // CO-159: one grab and one blast, however many enemies the blast hit.
+  const log = await readSounds(page);
+  expect(counts(log, ['pickup.bomb', 'pickup.bombBlast'])).toEqual({
+    'pickup.bomb': 1,
+    'pickup.bombBlast': 1,
+  });
   expect(errors).toEqual([]);
 });

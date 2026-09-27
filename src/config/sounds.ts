@@ -13,6 +13,8 @@
  * in `public/assets/audio/CREDITS.md`.
  */
 
+import type { ConsumableKind } from './pickups';
+
 /** Where the clips live under `public/`, as the loader sees them. */
 export const AUDIO_DIR = 'assets/audio';
 
@@ -29,6 +31,16 @@ export const SOUND_KEYS = [
   'progress.gem',
   'progress.levelUp',
   'progress.perk',
+  'pickup.ember',
+  'pickup.relic',
+  'pickup.health',
+  'pickup.magnet',
+  'pickup.bomb',
+  'pickup.chest',
+  'pickup.magnetPull',
+  'pickup.bombBlast',
+  'shield.hit',
+  'shield.break',
   'boss.spawn',
   'boss.telegraph',
   'boss.charge',
@@ -81,6 +93,18 @@ export const SOUNDS: Readonly<Record<SoundKey, SoundDef>> = {
   'progress.gem': clip('progress.gem', 0.35, 60, 2),
   'progress.levelUp': clip('progress.levelUp', 0.7, 200),
   'progress.perk': clip('progress.perk', 0.6, 200),
+  // A bomb leaves Embers in piles, and overlapping contacts hit a shield
+  // together: those two take a few per window. The rest are one event each.
+  'pickup.ember': clip('pickup.ember', 0.35, 60, 2),
+  'pickup.relic': clip('pickup.relic', 0.6, 200),
+  'pickup.health': clip('pickup.health', 0.5, 100),
+  'pickup.magnet': clip('pickup.magnet', 0.45, 100),
+  'pickup.bomb': clip('pickup.bomb', 0.45, 100),
+  'pickup.chest': clip('pickup.chest', 0.55, 100),
+  'pickup.magnetPull': clip('pickup.magnetPull', 0.55, 300),
+  'pickup.bombBlast': clip('pickup.bombBlast', 0.8, 300),
+  'shield.hit': clip('shield.hit', 0.45, 100, 2),
+  'shield.break': clip('shield.break', 0.7, 200),
   'boss.spawn': clip('boss.spawn', 0.9, 500),
   'boss.telegraph': clip('boss.telegraph', 0.7, 300),
   'boss.charge': clip('boss.charge', 0.7, 300),
@@ -112,6 +136,19 @@ export const AUDIO_SETTING_KEYS = {
   music: 'audio.music',
   muted: 'audio.muted',
 } as const;
+
+/** The pickup cue for each consumable (CO-159). */
+const CONSUMABLE_SOUNDS: Readonly<Record<ConsumableKind, SoundKey>> = {
+  health: 'pickup.health',
+  magnet: 'pickup.magnet',
+  bomb: 'pickup.bomb',
+  chest: 'pickup.chest',
+};
+
+/** The cue for picking up a consumable of `kind`. */
+export function consumableSoundFor(kind: ConsumableKind): SoundKey {
+  return CONSUMABLE_SOUNDS[kind];
+}
 
 /**
  * The cast cue for a spell: its element's. Roster ids are `<element>` or

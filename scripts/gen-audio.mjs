@@ -50,6 +50,38 @@ const RECIPES = {
     concat(ping(0.13, 523, 523), ping(0.13, 659, 659), ping(0.26, 784, 784)),
   'progress.perk': () => concat(ping(0.1, 660, 660), ping(0.2, 990, 990)),
 
+  // A magnet or a bomb plays its grab and its effect on the same frame, so the
+  // grab is a short blip and the effect carries the sound.
+  'pickup.ember': () => ping(0.1, 780, 1170),
+  'pickup.relic': () =>
+    mix(
+      [concat(ping(0.08, 784, 784), ping(0.08, 1047, 1047), ping(0.24, 1568, 1568)), 0.8],
+      [envelope(noise(0.4, 51, 7000), 0.05), 0.1],
+    ),
+  'pickup.health': () => ping(0.22, 440, 880),
+  'pickup.magnet': () => ping(0.06, 620, 930, square),
+  'pickup.bomb': () => ping(0.06, 330, 440, square),
+  'pickup.chest': () =>
+    concat(ping(0.06, 523, 523), ping(0.06, 659, 659), ping(0.06, 784, 784), ping(0.2, 1047, 1047)),
+  'pickup.magnetPull': () =>
+    mix([envelope(sweep(0.6, 200, 720), 0.25), 0.7], [envelope(noise(0.6, 52, 2500), 0.25), 0.3]),
+  'pickup.bombBlast': () =>
+    mix([envelope(noise(0.7, 53, 800), 0.003), 0.9], [envelope(sweep(0.7, 120, 35), 0.003), 0.8]),
+
+  // Glassy and high, a sine not a square: nothing like `player.hurt`'s buzz.
+  'shield.hit': () =>
+    mix(
+      [ping(0.07, 2600, 2400), 0.6],
+      [ping(0.07, 3900, 3600), 0.3],
+      [envelope(noise(0.03, 61, 9000), 0.001), 0.3],
+    ),
+  'shield.break': () =>
+    mix(
+      [envelope(noise(0.45, 62, 7000), 0.002), 0.8],
+      [ping(0.45, 2200, 700), 0.4],
+      [ping(0.3, 3300, 1500), 0.25],
+    ),
+
   'boss.spawn': () =>
     mix([envelope(noise(0.9, 41, 350), 0.15), 0.8], [envelope(sweep(0.9, 70, 50), 0.15), 0.7]),
   'boss.telegraph': () => envelope(sweep(0.42, 200, 620), 0.05),
