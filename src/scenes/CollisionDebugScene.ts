@@ -4,6 +4,7 @@ import { Enemy } from '../entities/Enemy';
 import { Player } from '../entities/Player';
 import { CollisionSystem, type SpellHitbox } from '../systems/CollisionSystem';
 import { EnemyPool } from '../systems/EnemyPool';
+import { EnemyShotPool } from '../systems/EnemyShotPool';
 import { GemPool } from '../systems/GemPool';
 import { PickupPool } from '../systems/PickupPool';
 
@@ -20,12 +21,19 @@ const SPELL_SPEED = 400;
 const GEM_DROP_OFFSET = 24;
 
 /** Every pair `CollisionSystem` registers, in the order they are listed on screen. */
-const PAIRS = ['enemy-player', 'gem-player', 'pickup-player', 'spell-enemy'] as const;
+const PAIRS = [
+  'enemy-player',
+  'shot-player',
+  'gem-player',
+  'pickup-player',
+  'spell-enemy',
+] as const;
 
 type Pair = (typeof PAIRS)[number];
 
 const PAIR_LABEL: Readonly<Record<Pair, string>> = {
   'enemy-player': 'enemy <-> player',
+  'shot-player': 'enemy shot <-> player',
   'gem-player': 'gem <-> player',
   'pickup-player': 'pickup <-> player',
   'spell-enemy': 'spell <-> enemy',
@@ -33,7 +41,8 @@ const PAIR_LABEL: Readonly<Record<Pair, string>> = {
 
 /**
  * Dev-only check for CO-032: every pair `CollisionSystem` registers, firing
- * without a hand on the keyboard. A tank walks into the player, gems and an
+ * without a hand on the keyboard. A tank walks into the player, a ranged
+ * enemy (#126) holds off above it and shoots at it, gems and an
  * Ember lie where the player will be pulled into them, and a stand-in spell
  * hitbox is fired at the enemy on a timer — every counter ticks up and turns
  * green.
@@ -45,6 +54,7 @@ const PAIR_LABEL: Readonly<Record<Pair, string>> = {
 export class CollisionDebugScene extends Phaser.Scene {
   private player!: Player;
   private enemies!: EnemyPool;
+  private enemyShots!: EnemyShotPool;
   private gems!: GemPool;
   private pickups!: PickupPool;
   private spells!: Phaser.Physics.Arcade.Group;
@@ -62,6 +72,7 @@ export class CollisionDebugScene extends Phaser.Scene {
 
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     this.enemies = new EnemyPool(this);
+    this.enemyShots = new EnemyShotPool(this);
     this.gems = new GemPool(this);
     this.pickups = new PickupPool(this);
     this.spells = this.physics.add.group();
@@ -70,10 +81,17 @@ export class CollisionDebugScene extends Phaser.Scene {
       this,
       this.player,
       this.enemies,
+      this.enemyShots,
       this.gems,
       this.pickups,
       {
         onEnemyContact: (enemy) => this.count('enemy-player', enemy.active),
+        // Spent on the touch, as in the run, so one shot counts once.
+        onEnemyShot: (shot) => {
+          if (!shot.active) return;
+          shot.despawn();
+          this.count('shot-player', true);
+        },
         // Collecting the gem is what proves the pickup path, not just the touch:
         // a gem that stays put would keep re-firing the same overlap.
         onGemPickup: (gem) => this.count('gem-player', this.gems.collect(gem, this.player) > 0),
@@ -84,6 +102,8 @@ export class CollisionDebugScene extends Phaser.Scene {
 
     // A tank: slow enough to watch, and it survives the contact it makes.
     this.enemies.spawn('tank', WORLD_WIDTH * 0.75, WORLD_HEIGHT / 2);
+    // Inside its keep-distance band, so it holds there, off the stand-in spell's line.
+    this.enemies.spawn('ranged', WORLD_WIDTH / 2, WORLD_HEIGHT * 0.1);
 
     this.add
       .text(WORLD_WIDTH / 2, 32, 'Collision pairs (CO-032)', {
@@ -102,7 +122,10 @@ export class CollisionDebugScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    this.enemies.update(delta, this.player);
+    this.enemies.update(delta, this.player, undefined, (enemy, target) =>
+      this.enemyShots.fire(enemy, target, enemy.shotDamage),
+    );
+    this.enemyShots.update();
     // Gems are dropped inside the pickup radius so they drift in without anyone
     // steering; one at a time, so the counter climbs steadily.
     if (this.gems.liveCount === 0) {

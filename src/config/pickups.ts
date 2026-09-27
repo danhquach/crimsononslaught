@@ -32,6 +32,8 @@ export const EMBER_DROPS: Readonly<Record<EnemyType, EmberDrop>> = {
   swarm: { chance: 0.2, value: 1 },
   fast: { chance: 0.2, value: 1 },
   tank: { chance: 1, value: 3 },
+  // #126: worth a little more than a swarm; the player walks into its fire to get it.
+  ranged: { chance: 0.3, value: 1 },
 };
 
 /** Spec §4: the boss pays this on the killing blow, credited to the run rather than dropped. */

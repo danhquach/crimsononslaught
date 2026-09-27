@@ -1,3 +1,4 @@
+import { isEnemyType, type EnemyType } from '../config/enemies';
 import { isRosterSpellId, type RosterSpellId } from '../config/loadout';
 import type { SpellId } from '../config/spells';
 import { BOSS_START_TIME } from '../config/waves';
@@ -350,4 +351,21 @@ export function resolveLoadout(search: string): RosterSpellId[] {
     .split(',')
     .map((id) => id.trim())
     .filter(isRosterSpellId);
+}
+
+/**
+ * `?enemies=ranged,tank` lets only those types into the run (#126). A test
+ * hook like `?loadout=`: a browser check of one enemy type needs it apart from
+ * a crowd that would hide what it does. The director still draws every spawn
+ * it would have, so a seed spends its RNG the same way; the other types' spawns
+ * are just dropped. Unknown types are dropped; none left, or the param absent,
+ * is no filter.
+ */
+export function resolveEnemyFilter(search: string): EnemyType[] {
+  const raw = new URLSearchParams(search).get('enemies');
+  if (raw === null) return [];
+  return raw
+    .split(',')
+    .map((type) => type.trim())
+    .filter(isEnemyType);
 }

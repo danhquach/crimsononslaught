@@ -117,12 +117,18 @@ describe('enemyAnimation', () => {
     ).toBe('tank.spawn');
   });
 
-  it('flips only the swarm, and only when it moves left', () => {
+  it('flips only the swarm and the ranged enemy, and only toward the left', () => {
     const swarm = (velocityX: number) =>
       enemyAnimation({ kind: 'swarm', phase: 'move', facing: 'down', velocityX });
     expect(swarm(-30)).toEqual({ name: 'swarm.move', flipX: true });
     expect(swarm(30)).toEqual({ name: 'swarm.move', flipX: false });
     expect(swarm(0).flipX).toBe(false);
+    expect(
+      enemyAnimation({ kind: 'ranged', phase: 'move', facing: 'down', velocityX: -1 }),
+    ).toEqual({ name: 'ranged.move', flipX: true });
+    expect(
+      enemyAnimation({ kind: 'ranged', phase: 'hurt', facing: 'down', velocityX: 1 }).flipX,
+    ).toBe(false);
     expect(enemyAnimation({ kind: 'fast', phase: 'move', facing: 'down', velocityX: -30 })).toEqual(
       {
         name: 'fast.move',

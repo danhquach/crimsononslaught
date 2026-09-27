@@ -11,6 +11,7 @@ import {
   type RunFrame,
   clampTimeScale,
   resolveInvulnerable,
+  resolveEnemyFilter,
   resolveLoadout,
   resolveStartAt,
   resolveTimeScale,
@@ -491,6 +492,20 @@ describe('resolveLoadout', () => {
       'fire_companion',
       'fire_meteor',
     ]);
+  });
+});
+
+describe('resolveEnemyFilter (#126)', () => {
+  it('is no filter when the param is absent or names nothing known', () => {
+    expect(resolveEnemyFilter('')).toEqual([]);
+    expect(resolveEnemyFilter('?seed=1&startAt=360')).toEqual([]);
+    expect(resolveEnemyFilter('?enemies=')).toEqual([]);
+    expect(resolveEnemyFilter('?enemies=boss,dragon')).toEqual([]);
+  });
+
+  it('reads the known types, trimmed, dropping the rest', () => {
+    expect(resolveEnemyFilter('?enemies=ranged')).toEqual(['ranged']);
+    expect(resolveEnemyFilter('?enemies=tank,%20ranged,,Swarm')).toEqual(['tank', 'ranged']);
   });
 });
 

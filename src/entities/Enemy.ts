@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ENEMY_ARCHETYPES, ENEMY_HURT_MS, type EnemyType } from '../config/enemies';
+import { ENEMY_ARCHETYPES, ENEMY_HURT_MS, RANGED_ATTACK, type EnemyType } from '../config/enemies';
 import { HIT_FLASH_MS, HIT_FLASH_TINT } from '../config/hitFeedback';
 import { BURN_DURATION } from '../config/spells';
 import {
@@ -34,6 +34,12 @@ import {
 } from '../core/frostNova';
 import { tickBoulderCooldown, tryBoulderHit } from '../core/orbitingBoulders';
 import {
+  inFireDistance,
+  rangedVelocity,
+  scaledShotDamage,
+  tickFireCooldown,
+} from '../core/rangedEnemy';
+import {
   NO_BLEED,
   applyBleed,
   applyStagger,
@@ -62,7 +68,9 @@ export interface EnemyStats {
  * A frost pulse can slow or freeze it (CO-045); the cold scales the chase speed
  * and runs out with it. A bolt can stun it (CO-046): a full stop that runs out
  * the same way. A boulder can hit it at most once per 0.4 s and shove it
- * (CO-047); that window drains with the chase too.
+ * (CO-047); that window drains with the chase too. A ranged enemy (#126)
+ * keeps its distance instead of closing in, and its fire timer runs with the
+ * chase; the shot it owes is taken by `EnemyPool` and flown by the run.
  *
  * Pooled — never constructed per spawn. `systems/EnemyPool.ts` owns the pool and
  * calls `spawn` / `despawn`; an inactive enemy has its body disabled, so it costs
@@ -85,6 +93,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** Contact damage as the spawning wave scaled it (#127); the boss has its own. */
   private contact = ENEMY_ARCHETYPES.swarm.contactDamage;
   private contactCooldownMs = 0;
+  /** #126, ranged only: a shot's damage as the spawning wave scaled it, and the time to the next. */
+  private shot = RANGED_ATTACK.shotDamage;
+  private fireCooldownMs = 0;
+  /** A shot is owed this step; `EnemyPool` takes it through `takeShot`. */
+  private shotOwed = false;
   private burn: BurnState = { ...NO_BURN };
   private bleed: BleedState = { ...NO_BLEED };
   private frost: FrostState = { ...NO_FROST };
@@ -97,6 +110,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** Velocity the spells have asked for since the last chase step (#136); spent and cleared by it. */
   private force: Readonly<Vec2> = NO_FORCE;
   private facing: Facing = DEFAULT_FACING;
+  /** The way its last move clip faced, kept so the death clip faces the same way. */
+  private look: Readonly<Vec2> = { x: 0, y: 0 };
   /** Run-clock ms left of the arrival hold, the hurt flash and the death clip. */
   private spawnMs = 0;
   private hurtMs = 0;
@@ -115,6 +130,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   get contactDamage(): number {
     return this.contact;
+  }
+
+  /** #126: what one of its shots deals, scaled by the wave that spawned it. */
+  get shotDamage(): number {
+    return this.shot;
   }
 
   /** Spec §5 Ice: moving slower than the archetype says, frozen included — what Shatter checks. */
@@ -175,7 +195,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.kind = type;
     const stats = scaleArchetype(ENEMY_ARCHETYPES[type], scale);
     this.contact = stats.contactDamage;
+    this.shot = scaledShotDamage(RANGED_ATTACK.shotDamage, scale.damageMul);
     this.arise(stats, x, y);
+    // A full interval before the first shot; it drains on the walk in.
+    this.fireCooldownMs = RANGED_ATTACK.fireIntervalMs;
   }
 
   /**
@@ -185,6 +208,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   protected arise(stats: Readonly<EnemyStats>, x: number, y: number): void {
     this.hp = stats.hp;
     this.contactCooldownMs = 0;
+    this.shotOwed = false;
     this.burn = { ...NO_BURN };
     this.bleed = { ...NO_BLEED };
     this.frost = { ...NO_FROST };
@@ -193,6 +217,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.boulderCooldownS = 0;
     this.force = NO_FORCE;
     this.facing = DEFAULT_FACING;
+    this.look = { x: 0, y: 0 };
     this.hurtMs = 0;
     this.flashMs = 0;
     this.deathMs = 0;
@@ -283,7 +308,12 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.facing = facingFromVector({ x, y }, this.facing);
     // The fast enemy's sheet is drawn facing up; it turns to its heading.
     if (this.kind === 'fast') this.setRotation(headingRotation({ x, y }, this.rotation));
-    this.show(this.clipPhase(), { x, y });
+    // A ranged enemy faces the player it shoots at, backing off or holding
+    // still included; everything else faces the way it moves.
+    const ranged = this.kind === 'ranged';
+    this.look = ranged ? { x: target.x - this.x, y: target.y - this.y } : { x, y };
+    this.show(this.clipPhase(), this.look);
+    if (ranged) this.aim(deltaMs, target, speedFactor);
     const wasFrozen = this.isFrozen;
     const frost = tickFrost(this.frost, deltaS);
     this.frost = frost.state;
@@ -307,8 +337,33 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    * scaled by whatever slow or stun holds the enemy. The boss (CO-050) overrides
    * this with its charge cycle; `deltaS` is for such stateful movers.
    */
-  protected steer(_deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
-    return chaseVelocity(this, target, ENEMY_ARCHETYPES[this.kind].speed * speedFactor);
+  protected steer(deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
+    const speed = ENEMY_ARCHETYPES[this.kind].speed * speedFactor;
+    if (this.kind !== 'ranged') return chaseVelocity(this, target, speed);
+    // #126: backing off must not walk it out of the arena, where the player
+    // cannot follow; one still out on the spawn ring may only come in.
+    const velocity = rangedVelocity(this, target, RANGED_ATTACK, speed);
+    return confineVelocity(this, velocity, deltaS, this.scene.physics.world.bounds);
+  }
+
+  /**
+   * #126: run the fire timer. A shot is owed when it runs out with the target
+   * in range and nothing holding the enemy still — a stun or a freeze stops
+   * its fire as well as its feet.
+   */
+  private aim(deltaMs: number, target: Readonly<Vec2>, speedFactor: number): void {
+    const { fireIntervalMs, fireDistance } = RANGED_ATTACK;
+    const canFire = speedFactor > 0 && inFireDistance(this, target, fireDistance);
+    const next = tickFireCooldown(this.fireCooldownMs, deltaMs, fireIntervalMs, canFire);
+    this.fireCooldownMs = next.cooldownMs;
+    if (next.fire) this.shotOwed = true;
+  }
+
+  /** #126: `true` once per shot the fire timer owes; the pool hands it to the run to fire. */
+  takeShot(): boolean {
+    const owed = this.shotOwed;
+    this.shotOwed = false;
+    return owed;
   }
 
   /**
@@ -449,7 +504,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(0, 0);
     this.disableBody(false, false);
     this.clearTint();
-    this.deathMs = this.show('death', { x: 0, y: 0 });
+    // Facing the way it last did, so a mirrored sheet does not flip as it dies.
+    this.deathMs = this.show('death', this.look);
     if (this.deathMs <= 0) this.despawn();
     return true;
   }

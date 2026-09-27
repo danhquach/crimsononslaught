@@ -42,7 +42,8 @@ browser smoke).
 Gold / meta shop, additional characters, spell evolutions, chests (since added
 by #128, see the 20-minute run spec §4.2), sound and
 music, real art, mobile / touch controls (gamepad IS in scope), saves, multiple arenas, ranged or
-elite enemies, settings menu.
+elite enemies (since added by #126: ranged first, the rest of the roster and elites to follow),
+settings menu.
 
 The loadout overhaul — multiple active spells, passives, and the full roster per
 element — is Phase 2 and is specified in
@@ -200,6 +201,7 @@ src/
 | Swarm | 10 | 90 | 3 | 10 | many, early |
 | Fast | 8 | 170 | 3 | 8 | from 1:00 |
 | Tank | 60 | 50 | 15 | 20 | from 2:00 |
+| Ranged | 12 | 80 | 3 | 11 | from 6:00 (#126); holds 200–240 px off, fires a 5-damage shot every 2.5 s from within 260 px |
 
 - AI: move directly toward player each frame.
 - Contact damage ticks at most once per 0.5 s per enemy.

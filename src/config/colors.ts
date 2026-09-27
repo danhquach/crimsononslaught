@@ -12,6 +12,7 @@ export const TEXTURE_KEYS = [
   'enemy_swarm',
   'enemy_fast',
   'enemy_tank',
+  'enemy_ranged',
   'boss',
   'gem',
   'proj_fire',
@@ -31,6 +32,7 @@ export const TEXTURE_KEYS = [
   'pickup_magnet',
   'pickup_bomb',
   'pickup_chest',
+  'proj_enemy',
 ] as const;
 
 export type TextureKey = (typeof TEXTURE_KEYS)[number];
@@ -51,6 +53,9 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   enemy_swarm: { shape: 'circle', color: 0xff5252, width: 16, height: 16 },
   enemy_fast: { shape: 'triangle', color: 0xffb300, width: 20, height: 20 },
   enemy_tank: { shape: 'rect', color: 0x8e1b1b, width: 32, height: 32 },
+  // #126: a diamond, the one enemy silhouette nothing else uses; with the atlas
+  // it plays its own sheet (CO-104).
+  enemy_ranged: { shape: 'diamond', color: 0xd84315, width: 22, height: 22 },
   boss: { shape: 'ring', color: 0x9c27b0, width: 80, height: 80, thickness: 10 },
   gem: { shape: 'diamond', color: 0x69f0ae, width: 12, height: 16 },
   proj_fire: { shape: 'circle', color: 0xff6d00, width: 12, height: 12 },
@@ -99,4 +104,10 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   pickup_magnet: { shape: 'ring', color: 0x448aff, width: 20, height: 20, thickness: 4 },
   pickup_bomb: { shape: 'circle', color: 0xd500f9, width: 14, height: 14 },
   pickup_chest: { shape: 'rect', color: 0xffc400, width: 20, height: 14 },
+  // #126: a ranged enemy's shot, the thing to dodge. Magenta, a hue none of
+  // the player's own shots use (fire's orange, ice's blue, lightning's yellow,
+  // earth's brown), and a thick ring where theirs are discs and diamonds, so
+  // the two never read alike (`colors.test.ts` holds the hue gap). With the
+  // atlas it plays the pink glob of CO-104's shot sheet, in the same hue.
+  proj_enemy: { shape: 'ring', color: 0xff00d4, width: 12, height: 12, thickness: 4 },
 };

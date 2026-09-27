@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  ENEMIES_REGISTRY_KEY,
   INVULNERABLE_REGISTRY_KEY,
   LOADOUT_REGISTRY_KEY,
   SAVE_REGISTRY_KEY,
@@ -114,7 +115,7 @@ import {
 } from '../config/arena';
 import { FRAMES } from '../config/frames';
 import { ARENA_DEPTH, PROP_DEPTH } from '../config/fx';
-import type { EnemyType } from '../config/enemies';
+import { MAX_LIVE_ENEMY_SHOTS, isEnemyType, type EnemyType } from '../config/enemies';
 import {
   BOMB_DAMAGE,
   BOSS_EMBERS,
@@ -177,6 +178,7 @@ import {
 } from '../config/shields';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
+import type { EnemyShot } from '../entities/EnemyShot';
 import { Player } from '../entities/Player';
 import type { Pickup } from '../entities/Pickup';
 import { XpGem } from '../entities/XpGem';
@@ -202,6 +204,7 @@ import { TelegraphPool, type MeteorView } from '../systems/TelegraphPool';
 import { CollisionSystem } from '../systems/CollisionSystem';
 import { DamageNumberPool } from '../systems/DamageNumberPool';
 import { EnemyPool } from '../systems/EnemyPool';
+import { EnemyShotPool } from '../systems/EnemyShotPool';
 import { FxPool } from '../systems/FxPool';
 import { GemPool } from '../systems/GemPool';
 import { PickupPool } from '../systems/PickupPool';
@@ -298,14 +301,20 @@ const CONSUMABLE_OFFSET = { x: -10, y: -8 } as const;
  * events, and `CollisionSystem` (CO-032) owns every overlap in the arena,
  * spell hitboxes included.
  *
- * Damage aimed at the player goes through one path — `onEnemyContact` — so the
- * run's defences sit in exactly one place: a shield (#134) absorbs what it can
+ * Damage aimed at the player goes through one path — `hurtPlayer`, which an
+ * enemy's touch and a ranged enemy's shot (#126) both call — so the run's
+ * defences sit in exactly one place: a shield (#134) absorbs what it can
  * before `Player.takeDamage` sees the rest.
  */
 export class GameScene extends Phaser.Scene {
   private payload: GamePayload | null = null;
   private player!: Player;
   private enemies!: EnemyPool;
+  /** Ranged enemies' shots in the air (#126). */
+  private enemyShots!: EnemyShotPool;
+  /** Test hook (#126): shots that have touched the player, and the HP they took. */
+  private shotHits = 0;
+  private shotHpLost = 0;
   private spawns!: SpawnDirector;
   private gems!: GemPool;
   /** Embers, consumables and relics (#195): everything on the floor but gems. */
@@ -341,7 +350,7 @@ export class GameScene extends Phaser.Scene {
   private offerIsLevelUp = false;
   /** #228: the run's rerolls, bans and banned cards; fresh every run. */
   private offerActions: OfferActions = startingActions();
-  /** `?invulnerable=1` (test hook): contact damage is dropped before it reaches the player. */
+  /** `?invulnerable=1` (test hook): every hit is dropped before it reaches the player. */
   private invulnerable = false;
   /** The game's one audio layer (CO-102); every cue in the run goes through it. */
   private audio!: Audio;
@@ -372,6 +381,39 @@ export class GameScene extends Phaser.Scene {
   /** Test hook (#125): damage numbers on screen right now; never past `MAX_LIVE_NUMBERS`. */
   get numberCount(): number {
     return this.numbers.count;
+  }
+
+  /**
+   * Test hook (#126): ranged enemies alive, enemy shots in the air, the pool's
+   * cap, and how many shots have hit the player and the HP they took off (0 for
+   * a hit a shield or the immunity window swallowed), plus the clips the
+   * ranged enemies and their shots are playing right now (CO-104). The browser
+   * suite checks ranged enemies really shoot and hurt, draw from their own
+   * sheets, and the pool holds its cap.
+   */
+  get enemyShotReport(): {
+    ranged: number;
+    live: number;
+    cap: number;
+    hits: number;
+    hpLost: number;
+    clips: string[];
+  } {
+    const ranged = this.enemies.live.filter((enemy) => enemy.enemyType === 'ranged');
+    const shots = this.enemyShots.group.getChildren().filter((shot) => shot.active);
+    const clips = new Set<string>();
+    for (const sprite of [...ranged, ...shots]) {
+      const key = (sprite as Phaser.GameObjects.Sprite).anims.currentAnim?.key;
+      if (key) clips.add(key);
+    }
+    return {
+      ranged: ranged.length,
+      live: this.enemyShots.liveCount,
+      cap: MAX_LIVE_ENEMY_SHOTS,
+      hits: this.shotHits,
+      hpLost: this.shotHpLost,
+      clips: [...clips].sort(),
+    };
   }
 
   /** Test hook: enemies alive in the arena, the bound `overlayCount` must respect. */
@@ -708,10 +750,16 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true);
 
     this.enemies = new EnemyPool(this);
-    this.spawns = new SpawnDirector(this.cameras.main, this.enemies, this.rng, {
-      width: WORLD_WIDTH,
-      height: WORLD_HEIGHT,
-    });
+    this.enemyShots = new EnemyShotPool(this);
+    this.shotHits = 0;
+    this.shotHpLost = 0;
+    this.spawns = new SpawnDirector(
+      this.cameras.main,
+      this.enemies,
+      this.rng,
+      { width: WORLD_WIDTH, height: WORLD_HEIGHT },
+      this.enemyFilter(),
+    );
     this.gems = new GemPool(this);
     this.pickups = new PickupPool(this);
     this.scatterProps(seed, this.placeRelics());
@@ -730,10 +778,12 @@ export class GameScene extends Phaser.Scene {
       this,
       this.player,
       this.enemies,
+      this.enemyShots,
       this.gems,
       this.pickups,
       {
         onEnemyContact: (enemy) => this.onEnemyContact(enemy),
+        onEnemyShot: (shot) => this.onEnemyShot(shot),
         onGemPickup: (gem) => this.onGemPickup(gem),
         onPickup: (pickup) => this.onPickup(pickup),
       },
@@ -916,9 +966,14 @@ export class GameScene extends Phaser.Scene {
     // moves, so a new enemy chases from the moment it lands.
     this.spawns.update(step.startMs / 1000, step.deltaMs / 1000);
     this.player.update(step.deltaMs);
-    this.enemies.update(step.deltaMs, this.player, (enemy, amount) =>
-      this.damageEnemy(enemy, amount, 'dot'),
+    this.enemies.update(
+      step.deltaMs,
+      this.player,
+      (enemy, amount) => this.damageEnemy(enemy, amount, 'dot'),
+      (enemy, target) => this.enemyShots.fire(enemy, target, enemy.shotDamage),
     );
+    // Before the physics step, so a shot spent at its range cannot land a hit past it.
+    this.enemyShots.update();
     // #128: a live magnet reaches every gem on the map; Embers and consumables
     // keep to the player's own radius.
     const player = this.player;
@@ -1259,6 +1314,12 @@ export class GameScene extends Phaser.Scene {
     return clampTimeScale(this.registry.get(TIME_SCALE_REGISTRY_KEY));
   }
 
+  /** `?enemies=` (#126) is resolved once in Boot; a Game started without it lets every type in. */
+  private enemyFilter(): EnemyType[] {
+    const types: unknown = this.registry.get(ENEMIES_REGISTRY_KEY);
+    return Array.isArray(types) ? types.filter(isEnemyType) : [];
+  }
+
   /** `?startAt=` (#127) is resolved once in Boot; a Game started without it starts at 0:00. */
   private startAt(): number {
     const ms: unknown = this.registry.get(START_AT_REGISTRY_KEY);
@@ -1272,6 +1333,24 @@ export class GameScene extends Phaser.Scene {
   private onEnemyContact(enemy: Enemy): void {
     if (!enemy.active || this.invulnerable) return;
     if (!enemy.tryContact()) return;
+    this.hurtPlayer(enemy.contactDamage);
+  }
+
+  /** #126: a shot is spent on the player it touches, whether or not the hit lands. */
+  private onEnemyShot(shot: EnemyShot): void {
+    if (!shot.active) return;
+    shot.despawn();
+    this.shotHits += 1;
+    this.shotHpLost += this.hurtPlayer(shot.damage);
+  }
+
+  /**
+   * Every hit the player takes, whatever dealt it (#126): `?invulnerable=1`,
+   * the immunity window, the shields, then HP, with the cues on what landed.
+   * Returns the HP it took off.
+   */
+  private hurtPlayer(amount: number): number {
+    if (this.invulnerable) return 0;
     // A hit the player is still immune to costs nothing: `core/health.ts` would
     // swallow it, so a shield must not pay for it out of its pool either.
     //
@@ -1281,21 +1360,22 @@ export class GameScene extends Phaser.Scene {
     // refills inside that window, and the next contact would then shatter a
     // shield holding a point or two and re-arm its whole delay, for a hit the
     // player never felt.
-    if (this.player.immune) return;
-    const throughShields = this.absorbOnShields(enemy.contactDamage);
-    if (throughShields <= 0) return;
+    if (this.player.immune) return 0;
+    const throughShields = this.absorbOnShields(amount);
+    if (throughShields <= 0) return 0;
     const before = this.player.hp;
     this.player.takeDamage(throughShields);
     // Cues (CO-102) read the outcome; they never decide it. The death cue
     // plays on the killing hit rather than at the end of the death clip.
     const hp = this.player.hp;
-    if (hp >= before) return;
+    if (hp >= before) return 0;
     this.shakeFor('playerHurt');
     if (hp <= 0) this.audio.play('player.death');
     else {
       this.audio.play('player.hurt');
       if (hp <= this.player.maxHp * LOW_HEALTH_RATIO) this.audio.play('player.lowHealth');
     }
+    return before - hp;
   }
 
   /**

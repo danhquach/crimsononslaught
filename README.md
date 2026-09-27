@@ -28,10 +28,11 @@ issues under the **Phase 1** milestone.
 - Level up to draw three cards: a second and third spell for the run's two
   active slots while they are open, then global passives — damage, cooldown,
   area, crit, survivability — for the rest of the run.
-- Three enemy archetypes (swarm, fast, tank) on a time-based spawn schedule.
+- Enemy archetypes on a time-based spawn schedule: swarm, fast and tank, then
+  ranged enemies from 6:00 that keep their distance and shoot.
 - Seeded runs: `?seed=<n>` reproduces a run exactly; `?timeScale=<n>` speeds
-  it up for testing; `?invulnerable=1` drops contact damage so an unattended
-  run reaches the boss.
+  it up for testing; `?invulnerable=1` drops every hit so an unattended run
+  reaches the boss; `?enemies=ranged,tank` lets only those types spawn.
 - Dev switches: `?debug=textures` plays every atlas animation in a labelled
   grid; `?debug=collisions` runs the collision pairs on their own.
 

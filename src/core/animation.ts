@@ -96,7 +96,7 @@ export interface EnemyPose {
   readonly phase: EnemyPhase;
   /** Used by the tank, whose walk and hurt are drawn per facing. */
   readonly facing: Facing;
-  /** Horizontal velocity sign, used by the swarm, which flips instead of turning. */
+  /** Horizontal velocity sign, used by the swarm and the ranged enemy, which flip instead of turning. */
   readonly velocityX: number;
 }
 
@@ -106,9 +106,10 @@ export interface Clip {
 }
 
 /**
- * Swarm and fast have one clip per phase; the tank walks and flinches per
- * facing (its sheet calls moving `walk`). The swarm mirrors itself to face its
- * direction of travel; nothing else flips, every other side is drawn.
+ * Swarm, fast and ranged have one clip per phase; the tank walks and flinches
+ * per facing (its sheet calls moving `walk`). The swarm and the ranged enemy
+ * (#126) are drawn facing right and mirror themselves to face left; nothing
+ * else flips, every other side is drawn.
  */
 export function enemyAnimation(pose: Readonly<EnemyPose>): Clip {
   const { kind, phase, facing, velocityX } = pose;
@@ -117,7 +118,8 @@ export function enemyAnimation(pose: Readonly<EnemyPose>): Clip {
     if (phase === 'hurt') return { name: `tank.hurt.${facing}`, flipX: false };
     return { name: `tank.${phase}`, flipX: false };
   }
-  return { name: `${kind}.${phase}`, flipX: kind === 'swarm' && velocityX < 0 };
+  const mirrors = kind === 'swarm' || kind === 'ranged';
+  return { name: `${kind}.${phase}`, flipX: mirrors && velocityX < 0 };
 }
 
 export interface BossPose {

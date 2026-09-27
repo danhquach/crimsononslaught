@@ -21,8 +21,14 @@ export interface Wave {
   damageMul: number;
 }
 
-/** Every regular type, once the tank has joined at 4:00. */
-const EVERY_TYPE: readonly EnemyType[] = ['swarm', 'fast', 'tank'];
+/** The three melee types, once the tank has joined at 4:00. */
+const MELEE: readonly EnemyType[] = ['swarm', 'fast', 'tank'];
+
+/**
+ * #126: ranged enemies join at 6:00. A new type only ever joins a mid-run row,
+ * so the early rows — and the crowd a seed draws in them — are unchanged.
+ */
+const WITH_RANGED: readonly EnemyType[] = [...MELEE, 'ranged'];
 
 /**
  * #127: a 20-minute run in two-minute rows. Later rows spawn faster and
@@ -32,14 +38,14 @@ const EVERY_TYPE: readonly EnemyType[] = ['swarm', 'fast', 'tank'];
 export const WAVES: readonly [Wave, ...Wave[]] = [
   { startTime: 0, types: ['swarm'], spawnsPerSecond: 1.5, hpMul: 1, damageMul: 1 },
   { startTime: 120, types: ['swarm', 'fast'], spawnsPerSecond: 2, hpMul: 1.2, damageMul: 1.1 },
-  { startTime: 240, types: EVERY_TYPE, spawnsPerSecond: 2.5, hpMul: 1.4, damageMul: 1.2 },
-  { startTime: 360, types: EVERY_TYPE, spawnsPerSecond: 3, hpMul: 1.6, damageMul: 1.3 },
-  { startTime: 480, types: EVERY_TYPE, spawnsPerSecond: 3.5, hpMul: 1.8, damageMul: 1.4 },
-  { startTime: 600, types: EVERY_TYPE, spawnsPerSecond: 4, hpMul: 2, damageMul: 1.5 },
-  { startTime: 720, types: EVERY_TYPE, spawnsPerSecond: 4.5, hpMul: 2.2, damageMul: 1.6 },
-  { startTime: 840, types: EVERY_TYPE, spawnsPerSecond: 5, hpMul: 2.4, damageMul: 1.7 },
-  { startTime: 960, types: EVERY_TYPE, spawnsPerSecond: 5.5, hpMul: 2.6, damageMul: 1.8 },
-  { startTime: 1080, types: EVERY_TYPE, spawnsPerSecond: 6, hpMul: 2.8, damageMul: 1.9 },
+  { startTime: 240, types: MELEE, spawnsPerSecond: 2.5, hpMul: 1.4, damageMul: 1.2 },
+  { startTime: 360, types: WITH_RANGED, spawnsPerSecond: 3, hpMul: 1.6, damageMul: 1.3 },
+  { startTime: 480, types: WITH_RANGED, spawnsPerSecond: 3.5, hpMul: 1.8, damageMul: 1.4 },
+  { startTime: 600, types: WITH_RANGED, spawnsPerSecond: 4, hpMul: 2, damageMul: 1.5 },
+  { startTime: 720, types: WITH_RANGED, spawnsPerSecond: 4.5, hpMul: 2.2, damageMul: 1.6 },
+  { startTime: 840, types: WITH_RANGED, spawnsPerSecond: 5, hpMul: 2.4, damageMul: 1.7 },
+  { startTime: 960, types: WITH_RANGED, spawnsPerSecond: 5.5, hpMul: 2.6, damageMul: 1.8 },
+  { startTime: 1080, types: WITH_RANGED, spawnsPerSecond: 6, hpMul: 2.8, damageMul: 1.9 },
   { startTime: 1200, types: [], spawnsPerSecond: 0, hpMul: 1, damageMul: 1 },
 ];
 

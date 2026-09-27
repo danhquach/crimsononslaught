@@ -1867,6 +1867,32 @@
         [{ "anim": "pond", "cols": [1, 2], "centred": true }],
         [{ "anim": "pond", "cols": [1, 2], "centred": true }]
       ]
+    },
+    {
+      "key": "ranged",
+      "ticket": "CO-104",
+      "file": "CO-104/enemy_ranged.png",
+      "page": 13,
+      "cols": 6,
+      "rows": 4,
+      "sheetCell": 144,
+      "maxMagenta": 20,
+      "rowSpecs": [
+        [{ "anim": "move", "cols": [1, 4] }],
+        [{ "anim": "hurt", "cols": [1, 1] }],
+        [{ "anim": "death", "cols": [1, 4] }],
+        [{ "anim": "spawn", "cols": [1, 4] }]
+      ]
+    },
+    {
+      "key": "ranged",
+      "ticket": "CO-104",
+      "file": "CO-104/ranged_shot.png",
+      "page": 13,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 220,
+      "rowSpecs": [[{ "anim": "shot", "cols": [1, 4], "centred": true }]]
     }
   ]
 }
