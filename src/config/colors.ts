@@ -13,6 +13,9 @@ export const TEXTURE_KEYS = [
   'enemy_fast',
   'enemy_tank',
   'enemy_ranged',
+  'enemy_exploder',
+  'enemy_splitter',
+  'enemy_splitling',
   'boss',
   'gem',
   'proj_fire',
@@ -56,6 +59,11 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // #126: a diamond, the one enemy silhouette nothing else uses; with the atlas
   // it plays its own sheet (CO-104).
   enemy_ranged: { shape: 'diamond', color: 0xd84315, width: 22, height: 22 },
+  // #126: the exploder a bright warning yellow-orange, the splitter a large
+  // olive disc and its splitling a small one, so a child reads as its parent's.
+  enemy_exploder: { shape: 'triangle', color: 0xffca28, width: 22, height: 22 },
+  enemy_splitter: { shape: 'circle', color: 0x827717, width: 30, height: 30 },
+  enemy_splitling: { shape: 'circle', color: 0xafb42b, width: 13, height: 13 },
   boss: { shape: 'ring', color: 0x9c27b0, width: 80, height: 80, thickness: 10 },
   gem: { shape: 'diamond', color: 0x69f0ae, width: 12, height: 16 },
   proj_fire: { shape: 'circle', color: 0xff6d00, width: 12, height: 12 },

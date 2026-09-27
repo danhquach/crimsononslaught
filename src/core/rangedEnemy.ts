@@ -55,8 +55,3 @@ export function inFireDistance(
 ): boolean {
   return Math.hypot(target.x - from.x, target.y - from.y) <= fireDistance;
 }
-
-/** A shot's damage as the spawning wave scaled it (#127): rounded, never below 1. */
-export function scaledShotDamage(shotDamage: number, damageMul: number): number {
-  return Math.max(1, Math.round(shotDamage * damageMul));
-}

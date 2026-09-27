@@ -32,6 +32,9 @@ describe('pickup tunables', () => {
       fast: { chance: 0.2, value: 1 },
       tank: { chance: 1, value: 3 },
       ranged: { chance: 0.3, value: 1 },
+      exploder: { chance: 0.25, value: 1 },
+      splitter: { chance: 0.5, value: 1 },
+      splitling: { chance: 0, value: 1 },
     });
     expect(BOSS_EMBERS).toBe(100);
     expect(CONSUMABLE_CHANCE).toBe(0.003);

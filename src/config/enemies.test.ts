@@ -10,7 +10,15 @@ import {
 
 describe('enemy types', () => {
   it('lists the regular enemies: the spec’s three, then #126’s', () => {
-    expect(ENEMY_TYPES).toEqual(['swarm', 'fast', 'tank', 'ranged']);
+    expect(ENEMY_TYPES).toEqual([
+      'swarm',
+      'fast',
+      'tank',
+      'ranged',
+      'exploder',
+      'splitter',
+      'splitling',
+    ]);
   });
 
   it('isEnemyType accepts only known types', () => {
@@ -55,6 +63,33 @@ describe('enemy archetypes', () => {
       radius: 11,
       texture: 'enemy_ranged',
     });
+    expect(ENEMY_ARCHETYPES.exploder).toEqual({
+      hp: 14,
+      speed: 120,
+      contactDamage: 3,
+      radius: 11,
+      texture: 'enemy_exploder',
+    });
+    expect(ENEMY_ARCHETYPES.splitter).toEqual({
+      hp: 36,
+      speed: 60,
+      contactDamage: 6,
+      radius: 15,
+      texture: 'enemy_splitter',
+    });
+    expect(ENEMY_ARCHETYPES.splitling).toEqual({
+      hp: 6,
+      speed: 105,
+      contactDamage: 2,
+      radius: 7,
+      texture: 'enemy_splitling',
+      loot: false,
+    });
+  });
+
+  it('drops loot from every type but the splitter’s child (#126)', () => {
+    const lootless = ENEMY_TYPES.filter((type) => ENEMY_ARCHETYPES[type].loot === false);
+    expect(lootless).toEqual(['splitling']);
   });
 
   it('points every archetype at a generated texture key', () => {

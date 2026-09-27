@@ -70,6 +70,15 @@ export interface WaveScale {
 export const UNSCALED: WaveScale = { hpMul: 1, damageMul: 1 };
 
 /**
+ * A damage figure as a wave scales it (#127): multiplied and rounded to a
+ * whole number, never below 1. Contact damage, a ranged shot and an exploder's
+ * blast (#126) all scale this way.
+ */
+export function scaleDamage(amount: number, damageMul: number): number {
+  return Math.max(1, Math.round(amount * damageMul));
+}
+
+/**
  * An archetype row as a wave spawns it (#127): hp and contact damage multiplied
  * and rounded to whole numbers, never below 1. Speed, radius and texture are
  * the row's own.
@@ -81,6 +90,6 @@ export function scaleArchetype(
   return {
     ...archetype,
     hp: Math.max(1, Math.round(archetype.hp * scale.hpMul)),
-    contactDamage: Math.max(1, Math.round(archetype.contactDamage * scale.damageMul)),
+    contactDamage: scaleDamage(archetype.contactDamage, scale.damageMul),
   };
 }

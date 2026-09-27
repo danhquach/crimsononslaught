@@ -53,9 +53,10 @@ describe('pickupHelpRows', () => {
     expect(row('Relic').effect).toContain(`1 of ${MAX_OFFER_SIZE}`);
   });
 
-  it('names every enemy type that only sometimes drops an Ember', () => {
-    const some = Object.entries(EMBER_DROPS).filter(([, drop]) => drop.chance < 1);
-    for (const [type] of some) expect(row('Ember').source).toContain(type);
+  it('says the other kills only sometimes drop an Ember (#126: too many types to name)', () => {
+    expect(row('Ember').source).toBe(
+      `every tank kill (worth ${EMBER_DROPS.tank.value}); some other kills; ${BOSS_EMBERS} from the boss`,
+    );
   });
 
   it('tells the magnet pickup apart from the Magnet passive', () => {
