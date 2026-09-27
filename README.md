@@ -66,6 +66,11 @@ npm run format     # Prettier (write)
 `test:e2e` starts its own Vite dev server and drives Chromium; the first run
 needs the browser installed once with `npx playwright install chromium`.
 
+The Help screen's feedback form posts to a form-to-email service and needs its
+access key in `VITE_FEEDBACK_ACCESS_KEY` (copy `.env.example` to `.env`).
+Without one the form says it is unavailable; the deploy build reads the key
+from the `FEEDBACK_ACCESS_KEY` Actions secret.
+
 ## Project layout
 
 ```
