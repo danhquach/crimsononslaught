@@ -1,0 +1,173 @@
+{
+  "frames": {
+    "ice.icicle.0": {
+      "frame": {
+        "x": 1000,
+        "y": 1,
+        "w": 32,
+        "h": 12
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 12
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 12
+      }
+    },
+    "ice.spikeRing.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 160,
+        "h": 208
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 208
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 208
+      }
+    },
+    "ice.spikeRing.1": {
+      "frame": {
+        "x": 162,
+        "y": 1,
+        "w": 160,
+        "h": 208
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 208
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 208
+      }
+    },
+    "ice.spikeRing.2": {
+      "frame": {
+        "x": 323,
+        "y": 1,
+        "w": 160,
+        "h": 208
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 208
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 208
+      }
+    },
+    "ice.spikeRing.3": {
+      "frame": {
+        "x": 484,
+        "y": 1,
+        "w": 160,
+        "h": 208
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 208
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 208
+      }
+    },
+    "ice.spikeRing.4": {
+      "frame": {
+        "x": 645,
+        "y": 1,
+        "w": 160,
+        "h": 208
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 208
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 208
+      }
+    },
+    "ice.spikeRing.5": {
+      "frame": {
+        "x": 806,
+        "y": 1,
+        "w": 160,
+        "h": 208
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 208
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 208
+      }
+    },
+    "ice.urchin.0": {
+      "frame": {
+        "x": 967,
+        "y": 1,
+        "w": 32,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 32
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 256
+    },
+    "scale": "1"
+  }
+}

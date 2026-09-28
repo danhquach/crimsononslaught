@@ -502,21 +502,21 @@ enemy cap can bury is not a warning.
 | Spell | id | Behaviour | Needs |
 |---|---|---|---|
 | Ice Arrow (default) | `ice` | Fast single projectile, small slow on hit, no AoE so it fires faster than Fire Bolt | — |
-| Frost Nova Bomb | `ice_nova_bomb` | Slow bomb detonates into a frost nova, slows the group | — |
+| Frost Nova Bomb | `ice_nova_bomb` | A spinning ice bomb rolls toward the densest group spraying icicles, then bursts into a freezing ring (reworked by CO-182, `2026-09-28-frost-nova-bomb-rework-design.md`) | — |
 | Ice Shield | `ice_shield` | Absorbing layer on the player; recharges; hurts and slows nearby enemies when it breaks | #134 |
 | Ice Companion | `ice_companion` | Ranged ally, light slow on hit | #133 |
 | Ice Storm | `ice_blizzard` | Ground area, heavy slow, the element's crowd control (renamed from Blizzard, #219) | #135 |
 
 | Field | `ice` | `ice_nova_bomb` | `ice_shield` | `ice_companion` | `ice_blizzard` |
 |---|---|---|---|---|---|
-| `cooldown` | 0.8 | 2.2 | — | — | 12 |
+| `cooldown` | 0.8 | 3.5 | — | — | 12 |
 | `attackCooldown` | — | — | — | 1.4 | — |
 | `damage` | 10 | 24 | — | 7 | — |
 | `tickDamage` | — | — | — | — | 6 |
 | `tickRate` | — | — | — | — | 0.5 |
 | `radius` | — | 110 | — | — | 120 |
-| `speed` | 380 | 220 | — | 320 | — |
-| `range` | 189 | 135 | — | — | — |
+| `speed` | 380 | 80 | — | 320 | — |
+| `range` | 189 | 240 | — | — | — |
 | `targetRange` | — | — | — | 260 | 180 |
 | `leashRadius` | — | — | — | 60 | — |
 | `duration` | — | — | — | — | 4.0 |
@@ -524,6 +524,11 @@ enemy cap can bury is not a warning.
 | `slowDuration` | 1.0 | 2.0 | 2.0 | 1.5 | 1.0 |
 | `freezeChance` | — | 0.15 | — | — | — |
 | `freezeDuration` | — | 1.0 | — | — | — |
+| `throwInterval` | — | 0.25 | — | — | — |
+| `icicles` | — | 2 | — | — | — |
+| `icicleDamage` | — | 14 | — | — | — |
+| `icicleSpeed` | — | 320 | — | — | — |
+| `icicleRange` | — | 110 | — | — | — |
 | `shieldHp` | — | — | 60 | — | — |
 | `rechargeDelay` | — | — | 6.0 | — | — |
 | `breakDamage` | — | — | 40 | — | — |

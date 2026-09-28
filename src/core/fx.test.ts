@@ -4,6 +4,7 @@ import { ENEMY_ARCHETYPES } from '../config/enemies';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { BASE_EARTH_SHIELD_STATS } from '../config/shields';
 import { BASE_AREA_STATS } from '../config/areas';
+import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
 import { ART_BOXES } from '../config/frames';
 import { BASE_TORNADO_STATS } from '../config/lightningRoster';
 import { BASE_METEOR_STATS } from '../config/strikes';
@@ -20,6 +21,7 @@ import {
   flightFlipY,
   flightRotation,
   novaScale,
+  spikeRingScale,
   spinTimeScale,
   statusOverlay,
   statusTint,
@@ -48,6 +50,12 @@ describe('effect scales (CO-082)', () => {
   it('draws the nova at radius / 90', () => {
     expect(novaScale(90)).toBe(1);
     expect(novaScale(180)).toBe(2);
+  });
+
+  it('draws the bomb burst at radius / 61, so the ring rim is the burst (CO-182)', () => {
+    expect(spikeRingScale(61)).toBe(1);
+    expect(spikeRingScale(122)).toBe(2);
+    expect(spikeRingScale(BASE_NOVA_BOMB_STATS.radius)).toBeCloseTo(1.803, 3);
   });
 
   it('draws a ground area at radius / 100, so the ring is the patch', () => {

@@ -29,17 +29,22 @@ describe('ice roster ids', () => {
 });
 
 describe('ice roster stat blocks', () => {
-  it('carries the spec §9.3 numbers for Frost Nova Bomb', () => {
+  it('carries the CO-182 rework numbers for Frost Nova Bomb', () => {
     expect(BASE_NOVA_BOMB_STATS).toEqual({
-      cooldown: 2.2,
+      cooldown: 3.5,
       damage: 24,
       radius: 110,
-      speed: 220,
-      range: 135,
+      speed: 80,
+      range: 240,
       slowPct: 0.4,
       slowDuration: 2,
       freezeChance: 0.15,
       freezeDuration: 1,
+      throwInterval: 0.25,
+      icicles: 2,
+      icicleDamage: 14,
+      icicleSpeed: 320,
+      icicleRange: 110,
     });
     expect(BASE_ICE_ROSTER_STATS.ice_nova_bomb).toBe(BASE_NOVA_BOMB_STATS);
   });
@@ -60,5 +65,19 @@ describe('ice roster presentation', () => {
       expect(ICE_ROSTER_CARDS[id].description, id).not.toContain('\n');
       expect(ICE_ROSTER_CARDS[id].stats.length, id).toBeGreaterThan(0);
     }
+  });
+
+  it('says what the reworked bomb does, with its own numbers (CO-182)', () => {
+    const card = ICE_ROSTER_CARDS.ice_nova_bomb;
+    expect(card.description).toBe(
+      'Rolls a spinning ice bomb through the crowd. It sprays icicles, then bursts into a freezing ring.',
+    );
+    expect(card.stats).toEqual([
+      ['Cooldown', '3.5 s'],
+      ['Icicles', '14 each'],
+      ['Burst', '24 in 110'],
+      ['Slow', '40% for 2 s'],
+      ['Freeze', '15% for 1 s'],
+    ]);
   });
 });

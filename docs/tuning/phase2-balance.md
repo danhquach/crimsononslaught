@@ -869,3 +869,37 @@ died there in #210's rounds 1 and 4).
   Tornado and Chain Lightning.
 - **Not tried:** a wider orbit, two blades, blades that grow with a spell level
   (spells have no levels), a lunge or a thrown arc.
+
+# Frost Nova Bomb rework (CO-182, 2026-09-28)
+
+Ticket: [#303](https://github.com/danhquach/crimsononslaught/issues/303) · Spec: `docs/superpowers/specs/2026-09-28-frost-nova-bomb-rework-design.md`
+
+**Question.** Does the reworked bomb land its bursts on groups, and does its
+spray land at all?
+
+**Method.**
+- The 20-minute bot: mortal, kiting, Ice with `?loadout=ice_nova_bomb`.
+- `timeScale=8`, one Vite server on its own port, runs one at a time.
+- Each run stopped at 10:00 of run time and read the bomb's test hook
+  (`iceReport`) for the enemies each burst caught and the icicle hits.
+
+**Burst trigger.** The first cut burst once 3 enemies stood within 50 px, with no
+arming distance. In a crowd round the player, 9 of 11 bombs burst on their first
+frame: 0 throws after 0.02 s. The bomb then acted like the old nova at the
+player's feet and never sprayed. The rule now arms after 120 px and then bursts
+once its 110 px ring would catch 3.
+
+| Seed | Bursts | On ≥3 enemies | On none | Icicle hits | Burst hits |
+|---|---|---|---|---|---|
+| 1 | 219 | 120 (55%) | 66 | 700 | 656 |
+| 2 | 187 | 119 (64%) | 37 | 685 | 715 |
+| 3 | 205 | 136 (66%) | 42 | 775 | 705 |
+
+- **Result:**
+  - Most bursts land on a group: 55–66% catch 3 or more.
+  - The spray lands about 3.5 hits a bomb, as much damage as the bursts deal.
+  - A fifth to a third of the bursts catch nobody. These are mostly bombs that roll
+    their full range through a thin field.
+- **Not yet run:** the ticket's balance check, Ice Storm alone vs Ice Storm + Frost Nova
+  Bomb over 40 pooled 20-minute runs each. It waits for #304 (Ice Storm radius 120,
+  4 s), so the baseline is the storm players will get.

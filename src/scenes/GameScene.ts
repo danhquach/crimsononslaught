@@ -733,14 +733,37 @@ export class GameScene extends Phaser.Scene {
    * Test hook (#141): Ice Arrow and Frost Nova Bomb, whichever is equipped —
    * hits each has landed and shots each has in the air right now. The browser
    * suite watches a run land hits with both and hold their pool caps.
+   *
+   * CO-182: the bomb's entry also carries `icicleHits` (icicles that broke on
+   * an enemy), `burstCaught` (enemies each burst caught, in order) and
+   * `bombSpin` (the first rolling bomb's throw id and rotation, or `null`), so the suite
+   * can tell the bomb spins, its icicles land and its bursts catch groups.
    */
-  get iceReport(): { id: RosterSpellId; hits: number; live: number }[] {
+  get iceReport(): {
+    id: RosterSpellId;
+    hits: number;
+    live: number;
+    icicleHits?: number;
+    burstCaught?: number[];
+    bombSpin?: { id: number; rotation: number } | null;
+  }[] {
     return this.spells.spells
       .filter(
         (spell): spell is IceArrowSpell | NovaBombSpell =>
           spell instanceof IceArrowSpell || spell instanceof NovaBombSpell,
       )
-      .map((spell) => ({ id: spell.id, hits: spell.hits, live: spell.liveCount }));
+      .map((spell) =>
+        spell instanceof NovaBombSpell
+          ? {
+              id: spell.id,
+              hits: spell.hits,
+              live: spell.liveCount,
+              icicleHits: spell.icicleHits,
+              burstCaught: [...spell.burstCaught],
+              bombSpin: spell.bombSpin,
+            }
+          : { id: spell.id, hits: spell.hits, live: spell.liveCount },
+      );
   }
 
   /**

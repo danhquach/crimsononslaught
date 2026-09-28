@@ -5,10 +5,12 @@ import type { SpellCard } from './spells';
 /**
  * The rest of the Ice roster (#141, Phase 2 spec §9.3): Frost Nova Bomb, the
  * one Ice spell with no mechanic to share the way Ice Shield, Ice Companion
- * and Ice Storm share theirs — it is its own class, `spells/NovaBombSpell.ts`,
- * Phase 1's Frost Nova thrown rather than pulsed from the player.
+ * and Ice Storm share theirs — it is its own class, `spells/NovaBombSpell.ts`.
+ * Since CO-182 it is a slow spinning ice urchin that rolls toward the densest
+ * group, sprays icicles in a spiral and bursts into its freezing ring inside
+ * the pack, rather than Phase 1's Frost Nova thrown at the nearest enemy.
  *
- * The block is the spec's §9.3 table verbatim.
+ * The block is the CO-182 rework table, not the spec's original §9.3 one.
  *
  * Pure data, no Phaser import.
  */
@@ -21,17 +23,25 @@ export function isIceRosterSpellId(value: unknown): value is IceRosterSpellId {
   return typeof value === 'string' && (ICE_ROSTER_SPELL_IDS as readonly string[]).includes(value);
 }
 
-/** Spec §9.3 base block. */
+/**
+ * The CO-182 rework base block (`docs/superpowers/specs/2026-09-28-frost-nova-bomb-rework-design.md`
+ * §4), not the §9.3 table it replaces.
+ */
 export const BASE_NOVA_BOMB_STATS: Readonly<NovaBombStats> = {
-  cooldown: 2.2,
+  cooldown: 3.5,
   damage: 24,
   radius: 110,
-  speed: 220,
-  range: 135,
+  speed: 80,
+  range: 240,
   slowPct: 0.4,
   slowDuration: 2,
   freezeChance: 0.15,
   freezeDuration: 1,
+  throwInterval: 0.25,
+  icicles: 2,
+  icicleDamage: 14,
+  icicleSpeed: 320,
+  icicleRange: 110,
 };
 
 export const BASE_ICE_ROSTER_STATS = {
@@ -43,11 +53,12 @@ export const ICE_ROSTER_CARDS: Readonly<Record<IceRosterSpellId, SpellCard>> = {
   ice_nova_bomb: {
     name: 'Frost Nova Bomb',
     color: PLACEHOLDERS.fx_nova.color,
-    description: 'Lobs a slow bomb that bursts into a freezing ring, slowing the whole group.',
+    description:
+      'Rolls a spinning ice bomb through the crowd. It sprays icicles, then bursts into a freezing ring.',
     stats: [
-      ['Cooldown', '2.2 s'],
-      ['Damage', '24'],
-      ['Radius', '110'],
+      ['Cooldown', '3.5 s'],
+      ['Icicles', '14 each'],
+      ['Burst', '24 in 110'],
       ['Slow', '40% for 2 s'],
       ['Freeze', '15% for 1 s'],
     ],

@@ -206,6 +206,13 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // `ice.blizzard` above is no longer drawn by the spell and is kept for later.
   spec('ice.stormSleet', 4, 1, LOOP),
   spec('ice.stormShard', 4, 12, ONCE),
+  // Frost Nova Bomb (CO-182): the ice urchin that rolls and the icicle it
+  // throws, both stills (the engine spins the one and turns the other along
+  // its flight), and the burst: a frost ring whose spikes rise and shatter.
+  // Ice Shield still bursts with `ice.nova`.
+  spec('ice.urchin', 1, 1, LOOP),
+  spec('ice.icicle', 1, 1, LOOP),
+  spec('ice.spikeRing', 6, 15, ONCE),
 
   spec('lightning.tornado', 4, 10, LOOP),
   spec('lightning.sword', 4, 12, LOOP),
@@ -344,6 +351,9 @@ export const STATIC_FRAMES: Readonly<Partial<Record<TextureKey, FrameName>>> = {
   // sprites the spells already build keep the size they were tuned at
   // (`docs/art/sheets/manifest.json` `sheetCell`).
   proj_ice: 'ice.arrow.0',
+  // CO-182: Frost Nova Bomb's urchin and its icicle, the icicle drawn flying right.
+  proj_nova_bomb: 'ice.urchin.0',
+  proj_icicle: 'ice.icicle.0',
   shield_ice: 'ice.shield.0',
   fx_telegraph: 'fire.meteorMark.0',
   // CO-106: the floor pickups, each cut to its placeholder's size.
