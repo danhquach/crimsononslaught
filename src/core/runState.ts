@@ -9,8 +9,8 @@ import { applyXpGain, xpToNext } from './xp';
 
 /**
  * The run itself (spec §4 step 2, §5): the clock, the phase it drives, and the
- * tallies the HUD and the result screen read — kills, level, xp, perks taken,
- * and the Embers, consumables and relics picked up (#195).
+ * tallies the HUD and the result screen read — kills, level, xp, and the
+ * Embers, consumables and relics picked up (#195).
  *
  * Every change is published on the Game scene's emitter through the `run:*`
  * contract in `core/runEvents.ts`, so nothing polls this object. The two
@@ -97,7 +97,6 @@ export class RunState {
   private killCount = 0;
   private levelValue = 1;
   private xpValue = 0;
-  private readonly perksTaken: string[] = [];
   private embersValue = 0;
   private consumableCount = 0;
   private relicCount = 0;
@@ -154,15 +153,6 @@ export class RunState {
   /** XP still needed to leave the current level (spec §5's curve, `core/xp.ts`). */
   get xpToNext(): number {
     return xpToNext(this.levelValue);
-  }
-
-  /**
-   * Display names of the upgrades taken, in pick order — a passive's name each
-   * time a rank of it is picked, and a spell's when it is equipped. A copy: the
-   * run owns the list.
-   */
-  get perks(): readonly string[] {
-    return [...this.perksTaken];
   }
 
   /**
@@ -259,11 +249,6 @@ export class RunState {
     return this.relicCount;
   }
 
-  /** One level-up pick, by display name (a passive rank or a newly equipped spell). */
-  recordPerk(displayName: string): void {
-    this.perksTaken.push(displayName);
-  }
-
   /** The summary the result screen renders (`core/resultModel.ts`). */
   stats(spellId: SpellId): RunStats {
     return {
@@ -271,7 +256,6 @@ export class RunState {
       level: this.levelValue,
       kills: this.killCount,
       spellId,
-      perks: this.perks,
       embers: this.embersValue,
       consumables: this.consumableCount,
       relics: this.relicCount,

@@ -8,11 +8,13 @@ import {
   START_AT_REGISTRY_KEY,
   TIME_SCALE_REGISTRY_KEY,
   isGamePayload,
+  type BuildSpell,
   type GamePayload,
   type LevelUpPayload,
   type Outcome,
   type PausePayload,
   type ResultPayload,
+  type RunBuild,
 } from '../core/scenePayloads';
 import {
   PAUSE_EVENT,
@@ -2051,10 +2053,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.payload || this.pausing || this.run.phase === 'over') return false;
     const view = pauseView({
       level: this.run.level,
-      spells: this.spells.spells.map((spell) => {
-        const card = this.cards.get(spell.id);
-        return { id: spell.id, name: card?.name ?? spell.id, color: card?.color ?? 0xffffff };
-      }),
+      spells: this.equippedSpells(),
       passives: this.spells.loadout.passives,
       relics: this.spells.loadout.relics,
       kills: this.run.kills,
@@ -2065,6 +2064,15 @@ export class GameScene extends Phaser.Scene {
     this.audio.play('ui.confirm');
     this.pauseUnder(SCENE.pause, payload);
     return true;
+  }
+
+  /** What casts right now, in equip order, as the pause and result screens draw it. */
+  private equippedSpells(): BuildSpell[] {
+    return this.spells.spells.flatMap((spell) => {
+      if (!isRosterSpellId(spell.id)) return [];
+      const card = this.cards.get(spell.id);
+      return [{ id: spell.id, name: card?.name ?? spell.id, color: card?.color ?? 0xffffff }];
+    });
   }
 
   /**
@@ -2128,9 +2136,6 @@ export class GameScene extends Phaser.Scene {
     const taken = card.kind === 'active' ? this.equipActive(card.id) : this.takePassive(card.id);
     if (!taken) return;
     this.audio.play('progress.perk');
-    // `RunStats.perks` carries display names; Result collapses repeats to `name ×n`.
-    // Relic buffs stay out of it: Result lists perks as the passives taken.
-    this.run.recordPerk(card.name);
   }
 
   /** A picked active fills the lowest open slot and starts casting (spec §3.1). */
@@ -2201,7 +2206,14 @@ export class GameScene extends Phaser.Scene {
     const save = recordRun(this.save(), stats, outcome, earned);
     this.registry.set(SAVE_REGISTRY_KEY, save);
     if (!storeSaveJson(serializeSave(save))) console.warn('[save] could not store progress');
-    const payload: ResultPayload = { outcome, stats, earned, balance: save.currency };
+    // #290: the build as the pause screen shows it, for Result's tiles.
+    const { passives, relics } = this.spells.loadout;
+    const build: RunBuild = {
+      spells: this.equippedSpells(),
+      passives: [...passives],
+      relics: [...relics],
+    };
+    const payload: ResultPayload = { outcome, stats, build, earned, balance: save.currency };
     // The HUD is a parallel scene; stopping Game does not stop it.
     this.scene.stop(SCENE.hud);
     this.scene.start(SCENE.result, payload);

@@ -17,7 +17,6 @@ const stats: RunStats = {
   level: 8,
   kills: 1234,
   spellId: 'fire',
-  perks: ['Power'],
   embers: 140,
   consumables: 3,
   relics: 2,
