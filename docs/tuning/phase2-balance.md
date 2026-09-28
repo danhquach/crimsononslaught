@@ -621,3 +621,172 @@ default spell's reach.
 - **Five-seed confirmation of the shipped values was skipped** at the owner's
   call. So was the main-with-new-bot row that would separate the bot's share
   of the gain from the config's.
+
+# The 20-minute run (#210, 2026-09-28)
+
+Ticket: [#210](https://github.com/danhquach/crimsononslaught/issues/210) · Spec: `docs/superpowers/specs/2026-09-23-twenty-minute-run-design.md`
+
+**Question.** #127 made the run 20 minutes long with the boss at the end, on
+starting values. Does every element reach the boss, and does the boss fall in
+the 45–90 s window? The PM kept that window for the 20-minute run, and asked for
+Fire to be lifted rather than left as the hard element.
+
+**Answer: `main` ships unchanged. The wave table cannot close the gap that is
+left.** Two sweeps of `main` won 28 of 40 runs. The best candidate, with four
+changes (below), won 29 of 40, which is the same number inside the noise.
+Where the boss falls outside the window, the loadout is the cause, not the
+waves: builds with little reach stall the run and drag the boss fight out,
+whatever the waves do. That goes to a follow-up.
+
+**Method.** The #126 bot and method, unchanged: fills the slots first, then
+passives damage-first. Mortal runs, 5 seeds × 4 elements, `timeScale=8`, one
+sweep per working tree on its own port, two runs at a time, a fresh Vite server
+for each round, no config edits mid-sweep. The bot now also logs the full
+loadout from the result screen (spells, passives with ranks, relics).
+
+**The noise sets what this pass can see.** Rounds 4 and 5 run identical configs
+up to 20:00; only boss HP differs, which cannot matter before the boss. They
+won 17/20 and 12/20, and Earth alone went 5/5 → 2/5. The seed fixes the crowd,
+not the run: level-up timing, and with it the offers, shift with the frame
+timing. At 20 runs a round, a change under about 5 wins cannot be told from
+noise.
+
+## Round 0 — `main` (`ab5ff1f`), two sweeps
+
+Second sweep, with loadouts (the element's default spell is always slot 1):
+
+| Element | Seed | Result | Level | Boss TTK | Other actives | Passives (ranks) |
+|---|---|---|---|---|---|---|
+| Fire | 1 | win 20:48 | 48 | 48 s | Fire Companion, Fire Wave | Persistence 11 · Power 9 · Haste 8 · Expanse 8 · Vitality 3 · Velocity 2 · Avarice 2 · Savagery 1 · Regeneration 1 |
+| Fire | 2 | died 14:23 | 37 | — | Fire Wave, Fire Companion | Expanse 6 · Haste 4 · Vitality 4 · Avarice 4 · Persistence 3 · Ward 2 · Precision 2 · Regeneration 2 · Magnet 2 · Power 2 · Savagery 1 · Velocity 1 · Swift 1 |
+| Fire | 3 | win 20:44 | 46 | 44 s | Fire Dragon, Fire Wave | Power 9 · Haste 7 · Ward 6 · Persistence 6 · Expanse 4 · Vitality 3 · Regeneration 2 · Magnet 2 · Precision 1 · Swift 1 · Velocity 1 · Savagery 1 |
+| Fire | 4 | win 20:27 | 55 | 27 s | Fire Companion, Fire Wave | Haste 11 · Power 11 · Expanse 11 · Persistence 6 · Precision 4 · Vitality 3 · Savagery 2 · Ward 1 · Velocity 1 · Avarice 1 · Regeneration 1 |
+| Fire | 5 | died 10:34 | 26 | — | Meteor, Fire Companion | Haste 8 · Expanse 5 · Power 4 · Swift 2 · Velocity 2 · Precision 2 |
+| Ice | 1 | win 22:05 | 52 | 125 s | Frost Nova Bomb, Ice Shield | Power 14 · Haste 7 · Regeneration 5 · Persistence 4 · Expanse 3 · Avarice 3 · Magnet 3 · Savagery 3 · Velocity 3 · Precision 2 · Ward 1 · Swift 1 |
+| Ice | 2 | died 9:34 | 16 | — | Ice Companion, Ice Storm | Persistence 4 · Expanse 3 · Haste 2 · Regeneration 1 · Power 1 · Ward 1 · Precision 1 |
+| Ice | 3 | win 21:11 | 48 | 71 s | Frost Nova Bomb, Ice Shield | Power 12 · Haste 11 · Persistence 5 · Expanse 5 · Velocity 3 · Vitality 3 · Regeneration 2 · Avarice 2 · Swift 1 · Savagery 1 |
+| Ice | 4 | win 20:39 | 55 | 39 s | Frost Nova Bomb, Ice Companion | Power 11 · Expanse 11 · Haste 10 · Persistence 8 · Velocity 3 · Ward 3 · Vitality 2 · Swift 1 · Avarice 1 · Magnet 1 · Regeneration 1 |
+| Ice | 5 | win 20:41 | 55 | 41 s | Ice Companion, Frost Nova Bomb | Power 12 · Expanse 12 · Haste 9 · Avarice 3 · Regeneration 3 · Persistence 3 · Swift 2 · Savagery 2 · Magnet 2 · Velocity 2 · Vitality 1 · Ward 1 |
+| Lightning | 1 | win 25:53 | 46 | 353 s | Lightning Sword, Chain Lightning | Haste 13 · Power 10 · Expanse 6 · Persistence 4 · Magnet 2 · Velocity 2 · Avarice 2 · Savagery 1 · Regeneration 1 · Swift 1 · Ward 1 |
+| Lightning | 2 | died 8:52 | 20 | — | Tornado, Chain Lightning | Expanse 4 · Savagery 3 · Ward 2 · Power 2 · Haste 1 · Avarice 1 · Persistence 1 · Magnet 1 · Swift 1 · Velocity 1 |
+| Lightning | 3 | win 23:04 | 31 | 184 s | Lightning Sword, Lightning Companion | Haste 9 · Power 5 · Expanse 4 · Regeneration 2 · Persistence 2 · Ward 1 · Vitality 1 · Precision 1 · Swift 1 · Velocity 1 · Savagery 1 |
+| Lightning | 4 | win 20:25 | 57 | 25 s | Lightning Sword, Tornado | Power 17 · Haste 12 · Expanse 10 · Persistence 5 · Magnet 2 · Vitality 2 · Avarice 2 · Savagery 1 · Swift 1 · Velocity 1 · Precision 1 |
+| Lightning | 5 | win 53:52 | 22 | 2032 s | Lightning Companion, Lightning Sword | Haste 6 · Power 4 · Persistence 4 · Expanse 3 · Vitality 1 · Swift 1 |
+| Earth | 1 | win 21:27 | 47 | 87 s | Earth Shield, Boulder | Haste 15 · Power 10 · Persistence 6 · Swift 3 · Expanse 3 · Velocity 2 · Avarice 1 · Ward 1 · Magnet 1 · Precision 1 · Regeneration 1 |
+| Earth | 2 | died 17:21 | 41 | — | Earthquake, Earth Companion | Power 8 · Expanse 8 · Haste 7 · Persistence 5 · Swift 2 · Ward 2 · Regeneration 1 · Pierce 1 · Velocity 1 · Savagery 1 · Precision 1 · Avarice 1 |
+| Earth | 3 | win 20:52 | 46 | 52 s | Boulder, Earth Shield | Power 11 · Haste 9 · Persistence 7 · Expanse 5 · Pierce 3 · Savagery 2 · Ward 2 · Magnet 1 · Regeneration 1 · Velocity 1 · Swift 1 |
+| Earth | 4 | win 25:53 | 32 | 353 s | Earth Shield, Earth Companion | Haste 7 · Persistence 4 · Expanse 4 · Swift 3 · Velocity 3 · Power 3 · Avarice 2 · Ward 2 · Vitality 1 |
+| Earth | 5 | win 24:05 | 33 | 245 s | Earth Shield, Earth Companion | Haste 8 · Power 6 · Persistence 4 · Expanse 3 · Regeneration 3 · Magnet 2 · Velocity 1 · Pierce 1 · Ward 1 · Savagery 1 |
+
+Every run spread its picks
+over 6–13 passives. Power, Haste, Persistence and Expanse led, at 4–17
+ranks each; one of those four was the top pick in every run.
+
+Both sweeps together (the first had no loadout logging):
+
+| Element | Reached the boss | Deaths | Boss TTK, wins (median) | In 45–90 s |
+|---|---|---|---|---|
+| Fire | 7 / 10 | 10:34–15:22 | 27–53 s (37) | 2 / 7 |
+| Ice | 7 / 10 | 8:20–13:07 | 39–1179 s (61) | 3 / 7 |
+| Lightning | 5 / 10 | 8:52–18:18 | 25–2032 s (184) | 0 / 5 |
+| Earth | 9 / 10 | 17:21 | 32–353 s (87) | 4 / 9 |
+| **Total** | **28 / 40** | | | **9 / 28** |
+
+- **Ice and Earth reach the boss on most seeds** (7/10 and 9/10). Fire is no
+  longer the weak element: 7/10, against #126's 1 of 3. Lightning is now the
+  lowest, at 5/10.
+- **Deaths come at 8:20–18:18.** Blasts and shots together took more than half
+  the HP lost in 10 of the 12.
+- **The boss window fails both ways.** Fire kills it too fast (median 37 s).
+  Lightning and some Earth runs take minutes. Four fights ran past 300 s.
+
+## Rounds 1–5 — candidates (seeds 1–5, not shipped)
+
+| Round | Change on top of the previous | Wins | Fights > 300 s |
+|---|---|---|---|
+| 1 | Recycling: an enemy more than 1.5 spawn-ring radii from the view centre moves to the ring point straight across, ahead of the player | 12 / 20 | 1 |
+| 2 | Wave `hpMul` from 6:00: 1.6–2.8 → **1.5–2.1**; `spawnsPerSecond` from 8:00: 3.5–6 → **3.25–4.5**; `BOSS.hp` 7200 → **10800** | 14 / 20 | 0 |
+| 3 | Tank `hp` 60 → **45** | 14 / 20 | 3 |
+| 4 | Round 2 (tank back to 60), and `spawnsPerSecond` from 4:00: **2.25–4** | 17 / 20 | 3 |
+| 5 | Round 4 with `BOSS.hp` **8000** | 12 / 20 | 2 |
+
+Rounds 4 and 5 together won 29 of 40, against `main`'s 28 of 40, with 5
+fights past 300 s against `main`'s 4. On the PM's call, none of it ships.
+
+What the rounds found:
+
+- **A full cap stops the run.** In the worst case, 189–197 tanks that could
+  never catch the kiting player held the cap from 18:00 to 39:00, at level 20. A
+  full cap spawns nothing and pays no XP. Recycling removed that case in round
+  1, and stalls came back in rounds 3–5. Every one had a loadout with none of
+  the four reach actives below.
+- **Where the boss falls outside the window, the loadout is the cause, not
+  the level.** The bot holds the boss at 200–330 px, past every default spell's
+  144–189 px. Across the 84 wins with a logged loadout, the 38 with Fire Dragon,
+  Fire Wave, Boulder or Tornado took 20–273 s (median 62 s, 20 in the window).
+  The 46 without took 39–2032 s (median 126 s, 10 in the window). In the slowest
+  round 4 fights the boss was the only enemy left, and the player lost no HP.
+  Boss HP moves both groups together, so no value puts both in the window.
+- **None of the 38 had a fight past 300 s. All 12 such fights with a logged
+  loadout lacked those four:** 11 paired two of Ice Shield, Earth Shield, a
+  companion, Frost Nova Bomb, Earthquake and Lightning Sword. The 12th was
+  Lightning Sword with Chain Lightning.
+
+## Earth's boss time-to-kill (#175)
+
+#175 found Earth killing the old 5-minute boss in 37–38 s. On `main` now,
+Earth's wins take 32–353 s (median 87 s), and only 2 of 9 are under 45 s. The
+too-fast problem is gone. What remains is the spread above, which the
+follow-up covers.
+
+## Frame rate at the cap
+
+The bot sampled `game.loop.actualFps` and the live count each run-minute. Across
+the 140 runs of this pass, 229 samples had 295–301 enemies alive. They came
+from 30 runs. All 120 runs with a logged loadout ended with three actives
+equipped. Every one read **56–61 fps**, and 222 of them read
+60–61. On `main` alone, 85 samples read 56–61. That was headless Chromium on a
+desktop at 8x. The CI runner was not measured. The cap holds, and no follow-up
+is needed.
+
+## Passives: is one of them always right? (20-minute run)
+
+The CO-125 probe, repeated on `main`: Lightning, invulnerable, seeds 1–3. Once
+the active slots are full, every pick goes into one named passive. The bot
+reached the boss at levels 32–58, against 11–16 on the 5-minute run.
+
+| Policy | TTK (seeds 1–3) | Mean TTK |
+|---|---|---|
+| Spread (the tuning order) | 113 · 150 · 83 s | **115 s** |
+| Power only | 569 · 124 · 169 s | 287 s |
+| Expanse only | 590 · 195 · 260 s | 348 s |
+| Persistence only | 471 · 123 · 474 s | 356 s |
+| Ward only | 716 · 290 · 129 s | 378 s |
+| Haste only | 237 · 587 · 1053 s | 626 s |
+| Vitality only | 731 · 430 · 871 s | 677 s |
+
+- **No passive is an always-pick.** Every single-passive stack lost to
+  spreading, by 2.5x or more on the mean. Haste, the strongest stack at 5
+  minutes, is second worst here; its runs took only 6–9 ranks of it.
+- **Uncapped stacks do not trivialise the boss.** The fastest single-passive
+  run took 123 s.
+- The times are long because the loadout spread above applies here too. The
+  bot's actives differ from run to run, so compare the policies with each
+  other, not with the 45–90 s window.
+
+## Final values versus the #127 starting values
+
+None changed. The wave table, `BOSS.hp` (7200), the XP curve and the passive
+table ship as #127 and #126 left them. No candidate beat `main` by more than
+the noise, and the gap that is left is set by the loadout, which no config in
+this pass reaches.
+
+## Follow-ups
+
+- **[#301](https://github.com/danhquach/crimsononslaught/issues/301) (CO-181):** loadouts with little reach stall the run and drag the boss
+  fight past 4 minutes. The candidate fixes and their numbers are above.
+- **Lightning is now the lowest element.** It reached the boss 5/10 and was
+  never in the window. Most of its slow fights took Lightning Sword.
+- **Recycling is ready if a later pass wants it.** It removed the far-behind cap
+  lock. It was not shipped because the stalls that remain are the loadout case.
+- **The Embers economy** is still out of scope, as #210 said.
