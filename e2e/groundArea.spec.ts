@@ -173,7 +173,7 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
     expect(ringShown, 'a storm hides the ring').toBe(false);
     expect(storm?.reach ?? 0, 'sleet seen inside the storm only').toBeLessThanOrEqual(radius);
     expect(storm?.brightest ?? 0).toBeLessThanOrEqual(1);
-    expect(storm?.shards ?? 0, 'shards bursting at once').toBeLessThanOrEqual(3);
+    expect(storm?.shards ?? 0, 'shards bursting at once').toBeLessThanOrEqual(5);
   }
   expect(
     Math.max(...storms.map((area) => area.storm?.sleet ?? 0)),
@@ -192,7 +192,7 @@ test('ground areas land on the crowd, tick it and come off the ground', async ({
   // fill it for their own reasons, so those samples are left out. Only Ice
   // Arrow and the storm slow since the quake staggers instead (#220), and the
   // polls can miss every one (#235), so frames are swept until one is seen.
-  // The storm's own, at radius 80, are only a few, so none is required.
+  // The storm's own are only a few, so none is required.
   const isChilled = (e: Report['tints'][number]): boolean =>
     e.slowed && !e.frozen && !e.stunned && !e.flashing;
   const chilled = trace.flatMap((report) => report.tints.filter(isChilled));

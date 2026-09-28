@@ -15,7 +15,8 @@ import type { SpellCard } from './spells';
  * slows (#220). Tornado (#136) is this
  * mechanic plus a drift and a pull and belongs to that ticket.
  *
- * Ice Storm's block is the spec's §9.3 table, its radius cut to 80 (#219).
+ * Ice Storm's block is the spec's §9.3 table, its radius cut to 80 (#219), then
+ * raised to 120 with a 4 s storm (#304).
  * Earthquake's §9.5 table gives its cooldown and tick but not its `duration`,
  * which is a tuning value here: a patch that lives longer than Ice Storm's on a
  * longer cooldown. #220 cut its radius to 80 and swapped the slow for a 0.2 s
@@ -34,15 +35,17 @@ export function isAreaSpellId(value: unknown): value is AreaSpellId {
 }
 
 /**
- * Spec §9.3 base block. The radius is 80 (#219): at 180 a patch covered two
- * thirds of the view's height; `targetRange` keeps its reach to the crowd.
+ * Spec §9.3 base block. The radius is 120 (#304): #219 cut it from 180 to 80,
+ * where a patch caught only the middle of a crowd; at 180 it covered two thirds
+ * of the view's height. The storm lasts 4 s, down from 6 (#304), so it is a
+ * wide, quick burst. `targetRange` keeps its reach to the crowd.
  */
 export const BASE_ICE_STORM_STATS: Readonly<GroundAreaStats> = {
   cooldown: 12,
   tickDamage: 6,
   tickRate: 0.5,
-  radius: 80,
-  duration: 6,
+  radius: 120,
+  duration: 4,
   targetRange: 180,
   slowPct: 0.5,
   slowDuration: 1,
@@ -159,8 +162,9 @@ export const AREA_LOOKS: Readonly<Record<AreaSpellId, AreaLook>> = {
         rimFade: 0.25,
         maxLive: 90,
       },
-      // #219's scope change: at radius 80, at most 3 at once or they overlap.
-      shards: { clip: 'ice.stormShard', perSecond: 3, maxLive: 3, reach: 0.85, scale: 0.6 },
+      // #219's scope change: at most 3 at once at radius 80 or they overlap;
+      // radius 120 (#304) has 2.25 times the room.
+      shards: { clip: 'ice.stormShard', perSecond: 5, maxLive: 5, reach: 0.85, scale: 0.6 },
       fade: { fadeInS: 0.4, fadeOutS: 0.6 },
     },
   },
@@ -176,8 +180,9 @@ export const AREA_CARDS: Readonly<Record<AreaSpellId, SpellCard>> = {
     stats: [
       ['Cooldown', '12 s'],
       ['Damage', '6 every 0.5 s'],
-      ['Radius', '80'],
+      ['Radius', '120'],
       ['Slow', '50% for 1 s'],
+      ['Lasts', '4 s'],
     ],
   },
   earth_quake: {

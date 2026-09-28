@@ -36,14 +36,14 @@ describe('area ids', () => {
 });
 
 describe('area stat blocks', () => {
-  // #219: the §9.3 numbers, but for the radius, cut from 180 to 80.
+  // #219 cut the radius from 180 to 80; #304 made it 120 and the storm 4 s.
   it('carries the spec §9.3 numbers for Ice Storm', () => {
     expect(BASE_ICE_STORM_STATS).toEqual({
       cooldown: 12,
       tickDamage: 6,
       tickRate: 0.5,
-      radius: 80,
-      duration: 6,
+      radius: 120,
+      duration: 4,
       targetRange: 180,
       slowPct: 0.5,
       slowDuration: 1,
@@ -149,7 +149,8 @@ describe('Ice Storm look (#219)', () => {
   it('names the card Ice Storm, a slow with no freeze in its words', () => {
     expect(AREA_CARDS.ice_blizzard.name).toBe('Ice Storm');
     expect(AREA_CARDS.ice_blizzard.description.toLowerCase()).not.toMatch(/freez/);
-    expect(AREA_CARDS.ice_blizzard.stats).toContainEqual(['Radius', '80']);
+    expect(AREA_CARDS.ice_blizzard.stats).toContainEqual(['Radius', '120']);
+    expect(AREA_CARDS.ice_blizzard.stats).toContainEqual(['Lasts', '4 s']);
   });
 
   it('is drawn as a storm of sleet and shards from atlas clips, not the ring or one clip', () => {
@@ -175,7 +176,7 @@ describe('Ice Storm look (#219)', () => {
   it('bursts shards inside the patch a few at a time', () => {
     expect(storm?.shards.reach).toBeLessThan(1);
     expect(storm?.shards.maxLive).toBeGreaterThan(0);
-    expect(storm?.shards.maxLive).toBeLessThanOrEqual(3);
+    expect(storm?.shards.maxLive).toBeLessThanOrEqual(5);
   });
 
   it('fades the whole storm in over 0.4 s and out over its last 0.6 s', () => {
