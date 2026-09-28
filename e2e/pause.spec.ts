@@ -238,6 +238,8 @@ test('End run by keyboard goes to the results with the run banked once', async (
   }, SCENE);
   expect(read.result.outcome).toBe('ended');
   expect(read.result.stats.timeSurvivedMs).toBeGreaterThan(0);
+  // #290: the build Result draws came through the payload guard.
+  expect(read.result.build.spells[0]?.id).toBe(PICKED);
   expect(read.hud).toBe(false);
   expect(read.pause).toBe(false);
   const stored = JSON.parse((await readStoredSave(page)) ?? '{}') as {

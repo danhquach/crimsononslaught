@@ -1,26 +1,31 @@
 import { describe, expect, it } from 'vitest';
+import { ROSTER_SPELL_IDS } from '../config/loadout';
+import { PASSIVES, type PassiveId } from '../config/passives';
+import { RELIC_BUFFS, type RelicBuffId } from '../config/relics';
 import {
   RESULT_HEADLINES,
+  RESULT_LAYOUT,
+  SPELL_PITCH,
+  TILE_REACH,
+  TILE_ROWS,
   isConfirmKey,
   mostPlayedSpell,
   profileRows,
   resultRows,
-  rewardRows,
-  summarizePerks,
+  resultView,
+  spellSlots,
+  tileGrid,
+  tilesPerRow,
+  type Box,
 } from './resultModel';
 import { emptySave } from './save';
-import type { RunStats } from './scenePayloads';
-
-/** Value of the row with `label`, or undefined when the row is missing. */
-const rowValue = (s: RunStats, label: string): string | undefined =>
-  resultRows(s).find(([l]) => l === label)?.[1];
+import { MAX_BUILD_COUNT, type ResultPayload, type RunStats } from './scenePayloads';
 
 const stats: RunStats = {
   timeSurvivedMs: 272_400,
   level: 8,
   kills: 1234,
   spellId: 'fire',
-  perks: ['Power', 'Meteor', 'Power'],
   embers: 312,
   consumables: 4,
   relics: 3,
@@ -50,75 +55,183 @@ describe('isConfirmKey', () => {
   });
 });
 
-describe('summarizePerks', () => {
-  it('reads none for an empty run', () => {
-    expect(summarizePerks([])).toBe('none');
-  });
+const payload: ResultPayload = {
+  outcome: 'win',
+  stats,
+  build: {
+    spells: [
+      { id: 'fire', name: 'Fire Bolt', color: 0xff5500 },
+      { id: 'fire_meteor', name: 'Meteor', color: 0xff8800 },
+    ],
+    passives: [
+      ['passive_power', 2],
+      ['passive_haste', 1],
+    ],
+    relics: [['relic_hourglass', 3]],
+  },
+  earned: 1234,
+  balance: 56789,
+};
 
-  it('keeps pick order and collapses repeats into ×n', () => {
-    expect(summarizePerks(stats.perks)).toBe('Power ×2, Meteor');
-    expect(summarizePerks(['a', 'a', 'a'])).toBe('a ×3');
-  });
-});
+/** Every passive at its top rank, every relic, and the three spell slots filled. */
+const maxed: ResultPayload = {
+  ...payload,
+  build: {
+    spells: [
+      { id: 'lightning', name: 'Lightning Bolt', color: 0xffee55 },
+      { id: 'lightning_companion', name: 'Lightning Companion', color: 0x88ccff },
+      { id: 'lightning_tornado', name: 'Tornado', color: 0x88ccff },
+    ],
+    passives: PASSIVES.map((p) => [p.id as PassiveId, p.maxRank ?? MAX_BUILD_COUNT] as const),
+    relics: RELIC_BUFFS.map((buff) => [buff.id as RelicBuffId, MAX_BUILD_COUNT] as const),
+  },
+};
 
 describe('resultRows', () => {
-  it('formats every stat in the ticket order', () => {
-    expect(resultRows(stats)).toEqual([
+  it('formats the stats card in order: time, kills, what was banked and the balance', () => {
+    expect(resultRows(payload)).toEqual([
       ['Time survived', '4:32'],
-      ['Level', '8'],
       ['Kills', '1,234'],
-      ['Spell', 'Fire Bolt'],
-      ['Upgrades taken', 'Power ×2, Meteor'],
-    ]);
-  });
-
-  it('names the spell for every id', () => {
-    expect(rowValue({ ...stats, spellId: 'ice' }, 'Spell')).toBe('Ice Arrow');
-    expect(rowValue({ ...stats, spellId: 'lightning' }, 'Spell')).toBe('Lightning Bolt');
-    expect(rowValue({ ...stats, spellId: 'earth' }, 'Spell')).toBe('Earth Spike');
-  });
-
-  it('renders a fresh run as 0:00, level 1, no kills, no perks', () => {
-    const fresh: RunStats = {
-      timeSurvivedMs: 0,
-      level: 1,
-      kills: 0,
-      spellId: 'earth',
-      perks: [],
-      embers: 0,
-      consumables: 0,
-      relics: 0,
-    };
-    expect(resultRows(fresh)).toEqual([
-      ['Time survived', '0:00'],
-      ['Level', '1'],
-      ['Kills', '0'],
-      ['Spell', 'Earth Spike'],
-      ['Upgrades taken', 'none'],
-    ]);
-  });
-
-  it('floors fractional counts and clamps negatives and NaN to 0', () => {
-    const odd: RunStats = { ...stats, level: 3.9, kills: -4 };
-    expect(rowValue(odd, 'Level')).toBe('3');
-    expect(rowValue(odd, 'Kills')).toBe('0');
-    expect(rowValue({ ...stats, kills: NaN }, 'Kills')).toBe('0');
-  });
-});
-
-describe('rewardRows', () => {
-  it('shows the Embers collected and the new balance', () => {
-    expect(rewardRows({ earned: 1234, balance: 56789 })).toEqual([
       ['Embers collected', '1,234'],
       ['Embers total', '56,789'],
     ]);
   });
 
-  it('reads 0 for a run that collected nothing', () => {
-    expect(rewardRows({ earned: 0, balance: 0 })).toEqual([
+  it('renders a fresh run as 0:00 with nothing killed or banked', () => {
+    const fresh = {
+      ...payload,
+      stats: { ...stats, timeSurvivedMs: 0, kills: 0 },
+      earned: 0,
+      balance: 0,
+    };
+    expect(resultRows(fresh)).toEqual([
+      ['Time survived', '0:00'],
+      ['Kills', '0'],
       ['Embers collected', '0'],
       ['Embers total', '0'],
     ]);
+  });
+
+  it('floors fractional counts and clamps negatives and NaN to 0', () => {
+    const odd = { ...payload, stats: { ...stats, kills: -4 }, earned: 3.9, balance: NaN };
+    expect(resultRows(odd).map(([, value]) => value)).toEqual(['4:32', '0', '3', '0']);
+  });
+});
+
+describe('resultView', () => {
+  it('keeps each outcome on its own headline, and greys the hero only on a loss', () => {
+    for (const outcome of ['win', 'lose', 'ended'] as const) {
+      const view = resultView({ ...payload, outcome });
+      expect(view.headline).toBe(RESULT_HEADLINES[outcome]);
+      expect(view.fallen).toBe(outcome === 'lose');
+    }
+  });
+
+  it('shows the level on the badge, floored', () => {
+    expect(resultView(payload).level).toBe('8');
+    expect(resultView({ ...payload, stats: { ...stats, level: 3.9 } }).level).toBe('3');
+  });
+
+  it("turns the build into the pause screen's tiles, in the order taken", () => {
+    const view = resultView(payload);
+    expect(view.spells.map((spell) => spell.name)).toEqual(['Fire Bolt', 'Meteor']);
+    expect(view.passives.map(({ name, abbr, count }) => [name, abbr, count])).toEqual([
+      ['Power', 'Po', 2],
+      ['Haste', 'Ha', 1],
+    ]);
+    expect(view.relics.map(({ name, count }) => [name, count])).toEqual([['Hourglass', 3]]);
+  });
+
+  it('gives a maxed build every passive and relic', () => {
+    const view = resultView(maxed);
+    expect(view.passives).toHaveLength(PASSIVES.length);
+    expect(view.relics).toHaveLength(RELIC_BUFFS.length);
+  });
+});
+
+/** Everything above the button: the card and the three strips. */
+const AREAS: readonly Box[] = [
+  RESULT_LAYOUT.card,
+  RESULT_LAYOUT.spells,
+  RESULT_LAYOUT.passives,
+  RESULT_LAYOUT.relics,
+];
+const inside = (x: number, y: number, box: Box, reach: number): boolean =>
+  x - reach >= box.x &&
+  x + reach <= box.x + box.width &&
+  y - reach >= box.y &&
+  y + reach <= box.y + box.height;
+
+describe('RESULT_LAYOUT', () => {
+  it('ends every area above the button, and keeps the button and hint on the 960×540 screen', () => {
+    const { button, hintY } = RESULT_LAYOUT;
+    for (const area of AREAS) expect(area.y + area.height).toBeLessThanOrEqual(button.y - 8);
+    expect(button.x).toBeGreaterThanOrEqual(8);
+    expect(button.x + button.width).toBeLessThanOrEqual(960 - 8);
+    expect(hintY).toBeGreaterThan(button.y + button.height);
+    // A 14 px hint centred on hintY, with CI's taller fonts, still clears the bottom by 8 px.
+    expect(hintY + 12).toBeLessThanOrEqual(540 - 8);
+  });
+
+  it('keeps the strips clear of each other and of the card', () => {
+    const sorted = [...AREAS.slice(1)].sort((a, b) => a.y - b.y);
+    for (let i = 1; i < sorted.length; i += 1) {
+      const above = sorted[i - 1];
+      expect(above && above.y + above.height).toBeLessThan(sorted[i]?.y ?? 0);
+    }
+    const { card } = RESULT_LAYOUT;
+    for (const strip of sorted) expect(card.x + card.width).toBeLessThan(strip.x);
+  });
+});
+
+describe('tileGrid', () => {
+  it('places every tile of a maxed build inside its strip', () => {
+    for (const [count, strip] of [
+      [PASSIVES.length, RESULT_LAYOUT.passives],
+      [RELIC_BUFFS.length, RESULT_LAYOUT.relics],
+    ] as const) {
+      const grid = tileGrid(count, strip);
+      expect(grid.overflow).toBe(0);
+      expect(grid.slots).toHaveLength(count);
+      for (const { x, y } of grid.slots) expect(inside(x, y, strip, TILE_REACH)).toBe(true);
+    }
+  });
+
+  it('wraps into rows without ever growing the strip, however many tiles come', () => {
+    for (const strip of [RESULT_LAYOUT.passives, RESULT_LAYOUT.relics]) {
+      const room = tilesPerRow(strip) * TILE_ROWS;
+      for (let count = 0; count <= 3 * room; count += 1) {
+        const { slots, overflow } = tileGrid(count, strip);
+        expect(slots.length).toBeLessThanOrEqual(room);
+        // Every tile gets a spot: a slot of its own, or a count on the "+N" marker.
+        expect(overflow > 0 ? slots.length - 1 + overflow : slots.length).toBe(count);
+        for (const { x, y } of slots) expect(inside(x, y, strip, TILE_REACH)).toBe(true);
+        expect(new Set(slots.map(({ x, y }) => `${x},${y}`)).size).toBe(slots.length);
+      }
+    }
+  });
+
+  it('turns junk counts into an empty strip', () => {
+    for (const count of [-3, NaN, 0])
+      expect(tileGrid(count, RESULT_LAYOUT.passives).slots).toEqual([]);
+  });
+});
+
+describe('spellSlots', () => {
+  it('names up to the three a run can hold, a full pitch apart', () => {
+    for (const count of [1, 2, 3]) {
+      const { xs, named } = spellSlots(count);
+      expect(named).toBe(true);
+      expect(xs).toHaveLength(count);
+      if (count > 1) expect((xs[1] ?? 0) - (xs[0] ?? 0)).toBe(SPELL_PITCH);
+    }
+  });
+
+  it('squeezes a crowded strip into its width and drops the names', () => {
+    const strip = RESULT_LAYOUT.spells;
+    const { xs, y, named } = spellSlots(ROSTER_SPELL_IDS.length);
+    expect(named).toBe(false);
+    for (const x of xs) expect(inside(x, y, strip, 19)).toBe(true);
   });
 });
 

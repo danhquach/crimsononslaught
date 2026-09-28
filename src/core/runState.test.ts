@@ -47,14 +47,13 @@ describe('BOSS_START_MS', () => {
 });
 
 describe('RunState initial state', () => {
-  it('starts at zero on the waves phase with level 1 and no kills, xp or perks', () => {
+  it('starts at zero on the waves phase with level 1 and no kills or xp', () => {
     const { run } = newRun();
     expect(run.elapsedMs).toBe(0);
     expect(run.phase).toBe('waves');
     expect(run.level).toBe(1);
     expect(run.kills).toBe(0);
     expect(run.xp).toBe(0);
-    expect(run.perks).toEqual([]);
   });
 
   it('emits nothing before the first tick', () => {
@@ -274,30 +273,12 @@ describe('RunState.addXp', () => {
   });
 });
 
-describe('RunState.recordPerk', () => {
-  it('keeps the display names in pick order, repeats included', () => {
-    const { run } = newRun();
-    run.recordPerk('Sharper Edge');
-    run.recordPerk('Quick Cast');
-    run.recordPerk('Sharper Edge');
-    expect(run.perks).toEqual(['Sharper Edge', 'Quick Cast', 'Sharper Edge']);
-  });
-
-  it('hands out a copy, so a caller cannot mutate the run', () => {
-    const { run } = newRun();
-    run.recordPerk('Sharper Edge');
-    (run.perks as string[]).push('Not Taken');
-    expect(run.perks).toEqual(['Sharper Edge']);
-  });
-});
-
 describe('RunState.stats', () => {
   it('produces a valid RunStats for the result screen', () => {
     const { run } = newRun();
     run.tick(1500);
     run.recordKill();
     run.addXp(15);
-    run.recordPerk('Quick Cast');
     run.addEmbers(3);
     run.recordConsumable();
     run.recordRelic();
@@ -310,7 +291,6 @@ describe('RunState.stats', () => {
       level: 2,
       kills: 1,
       spellId: 'fire',
-      perks: ['Quick Cast'],
       embers: 3,
       consumables: 1,
       relics: 2,

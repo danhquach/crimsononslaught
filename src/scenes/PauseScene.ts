@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PASSIVE_COLOR, RELIC_COLOR, offerColor } from '../core/offerColors';
+import { PASSIVE_COLOR, RELIC_COLOR } from '../core/offerColors';
 import {
   CONFIRM_PROMPTS,
   EMPTY_STRIP_TEXT,
@@ -17,19 +17,25 @@ import {
 } from '../core/pauseModel';
 import { SCENE, isPausePayload, type PausePayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
-import { SPELL_ICON_ART_SIZE, addSpellIcon } from '../render/spellIcon';
+import {
+  CRIMSON,
+  CRIMSON_CSS,
+  SERIF,
+  SPELL_ICON_SIZE,
+  TILE,
+  WINE,
+  addPassiveTile,
+  addRelicGem,
+  addSpellDisc,
+  drawHeroStand,
+  drawStrip,
+} from './buildStrips';
 import { attachMenuInput, watchStartButton, type MenuItem } from './input';
 
-const CRIMSON = 0xdc143c;
-const CRIMSON_CSS = '#dc143c';
-const WINE = 0x5a1620;
 const BACKDROP_ALPHA = 0.8;
-const SERIF = 'Georgia, serif';
 
 /** The left column: the hero on a stand, the level badge and the menu under it. */
 const STAND_X = 170;
-const HERO_CLIP = 'hero.idle.down';
-const HERO_SCALE = 3;
 const PEDESTAL_Y = 180;
 const MENU_TOP = 250;
 const MENU_PITCH = 42;
@@ -41,11 +47,8 @@ const STRIP_X = 330;
 const STRIP_WIDTH = 600;
 /** Where a strip's contents start, right of its label. */
 const STRIP_CONTENT_X = STRIP_X + 104;
-const TILE = 32;
 const TILE_PITCH = 40;
 const TILES_PER_ROW = Math.floor((STRIP_X + STRIP_WIDTH - STRIP_CONTENT_X) / TILE_PITCH);
-/** The HUD slot's size (CO-170): a whole-number scale keeps the art's pixels even. */
-const SPELL_ICON_SIZE = SPELL_ICON_ART_SIZE;
 const SPELL_PITCH = 84;
 const INFO_HINT = 'Point at a passive or relic to read it';
 
@@ -145,8 +148,12 @@ export class PauseScene extends Phaser.Scene {
     };
 
     this.drawSpells(view.spells, 28);
-    this.drawTiles('Passives', view.passives, 136, (x, y, tile) => this.addTile(x, y, tile, show));
-    this.drawTiles('Relics', view.relics, 268, (x, y, tile) => this.addGem(x, y, tile, show));
+    this.drawTiles('Passives', view.passives, 136, (x, y, tile) =>
+      this.hoverable(addPassiveTile(this, x, y, tile), tile, show, PASSIVE_COLOR),
+    );
+    this.drawTiles('Relics', view.relics, 268, (x, y, tile) =>
+      this.hoverable(addRelicGem(this, x, y, tile), tile, show, RELIC_COLOR),
+    );
     this.add.text(STRIP_X, 408, statsLine(view), {
       fontFamily: 'monospace',
       fontSize: '14px',
@@ -159,46 +166,11 @@ export class PauseScene extends Phaser.Scene {
     this.add
       .text(STAND_X, 44, 'Paused', { fontFamily: SERIF, fontSize: '42px', color: CRIMSON_CSS })
       .setOrigin(0.5);
-    this.add.ellipse(STAND_X, PEDESTAL_Y, 130, 30, 0x2a0a10).setStrokeStyle(2, CRIMSON);
-    if (this.anims.exists(HERO_CLIP)) {
-      this.add
-        .sprite(STAND_X, PEDESTAL_Y + 4, '__DEFAULT')
-        .setOrigin(0.5, 1)
-        .setScale(HERO_SCALE)
-        .play(HERO_CLIP);
-    } else {
-      // No atlas: a plain marker keeps the stand from looking empty.
-      this.add.circle(STAND_X, PEDESTAL_Y - 40, 28, 0x2a0a10).setStrokeStyle(2, CRIMSON);
-    }
-    this.add.rectangle(STAND_X, PEDESTAL_Y + 30, 64, 22, CRIMSON);
-    this.add
-      .text(STAND_X, PEDESTAL_Y + 30, `LV ${level}`, {
-        fontFamily: 'monospace',
-        fontSize: '14px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5);
-  }
-
-  /** A framed strip with its label; the caller fills it. */
-  private drawStrip(label: string, y: number, stripHeight: number): void {
-    this.add
-      .rectangle(STRIP_X - 4, y - 4, STRIP_WIDTH + 8, stripHeight + 8)
-      .setOrigin(0)
-      .setStrokeStyle(1, 0x2a0a10);
-    this.add
-      .rectangle(STRIP_X, y, STRIP_WIDTH, stripHeight, 0x17110f)
-      .setOrigin(0)
-      .setStrokeStyle(2, WINE);
-    this.add.text(STRIP_X + 14, y + 12, label.toUpperCase(), {
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      color: CRIMSON_CSS,
-    });
+    drawHeroStand(this, STAND_X, PEDESTAL_Y, level);
   }
 
   private drawSpells(spells: PauseView['spells'], y: number): void {
-    this.drawStrip('Spells', y, 96);
+    drawStrip(this, STRIP_X, y, STRIP_WIDTH, 96, 'Spells');
     const cy = y + 38;
     // A `?loadout=` run can carry more spells than a real one; squeeze them
     // into the strip rather than past it, and drop the names that would collide.
@@ -207,11 +179,7 @@ export class PauseScene extends Phaser.Scene {
     const named = pitch === SPELL_PITCH;
     spells.forEach((spell, i) => {
       const x = STRIP_CONTENT_X + SPELL_ICON_SIZE / 2 + i * pitch;
-      // CO-164: each pick's rim wears its kind's colour, as its level-up card did.
-      this.add
-        .circle(x, cy, SPELL_ICON_SIZE / 2 + 3, 0x000000)
-        .setStrokeStyle(2, offerColor('active', spell.id));
-      addSpellIcon(this, x, cy, spell, 1);
+      addSpellDisc(this, x, cy, spell);
       if (!named) return;
       this.add
         .text(x, cy + SPELL_ICON_SIZE / 2 + 12, spell.name, {
@@ -232,7 +200,7 @@ export class PauseScene extends Phaser.Scene {
     y: number,
     add: (x: number, y: number, tile: PauseItem) => void,
   ): void {
-    this.drawStrip(label, y, 120);
+    drawStrip(this, STRIP_X, y, STRIP_WIDTH, 120, label);
     if (tiles.length === 0) {
       this.add.text(STRIP_CONTENT_X, y + 12, EMPTY_STRIP_TEXT, {
         fontFamily: SERIF,
@@ -246,46 +214,6 @@ export class PauseScene extends Phaser.Scene {
       const row = Math.floor(i / TILES_PER_ROW);
       add(STRIP_CONTENT_X + TILE / 2 + col * TILE_PITCH, y + 34 + row * 44, tile);
     });
-  }
-
-  /** A passive: a square tile with its letters and its rank on a badge. */
-  private addTile(
-    x: number,
-    y: number,
-    tile: PauseItem,
-    show: (t: PauseItem | null) => void,
-  ): void {
-    const face = this.add.rectangle(x, y, TILE, TILE, 0x241a14).setStrokeStyle(1, PASSIVE_COLOR);
-    this.add
-      .text(x, y, tile.abbr, { fontFamily: 'monospace', fontSize: '13px', color: '#e8d8b0' })
-      .setOrigin(0.5);
-    this.addBadge(x + TILE / 2, y + TILE / 2, tile.count);
-    this.hoverable(face, tile, show, PASSIVE_COLOR);
-  }
-
-  /** A relic buff: a gem (a square on its point) with its letters and its stacks. */
-  private addGem(x: number, y: number, tile: PauseItem, show: (t: PauseItem | null) => void): void {
-    const face = this.add
-      .rectangle(x, y, 24, 24, 0x4a1030)
-      .setAngle(45)
-      .setStrokeStyle(1, RELIC_COLOR);
-    this.add
-      .text(x, y, tile.abbr, { fontFamily: 'monospace', fontSize: '11px', color: '#ffffff' })
-      .setOrigin(0.5);
-    this.addBadge(x + 14, y + 12, tile.count);
-    this.hoverable(face, tile, show, RELIC_COLOR);
-  }
-
-  private addBadge(x: number, y: number, count: number): void {
-    this.add
-      .text(x, y, `${count}`, {
-        fontFamily: 'monospace',
-        fontSize: '10px',
-        color: '#ffffff',
-        backgroundColor: CRIMSON_CSS,
-        padding: { x: 3, y: 0 },
-      })
-      .setOrigin(0.5);
   }
 
   /** Pointing at a tile thickens its rim, in its kind's colour, and reads it on the info line. */

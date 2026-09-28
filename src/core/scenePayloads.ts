@@ -1,3 +1,6 @@
+import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
+import { PASSIVES, isPassiveId, type PassiveId } from '../config/passives';
+import { RELIC_BUFFS, isRelicBuffId, type RelicBuffId } from '../config/relics';
 import { isSpellId, type SpellId } from '../config/spells';
 import { MAX_OFFER_SIZE, isOfferCard, type OfferCard } from './levelUp';
 import type { OfferActionCounts } from './offerActions';
@@ -116,8 +119,6 @@ export interface RunStats {
   level: number;
   kills: number;
   spellId: SpellId;
-  /** Display names of the perks taken, in pick order; a perk taken at several ranks repeats. */
-  perks: readonly string[];
   /** Embers collected (#195): what the run banks, win or lose. */
   embers: number;
   /** Consumables and relics picked up (#195); their effects are later tickets'. */
@@ -125,10 +126,29 @@ export interface RunStats {
   relics: number;
 }
 
+/** An equipped spell as the result screen draws it: the id picks the icon art, the colour its fallback disc. */
+export interface BuildSpell {
+  id: RosterSpellId;
+  name: string;
+  color: number;
+}
+
+/**
+ * The run's build at its end (#290), the same one the pause screen shows:
+ * equipped spells in equip order, and `[id, count]` pairs in the order taken,
+ * where count is a passive's rank or a relic buff's stacks.
+ */
+export interface RunBuild {
+  spells: readonly BuildSpell[];
+  passives: readonly (readonly [PassiveId, number])[];
+  relics: readonly (readonly [RelicBuffId, number])[];
+}
+
 /** `Game -> Result` */
 export interface ResultPayload {
   outcome: Outcome;
   stats: RunStats;
+  build: RunBuild;
   /** Currency this run paid out (CO-101), already added to the save: its `stats.embers` (#195). */
   earned: number;
   /** The save's balance after `earned` was added. */
@@ -180,8 +200,6 @@ export function isRunStats(data: unknown): data is RunStats {
     isFiniteNumber(data.level) &&
     isFiniteNumber(data.kills) &&
     isSpellId(data.spellId) &&
-    Array.isArray(data.perks) &&
-    data.perks.every((p) => typeof p === 'string') &&
     isFiniteNumber(data.embers) &&
     isFiniteNumber(data.consumables) &&
     isFiniteNumber(data.relics)
@@ -194,7 +212,63 @@ export function isResultPayload(data: unknown): data is ResultPayload {
     typeof data.outcome === 'string' &&
     OUTCOMES.includes(data.outcome) &&
     isRunStats(data.stats) &&
+    isRunBuild(data.build) &&
     isFiniteNumber(data.earned) &&
     isFiniteNumber(data.balance)
+  );
+}
+
+/** A rank or a stack count the result screen will draw: a whole number from 1 up to this. */
+export const MAX_BUILD_COUNT = 999;
+/**
+ * A spell name is a card's, or its id when Game has no card for it: ASCII
+ * letters, digits, spaces, apostrophes, hyphens and underscores, nothing else.
+ */
+const SPELL_NAME = /^[A-Za-z0-9 '_-]{1,40}$/;
+
+function isBuildSpell(data: unknown): data is BuildSpell {
+  return (
+    isRecord(data) &&
+    isRosterSpellId(data.id) &&
+    typeof data.name === 'string' &&
+    SPELL_NAME.test(data.name) &&
+    Number.isInteger(data.color) &&
+    (data.color as number) >= 0 &&
+    (data.color as number) <= 0xffffff
+  );
+}
+
+/**
+ * `[id, count]` pairs whose ids pass `isId`, each id once, with a whole-number
+ * count from 1 to `MAX_BUILD_COUNT`. The length check comes first, so a huge
+ * array is turned away before any of it is read.
+ */
+function isCountPairs(data: unknown, isId: (v: unknown) => boolean, maxLength: number): boolean {
+  if (!Array.isArray(data) || data.length > maxLength) return false;
+  const seen = new Set<unknown>();
+  return data.every((pair) => {
+    if (!Array.isArray(pair) || pair.length !== 2) return false;
+    const [id, count] = pair as unknown[];
+    if (!isId(id) || seen.has(id)) return false;
+    seen.add(id);
+    return (
+      Number.isInteger(count) && (count as number) >= 1 && (count as number) <= MAX_BUILD_COUNT
+    );
+  });
+}
+
+/** An allow-list check: every id is one this build knows, and nothing repeats. */
+export function isRunBuild(data: unknown): data is RunBuild {
+  if (!isRecord(data)) return false;
+  const { spells } = data;
+  if (!Array.isArray(spells) || spells.length > ROSTER_SPELL_IDS.length) return false;
+  const spellIds = new Set<unknown>();
+  for (const spell of spells) {
+    if (!isBuildSpell(spell) || spellIds.has(spell.id)) return false;
+    spellIds.add(spell.id);
+  }
+  return (
+    isCountPairs(data.passives, isPassiveId, PASSIVES.length) &&
+    isCountPairs(data.relics, isRelicBuffId, RELIC_BUFFS.length)
   );
 }

@@ -1,13 +1,28 @@
 import { describe, expect, it } from 'vitest';
+import { AREA_CARDS } from '../config/areas';
+import { COMPANION_CARDS } from '../config/companions';
+import { EARTH_ROSTER_CARDS } from '../config/earthRoster';
+import { FIRE_ROSTER_CARDS } from '../config/fireRoster';
+import { ICE_ROSTER_CARDS } from '../config/iceRoster';
+import { LIGHTNING_ROSTER_CARDS } from '../config/lightningRoster';
+import { ROSTER_SPELL_IDS } from '../config/loadout';
+import { PASSIVES } from '../config/passives';
+import { RELIC_BUFFS } from '../config/relics';
+import { SHIELD_CARDS } from '../config/shields';
+import { SPELL_CARDS } from '../config/spells';
+import { STRIKE_CARDS } from '../config/strikes';
 import {
   HELP_VIEWS,
+  MAX_BUILD_COUNT,
   isGamePayload,
   isHelpPayload,
   isLevelUpPayload,
   isPausePayload,
   isResultPayload,
+  isRunBuild,
   isRunStats,
   type ResultPayload,
+  type RunBuild,
 } from './scenePayloads';
 
 const stats = {
@@ -15,14 +30,25 @@ const stats = {
   level: 3,
   kills: 42,
   spellId: 'fire',
-  perks: ['a', 'b'],
   embers: 17,
   consumables: 2,
   relics: 1,
 };
+const build: RunBuild = {
+  spells: [
+    { id: 'fire', name: 'Fire Bolt', color: 0xff5500 },
+    { id: 'fire_meteor', name: 'Meteor', color: 0xff8800 },
+  ],
+  passives: [
+    ['passive_power', 3],
+    ['passive_haste', 1],
+  ],
+  relics: [['relic_hourglass', 2]],
+};
 const result: ResultPayload = {
   outcome: 'win',
   stats: { ...stats, spellId: 'fire' },
+  build,
   earned: 210,
   balance: 560,
 };
@@ -49,9 +75,8 @@ describe('isGamePayload', () => {
 });
 
 describe('isRunStats', () => {
-  it('accepts a full stats object, including an empty perk list', () => {
+  it('accepts a full stats object', () => {
     expect(isRunStats(stats)).toBe(true);
-    expect(isRunStats({ ...stats, perks: [] })).toBe(true);
   });
 
   it('rejects each missing or mistyped field', () => {
@@ -63,8 +88,6 @@ describe('isRunStats', () => {
     expect(isRunStats({ ...stats, kills: Infinity })).toBe(false);
     expect(isRunStats({ ...stats, level: '3' })).toBe(false);
     expect(isRunStats({ ...stats, spellId: 'water' })).toBe(false);
-    expect(isRunStats({ ...stats, perks: [1] })).toBe(false);
-    expect(isRunStats({ ...stats, perks: 'a' })).toBe(false);
     expect(isRunStats({ ...stats, embers: '17' })).toBe(false);
     expect(isRunStats({ ...stats, consumables: null })).toBe(false);
     expect(isRunStats({ ...stats, relics: NaN })).toBe(false);
@@ -135,10 +158,154 @@ describe('isResultPayload', () => {
     expect(isResultPayload({ outcome: 'win', stats: {} })).toBe(false);
   });
 
+  it('rejects a payload without a valid build', () => {
+    expect(isResultPayload({ ...result, build: undefined })).toBe(false);
+    expect(
+      isResultPayload({ ...result, build: { ...build, passives: [['passive_nope', 1]] } }),
+    ).toBe(false);
+  });
+
   it('rejects a payload without the run reward', () => {
     expect(isResultPayload({ outcome: 'win', stats })).toBe(false);
     expect(isResultPayload({ ...result, earned: NaN })).toBe(false);
     expect(isResultPayload({ ...result, balance: undefined })).toBe(false);
+  });
+});
+
+/** Every spell a run can equip, named and coloured as Game's cards are. */
+const ROSTER_CARDS: Readonly<Record<string, { name: string; color: number }>> = {
+  ...SPELL_CARDS,
+  ...COMPANION_CARDS,
+  ...SHIELD_CARDS,
+  ...AREA_CARDS,
+  ...STRIKE_CARDS,
+  ...FIRE_ROSTER_CARDS,
+  ...ICE_ROSTER_CARDS,
+  ...LIGHTNING_ROSTER_CARDS,
+  ...EARTH_ROSTER_CARDS,
+};
+
+describe('isRunBuild', () => {
+  const withSpells = (spells: unknown): unknown => ({ ...build, spells });
+  const withPassives = (passives: unknown): unknown => ({ ...build, passives });
+  const withRelics = (relics: unknown): unknown => ({ ...build, relics });
+
+  it('accepts an empty build and a valid one', () => {
+    expect(isRunBuild({ spells: [], passives: [], relics: [] })).toBe(true);
+    expect(isRunBuild(build)).toBe(true);
+  });
+
+  it("accepts every roster spell under its own card's name and colour", () => {
+    const spells = ROSTER_SPELL_IDS.map((id) => {
+      const card = ROSTER_CARDS[id];
+      expect(card, id).toBeDefined();
+      return { id, name: card?.name, color: card?.color };
+    });
+    expect(isRunBuild(withSpells(spells))).toBe(true);
+  });
+
+  it('accepts the largest build the game allows: every passive and relic, at any rank up to the cap', () => {
+    const maxed = {
+      spells: build.spells,
+      passives: PASSIVES.map((passive) => [passive.id, passive.maxRank ?? MAX_BUILD_COUNT]),
+      relics: RELIC_BUFFS.map((buff) => [buff.id, MAX_BUILD_COUNT]),
+    };
+    expect(isRunBuild(maxed)).toBe(true);
+  });
+
+  it('rejects ids outside the allow-lists, and repeats', () => {
+    expect(isRunBuild(withSpells([{ id: 'water', name: 'Water', color: 0 }]))).toBe(false);
+    expect(isRunBuild(withSpells([build.spells[0], build.spells[0]]))).toBe(false);
+    expect(isRunBuild(withPassives([['passive_nope', 1]]))).toBe(false);
+    expect(isRunBuild(withPassives([['relic_hourglass', 1]]))).toBe(false);
+    expect(isRunBuild(withRelics([['passive_power', 1]]))).toBe(false);
+    expect(
+      isRunBuild(
+        withPassives([
+          ['passive_power', 1],
+          ['passive_power', 2],
+        ]),
+      ),
+    ).toBe(false);
+    expect(
+      isRunBuild(
+        withRelics([
+          ['relic_hourglass', 1],
+          ['relic_hourglass', 1],
+        ]),
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects prototype keys and inherited names as ids', () => {
+    for (const id of ['__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty']) {
+      expect(isRunBuild(withPassives([[id, 1]])), id).toBe(false);
+      expect(isRunBuild(withRelics([[id, 1]])), id).toBe(false);
+      expect(isRunBuild(withSpells([{ id, name: 'Fire Bolt', color: 0 }])), id).toBe(false);
+    }
+    // A parsed `__proto__` key is an own property, not the prototype; the guard reads fields only.
+    const parsed: unknown = JSON.parse(
+      '{"spells":[],"passives":[],"relics":[],"__proto__":{"polluted":true}}',
+    );
+    expect(isRunBuild(parsed)).toBe(true);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    const parsedSpell: unknown = JSON.parse(
+      '{"spells":[{"__proto__":{"id":"fire","name":"Fire Bolt","color":0}}],"passives":[],"relics":[]}',
+    );
+    expect(isRunBuild(parsedSpell)).toBe(false);
+  });
+
+  it('rejects ranks and stacks that are not whole numbers from 1 to the cap', () => {
+    for (const count of [0, -1, 1.5, NaN, Infinity, MAX_BUILD_COUNT + 1, '3', null, undefined]) {
+      expect(isRunBuild(withPassives([['passive_power', count]])), String(count)).toBe(false);
+      expect(isRunBuild(withRelics([['relic_hourglass', count]])), String(count)).toBe(false);
+    }
+  });
+
+  it('rejects malformed pairs and fields', () => {
+    for (const pair of [
+      ['passive_power'],
+      ['passive_power', 1, 2],
+      { 0: 'passive_power', 1: 1 },
+      'passive_power',
+    ]) {
+      expect(isRunBuild(withPassives([pair])), JSON.stringify(pair)).toBe(false);
+    }
+    expect(isRunBuild(withPassives({ passive_power: 1 }))).toBe(false);
+    expect(isRunBuild(withPassives(new Map([['passive_power', 1]])))).toBe(false);
+    expect(isRunBuild({ ...build, spells: undefined })).toBe(false);
+    expect(isRunBuild(null)).toBe(false);
+    expect(isRunBuild('build')).toBe(false);
+  });
+
+  it('turns away a huge array before reading it', () => {
+    const huge = Array.from({ length: 100_000 }, () => ['passive_power', 1]);
+    expect(isRunBuild(withPassives(huge))).toBe(false);
+    expect(isRunBuild(withRelics(huge))).toBe(false);
+    const spells = Array.from({ length: 100_000 }, () => build.spells[0]);
+    expect(isRunBuild(withSpells(spells))).toBe(false);
+  });
+
+  it('allows only plain ASCII spell names, and a colour in 24-bit RGB', () => {
+    const spell = (name: unknown, color: unknown = 0xff5500): unknown =>
+      withSpells([{ id: 'fire', name, color }]);
+    expect(isRunBuild(spell("Sage's Fire-Bolt 2"))).toBe(true);
+    expect(isRunBuild(spell('fire_meteor'))).toBe(true); // Game's fallback: the id
+    for (const name of [
+      '',
+      'x'.repeat(41),
+      'Fire\u202EBolt', // bidi override
+      'Fire\u200BBolt', // zero-width space
+      'F\u0456re Bolt', // Cyrillic look-alike i
+      '<img src=x onerror=alert(1)>',
+      'Fire\nBolt',
+      42,
+    ]) {
+      expect(isRunBuild(spell(name)), JSON.stringify(name)).toBe(false);
+    }
+    for (const color of [-1, 0x1000000, 1.5, NaN, '0xff5500']) {
+      expect(isRunBuild(spell('Fire Bolt', color)), String(color)).toBe(false);
+    }
   });
 });
 
