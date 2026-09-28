@@ -499,14 +499,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Test hook (#126): elites alive — their types and HP left — how many have
+   * Test hook (#126): elites alive — their types, HP left and HP multiplier
+   * (their wave's times `ELITE.hpMul`, which no hit changes) — how many have
    * been placed, are waiting for room at the cap, and have been killed, the
    * run time the first landed at, and
    * the marks out with the clips they play. The browser suite checks an elite
    * lands on schedule, is marked while it lives and pays out when it dies.
    */
   get eliteReport(): {
-    live: { type: EnemyType; hp: number }[];
+    live: { type: EnemyType; hp: number; hpMul: number }[];
     spawned: number;
     waiting: number;
     firstAt: number | null;
@@ -516,7 +517,11 @@ export class GameScene extends Phaser.Scene {
   } {
     const live = this.enemies.live
       .filter((enemy) => enemy.isElite)
-      .map((enemy) => ({ type: enemy.enemyType, hp: enemy.remainingHp }));
+      .map((enemy) => ({
+        type: enemy.enemyType,
+        hp: enemy.remainingHp,
+        hpMul: enemy.hitScale.hpMul,
+      }));
     return {
       live,
       ...this.spawns.eliteCounts,
