@@ -74,11 +74,18 @@ export const BASE_TORNADO_STATS: Readonly<TornadoStats> = {
   duration: 5,
 };
 
-/** Spec §9.4 base block. */
+/**
+ * Spec §9.4 base block, three blades turning faster (#305): one blade at
+ * 3.2 rad/s crossed any given point of the ring once every 2 s, which is why a
+ * Lightning Sword build barely thinned a crowd it kept at arm's length. Three
+ * blades at 4.5 rad/s pass a point every 0.47 s, still past the 0.35 s
+ * `hitCooldown`, so the shared per-enemy window never swallows a second blade's
+ * cut.
+ */
 export const BASE_SWORD_STATS: Readonly<SwordStats> = {
-  count: 1,
+  count: 3,
   orbitRadius: 70,
-  orbitSpeed: 3.2,
+  orbitSpeed: 4.5,
   damage: 16,
   size: 18,
   hitCooldown: 0.35,
@@ -129,8 +136,9 @@ export const LIGHTNING_ROSTER_CARDS: Readonly<Record<LightningRosterSpellId, Spe
   lightning_sword: {
     name: 'Lightning Sword',
     color: 0xfff176,
-    description: 'A charged blade circles you, cutting and staggering whatever it passes.',
+    description: 'Three charged blades circle you, cutting and staggering whatever they pass.',
     stats: [
+      ['Blades', '3'],
       ['Damage', '16'],
       ['Orbit radius', '70'],
       ['Stagger', '0.3 s'],

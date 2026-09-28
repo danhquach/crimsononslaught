@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { MAX_LIVE_AREAS } from '../src/config/fx';
-import { LIGHTNING_ROSTER_SPELL_IDS } from '../src/config/lightningRoster';
+import { BASE_SWORD_STATS, LIGHTNING_ROSTER_SPELL_IDS } from '../src/config/lightningRoster';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { MAX_BOULDERS } from '../src/core/orbitingBoulders';
 import { SCENE } from '../src/core/scenePayloads';
@@ -58,8 +58,10 @@ const RUN_MS = 180_000;
  * Run time the window starts at, in seconds (#127). The 20-minute schedule
  * brings tanks in at 4:00 rather than 2:00, so the window starts at 3:00 to
  * face the crowd those close-range spells need; it is measured from here.
- * Over 3:00-6:00 the sword had 138-167 cuts and the tornado 571-630 ticks
- * over four local runs.
+ * Over 3:00-6:00 the sword had 360-449 cuts and the tornado 106-122 ticks
+ * over three local runs (#305: three blades at 4.5 rad/s; the one blade at
+ * 3.2 rad/s had 138-173 cuts and the tornado 571-630 ticks; the drop in
+ * tornado ticks is measured, its cause is not isolated).
  */
 const START_AT_S = 180;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
@@ -165,11 +167,11 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
     expect(area.ringShown, `tornado hides the ring ${i}`).toBe(false);
   }
 
-  // The sword is always out: one blade on the ring from the first frame (spec §9.4 `count` 1).
+  // The sword is always out: three blades on the ring from the first frame (spec §9.4 `count` 3, #305).
   const swordLive = trace.map((report) => report.find((s) => s.id === 'lightning_sword')?.live);
   expect(
-    swordLive.every((live) => live === 1),
-    'one blade on the ring throughout',
+    swordLive.every((live) => live === BASE_SWORD_STATS.count),
+    'the full ring of blades throughout',
   ).toBe(true);
 
   const last = trace[trace.length - 1] ?? [];
