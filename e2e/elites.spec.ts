@@ -4,6 +4,7 @@ import { ELITE_MARK } from '../src/config/fx';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { ELITE_SCHEDULE } from '../src/config/waves';
 import { SCENE } from '../src/core/scenePayloads';
+import { activeWave } from '../src/core/waveSchedule';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
 import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
@@ -114,8 +115,10 @@ test('the first elite lands on time, is marked while it lives, and drops a chest
   expect(last!.firstAt!).toBeGreaterThanOrEqual(FIRST.at);
   expect(last!.firstAt!).toBeLessThan(FIRST.at + 0.1);
   expect(firstOut!.elapsedMs).toBeGreaterThanOrEqual(FIRST.at * 1000);
-  // Far tougher than the crowd it joined.
-  expect(firstOut!.topHp).toBeGreaterThan(ENEMY_ARCHETYPES[FIRST.type].hp * 4);
+  // Far tougher than the crowd it joined: over twice its HP, which leaves room
+  // for hits it takes before the first sample reads it at timeScale 10.
+  const crowdHp = ENEMY_ARCHETYPES[FIRST.type].hp * activeWave(FIRST.at).hpMul;
+  expect(firstOut!.topHp).toBeGreaterThan(crowdHp * 2);
   // Every elite out carries exactly one mark, for as long as it lives.
   for (const s of out) expect(s.marks, `marks at ${s.elapsedMs} ms`).toBe(s.live);
   expect([...clips]).toEqual([ELITE_MARK.clip]);

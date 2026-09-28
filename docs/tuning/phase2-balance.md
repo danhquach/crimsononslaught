@@ -419,3 +419,205 @@ Seed 1 on the branch reached the boss and died two seconds into the fight.
 - **No tuning change.** `damage` stays 16. Both builds show one invulnerable
   run near 31–32 s. That is #210's 20-minute boss floor question, not this
   spell's.
+
+---
+
+# The expanded enemy roster (#126, 2026-09-27)
+
+Ticket: [#126](https://github.com/danhquach/crimsononslaught/issues/126) · Spec: `docs/superpowers/specs/2026-09-14-phase1-design.md` "Enemies"
+
+**Question.** #126 added four enemy types (ranged from 6:00, exploder from 8:00,
+splitter from 10:00, shielded from 12:00) and nine scheduled elites. Does the
+20-minute run stay winnable with every element?
+
+**Answer: not yet, and the rest belongs to #210.** On the commit before #126,
+the bot won 20 of 20 runs. With the roster as merged it won 10 of 20. Three
+changes, all config values, bring it to 7 of 12 on seeds 1–3, where the
+baseline won 12 of 12. Two further levers did not move the count, so the
+remaining gap goes to #210's pass over the whole run.
+
+**Method.** This is a before-and-after comparison, not a balance target. The
+baseline is `fb06b0b`, the last commit before #126; nothing merged since then
+changes balance, only sound, music, the Help screen and the player name. The
+bot is a new scratch Playwright bot built along the lines of the #128 bot:
+
+- It steers by overriding the player's keyboard read on every simulation step.
+- It is pushed away from enemies within 320 px, weighted by distance (the boss
+  4x, an elite 2x), and from enemy shots within 220 px.
+- It sidesteps round the crowd at 65°. It backs straight off when pressed or
+  under 40 % HP.
+- It keeps 450 px off the walls.
+- It walks to a chest within 700 px, to a consumable within 350 px (a health
+  pickup within 700 px when under 70 % HP), and otherwise to the nearest XP gem
+  that no enemy is standing on.
+- It holds the boss at 200–330 px.
+- It picks actives first, then Power, Haste, Expanse and Persistence, then
+  anything else.
+
+The sweeps used `timeScale=4`, mortal runs and a fresh context each time, from
+their own worktrees on their own ports, two runs at a time. A win's boss
+time-to-kill is `timeSurvivedMs − 1 200 000`. The bot also logs the HP lost to
+shots, blasts and contact, and the live types every minute.
+
+Two limits on this method:
+
+- **Rounds 2 and 3 used seeds 1–3, and their last ten runs used
+  `timeScale=8`.** Both were cut to save time. `Player.update` runs once per
+  ~16 ms simulation step at any time scale, so 8x plays the same simulation as
+  4x, only faster. Three seeds only show a large change; the doc's own
+  earlier rounds found that three seeds cannot separate a one-run move from
+  noise.
+- **The bot changed after round 1.** It was taught to walk at a ranged enemy
+  when no melee enemy is within 150 px (see round 2). Baseline has no ranged
+  enemies, so its numbers stand. The main-with-new-bot runs were dropped to save
+  time after two (Fire seed 1 lost where the old bot won; Ice seed 1 won). How
+  much of round 2's gain is the bot, not the config, is therefore not measured.
+
+## Round 0 — before and after #126 (seeds 1–5)
+
+| Element | Baseline `fb06b0b` | #126 as merged (`c1e868c`) |
+|---|---|---|
+| Fire | 5 / 5 · TTK 23–46 s | 1 / 5 · died 8:44–10:03 |
+| Ice | 5 / 5 · TTK 24–64 s | 3 / 5 · died 8:05, 9:59 |
+| Lightning | 5 / 5 · TTK 56–99 s | 2 / 5 · one a stall (below) · died 9:49–15:11 |
+| Earth | 5 / 5 · TTK 43–216 s | 4 / 5 · one a stall · died 8:45 |
+| **Total** | **20 / 20** | **10 / 20** |
+
+Winning runs on the baseline ended at level 43–68. The winning runs on main that
+did not stall ended at level 35–60.
+
+What the runs say:
+
+- **Both builds run the same until 6:00.** Mean level each minute matched to
+  within half a level through 5:00 (both builds reach 11.5 by then), and both
+  gather the same tank wave at 4:00–5:00. From 6:00 main carried 89–133 live
+  enemies against 60–88 on the baseline.
+- **Ranged enemies could not be killed by a kiting player.** They hold
+  200–240 px off and fire from 260 px, but every element's default spell
+  reaches only 144–189 px (Earth 144, Fire and Lightning 150, Ice 189). By
+  8–10 minutes 80–120 of them stood round the player, unkillable and filling
+  the 300 cap. With the cap full nothing new spawns, so the run stops paying
+  XP.
+- **Two runs stalled.** Lightning seed 2 and Earth seed 5 hit a cap of tanks and
+  ranged enemies that never caught the player. They went on with no kill and no
+  hit for over ten minutes, reached the boss at level 18–19, and needed
+  21–36 minutes to kill it. A player who only kites can stall the whole run.
+- **Exploder blasts did most of the killing.** In seven of the eight deaths
+  measured, blasts took 40–82 % of the HP lost and shots 17–29 %. The eighth,
+  Ice seed 5, died at 8:05, five seconds after exploders joined, to contact
+  and shots.
+
+## Isolation runs (Fire, seeds 1–5)
+
+Fire was the element #126 hurt most, so two single changes were run on it:
+
+| Change | Fire wins |
+|---|---|
+| none (round 0) | 1 / 5 |
+| A: no elites (one swarm elite at 19:59.9, to keep the mark pool non-empty) | 3 / 5 |
+| B: `EXPLODER_BLAST.damage` 16 → 8 | 2 / 5 |
+
+Both were real causes. With the elites off, the tank build-up from 5:00 mostly
+went away: an 8x elite tank near the player soaked single-target fire while its
+crowd grew.
+
+## Round 1 — elite HP and the blast (seeds 1–5)
+
+Changes: `ELITE.hpMul` 8 → **4**; `EXPLODER_BLAST.damage` 16 → **8**.
+
+| Element | Wins | Runs |
+|---|---|---|
+| Fire | 3 / 5 | two deaths at 8:25, 9:12 |
+| Ice | 5 / 5 | one stall (TTK 313 s at level 23) |
+| Lightning | 3 / 5 | died 10:14 and 22:44 |
+| Earth | 4 / 5 | died 8:25 |
+| **Total** | **15 / 20** | |
+
+Better, but the ranged build-up was untouched, and it explained the low-level
+wins as well as the stalls.
+
+## Round 2 — bring ranged enemies within reach (seeds 1–3)
+
+Changes: `RANGED_ATTACK.keepDistance` 240 → **170** and `fireDistance` 260 →
+**190**, so it holds 130–170 px off, a step from every default reach; the bot
+walks at a ranged enemy when no melee enemy is near. Round 1's changes are kept.
+
+| Element | Baseline, seeds 1–3 | Round 2 |
+|---|---|---|
+| Fire | 3 / 3 | 1 / 3 · died 8:15, 12:13 |
+| Ice | 3 / 3 | 3 / 3 |
+| Lightning | 3 / 3 | 1 / 3 · died 10:28, 11:36 |
+| Earth | 3 / 3 | 2 / 3 · died 9:44 |
+| **Total** | **12 / 12** | **7 / 12** |
+
+The build-up is gone: 11–34 ranged enemies were alive at the deaths, against
+80–120 in round 0, and no run stalled. The deaths are spread over blasts, shots
+and contact, and Fire still collects tanks (128–200 alive at its deaths).
+
+## Round 3 — stronger levers (seeds 1–3, not shipped)
+
+Changes on top of round 2: exploders join at 10:00 instead of 8:00;
+`EXPLODER_BLAST.damage` 8 → 6; `ELITE.damageMul` 1.5 → 1.25; the elite schedule
+reshuffled so each elite's type is still in its row's crowd.
+
+| Element | Round 3 |
+|---|---|
+| Fire | 0 / 3 · died 10:35, 11:29, and 20:06 in the boss fight |
+| Ice | 2 / 3 · died 13:35 |
+| Lightning | 2 / 3 · one a stall (TTK 641 s) · died 12:49 |
+| Earth | 3 / 3 |
+| **Total** | **7 / 12** |
+
+Same count as round 2; the changes moved which runs died, not how many. With
+shots, blasts and contact now each only part of any death, no #126 lever is left
+that clearly outweighs the noise of three seeds. Round 2's values ship, since
+they change the wave table and the elite schedule not at all.
+
+## Frame rate at the cap
+
+The bot sampled `game.loop.actualFps` and the live count every run-minute. Across
+19 runs on #126 builds there are 179 samples with 295–301 enemies alive (the cap
+plus the boss's own slot), every regular type mixed in including splitlings:
+**60–61 fps in every one**, headless Chromium on a desktop, at 4x and 8x. A
+separate probe at 18:00 read every pool against its cap each 5 s for 150 s:
+enemies, shots (max 60), gems, pickups, effects and elite marks (max 9) never
+passed their caps. The CI runner draws about 10 fps (#94) and was not measured.
+
+## Final values versus the #126 starting values
+
+| Table | Field | Was | Now | Why |
+|---|---|---|---|---|
+| `enemies.ts` | `RANGED_ATTACK.keepDistance` / `fireDistance` | 240 / 260 | **170 / 190** | Held past every default spell's reach, ranged enemies outlived a kiting player, filled the cap and stalled two runs |
+| `enemies.ts` | `EXPLODER_BLAST.damage` | 16 | **8** | Blasts were 40–82 % of the HP lost in seven of eight deaths after 8:00; Fire went 1/5 → 2/5 on this alone |
+| `enemies.ts` | `ELITE.hpMul` | 8 | **4** | An 8x elite tank at 5:00 soaked single-target fire while the crowd grew; Fire went 1/5 → 3/5 with elites off |
+
+The phase1 spec's Ranged and Exploder rows were updated with them. A new unit
+test pins the rule round 0 found: a ranged enemy's inner edge sits inside every
+default spell's reach.
+
+## What did not change, and why
+
+- **The wave table, the elite schedule, `ELITE.damageMul` and `gemMul`.**
+  Round 3 changed three of them for no gain in wins.
+- **Splitter and shielded stats.** Neither showed up as a cause: at the deaths
+  they were a few of the enemies near the player, never the main source of HP
+  lost.
+- **Ranged shot damage and fire interval.** Shots took a larger share once ranged
+  enemies came in range (44–318 HP in round 3's deaths). They are the next lever
+  if #210 wants one.
+
+## Follow-ups
+
+- **#210 owns the remaining gap:** 7 of 12 against the baseline's 12 of 12, with
+  deaths at 8:15–13:35. The wave multipliers (`hpMul`, `damageMul`,
+  `spawnsPerSecond` from 6:00) are the whole-run levers, and #210's pass sets
+  them.
+- **Fire is again the weak element.** It won 1 of 3 in round 2 and 0 of 3 in
+  round 3, and still collects tanks, which its single-target default cannot
+  clear.
+- **Stalls are possible.** A crowd that fills the cap and never reaches the
+  player freezes the run. Pulling ranged enemies in removed the cases seen here
+  (none in round 2). A cap made of slow tanks alone could still do it.
+- **Five-seed confirmation of the shipped values was skipped** at the owner's
+  call. So was the main-with-new-bot row that would separate the bot's share
+  of the gain from the config's.
