@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import type Phaser from 'phaser';
+import { passiveById, type PassiveId } from '../src/config/passives';
+import { relicBuffById, type RelicBuffId } from '../src/config/relics';
 import { SPELL_CARDS, SPELL_IDS, type SpellId } from '../src/config/spells';
+import { abbreviate, itemInfo } from '../src/core/pauseModel';
 import { spellGlyph } from '../src/core/hudModel';
 import type { PausePayload, ResultPayload } from '../src/core/scenePayloads';
 import { SCENE } from '../src/core/scenePayloads';
@@ -118,6 +121,51 @@ async function waitForPause(page: Page, confirm: PausePayload['confirm']): Promi
 const readStoredSave = (page: Page): Promise<string | null> =>
   page.evaluate((key) => localStorage.getItem(key), SAVE_STORAGE_KEY);
 
+/** Standard-mapping pad buttons. */
+const A = 0;
+const START = 9;
+const UP = 12;
+const DOWN = 13;
+const LEFT = 14;
+const RIGHT = 15;
+
+/** A fake standard-mapping pad Phaser finds by polling `navigator.getGamepads`; call before `goto`. */
+async function installPad(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const pad = {
+      id: 'e2e pad',
+      index: 0,
+      connected: true,
+      mapping: 'standard',
+      timestamp: 0,
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    };
+    (window as unknown as { e2ePad: typeof pad }).e2ePad = pad;
+    navigator.getGamepads = () => [pad as unknown as Gamepad];
+  });
+}
+
+/** Press and release one button on the fake pad, a few frames each. */
+async function pressPad(page: Page, button: number): Promise<void> {
+  for (const down of [true, false]) {
+    await page.evaluate(
+      ([index, pressed]) => {
+        const pad = (
+          window as unknown as {
+            e2ePad: { timestamp: number; buttons: { pressed: boolean; value: number }[] };
+          }
+        ).e2ePad;
+        pad.buttons[index as number] = { pressed: pressed as boolean, value: pressed ? 1 : 0 };
+        // Phaser skips a pad state stamped before it first saw the pad.
+        pad.timestamp = performance.now();
+      },
+      [button, down] as const,
+    );
+    await frames(page, 4);
+  }
+}
+
 test('Esc pauses the whole run over the build, and Esc resumes it without a jump', async ({
   page,
 }) => {
@@ -131,8 +179,8 @@ test('Esc pauses the whole run over the build, and Esc resumes it without a jump
   expect(paused.gamePaused).toBe(true);
   expect(paused.hudVisible).toBe(false);
   expect(paused.pause?.view.level).toBe(paused.level);
-  const { name, color } = SPELL_CARDS[PICKED];
-  expect(paused.pause?.view.spells).toEqual([{ id: PICKED, name, color }]);
+  const { name, color, description } = SPELL_CARDS[PICKED];
+  expect(paused.pause?.view.spells).toEqual([{ id: PICKED, name, color, description }]);
   expect(paused.pause?.view.stats.kills).toBe(paused.kills);
 
   // Frozen: a second of wall time moves nothing (spec: enemies, spells,
@@ -212,13 +260,13 @@ test('End run by keyboard goes to the results with the run banked once', async (
   await page.keyboard.press('Escape');
   await waitForPause(page, undefined);
   // The first arrow wakes the highlight on Resume; two more reach End run.
-  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowRight');
+  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await waitForPause(page, 'end');
   // Enter with nothing highlighted is No.
   await page.keyboard.press('Enter');
   await waitForPause(page, undefined);
-  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowRight');
+  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await waitForPause(page, 'end');
   await page.keyboard.press('ArrowLeft'); // wakes the highlight on Yes
@@ -296,41 +344,8 @@ test('losing focus on the frame a level-up is queued leaves only the level-up', 
 test('a gamepad pauses with Start, resumes with Start, and leaves for the main menu', async ({
   page,
 }) => {
-  // A fake standard-mapping pad Phaser finds by polling `navigator.getGamepads`.
-  await page.addInitScript(() => {
-    const pad = {
-      id: 'e2e pad',
-      index: 0,
-      connected: true,
-      mapping: 'standard',
-      timestamp: 0,
-      axes: [0, 0, 0, 0],
-      buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
-    };
-    (window as unknown as { e2ePad: typeof pad }).e2ePad = pad;
-    navigator.getGamepads = () => [pad as unknown as Gamepad];
-  });
-  const press = async (button: number): Promise<void> => {
-    for (const down of [true, false]) {
-      await page.evaluate(
-        ([index, pressed]) => {
-          const pad = (
-            window as unknown as {
-              e2ePad: { timestamp: number; buttons: { pressed: boolean; value: number }[] };
-            }
-          ).e2ePad;
-          pad.buttons[index as number] = { pressed: pressed as boolean, value: pressed ? 1 : 0 };
-          // Phaser skips a pad state stamped before it first saw the pad.
-          pad.timestamp = performance.now();
-        },
-        [button, down] as const,
-      );
-      await frames(page, 4);
-    }
-  };
-  const A = 0;
-  const START = 9;
-  const RIGHT = 15;
+  await installPad(page);
+  const press = (button: number): Promise<void> => pressPad(page, button);
 
   const errors = collectErrors(page);
   await startRun(page);
@@ -347,8 +362,8 @@ test('a gamepad pauses with Start, resumes with Start, and leaves for the main m
   await press(START);
   await waitForPause(page, undefined);
   await frames(page, 4);
-  await press(RIGHT); // wakes the highlight on Resume
-  for (let i = 0; i < 3; i += 1) await press(RIGHT); // to Main menu
+  await press(DOWN); // wakes the highlight on Resume
+  for (let i = 0; i < 3; i += 1) await press(DOWN); // to Main menu
   await press(A);
   await waitForPause(page, 'menu');
   await frames(page, 4);
@@ -415,7 +430,17 @@ function sampleIcons(page: Page): Promise<IconSample> {
   }, SCENE);
 }
 
-async function pauseWithLoadout(page: Page, loadout: readonly string[]): Promise<void> {
+/** Passives and relic buffs to take, one rank each, before pausing. */
+interface Extras {
+  passives?: readonly PassiveId[];
+  relics?: readonly RelicBuffId[];
+}
+
+async function pauseWithLoadout(
+  page: Page,
+  loadout: readonly string[],
+  extras: Extras = {},
+): Promise<void> {
   await page.goto(`/?seed=1&invulnerable=1&loadout=${loadout.join(',')}`);
   await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
@@ -423,6 +448,17 @@ async function pauseWithLoadout(page: Page, loadout: readonly string[]): Promise
   await page.mouse.click(x, y);
   await waitForScene(page, SCENE.game);
   await expect.poll(async () => (await snapshot(page)).spells.length).toBe(1 + loadout.length);
+  await page.evaluate(
+    async ([key, { passives = [], relics = [] }]) => {
+      const { game } = await import('/src/main.ts');
+      const { spells } = game.scene.getScene(key) as unknown as {
+        spells: { takePassive(id: string): void; takeRelic(id: string): void };
+      };
+      for (const id of passives) spells.takePassive(id);
+      for (const id of relics) spells.takeRelic(id);
+    },
+    [SCENE.game, extras] as const,
+  );
   await frames(page, 4); // the HUD has drawn every slot
   await page.keyboard.press('Escape');
   await waitForPause(page, undefined);
@@ -462,4 +498,202 @@ test('with no icon art, the pause screen shows the HUD slot letters on the spell
   // The ticket's cases: one letter, not "To" / "Ea".
   expect(expected.slice(1).map((glyph) => glyph.text)).toEqual(['T', 'E']);
   for (const { text } of expected) expect(sample.hudTexts).toContain(text);
+});
+
+/**
+ * CO-179: the roster's longest name beside three more spells, two passives on
+ * one row and a relic below them.
+ */
+const LONG_LOADOUT = ['lightning_companion', 'lightning_chain', 'earth_companion'] as const;
+const BUILD: Required<Extras> = {
+  passives: ['passive_power', 'passive_haste'],
+  relics: ['relic_hourglass'],
+};
+
+/** The spell strip's frame and every text drawn inside its band, read in one evaluate. */
+function sampleStrip(page: Page) {
+  return page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    const scene = game.scene.getScene(key);
+    const texts = scene.children.list.filter(
+      (o) => o.type === 'Text',
+    ) as unknown as Phaser.GameObjects.Text[];
+    // The strip is the first filled rectangle the screen draws after its backdrop.
+    const strip = (scene.children.list as Phaser.GameObjects.Rectangle[]).find(
+      (o) => o.type === 'Rectangle' && o.isFilled && o.fillColor === 0x17110f,
+    );
+    const box = strip?.getBounds();
+    const inBand = (t: Phaser.GameObjects.Text) =>
+      box !== undefined && t.y > box.y + 30 && t.y < box.bottom;
+    return {
+      strip: box ? { x: box.x, y: box.y, right: box.right, bottom: box.bottom } : null,
+      names: texts.filter(inBand).map((t) => {
+        const b = t.getBounds();
+        return { text: t.text, x: b.x, y: b.y, right: b.right, bottom: b.bottom };
+      }),
+      icons: (scene.children.list as Phaser.GameObjects.Image[])
+        .filter((o) => o.type === 'Image' && o.frame.name.startsWith('icon.'))
+        .map((o) => o.frame.name),
+    };
+  }, SCENE.pause);
+}
+
+const readNav = (page: Page) =>
+  page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    return (game.scene.getScene(key) as PauseScene).nav;
+  }, SCENE.pause);
+
+test('every spell name fits inside the Spells strip, and passives and relics wear icons', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await pauseWithLoadout(page, LONG_LOADOUT, BUILD);
+
+  const sample = await sampleStrip(page);
+  expect(sample.strip).not.toBeNull();
+  const strip = sample.strip!;
+  // Four names, each on one line, inside the strip's frame.
+  expect(sample.names).toHaveLength(1 + LONG_LOADOUT.length);
+  for (const name of sample.names) {
+    expect(name.text, name.text).not.toContain('\n');
+    expect(name.x, name.text).toBeGreaterThanOrEqual(strip.x);
+    expect(name.right, name.text).toBeLessThanOrEqual(strip.right);
+    expect(name.bottom, name.text).toBeLessThanOrEqual(strip.bottom);
+  }
+  // Names do not run into one another.
+  const sorted = [...sample.names].sort((a, b) => a.x - b.x);
+  for (let i = 1; i < sorted.length; i += 1) {
+    expect(sorted[i]!.x).toBeGreaterThan(sorted[i - 1]!.right);
+  }
+
+  // Each passive and relic draws its own icon art, not its letters.
+  const expected = [...BUILD.passives, ...BUILD.relics].map((id) => `icon.${id}.0.art`);
+  for (const frame of expected) expect(sample.icons).toContain(frame);
+  expect(errors).toEqual([]);
+});
+
+test('the arrows walk from the menu through every strip and read each item', async ({ page }) => {
+  const errors = collectErrors(page);
+  await pauseWithLoadout(page, LONG_LOADOUT, BUILD);
+  const info = (id: string, kind: 'spell' | 'passive' | 'relic'): string => {
+    if (kind === 'spell') {
+      const card = SPELL_CARDS[id as SpellId];
+      return card ? itemInfo({ ...card, id }) : id;
+    }
+    const entry = kind === 'passive' ? passiveById(id) : relicBuffById(id);
+    return itemInfo({ id, name: entry!.name, abbr: '', description: entry!.description, count: 1 });
+  };
+
+  expect((await readNav(page)).focus).toBeNull();
+  await page.keyboard.press('ArrowDown'); // wakes the highlight on Resume
+  await page.keyboard.press('ArrowDown'); // Restart
+  expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 1 });
+
+  await page.keyboard.press('ArrowRight');
+  let nav = await readNav(page);
+  expect(nav.focus).toMatchObject({ zone: 'build', row: 0, col: 0 });
+  expect(nav.info).toBe(info(PICKED, 'spell'));
+  expect(nav.cursor).not.toBeNull();
+
+  // The long name reads whole on the info line, however it fits under its icon.
+  await page.keyboard.press('ArrowRight');
+  nav = await readNav(page);
+  expect(nav.info).toContain('Lightning Companion');
+  const spellCursor = nav.cursor;
+
+  await page.keyboard.press('ArrowDown');
+  nav = await readNav(page);
+  expect(nav.focus).toMatchObject({ zone: 'build', row: 1 });
+  expect([info('passive_power', 'passive'), info('passive_haste', 'passive')]).toContain(nav.info);
+  expect(nav.cursor).not.toEqual(spellCursor);
+
+  await page.keyboard.press('ArrowDown');
+  nav = await readNav(page);
+  expect(nav.focus).toMatchObject({ zone: 'build', row: 2, col: 0 });
+  expect(nav.info).toBe(info('relic_hourglass', 'relic'));
+
+  // The mouse still reads a tile, and the pad's item comes back when it leaves.
+  const tile = nav.cursor!;
+  await page.mouse.move(tile.x, tile.y - 132); // the passive row above
+  await expect.poll(async () => (await readNav(page)).info).toBe(info('passive_power', 'passive'));
+  await page.mouse.move(5, 5);
+  await expect.poll(async () => (await readNav(page)).info).toBe(info('relic_hourglass', 'relic'));
+
+  // Left off the row's first item goes back to the menu row it came from.
+  await page.keyboard.press('ArrowLeft');
+  nav = await readNav(page);
+  expect(nav.focus).toEqual({ zone: 'menu', index: 1 });
+  expect(nav.cursor).toBeNull();
+
+  // Esc still resumes.
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await snapshot(page)).gamePaused).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('a gamepad reaches the spells, passives and relics, and Start still resumes', async ({
+  page,
+}) => {
+  await installPad(page);
+  const errors = collectErrors(page);
+  await pauseWithLoadout(page, LONG_LOADOUT, BUILD);
+  await frames(page, 4); // the first poll after a connect only takes a baseline
+
+  await pressPad(page, DOWN); // wakes the highlight on Resume
+  await pressPad(page, RIGHT);
+  let nav = await readNav(page);
+  expect(nav.focus).toMatchObject({ zone: 'build', row: 0, col: 0 });
+  expect(nav.info).toContain(SPELL_CARDS[PICKED].name);
+
+  // Down lands on the passive nearest across: the second, under the first spell.
+  await pressPad(page, DOWN);
+  nav = await readNav(page);
+  expect(nav.focus).toMatchObject({ zone: 'build', row: 1, col: 1 });
+  expect(nav.info).toContain(passiveById('passive_haste')!.name);
+  await pressPad(page, LEFT);
+  expect((await readNav(page)).info).toContain(passiveById('passive_power')!.name);
+
+  await pressPad(page, DOWN);
+  nav = await readNav(page);
+  expect(nav.focus).toMatchObject({ zone: 'build', row: 2 });
+  expect(nav.info).toContain(relicBuffById('relic_hourglass')!.name);
+  // A on a strip item does nothing.
+  await pressPad(page, A);
+  const after = await snapshot(page);
+  expect(after.pause).not.toBeNull();
+  expect(after.pause?.confirm).toBeUndefined();
+  expect((await readNav(page)).focus).toEqual(nav.focus);
+
+  await pressPad(page, UP);
+  expect((await readNav(page)).focus).toMatchObject({ zone: 'build', row: 1, col: 0 });
+  await pressPad(page, LEFT);
+  expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 0 });
+  await pressPad(page, START);
+  await expect.poll(async () => (await snapshot(page)).gamePaused).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('with no icon art, passives and relics keep their letters and badges', async ({ page }) => {
+  // The build icons' page failing takes every atlas page down with it (CO-130).
+  await page.route('**/assets/atlas/props17.png', (route) => route.abort());
+  await pauseWithLoadout(page, LONG_LOADOUT, BUILD);
+
+  const read = await page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    const list = game.scene.getScene(key).children.list;
+    return {
+      icons: (list as Phaser.GameObjects.Image[])
+        .filter((o) => o.type === 'Image' && o.frame.name.startsWith('icon.'))
+        .map((o) => o.frame.name),
+      texts: (list as Phaser.GameObjects.Text[])
+        .filter((o) => o.type === 'Text')
+        .map((o) => o.text),
+    };
+  }, SCENE.pause);
+  expect(read.icons).toEqual([]);
+  for (const id of [...BUILD.passives, ...BUILD.relics]) {
+    const name = (passiveById(id) ?? relicBuffById(id))!.name;
+    expect(read.texts, id).toContain(abbreviate(name));
+  }
 });

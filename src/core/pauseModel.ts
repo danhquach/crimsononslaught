@@ -13,8 +13,10 @@ import { formatTimer } from './hudModel';
 
 /** A passive or relic buff as a tile: `count` is a passive's rank, a relic's stacks. */
 export interface PauseItem {
+  /** Picks the tile's icon art (CO-179). */
+  id: string;
   name: string;
-  /** Two letters for the tile face; there is no passive or relic icon art. Spells use their own glyph. */
+  /** Two letters for the tile face when its icon art is missing. Spells use their own glyph. */
   abbr: string;
   description: string;
   count: number;
@@ -25,7 +27,7 @@ export interface PauseView {
   /** The run's level; spells have no level of their own. */
   level: number;
   /** The equipped spells in equip order; the id picks the icon art, the colour its fallback disc. */
-  spells: readonly { id: string; name: string; color: number }[];
+  spells: readonly PauseSpell[];
   /** Passives in the order taken. */
   passives: readonly PauseItem[];
   /** Relic buffs in the order picked. */
@@ -33,9 +35,18 @@ export interface PauseView {
   stats: { kills: number; embers: number; elapsedMs: number };
 }
 
+/** An equipped spell; the info line reads its name and description (CO-179). */
+export interface PauseSpell {
+  id: string;
+  name: string;
+  color: number;
+  description: string;
+}
+
 export interface PauseBuild {
   level: number;
-  spells: readonly { id: string; name: string; color: number }[];
+  /** The result screen's build (#290) carries no descriptions; it has no info line. */
+  spells: readonly (Omit<PauseSpell, 'description'> & { description?: string })[];
   passives: ReadonlyMap<PassiveId, number>;
   relics: ReadonlyMap<RelicBuffId, number>;
   kills: number;
@@ -50,8 +61,8 @@ export function abbreviate(name: string): string {
   return first.charAt(0).toUpperCase() + first.charAt(1).toLowerCase();
 }
 
-function item(name: string, description: string, count: number): PauseItem {
-  return { name, abbr: abbreviate(name), description, count };
+function item(id: string, name: string, description: string, count: number): PauseItem {
+  return { id, name, abbr: abbreviate(name), description, count };
 }
 
 /**
@@ -61,14 +72,19 @@ function item(name: string, description: string, count: number): PauseItem {
 export function pauseView(build: PauseBuild): PauseView {
   return {
     level: build.level,
-    spells: build.spells.map(({ id, name, color }) => ({ id, name, color })),
+    spells: build.spells.map(({ id, name, color, description = '' }) => ({
+      id,
+      name,
+      color,
+      description,
+    })),
     passives: [...build.passives].map(([id, rank]) => {
       const passive = passiveById(id);
-      return item(passive?.name ?? id, passive?.description ?? '', rank);
+      return item(id, passive?.name ?? id, passive?.description ?? '', rank);
     }),
     relics: [...build.relics].map(([id, stacks]) => {
       const buff = relicBuffById(id);
-      return item(buff?.name ?? id, buff?.description ?? '', stacks);
+      return item(id, buff?.name ?? id, buff?.description ?? '', stacks);
     }),
     stats: { kills: build.kills, embers: build.embers, elapsedMs: build.elapsedMs },
   };
@@ -83,9 +99,13 @@ export function statsLine(view: Readonly<PauseView>): string {
   return `Kills ${kills}  ·  ${CURRENCY_NAME} ${embers}  ·  ${formatTimer(elapsedMs)}`;
 }
 
-/** The info line for a hovered tile: `Power ×2 — Every spell deals 10% more damage.` */
-export function itemInfo(tile: Readonly<PauseItem>): string {
-  const head = `${tile.name} ×${tile.count}`;
+/**
+ * The info line for a pointed-at or selected tile: `Power ×2  —  Every spell
+ * deals 10% more damage.` A spell has no count of its own, so it reads its
+ * name and description alone.
+ */
+export function itemInfo(tile: Readonly<PauseItem | PauseSpell>): string {
+  const head = 'count' in tile ? `${tile.name} ×${tile.count}` : tile.name;
   return tile.description ? `${head}  —  ${tile.description}` : head;
 }
 
@@ -148,6 +168,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 function isPauseItem(v: unknown): boolean {
   return (
     isRecord(v) &&
+    typeof v.id === 'string' &&
     typeof v.name === 'string' &&
     typeof v.abbr === 'string' &&
     typeof v.description === 'string' &&
@@ -166,7 +187,8 @@ export function isPauseView(data: unknown): data is PauseView {
         isRecord(s) &&
         typeof s.id === 'string' &&
         typeof s.name === 'string' &&
-        typeof s.color === 'number',
+        typeof s.color === 'number' &&
+        typeof s.description === 'string',
     ) &&
     Array.isArray(data.passives) &&
     data.passives.every(isPauseItem) &&

@@ -1,7 +1,14 @@
 import Phaser from 'phaser';
 import { PASSIVE_COLOR, RELIC_COLOR, offerColor } from '../core/offerColors';
 import type { PauseItem } from '../core/pauseModel';
-import { SPELL_ICON_ART_SIZE, addSpellIcon, type IconSpell } from '../render/spellIcon';
+import { FRAMES } from '../config/frames';
+import { artFrame } from '../core/animation';
+import {
+  SPELL_ICON_ART_SIZE,
+  addSpellIcon,
+  buildIconArt,
+  type IconSpell,
+} from '../render/spellIcon';
 
 /**
  * The pieces the pause screen (#252) and the result screen (#290) both draw a
@@ -48,12 +55,41 @@ export function drawStrip(
   });
 }
 
-/** A spell's icon on a black disc whose rim wears its kind's colour (CO-164), as its level-up card did. */
-export function addSpellDisc(scene: Phaser.Scene, x: number, y: number, spell: IconSpell): void {
-  scene.add
+/**
+ * A spell's icon on a black disc whose rim wears its kind's colour (CO-164),
+ * as its level-up card did. Returns the rim.
+ */
+export function addSpellDisc(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  spell: IconSpell,
+): Phaser.GameObjects.Arc {
+  const rim = scene.add
     .circle(x, y, SPELL_ICON_SIZE / 2 + 3, 0x000000)
     .setStrokeStyle(2, offerColor('active', spell.id));
   addSpellIcon(scene, x, y, spell, 1);
+  return rim;
+}
+
+/**
+ * A passive's or relic buff's icon art (CO-179) at 1x, the spell icons' size,
+ * on a black disc rimmed in `rim`, with its count on a badge. Returns the rim,
+ * or `null` with no icon art, where the caller draws its lettered tile.
+ */
+export function addBuildIcon(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  tile: PauseItem,
+  rim: number,
+): Phaser.GameObjects.Arc | null {
+  const frame = buildIconArt(scene, tile.id);
+  if (!frame) return null;
+  const face = scene.add.circle(x, y, TILE / 2 + 2, 0x000000).setStrokeStyle(1, rim);
+  scene.add.image(x, y, FRAMES[frame].page, artFrame(frame));
+  addBadge(scene, x + TILE / 2 - 2, y + TILE / 2 - 2, tile.count);
+  return face;
 }
 
 /** A passive: a square tile with its letters and its rank on a badge. Returns the face. */
