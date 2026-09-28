@@ -107,16 +107,22 @@ describe('isHelpPayload', () => {
 });
 
 describe('isPausePayload', () => {
-  const power = { name: 'Power', abbr: 'Po', description: 'More damage.', count: 2 };
+  const power = {
+    id: 'passive_power',
+    name: 'Power',
+    abbr: 'Po',
+    description: 'More damage.',
+    count: 2,
+  };
   const stats = { kills: 12, embers: 3, elapsedMs: 61_000 };
   const view = {
     level: 4,
     spells: [
-      { id: 'fire', name: 'Fire Bolt', color: 0xff4400 },
-      { id: 'ice', name: 'Ice Arrow', color: 0x66ccff },
+      { id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.' },
+      { id: 'ice', name: 'Ice Arrow', color: 0x66ccff, description: 'An arrow.' },
     ],
     passives: [power],
-    relics: [{ ...power, name: 'Hourglass', abbr: 'Ho', count: 1 }],
+    relics: [{ ...power, id: 'relic_hourglass', name: 'Hourglass', abbr: 'Ho', count: 1 }],
     stats,
   };
   const empty = { level: 1, spells: [], passives: [], relics: [], stats };

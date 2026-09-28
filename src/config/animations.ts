@@ -13,6 +13,8 @@
 import type { TextureKey } from './colors';
 import type { FrameName } from './frames';
 import { ROSTER_SPELL_IDS } from './loadout';
+import { PASSIVES } from './passives';
+import { RELIC_BUFFS } from './relics';
 
 export interface AnimationSpec {
   /** Animation key, matching the frame prefix, e.g. `hero.walk.down`. */
@@ -287,6 +289,10 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // HUD slot icons (CO-154): one still per roster spell, drawn by HudScene
   // straight from the atlas, never played.
   ...ROSTER_SPELL_IDS.map((id) => spec(`icon.${id}`, 1, 1, ONCE)),
+
+  // Pause screen build icons (CO-179): one still per passive and relic buff,
+  // drawn by PauseScene straight from the atlas, never played.
+  ...[...PASSIVES, ...RELIC_BUFFS].map(({ id }) => spec(`icon.${id}`, 1, 1, ONCE)),
 
   // HUD bar frames and their end marks (CO-156): stills, never played; each
   // frame is cut into caps and a middle by `render/barFrame.ts`.

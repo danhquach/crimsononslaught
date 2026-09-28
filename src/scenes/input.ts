@@ -1,5 +1,12 @@
 import Phaser from 'phaser';
-import { menuStep, pressedEdges, stickVector, wrapIndex, type MenuInputState } from '../core/input';
+import {
+  menuStep,
+  pressedEdges,
+  stickVector,
+  wrapIndex,
+  type DirectionState,
+  type MenuInputState,
+} from '../core/input';
 import { isConfirmKey } from '../core/resultModel';
 import { audioOf } from '../render/audio';
 
@@ -49,49 +56,34 @@ export interface MenuInputOptions {
   enterDefault?: number;
 }
 
-/** Selection step per arrow key; up and left go back, as on the pad. */
-const ARROW_STEP: Readonly<Record<string, number>> = {
-  ArrowUp: -1,
-  ArrowLeft: -1,
-  ArrowDown: 1,
-  ArrowRight: 1,
+/** The direction each arrow key presses. */
+const ARROW_DIRECTION: Readonly<Record<string, keyof DirectionState>> = {
+  ArrowUp: 'up',
+  ArrowLeft: 'left',
+  ArrowDown: 'down',
+  ArrowRight: 'right',
 };
 
+/** Where a press came from: pad A and Enter wake and confirm a little differently. */
+export type NavSource = 'pad' | 'keyboard';
+
 /**
- * Gamepad navigation for menus and overlays (spec §5): D-pad or left stick
- * changes the selection, A confirms it. With `keyboard`, the arrow keys and
- * Enter drive the same selection.
- *
- * Mouse and keyboard stay primary — nothing is highlighted until a pad is
- * actually used, and the press that first wakes the pad only reveals the
- * highlight rather than confirming, so a controller can never fire a menu item
- * the player has not seen selected.
+ * Fresh presses from the first pad and, with `keyboard`, the arrow keys and
+ * Enter, as one `MenuInputState` of edges per press. `attachMenuInput` steps a
+ * list with it; the pause screen (CO-179) walks its own layout.
  *
  * Polls on the scene's update event, so scenes need no `update` of their own,
  * and unhooks itself on shutdown.
  */
-export function attachMenuInput(
+export function attachNavInput(
   scene: Phaser.Scene,
-  items: readonly MenuItem[],
-  options: MenuInputOptions = {},
+  onPress: (pressed: MenuInputState, source: NavSource) => void,
+  options: { keyboard?: boolean } = {},
 ): void {
-  if (items.length === 0) return;
-
-  let selected = -1;
   // Previous poll, for edge detection. Null until a pad is seen: the first poll
   // after a connect only takes a baseline, so a button already held down when
   // the pad appears is not read as a fresh press.
   let prev: MenuInputState | null = null;
-
-  // The move cue plays here (CO-102) and the confirm cue in the action each
-  // item runs, so a click, a key and a pad press through the same action all
-  // sound once.
-  const audio = audioOf(scene);
-  const select = (index: number): void => {
-    if (index !== selected) audio.play('ui.move');
-    selected = index;
-    items.forEach((item, i) => item.setSelected(i === selected));
-  };
 
   const poll = (): void => {
     const pad = firstPad(scene);
@@ -106,15 +98,8 @@ export function attachMenuInput(
     }
     const pressed = pressedEdges(prev, curr);
     prev = curr;
-
-    const step = menuStep(pressed);
-    if (step !== 0) {
-      select(selected < 0 ? 0 : wrapIndex(selected, step, items.length));
-      return;
-    }
-    if (pressed.confirm) {
-      if (selected < 0) select(0);
-      else items[selected]?.confirm();
+    if (pressed.up || pressed.down || pressed.left || pressed.right || pressed.confirm) {
+      onPress(pressed, 'pad');
     }
   };
 
@@ -130,14 +115,14 @@ export function attachMenuInput(
     scene.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (handled.has(event)) return;
       handled.add(event);
-      const step = ARROW_STEP[event.key];
-      if (step !== undefined) {
-        select(selected < 0 ? 0 : wrapIndex(selected, step, items.length));
-      } else if (isConfirmKey(event.key)) {
-        const target = selected >= 0 ? selected : options.enterDefault;
-        if (target === undefined) select(0);
-        else items[target]?.confirm();
-      }
+      const dir = Object.hasOwn(ARROW_DIRECTION, event.key)
+        ? ARROW_DIRECTION[event.key]
+        : undefined;
+      const confirm = dir === undefined && isConfirmKey(event.key);
+      if (dir === undefined && !confirm) return;
+      const pressed = { up: false, down: false, left: false, right: false, confirm };
+      if (dir) pressed[dir] = true;
+      onPress(pressed, 'keyboard');
     });
   }
 
@@ -145,6 +130,53 @@ export function attachMenuInput(
   scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
     scene.events.off(Phaser.Scenes.Events.UPDATE, poll);
   });
+}
+
+/**
+ * Gamepad navigation for menus and overlays (spec §5): D-pad or left stick
+ * changes the selection, A confirms it. With `keyboard`, the arrow keys and
+ * Enter drive the same selection.
+ *
+ * Mouse and keyboard stay primary — nothing is highlighted until a pad is
+ * actually used, and the press that first wakes the pad only reveals the
+ * highlight rather than confirming, so a controller can never fire a menu item
+ * the player has not seen selected.
+ */
+export function attachMenuInput(
+  scene: Phaser.Scene,
+  items: readonly MenuItem[],
+  options: MenuInputOptions = {},
+): void {
+  if (items.length === 0) return;
+
+  let selected = -1;
+
+  // The move cue plays here (CO-102) and the confirm cue in the action each
+  // item runs, so a click, a key and a pad press through the same action all
+  // sound once.
+  const audio = audioOf(scene);
+  const select = (index: number): void => {
+    if (index !== selected) audio.play('ui.move');
+    selected = index;
+    items.forEach((item, i) => item.setSelected(i === selected));
+  };
+
+  attachNavInput(
+    scene,
+    (pressed, source) => {
+      const step = menuStep(pressed);
+      if (step !== 0) {
+        select(selected < 0 ? 0 : wrapIndex(selected, step, items.length));
+        return;
+      }
+      if (!pressed.confirm) return;
+      const target =
+        selected >= 0 ? selected : source === 'keyboard' ? options.enterDefault : undefined;
+      if (target === undefined) select(0);
+      else items[target]?.confirm();
+    },
+    { keyboard: options.keyboard },
+  );
 }
 
 /**
@@ -156,23 +188,31 @@ const START_BUTTON = 9;
 export interface StartButtonWatch {
   /** True on the poll where Start goes down; call once a frame. */
   pressed(): boolean;
-  /** Take a fresh baseline on the next poll, as after a stretch of not polling. */
+  /** Take a fresh baseline, as after a stretch of not polling. */
   reset(): void;
 }
 
 /**
  * Pad Start as a press edge (#252: it toggles the pause screen). Like
- * `attachMenuInput`, the first poll after a connect or a `reset` only takes a
- * baseline, so a Start still held from the press that opened a screen does not
- * close it again.
+ * `attachMenuInput`, the first poll after a connect only takes a baseline, so
+ * a Start still held from the press that opened a screen does not close it
+ * again.
+ *
+ * After a `reset` the first poll is skipped as well (CO-179). Phaser refreshes
+ * a scene's pads after the scenes update, so a scene's first update after a
+ * resume still reads the pad as it was before it paused. Taken as the
+ * baseline, that stale state made the Start that resumed a pause opened with
+ * Esc read as a fresh press one frame later, and the pause opened again.
  */
 export function watchStartButton(scene: Phaser.Scene): StartButtonWatch {
   let prev: boolean | null = null;
+  let stale = false;
   return {
     pressed: () => {
       const pad = firstPad(scene);
-      if (!pad) {
+      if (!pad || stale) {
         prev = null;
+        stale = false;
         return false;
       }
       const down = pad.buttons[START_BUTTON]?.pressed ?? false;
@@ -182,6 +222,7 @@ export function watchStartButton(scene: Phaser.Scene): StartButtonWatch {
     },
     reset: () => {
       prev = null;
+      stale = true;
     },
   };
 }

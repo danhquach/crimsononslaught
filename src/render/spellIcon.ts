@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { buildIconFrame } from '../config/buildIcons';
 import { FRAMES, type FrameName } from '../config/frames';
 import { spellIconFrame } from '../config/spellIcons';
 import { artFrame } from '../core/animation';
@@ -16,6 +17,12 @@ export const SPELL_ICON_ART_SIZE = 32;
  */
 export function spellIconArt(scene: Phaser.Scene, id: string): FrameName | null {
   const frame = spellIconFrame(id);
+  return frame && hasFrameArt(scene, frame) ? frame : null;
+}
+
+/** A passive's or relic buff's icon art (CO-179), or `null` for one with none or a run with no atlas. */
+export function buildIconArt(scene: Phaser.Scene, id: string): FrameName | null {
+  const frame = buildIconFrame(id);
   return frame && hasFrameArt(scene, frame) ? frame : null;
 }
 

@@ -26,11 +26,11 @@ describe('pauseView', () => {
   it('shows an empty build as the level, the spell and the stats alone', () => {
     const view = pauseView({
       ...empty,
-      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff4400 }],
+      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.' }],
     });
     expect(view).toEqual({
       level: 1,
-      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff4400 }],
+      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.' }],
       passives: [],
       relics: [],
       stats: { kills: 0, embers: 0, elapsedMs: 0 },
@@ -43,8 +43,8 @@ describe('pauseView', () => {
       ...empty,
       level: 9,
       spells: [
-        { id: 'fire', name: 'Fire Bolt', color: 0xff4400 },
-        { id: 'ice', name: 'Ice Arrow', color: 0x66ccff },
+        { id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.' },
+        { id: 'ice', name: 'Ice Arrow', color: 0x66ccff, description: 'An arrow.' },
       ],
       passives: new Map<PassiveId, number>([
         ['passive_vitality', 3],
@@ -59,13 +59,13 @@ describe('pauseView', () => {
       elapsedMs: 252_000,
     });
     expect(view.spells.map((s) => s.id)).toEqual(['fire', 'ice']);
-    expect(view.passives.map(({ name, abbr, count }) => [name, abbr, count])).toEqual([
-      ['Vitality', 'Vi', 3],
-      ['Power', 'Po', 1],
+    expect(view.passives.map(({ id, name, abbr, count }) => [id, name, abbr, count])).toEqual([
+      ['passive_vitality', 'Vitality', 'Vi', 3],
+      ['passive_power', 'Power', 'Po', 1],
     ]);
-    expect(view.relics.map(({ name, abbr, count }) => [name, abbr, count])).toEqual([
-      ['Hourglass', 'Ho', 2],
-      ['Ancient Fury', 'AF', 1],
+    expect(view.relics.map(({ id, name, abbr, count }) => [id, name, abbr, count])).toEqual([
+      ['relic_hourglass', 'Hourglass', 'Ho', 2],
+      ['relic_ancient_fury', 'Ancient Fury', 'AF', 1],
     ]);
     expect(view.passives[1]?.description).toBe(
       PASSIVES.find((p) => p.id === 'passive_power')?.description,
@@ -80,8 +80,12 @@ describe('pauseView', () => {
       passives: new Map([['gone' as PassiveId, 1]]),
       relics: new Map([['lost' as RelicBuffId, 2]]),
     });
-    expect(view.passives).toEqual([{ name: 'gone', abbr: 'Go', description: '', count: 1 }]);
-    expect(view.relics).toEqual([{ name: 'lost', abbr: 'Lo', description: '', count: 2 }]);
+    expect(view.passives).toEqual([
+      { id: 'gone', name: 'gone', abbr: 'Go', description: '', count: 1 },
+    ]);
+    expect(view.relics).toEqual([
+      { id: 'lost', name: 'lost', abbr: 'Lo', description: '', count: 2 },
+    ]);
   });
 
   it('carries only this run: never the shop upgrades', () => {
@@ -114,9 +118,15 @@ describe('statsLine and itemInfo', () => {
   });
 
   it('names a tile with its count and says what it does', () => {
-    const tile = { name: 'Power', abbr: 'Po', description: 'More damage.', count: 2 };
+    const tile = { id: 'p', name: 'Power', abbr: 'Po', description: 'More damage.', count: 2 };
     expect(itemInfo(tile)).toBe('Power ×2  —  More damage.');
     expect(itemInfo({ ...tile, description: '' })).toBe('Power ×2');
+  });
+
+  it('names a spell with no count, since spells have no level of their own', () => {
+    const spell = { id: 'fire', name: 'Fire Bolt', color: 0, description: 'A bolt.' };
+    expect(itemInfo(spell)).toBe('Fire Bolt  —  A bolt.');
+    expect(itemInfo({ ...spell, description: '' })).toBe('Fire Bolt');
   });
 });
 
@@ -147,11 +157,25 @@ describe('isPauseView', () => {
     expect(isPauseView({ level: -1, spells: [], passives: [], relics: [], stats })).toBe(false);
     const spell = { id: 'fire', name: 'Fire Bolt' };
     expect(isPauseView({ level: 1, spells: [spell], passives: [], relics: [], stats })).toBe(false);
+    const noText = { id: 'fire', name: 'Fire Bolt', color: 0 };
+    expect(isPauseView({ level: 1, spells: [noText], passives: [], relics: [], stats })).toBe(
+      false,
+    );
+    const noId = { name: 'a', abbr: 'A', description: '', count: 1 };
+    expect(isPauseView({ level: 1, spells: [], passives: [noId], relics: [], stats })).toBe(false);
+    const numericText = { ...noText, description: 5 };
+    expect(isPauseView({ level: 1, spells: [numericText], passives: [], relics: [], stats })).toBe(
+      false,
+    );
+    const numericId = { ...noId, id: 7 };
+    expect(isPauseView({ level: 1, spells: [], passives: [], relics: [numericId], stats })).toBe(
+      false,
+    );
     expect(
       isPauseView({
         level: 1,
         spells: [],
-        passives: [{ name: 'a', abbr: 'A', description: '', count: -1 }],
+        passives: [{ id: 'a', name: 'a', abbr: 'A', description: '', count: -1 }],
         relics: [],
         stats,
       }),

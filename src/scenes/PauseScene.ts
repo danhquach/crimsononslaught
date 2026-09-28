@@ -13,8 +13,10 @@ import {
   type PauseAction,
   type PauseChoosePayload,
   type PauseItem,
+  type PauseSpell,
   type PauseView,
 } from '../core/pauseModel';
+import { stepPauseFocus, type NavDirection, type PauseFocus } from '../core/pauseNav';
 import { SCENE, isPausePayload, type PausePayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import {
@@ -24,13 +26,14 @@ import {
   SPELL_ICON_SIZE,
   TILE,
   WINE,
+  addBuildIcon,
   addPassiveTile,
   addRelicGem,
   addSpellDisc,
   drawHeroStand,
   drawStrip,
 } from './buildStrips';
-import { attachMenuInput, watchStartButton, type MenuItem } from './input';
+import { attachMenuInput, attachNavInput, watchStartButton, type MenuItem } from './input';
 
 const BACKDROP_ALPHA = 0.8;
 
@@ -49,16 +52,35 @@ const STRIP_WIDTH = 600;
 const STRIP_CONTENT_X = STRIP_X + 104;
 const TILE_PITCH = 40;
 const TILES_PER_ROW = Math.floor((STRIP_X + STRIP_WIDTH - STRIP_CONTENT_X) / TILE_PITCH);
-const SPELL_PITCH = 84;
-const INFO_HINT = 'Point at a passive or relic to read it';
+/** Four spells fill the strip at this pitch, room enough for the roster's longest name (CO-179). */
+const SPELL_PITCH = 120;
+const SPELL_STRIP_HEIGHT = 96;
+/** A spell name's font sizes, tried in order until it fits. */
+const NAME_SIZES = [12, 11, 10] as const;
+const INFO_HINT = 'Point at a spell, passive or relic, or reach it with the arrows or a pad';
+/** The pad's highlight round the selected strip item. */
+const CURSOR_COLOR = 0xffffff;
+const NAV_DIRECTIONS: readonly NavDirection[] = ['up', 'down', 'left', 'right'];
+
+/** One readable item in a strip, for the pointer and the pad alike. */
+interface BuildSlot {
+  x: number;
+  y: number;
+  /** Its face's size, for the pad's highlight. */
+  size: number;
+  /** What the info line reads for it. */
+  info: string;
+  setLit(on: boolean): void;
+}
 
 /**
  * Pause screen (#252): launched by Game over its own paused scene with the
  * run's build. The hero idles on a stand with the run level on a badge and the
  * menu under it; beside it, framed strips hold the spells' icons, the passives
  * as tiles with their ranks and the relic buffs as gems with their stacks, and
- * pointing at a tile reads it out. Resume, Restart, End run and Main menu by
- * mouse, arrows + Enter or a gamepad; Esc or pad Start resumes. The last three
+ * pointing at one, or reaching it with the arrows or a pad (CO-179), reads it
+ * out. Resume, Restart, End run and Main menu by mouse, arrows + Enter or a
+ * gamepad; Esc or pad Start resumes. The last three
  * ask first: the scene restarts itself with `confirm` set, which shows Yes / No
  * (No is Enter's default) and goes back to the menu on No, Esc or Start. A
  * confirmed choice is emitted as `PAUSE_EVENT.choose` on Game's emitter; Game
@@ -69,6 +91,12 @@ export class PauseScene extends Phaser.Scene {
   private payload: PausePayload | null = null;
   /** Set once this screen has acted; everything after is ignored until it stops. */
   private leaving = false;
+  /** Where the pad or the arrows have the highlight; `null` until the first press. */
+  private focus: PauseFocus | null = null;
+  /** The strip item the pad has lit, if the focus is in the strips. */
+  private padSlot: BuildSlot | null = null;
+  private info: Phaser.GameObjects.Text | null = null;
+  private cursor: Phaser.GameObjects.Rectangle | null = null;
 
   constructor() {
     super(SCENE.pause);
@@ -79,6 +107,17 @@ export class PauseScene extends Phaser.Scene {
     return this.payload;
   }
 
+  /** The pad's focus and the info line, read-only, for the browser suite (CO-179). */
+  get nav(): {
+    focus: PauseFocus | null;
+    info: string;
+    /** The pad's highlight, where it sits over a strip item; `null` while hidden. */
+    cursor: { x: number; y: number } | null;
+  } {
+    const cursor = this.cursor?.visible ? { x: this.cursor.x, y: this.cursor.y } : null;
+    return { focus: this.focus, info: this.info?.text ?? '', cursor };
+  }
+
   init(data: unknown): void {
     this.payload = isPausePayload(data) ? data : null;
     // Phaser replays the last launch payload on a payload-less launch; clear it.
@@ -87,6 +126,10 @@ export class PauseScene extends Phaser.Scene {
 
   create(): void {
     this.leaving = false;
+    this.focus = null;
+    this.padSlot = null;
+    this.info = null;
+    this.cursor = null;
     if (!this.payload) {
       console.warn('[Pause] launched without a valid payload; resuming Game');
       this.resume();
@@ -132,33 +175,79 @@ export class PauseScene extends Phaser.Scene {
         this.choose(action, view),
       ),
     );
-    attachMenuInput(this, items, { keyboard: true, enterDefault: 0 });
     const hintY = MENU_TOP + PAUSE_ACTIONS.length * MENU_PITCH + 12;
     this.addHint(STAND_X, hintY, 'Esc or Start to resume');
     this.addHint(STAND_X, hintY + 22, 'click, arrows + Enter, or a gamepad');
 
-    const info = this.add.text(STRIP_X, 440, INFO_HINT, {
+    this.info = this.add.text(STRIP_X, 440, INFO_HINT, {
       fontFamily: SERIF,
       fontSize: '15px',
       color: '#888888',
       wordWrap: { width: STRIP_WIDTH },
     });
-    const show = (tile: PauseItem | null): void => {
-      info.setText(tile ? itemInfo(tile) : INFO_HINT).setColor(tile ? '#eeeeee' : '#888888');
-    };
+    this.cursor = this.add
+      .rectangle(0, 0, TILE, TILE)
+      .setStrokeStyle(2, CURSOR_COLOR)
+      .setVisible(false);
 
-    this.drawSpells(view.spells, 28);
-    this.drawTiles('Passives', view.passives, 136, (x, y, tile) =>
-      this.hoverable(addPassiveTile(this, x, y, tile), tile, show, PASSIVE_COLOR),
-    );
-    this.drawTiles('Relics', view.relics, 268, (x, y, tile) =>
-      this.hoverable(addRelicGem(this, x, y, tile), tile, show, RELIC_COLOR),
-    );
+    const rows = [
+      this.drawSpells(view.spells, 28),
+      ...this.drawTiles('Passives', view.passives, 136, (x, y, tile) => this.addTile(x, y, tile)),
+      ...this.drawTiles('Relics', view.relics, 268, (x, y, tile) => this.addGem(x, y, tile)),
+    ].filter((row) => row.length > 0);
+    this.children.bringToTop(this.cursor);
     this.add.text(STRIP_X, 408, statsLine(view), {
       fontFamily: 'monospace',
       fontSize: '14px',
       color: '#bbbbbb',
     });
+    this.attachFocus(items, rows);
+  }
+
+  /**
+   * CO-179: the pad and the arrows walk the menu and the strips as one layout
+   * (`core/pauseNav.ts`). Nothing is lit until the first press, which wakes the
+   * highlight on Resume; Enter with nothing lit is Resume, as before. A or
+   * Enter acts on a menu row and does nothing on a strip item.
+   */
+  private attachFocus(items: readonly MenuItem[], rows: readonly BuildSlot[][]): void {
+    const layout = { menuRows: items.length, buildRows: rows.map((row) => row.map((s) => s.x)) };
+    const focusOn = (next: PauseFocus): void => {
+      const before = this.focus;
+      if (before && JSON.stringify(before) === JSON.stringify(next)) return;
+      this.focus = next;
+      audioOf(this).play('ui.move');
+      items.forEach((item, i) => item.setSelected(next.zone === 'menu' && i === next.index));
+      this.padSlot?.setLit(false);
+      this.padSlot = next.zone === 'build' ? (rows[next.row]?.[next.col] ?? null) : null;
+      this.padSlot?.setLit(true);
+      const slot = this.padSlot;
+      this.cursor?.setVisible(slot !== null);
+      if (slot) this.cursor?.setPosition(slot.x, slot.y).setSize(slot.size + 8, slot.size + 8);
+      this.showInfo(null);
+    };
+    attachNavInput(
+      this,
+      (pressed, source) => {
+        const dir = NAV_DIRECTIONS.find((d) => pressed[d]);
+        if (dir) {
+          focusOn(stepPauseFocus(this.focus, dir, layout));
+          return;
+        }
+        if (!pressed.confirm) return;
+        const focus = this.focus;
+        if (focus?.zone === 'menu') items[focus.index]?.confirm();
+        else if (focus === null && source === 'keyboard') items[0]?.confirm();
+        else if (focus === null) focusOn(stepPauseFocus(null, 'down', layout));
+      },
+      { keyboard: true },
+    );
+  }
+
+  /** The info line: the pointed-at slot, else the pad's, else the hint. */
+  private showInfo(pointed: BuildSlot | null): void {
+    const slot = pointed ?? this.padSlot;
+    this.info?.setText(slot ? slot.info : INFO_HINT).setColor(slot ? '#eeeeee' : '#888888');
   }
 
   /** The hero idling on its pedestal, the "Paused" title over it and the level badge under it. */
@@ -169,37 +258,49 @@ export class PauseScene extends Phaser.Scene {
     drawHeroStand(this, STAND_X, PEDESTAL_Y, level);
   }
 
-  private drawSpells(spells: PauseView['spells'], y: number): void {
-    drawStrip(this, STRIP_X, y, STRIP_WIDTH, 96, 'Spells');
+  /** The spells' icons with their names under them, fitted to the strip; returns them as one row. */
+  private drawSpells(spells: readonly PauseSpell[], y: number): BuildSlot[] {
+    drawStrip(this, STRIP_X, y, STRIP_WIDTH, SPELL_STRIP_HEIGHT, 'Spells');
     const cy = y + 38;
     // A `?loadout=` run can carry more spells than a real one; squeeze them
-    // into the strip rather than past it, and drop the names that would collide.
+    // into the strip rather than past it.
     const room = STRIP_X + STRIP_WIDTH - STRIP_CONTENT_X - 8;
     const pitch = Math.min(SPELL_PITCH, room / Math.max(1, spells.length));
-    const named = pitch === SPELL_PITCH;
-    spells.forEach((spell, i) => {
-      const x = STRIP_CONTENT_X + SPELL_ICON_SIZE / 2 + i * pitch;
-      addSpellDisc(this, x, cy, spell);
-      if (!named) return;
-      this.add
-        .text(x, cy + SPELL_ICON_SIZE / 2 + 12, spell.name, {
-          fontFamily: SERIF,
-          fontSize: '12px',
-          color: '#dddddd',
-          align: 'center',
-          wordWrap: { width: SPELL_PITCH - 4 },
-        })
-        .setOrigin(0.5, 0);
+    return spells.map((spell, i) => {
+      const x = STRIP_CONTENT_X + pitch / 2 + i * pitch;
+      const rim = addSpellDisc(this, x, cy, spell);
+      this.addFittedName(x, cy + SPELL_ICON_SIZE / 2 + 12, spell.name, pitch - 8);
+      return this.slot(rim, x, cy, SPELL_ICON_SIZE + 6, itemInfo(spell), rim.strokeColor, 2);
     });
   }
 
-  /** A strip of tiles in rows of `TILES_PER_ROW`, or "None yet". */
+  /**
+   * CO-179: a spell's name on one line under its icon, at most `maxWidth`
+   * across: a size or two smaller if it must, then trimmed with an ellipsis.
+   * The info line reads the whole name.
+   */
+  private addFittedName(x: number, y: number, name: string, maxWidth: number): void {
+    const text = this.add
+      .text(x, y, name, { fontFamily: SERIF, fontSize: `${NAME_SIZES[0]}px`, color: '#dddddd' })
+      .setOrigin(0.5, 0);
+    for (const size of NAME_SIZES.slice(1)) {
+      if (text.width <= maxWidth) return;
+      text.setFontSize(size);
+    }
+    let kept = name;
+    while (text.width > maxWidth && kept.length > 1) {
+      kept = kept.slice(0, -1).trimEnd();
+      text.setText(`${kept}…`);
+    }
+  }
+
+  /** A strip of tiles in rows of `TILES_PER_ROW`, or "None yet"; returns the tiles row by row. */
   private drawTiles(
     label: string,
     tiles: readonly PauseItem[],
     y: number,
-    add: (x: number, y: number, tile: PauseItem) => void,
-  ): void {
+    add: (x: number, y: number, tile: PauseItem) => BuildSlot,
+  ): BuildSlot[][] {
     drawStrip(this, STRIP_X, y, STRIP_WIDTH, 120, label);
     if (tiles.length === 0) {
       this.add.text(STRIP_CONTENT_X, y + 12, EMPTY_STRIP_TEXT, {
@@ -207,31 +308,71 @@ export class PauseScene extends Phaser.Scene {
         fontSize: '14px',
         color: '#777777',
       });
-      return;
+      return [];
     }
+    const rows: BuildSlot[][] = [];
     tiles.forEach((tile, i) => {
       const col = i % TILES_PER_ROW;
       const row = Math.floor(i / TILES_PER_ROW);
-      add(STRIP_CONTENT_X + TILE / 2 + col * TILE_PITCH, y + 34 + row * 44, tile);
+      (rows[row] ??= []).push(
+        add(STRIP_CONTENT_X + TILE / 2 + col * TILE_PITCH, y + 34 + row * 44, tile),
+      );
     });
+    return rows;
   }
 
-  /** Pointing at a tile thickens its rim, in its kind's colour, and reads it on the info line. */
-  private hoverable(
-    face: Phaser.GameObjects.Rectangle,
-    tile: PauseItem,
-    show: (t: PauseItem | null) => void,
+  /** A passive: its icon (CO-179) in a mint rim, or its lettered tile with no icon art. */
+  private addTile(x: number, y: number, tile: PauseItem): BuildSlot {
+    const face = addBuildIcon(this, x, y, tile, PASSIVE_COLOR) ?? addPassiveTile(this, x, y, tile);
+    return this.slot(face, x, y, TILE + 4, itemInfo(tile), PASSIVE_COLOR);
+  }
+
+  /** A relic buff: its icon (CO-179) in a violet rim, or its lettered gem with no icon art. */
+  private addGem(x: number, y: number, tile: PauseItem): BuildSlot {
+    const face = addBuildIcon(this, x, y, tile, RELIC_COLOR) ?? addRelicGem(this, x, y, tile);
+    return this.slot(face, x, y, TILE + 4, itemInfo(tile), RELIC_COLOR);
+  }
+
+  /**
+   * One readable item in a strip. Pointing at it, or the pad selecting it,
+   * thickens its rim in its kind's colour and reads it on the info line.
+   */
+  private slot(
+    face: Phaser.GameObjects.Shape,
+    x: number,
+    y: number,
+    size: number,
+    info: string,
     rim: number,
-  ): void {
+    restWidth = 1,
+  ): BuildSlot {
+    let hovered = false;
+    let lit = false;
+    const paint = (): void => {
+      face.setStrokeStyle(hovered || lit ? restWidth + 1 : restWidth, rim);
+    };
+    const slot: BuildSlot = {
+      x,
+      y,
+      size,
+      info,
+      setLit: (on) => {
+        lit = on;
+        paint();
+      },
+    };
     face.setInteractive();
     face.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      face.setStrokeStyle(2, rim);
-      show(tile);
+      hovered = true;
+      paint();
+      this.showInfo(slot);
     });
     face.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      face.setStrokeStyle(1, rim);
-      show(null);
+      hovered = false;
+      paint();
+      this.showInfo(null);
     });
+    return slot;
   }
 
   private drawConfirm(view: PauseView, action: ConfirmAction): void {

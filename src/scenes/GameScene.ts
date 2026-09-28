@@ -368,8 +368,11 @@ export class GameScene extends Phaser.Scene {
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
-  /** Each roster spell's name and colour, as the HUD's slot boxes show them (#144). */
-  private cards!: ReadonlyMap<string, { name: string; color: number }>;
+  /**
+   * Each roster spell's name and colour, as the HUD's slot boxes show them
+   * (#144), and its description for the pause screen's info line (CO-179).
+   */
+  private cards!: ReadonlyMap<string, { name: string; color: number; description: string }>;
   /** Kept so a spell equipped mid-run can be given the arena's overlaps. */
   private collisions!: CollisionSystem;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
@@ -2058,7 +2061,11 @@ export class GameScene extends Phaser.Scene {
     if (!this.payload || this.pausing || this.run.phase === 'over') return false;
     const view = pauseView({
       level: this.run.level,
-      spells: this.equippedSpells(),
+      // CO-179: the pause screen's info line reads each spell's description too.
+      spells: this.equippedSpells().map((spell) => ({
+        ...spell,
+        description: this.cards.get(spell.id)?.description ?? '',
+      })),
       passives: this.spells.loadout.passives,
       relics: this.spells.loadout.relics,
       kills: this.run.kills,

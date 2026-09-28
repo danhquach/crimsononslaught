@@ -1977,6 +1977,111 @@
       "rows": 1,
       "sheetCell": 352,
       "rowSpecs": [[{ "anim": "elite", "cols": [1, 4], "centred": true }]]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-179",
+      "file": "CO-179/icons_passives_1.png",
+      "page": 17,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "passive_power", "cols": [1, 1], "centred": true },
+          { "anim": "passive_haste", "cols": [2, 2], "centred": true },
+          { "anim": "passive_expanse", "cols": [3, 3], "centred": true },
+          { "anim": "passive_velocity", "cols": [4, 4], "centred": true },
+          { "anim": "passive_persistence", "cols": [5, 5], "centred": true }
+        ]
+      ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-179",
+      "file": "CO-179/icons_passives_2.png",
+      "page": 17,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "passive_precision", "cols": [1, 1], "centred": true },
+          { "anim": "passive_savagery", "cols": [2, 2], "centred": true },
+          { "anim": "passive_ward", "cols": [3, 3], "centred": true },
+          { "anim": "passive_swift", "cols": [4, 4], "centred": true },
+          { "anim": "passive_vitality", "cols": [5, 5], "centred": true }
+        ]
+      ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-179",
+      "file": "CO-179/icons_passives_3.png",
+      "page": 17,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "passive_regeneration", "cols": [1, 1], "centred": true },
+          { "anim": "passive_magnet", "cols": [2, 2], "centred": true },
+          { "anim": "passive_avarice", "cols": [3, 3], "centred": true },
+          { "anim": "passive_pierce", "cols": [4, 4], "centred": true }
+        ]
+      ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-179",
+      "file": "CO-179/icons_relics_1.png",
+      "page": 17,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "relic_ancient_fury", "cols": [1, 1], "centred": true },
+          { "anim": "relic_hourglass", "cols": [2, 2], "centred": true },
+          { "anim": "relic_colossus", "cols": [3, 3], "centred": true },
+          { "anim": "relic_tailwind", "cols": [4, 4], "centred": true },
+          { "anim": "relic_everfrost", "cols": [5, 5], "centred": true }
+        ]
+      ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-179",
+      "file": "CO-179/icons_relics_2.png",
+      "page": 17,
+      "cols": 5,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "relic_hawk_eye", "cols": [1, 1], "centred": true },
+          { "anim": "relic_executioner", "cols": [2, 2], "centred": true },
+          { "anim": "relic_bulwark", "cols": [3, 3], "centred": true },
+          { "anim": "relic_windstep", "cols": [4, 4], "centred": true },
+          { "anim": "relic_bloodstone", "cols": [5, 5], "centred": true }
+        ]
+      ]
+    },
+    {
+      "key": "icon",
+      "ticket": "CO-179",
+      "file": "CO-179/icons_relics_3.png",
+      "page": 17,
+      "cols": 3,
+      "rows": 1,
+      "sheetCell": 144,
+      "rowSpecs": [
+        [
+          { "anim": "relic_wellspring", "cols": [1, 1], "centred": true },
+          { "anim": "relic_lodestone", "cols": [2, 2], "centred": true },
+          { "anim": "relic_sages_tome", "cols": [3, 3], "centred": true }
+        ]
+      ]
     }
   ]
 }
