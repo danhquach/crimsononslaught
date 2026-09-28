@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import type Phaser from 'phaser';
 import { PASSIVES } from '../src/config/passives';
 import { RELIC_BUFFS } from '../src/config/relics';
+import { PASSIVE_COLOR, RELIC_COLOR } from '../src/core/offerColors';
+import { abbreviate } from '../src/core/pauseModel';
 import { RESULT_HEADLINES } from '../src/core/resultModel';
 import {
   MAX_BUILD_COUNT,
@@ -105,6 +107,13 @@ interface Sample {
   headline: { text: string; color: string } | null;
   passiveTiles: Box[];
   relicGems: Box[];
+  /** The build icons' rims (CO-179), by the strip's colour. */
+  passiveIcons: Box[];
+  relicIcons: Box[];
+  /** Every `icon.*` frame an image on the screen shows. */
+  iconFrames: string[];
+  /** The rank and stack badges' count. */
+  badges: number;
   /** Every text on the screen, with its bounds. */
   texts: { text: string; box: Box }[];
 }
@@ -112,16 +121,24 @@ interface Sample {
 /** Everything a check compares, read in one evaluate. */
 function sample(page: Page): Promise<Sample> {
   return page.evaluate(
-    async ({ scene, headlines }) => {
+    async ({ scene, headlines, passiveColor, relicColor }) => {
       const { game } = await import('/src/main.ts');
       const result = game.scene.getScene(scene.result) as ResultScene;
       const list = result.children.list;
-      const box = (o: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Text): Box => {
+      const box = (o: { getBounds(): Phaser.Geom.Rectangle }): Box => {
         const b = o.getBounds();
         return { x: b.x, y: b.y, width: b.width, height: b.height };
       };
       const rects = list.filter((o) => o.type === 'Rectangle') as Phaser.GameObjects.Rectangle[];
       const texts = list.filter((o) => o.type === 'Text') as Phaser.GameObjects.Text[];
+      // A build icon's black disc has radius TILE / 2 + 2 = 18; a spell's is 19 (`buildStrips.ts`).
+      const rims = (color: number): Box[] =>
+        (list as Phaser.GameObjects.Arc[])
+          .filter(
+            (o) =>
+              o.type === 'Arc' && o.fillColor === 0 && o.radius === 18 && o.strokeColor === color,
+          )
+          .map(box);
       const head = texts.find((t) => headlines.includes(t.text));
       return {
         summary: result.summary,
@@ -130,10 +147,21 @@ function sample(page: Page): Promise<Sample> {
         // The tile faces' fills (`buildStrips.ts`).
         passiveTiles: rects.filter((r) => r.fillColor === 0x241a14).map(box),
         relicGems: rects.filter((r) => r.fillColor === 0x4a1030).map(box),
+        passiveIcons: rims(passiveColor),
+        relicIcons: rims(relicColor),
+        iconFrames: (list as Phaser.GameObjects.Image[])
+          .filter((o) => o.type === 'Image' && o.frame.name.startsWith('icon.'))
+          .map((o) => o.frame.name),
+        badges: texts.filter((t) => t.style.backgroundColor === '#dc143c').length,
         texts: texts.map((t) => ({ text: t.text, box: box(t) })),
       };
     },
-    { scene: SCENE, headlines: Object.values(RESULT_HEADLINES).map((h) => h.text) },
+    {
+      scene: SCENE,
+      headlines: Object.values(RESULT_HEADLINES).map((h) => h.text),
+      passiveColor: PASSIVE_COLOR,
+      relicColor: RELIC_COLOR,
+    },
   );
 }
 
@@ -142,6 +170,20 @@ const within = (b: Box, slack: number): boolean =>
   b.y >= slack &&
   b.x + b.width <= WIDTH - slack &&
   b.y + b.height <= HEIGHT - slack;
+
+/** Every passive and relic face sits on screen above the button with its badge. */
+function expectBuildAboveButton(s: Sample, passives: Box[], relics: Box[]): void {
+  expect(passives).toHaveLength(PASSIVES.length);
+  expect(relics).toHaveLength(RELIC_BUFFS.length);
+  expect(s.badges).toBe(PASSIVES.length + RELIC_BUFFS.length);
+  const buttonTop = s.controls?.button.y ?? 0;
+  for (const face of [...passives, ...relics]) {
+    expect(within(face, SLACK), JSON.stringify(face)).toBe(true);
+    expect(face.y + face.height).toBeLessThan(buttonTop);
+  }
+}
+
+const buildFrames = [...PASSIVES, ...RELIC_BUFFS].map(({ id }) => `icon.${id}.0.art`);
 
 const spellSelectStarts = (page: Page): Promise<number> =>
   page.evaluate(() => (window as unknown as { spellSelectStarts: number }).spellSelectStarts);
@@ -171,19 +213,37 @@ for (const outcome of ['win', 'lose', 'ended'] as const) {
     const hintText = s.texts.find((t) => t.text === 'click, press Enter, or gamepad A');
     expect(hintText && within(hintText.box, SLACK)).toBe(true);
 
-    // Every passive and relic has a tile, all of them above the button.
-    expect(s.passiveTiles).toHaveLength(PASSIVES.length);
-    expect(s.relicGems).toHaveLength(RELIC_BUFFS.length);
-    const buttonTop = button?.y ?? 0;
-    for (const tile of [...s.passiveTiles, ...s.relicGems]) {
-      expect(within(tile, SLACK)).toBe(true);
-      expect(tile.y + tile.height).toBeLessThan(buttonTop);
-    }
+    // Every passive and relic wears its icon art (CO-179), not its letters, all above the button.
+    expectBuildAboveButton(s, s.passiveIcons, s.relicIcons);
+    for (const frame of buildFrames) expect(s.iconFrames, frame).toContain(frame);
+    expect(s.passiveTiles).toEqual([]);
+    expect(s.relicGems).toEqual([]);
     // No text overflows the screen either.
     for (const t of s.texts) expect(within(t.box, 0), t.text).toBe(true);
     expect(errors).toEqual([]);
   });
 }
+
+test('with no icon art, passives and relics keep their letter tiles and badges', async ({
+  page,
+}) => {
+  // The build icons' page failing takes every atlas page down with it (CO-130).
+  await page.route('**/assets/atlas/props17.png', (route) => route.abort());
+  await openResult(page, maxedPayload('win'));
+  await waitForScene(page, SCENE.result);
+  await frames(page, 4);
+  const s = await sample(page);
+  await page.screenshot({ path: test.info().outputPath('result-no-icons.png') });
+
+  expect(s.iconFrames).toEqual([]);
+  expect(s.passiveIcons).toEqual([]);
+  expect(s.relicIcons).toEqual([]);
+  expectBuildAboveButton(s, s.passiveTiles, s.relicGems);
+  const texts = s.texts.map((t) => t.text);
+  for (const { id, name } of [...PASSIVES, ...RELIC_BUFFS]) {
+    expect(texts, id).toContain(abbreviate(name));
+  }
+});
 
 for (const [name, click, enter] of [
   ['a click starts', true, false],

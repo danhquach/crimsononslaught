@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { PASSIVE_COLOR, RELIC_COLOR } from '../core/offerColors';
 import type { PauseItem } from '../core/pauseModel';
 import {
   RESULT_EMPTY_TEXT,
@@ -19,6 +20,7 @@ import {
   SERIF,
   SPELL_ICON_SIZE,
   WINE,
+  addBuildIcon,
   addPassiveTile,
   addRelicGem,
   addSpellDisc,
@@ -40,9 +42,9 @@ export interface ResultControls {
 /**
  * Result screen (#290): the outcome's headline and subtitle on top; the hero
  * on its stand with the run level and a stats card on the left (greyed on a
- * loss); the run's spells, passives with ranks and relic buffs with stacks in
- * the pause screen's framed strips on the right; and "Play again" with its
- * hint at a fixed place at the bottom. Every area is fixed (`RESULT_LAYOUT`),
+ * loss); the run's spells, passives with ranks and relic buffs with stacks
+ * (icon art, or lettered tiles without it) in the pause screen's framed strips
+ * on the right; and "Play again" with its hint at a fixed place at the bottom. Every area is fixed (`RESULT_LAYOUT`),
  * so no build moves the button. Click, Enter or pad A start SpellSelect,
  * exactly once. Started without a valid payload it falls back to SpellSelect
  * (spec §7).
@@ -92,8 +94,21 @@ export class ResultScene extends Phaser.Scene {
     this.drawHeadline(view);
     this.drawCard(view);
     this.drawSpells(view.spells);
-    this.drawTiles('Passives', view.passives, RESULT_LAYOUT.passives, addPassiveTile);
-    this.drawTiles('Relics', view.relics, RESULT_LAYOUT.relics, addRelicGem);
+    // Icon art as the pause screen draws it (CO-179), or its lettered tile without the art.
+    this.drawTiles(
+      'Passives',
+      view.passives,
+      RESULT_LAYOUT.passives,
+      (scene, x, y, tile) =>
+        addBuildIcon(scene, x, y, tile, PASSIVE_COLOR) ?? addPassiveTile(scene, x, y, tile),
+    );
+    this.drawTiles(
+      'Relics',
+      view.relics,
+      RESULT_LAYOUT.relics,
+      (scene, x, y, tile) =>
+        addBuildIcon(scene, x, y, tile, RELIC_COLOR) ?? addRelicGem(scene, x, y, tile),
+    );
     this.drawPlayAgain();
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
