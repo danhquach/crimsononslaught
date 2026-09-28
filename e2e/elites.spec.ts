@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ENEMY_ARCHETYPES } from '../src/config/enemies';
 import { ELITE_MARK } from '../src/config/fx';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { ELITE_SCHEDULE } from '../src/config/waves';
 import { SCENE } from '../src/core/scenePayloads';
+import { activeWave } from '../src/core/waveSchedule';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
 import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
@@ -30,6 +30,8 @@ interface Sample extends Omit<GameScene['eliteReport'], 'live'> {
   live: number;
   /** HP of the toughest live elite; 0 with none out. */
   topHp: number;
+  /** The largest HP multiplier among live elites; 0 with none out. Hits never change it. */
+  topHpMul: number;
   /** Chests on the floor plus consumables picked up, so a chest dropped at the player's feet counts. */
   chests: number;
   elapsedMs: number;
@@ -48,6 +50,7 @@ function sample(page: Page): Promise<Sample | null> {
       ...elite,
       live: live.length,
       topHp: Math.max(0, ...live.map((e) => e.hp)),
+      topHpMul: Math.max(0, ...live.map((e) => e.hpMul)),
       chests: pickups.consumablesLive.chest + pickups.consumables,
       elapsedMs: hud.elapsedMs,
     };
@@ -99,7 +102,7 @@ test('the first elite lands on time, is marked while it lives, and drops a chest
   const clips = new Set(trace.flatMap((s) => s.markClips));
   console.log(
     `elites e2e: ${trace.length} samples, ${out.length} with an elite out; ` +
-      `first landed at ${last?.firstAt} s, first seen at ${firstOut?.elapsedMs} ms, hp ${firstOut?.topHp}; ` +
+      `first landed at ${last?.firstAt} s, first seen at ${firstOut?.elapsedMs} ms, hp ${firstOut?.topHp} (x${firstOut?.topHpMul}); ` +
       `marks/live mismatches ${out.filter((s) => s.marks !== s.live).length}; ` +
       `spawned ${last?.spawned}, waiting ${last?.waiting}, killed ${last?.killed}, ` +
       `chests ${last?.chests}; clips ${[...clips].join(',')}`,
@@ -114,8 +117,10 @@ test('the first elite lands on time, is marked while it lives, and drops a chest
   expect(last!.firstAt!).toBeGreaterThanOrEqual(FIRST.at);
   expect(last!.firstAt!).toBeLessThan(FIRST.at + 0.1);
   expect(firstOut!.elapsedMs).toBeGreaterThanOrEqual(FIRST.at * 1000);
-  // Far tougher than the crowd it joined.
-  expect(firstOut!.topHp).toBeGreaterThan(ENEMY_ARCHETYPES[FIRST.type].hp * 4);
+  // Far tougher than the crowd it joined: over twice its wave's HP multiplier.
+  // Read as the multiplier, not HP left, which hits before the first sample
+  // (up to seconds of run time on a slow runner) would eat into.
+  expect(firstOut!.topHpMul).toBeGreaterThan(activeWave(FIRST.at).hpMul * 2);
   // Every elite out carries exactly one mark, for as long as it lives.
   for (const s of out) expect(s.marks, `marks at ${s.elapsedMs} ms`).toBe(s.live);
   expect([...clips]).toEqual([ELITE_MARK.clip]);

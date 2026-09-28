@@ -138,7 +138,7 @@ describe('contact damage interval', () => {
 
 describe('elite stats (#126)', () => {
   it('makes an elite tougher, harder-hitting and richer than its crowd', () => {
-    expect(ELITE).toEqual({ hpMul: 8, damageMul: 1.5, gemMul: 3 });
+    expect(ELITE).toEqual({ hpMul: 4, damageMul: 1.5, gemMul: 3 });
     expect(ELITE.hpMul).toBeGreaterThan(1);
     expect(ELITE.damageMul).toBeGreaterThanOrEqual(1);
     expect(Number.isInteger(ELITE.gemMul)).toBe(true);

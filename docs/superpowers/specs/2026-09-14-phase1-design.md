@@ -201,8 +201,8 @@ src/
 | Swarm | 10 | 90 | 3 | 10 | many, early |
 | Fast | 8 | 170 | 3 | 8 | from 1:00 |
 | Tank | 60 | 50 | 15 | 20 | from 2:00 |
-| Ranged | 12 | 80 | 3 | 11 | from 6:00 (#126); holds 200–240 px off, fires a 5-damage shot every 2.5 s from within 260 px |
-| Exploder | 14 | 120 | — | 11 | from 8:00 (#126); detonates on contact or on death: 16 damage to the player within 72 px, never to enemies |
+| Ranged | 12 | 80 | 3 | 11 | from 6:00 (#126); holds 130–170 px off, a step from every default spell's reach, and fires a 5-damage shot every 2.5 s from within 190 px |
+| Exploder | 14 | 120 | — | 11 | from 8:00 (#126); detonates on contact or on death: 8 damage to the player within 72 px, never to enemies |
 | Splitter | 36 | 60 | 6 | 15 | from 10:00 (#126); dies into 3 splitlings 16 px round it, at its wave scale |
 | Splitling | 6 | 105 | 2 | 7 | only from a splitter; drops no gems, Embers or consumables |
 | Shielded | 30 | 55 | 8 | 14 | from 12:00 (#126); a hit within 60° of the way it faces deals 25%; walks the way it faces and turns at most 30°/s, so a player circling it within 160 px gets behind it |

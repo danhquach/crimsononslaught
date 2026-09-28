@@ -86,9 +86,11 @@ export const SHIELD_GUARD: Readonly<ShieldGuard> = { arcDeg: 120, factor: 0.25, 
  * whatever killed it, dealing `damage` (scaled by the spawning wave's
  * `damageMul`) to the player if they stand within `radius` of the blast. It
  * hurts only the player: a blast never damages other enemies, so exploders
- * cannot set each other off.
+ * cannot set each other off. Tuned from 16 in #126's round: blasts took
+ * 40–82 % of the HP lost in most runs that died after 8:00
+ * (`docs/tuning/phase2-balance.md`).
  */
-export const EXPLODER_BLAST = { radius: 72, damage: 16 } as const;
+export const EXPLODER_BLAST = { radius: 72, damage: 8 } as const;
 
 /**
  * #126: a dying splitter leaves `count` splitlings ringed `spread` px round
@@ -107,6 +109,11 @@ export const SPLITTER_SPLIT = { count: 3, spread: 16, child: 'splitling' } as co
  * flies slightly faster than the player walks, so moving sideways dodges it
  * and standing still does not.
  *
+ * Its inner edge (`keepDistance - band`, 130 px) is inside every element's
+ * default reach (144–189 px), so a player who steps at it hits it. Tuned from
+ * 240/260 in #126's round: held past that reach, ranged enemies outlived a
+ * kiting player and filled the enemy cap.
+ *
  * `shotDamage` is scaled by the spawning wave's `damageMul`, like contact damage.
  */
 export interface RangedAttack {
@@ -122,9 +129,9 @@ export interface RangedAttack {
 }
 
 export const RANGED_ATTACK: Readonly<RangedAttack> = {
-  keepDistance: 240,
+  keepDistance: 170,
   band: 40,
-  fireDistance: 260,
+  fireDistance: 190,
   fireIntervalMs: 2500,
   shotDamage: 5,
   shotSpeed: 200,
@@ -142,8 +149,8 @@ export const MAX_LIVE_ENEMY_SHOTS = 60;
  * times these, so an elite is `hpMul` times as tough as its crowd and hits
  * `damageMul` times as hard — contact, shot and blast alike. It drops
  * `gemMul` times its type's gems and always rolls for a chest. Speed and
- * body radius are its type's own. The numbers are starting values for the
- * tuning round.
+ * body radius are its type's own. `hpMul` was tuned from 8 in #126's round:
+ * an 8x tank at 5:00 soaked single-target fire while the crowd grew.
  */
 export interface EliteStats {
   hpMul: number;
@@ -151,7 +158,7 @@ export interface EliteStats {
   gemMul: number;
 }
 
-export const ELITE: Readonly<EliteStats> = { hpMul: 8, damageMul: 1.5, gemMul: 3 };
+export const ELITE: Readonly<EliteStats> = { hpMul: 4, damageMul: 1.5, gemMul: 3 };
 
 /**
  * Spec §5: a hard cap of 300 live enemies. The spawn director (CO-025) can ask

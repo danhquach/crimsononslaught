@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RANGED_ATTACK } from '../config/enemies';
 import { PLAYER_SPEED } from '../config/player';
+import { BASE_SPELL_STATS } from '../config/spells';
 import { scaleDamage } from './enemy';
 import { inFireDistance, rangedVelocity, tickFireCooldown } from './rangedEnemy';
 
@@ -105,6 +106,14 @@ describe('the ranged tuning (#126)', () => {
     expect(band).toBeGreaterThan(0);
     expect(keepDistance - band).toBeGreaterThan(0);
     expect(keepDistance).toBeLessThan(fireDistance);
+  });
+
+  it('holds where every default spell reaches it once the player steps in', () => {
+    // #126's tuning round: held past every default's reach, ranged enemies
+    // outlived a kiting player and filled the enemy cap.
+    const { fire, ice, lightning, earth } = BASE_SPELL_STATS;
+    const reach = Math.min(fire.range, ice.range, lightning.targetRange, earth.range);
+    expect(RANGED_ATTACK.keepDistance - RANGED_ATTACK.band).toBeLessThan(reach);
   });
 
   it('only fires from on screen, and its shot flies on past the player', () => {
