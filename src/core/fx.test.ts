@@ -52,7 +52,7 @@ describe('effect scales (CO-082)', () => {
 
   it('draws a ground area at radius / 100, so the ring is the patch', () => {
     expect(areaScale(100)).toBe(1);
-    expect(areaScale(BASE_AREA_STATS.ice_blizzard.radius)).toBeCloseTo(0.8);
+    expect(areaScale(BASE_AREA_STATS.ice_blizzard.radius)).toBeCloseTo(1.2);
     // A block with no radius draws nothing rather than a mirrored ring.
     expect(areaScale(-50)).toBe(0);
   });

@@ -514,12 +514,12 @@ enemy cap can bury is not a warning.
 | `damage` | 10 | 24 | — | 7 | — |
 | `tickDamage` | — | — | — | — | 6 |
 | `tickRate` | — | — | — | — | 0.5 |
-| `radius` | — | 110 | — | — | 80 |
+| `radius` | — | 110 | — | — | 120 |
 | `speed` | 380 | 220 | — | 320 | — |
 | `range` | 189 | 135 | — | — | — |
 | `targetRange` | — | — | — | 260 | 180 |
 | `leashRadius` | — | — | — | 60 | — |
-| `duration` | — | — | — | — | 6.0 |
+| `duration` | — | — | — | — | 4.0 |
 | `slowPct` | 0.2 | 0.4 | 0.4 | 0.25 | 0.5 |
 | `slowDuration` | 1.0 | 2.0 | 2.0 | 1.5 | 1.0 |
 | `freezeChance` | — | 0.15 | — | — | — |
@@ -557,8 +557,8 @@ slanted a little by the wind, and ice bursts on the stones where it lands. It
 has no drawn border: the sleet thins out over the outer quarter of the radius
 and is never seen past the edge that ticks. The sleet falls over the crowd but
 is thin enough to keep it readable. The whole storm fades in when it lands and
-out as it runs down. Its radius is 80 (#219): at 180 a patch covered two
-thirds of the view's height.
+out as it runs down. Its radius is 120 and it lasts 4 s (#304): at 180 a patch
+covered two thirds of the view's height, at 80 (#219) only the middle of a crowd.
 
 Slowed and frozen look different, for every spell (#219). A slowed enemy keeps
 its own colours under a light blue tint, plus the small frost overlay; only a
