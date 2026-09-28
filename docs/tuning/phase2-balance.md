@@ -790,3 +790,82 @@ this pass reaches.
 - **Recycling is ready if a later pass wants it.** It removed the far-behind cap
   lock. It was not shipped because the stalls that remain are the loadout case.
 - **The Embers economy** is still out of scope, as #210 said.
+
+# Lightning Sword rework (#305, 2026-09-28)
+
+Ticket: [#305](https://github.com/danhquach/crimsononslaught/issues/305) · Spec: `docs/superpowers/specs/2026-09-18-phase2-spells.md` §9.4
+
+**Question.** Lightning Sword was one blade, 70 px out, turning 3.2 rad/s. It
+sat in the slowest Lightning runs of the 20-minute pass (boss fights of 25, 184,
+353 and 2032 s). Do more blades and a faster orbit make it earn its slot?
+
+**Answer: the base block ships with 3 blades at 4.5 rad/s; the data cannot tell
+that from the old block.** The invulnerable bot kills the boss just as fast with
+one blade as with three, so this pass shows no regression and no gain there.
+The pooled mortal re-measure the ticket asks for is still owed.
+
+**Method.** The #210 bot and method: Lightning, `timeScale=8`, a fresh Vite
+server per arm, no config edits mid-sweep. The loadout hook equips Lightning
+Sword and Lightning Companion at the start; the bot's level-up picks then
+filled the other two slots, so **every run also ended with Tornado and Chain
+Lightning**. This time one run at a time, not two. The decision rule (10
+seeds, median 45–90 s) was cut to 5 seeds after the machine strained. Arms A
+and B are the only ones run.
+
+| Arm | Blades | Orbit speed | Orbit radius | Mode | Seeds |
+|---|---|---|---|---|---|
+| A (`main`) | 1 | 3.2 rad/s | 70 | invulnerable | 1–10 |
+| B | 3 | 4.5 rad/s | 70 | invulnerable | 1–5 |
+| B | 3 | 4.5 rad/s | 70 | mortal | 1–3 |
+
+Three blades turn 2.09 rad apart. At 4.5 rad/s the next blade reaches an enemy
+0.47 s after the last, longer than the 0.35 s per-enemy `hitCooldown` they
+share, so no blade's cut is swallowed by another's window. A unit test holds
+that gap.
+
+## Results
+
+Boss TTK by seed (invulnerable), wins only:
+
+| Arm | Wins | TTK per seed | Median | In 45–90 s | Longest | Level at 20:00 | Most alive |
+|---|---|---|---|---|---|---|---|
+| A, seeds 1–10 | 10 / 10 | 27 · 23 · 39 · 22 · 74 · 66 · 50 · 27 · 28 · 31 s | 29.5 s | 3 / 10 | 74 s | 44–59 | 59–115 |
+| A, seeds 1–5 | 5 / 5 | 27 · 23 · 39 · 22 · 74 s | 27 s | 1 / 5 | 74 s | 47–59 | 59–101 |
+| B, seeds 1–5 | 5 / 5 | 19 · 33 · 33 · 22 · 31 s | 31 s | 0 / 5 | 33 s | 47–54 | 61–77 |
+
+Mortal, arm B, seeds 1–3: seed 1 won (boss TTK 39 s), seed 3 won (38 s), seed 2
+died at 19:19 with the level stuck at 31 from 14:31 on and 39–59 enemies alive
+(not at the 300 cap). On `main` in #210, the same seeds 1 and 3 with a Lightning
+Sword build took 353 s and 184 s. Seed 2 is a hard seed on `main` too (Lightning
+died there in #210's rounds 1 and 4).
+
+## What the runs say
+
+- **Invulnerable runs do not separate the arms.** `main`'s block already
+  killed the boss in a median 29.5 s on 10 seeds, under the window, with no
+  stall (at most 115 alive, never near the 300 cap). Three blades gave 31 s
+  on 5 seeds, in the same range as A's own seeds 1–5 (27 s).
+- **Neither arm meets the 45–90 s rule.** Both are too fast, and A is too fast
+  by the same margin, so "too strong" cannot be blamed on the rework. The
+  count-2 and wider-orbit arms would have been measured on the same
+  non-discriminating harness, so they were not run.
+- **The stalls the ticket describes came from mortal runs.** The mortal
+  baseline on these seeds is the #210 data above (a
+  different loadout mix), so the two mortal wins are a hint, not a measurement.
+- **Cuts in the e2e window rose 2.5x.** `e2e/lightningRoster.spec.ts`, 3:00–6:00,
+  standing still: 360–449 sword cuts over three runs, against 173 on `main`
+  (one run). The same runs read 106–122 Tornado ticks, against 583 on `main`;
+  the cause of that drop was not isolated.
+
+## Limits
+
+- **The sample is small and noisy.** 5 seeds and one config per arm, and #210
+  showed identical configs swinging 17/20 to 12/20. The pooled 40-run re-measure
+  is still owed.
+- **No mortal baseline was run** in this pass, so the mortal comparison leans on
+  #210's `main` numbers.
+- **The bot ends with four Lightning spells**, so a Lightning Sword build in
+  this harness is never the sword alone. What the sword adds is diluted by
+  Tornado and Chain Lightning.
+- **Not tried:** a wider orbit, two blades, blades that grow with a spell level
+  (spells have no levels), a lunge or a thrown arc.

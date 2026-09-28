@@ -72,9 +72,9 @@ describe('Lightning roster base blocks match spec §9.4', () => {
 
   it('Lightning Sword', () => {
     expect(BASE_SWORD_STATS).toEqual({
-      count: 1,
+      count: 3,
       orbitRadius: 70,
-      orbitSpeed: 3.2,
+      orbitSpeed: 4.5,
       damage: 16,
       size: 18,
       hitCooldown: 0.35,

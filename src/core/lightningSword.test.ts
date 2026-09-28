@@ -48,8 +48,17 @@ describe('swordCut (#142)', () => {
 });
 
 describe('the sword on the shared ring (#142)', () => {
-  it('base count is one blade', () => {
-    expect(boulderAngles(0, base.count)).toEqual([0]);
+  it('base count is three blades, a third of a turn apart (#305)', () => {
+    const third = (Math.PI * 2) / 3;
+    const angles = boulderAngles(0, base.count);
+    expect(angles).toHaveLength(3);
+    expect(angles[1]).toBeCloseTo(third, 9);
+    expect(angles[2]).toBeCloseTo(2 * third, 9);
+  });
+
+  it('the next blade reaches an enemy after its hit window has closed (#305)', () => {
+    const gapS = (Math.PI * 2) / base.count / base.orbitSpeed;
+    expect(gapS).toBeGreaterThan(base.hitCooldown);
   });
 
   it('cuts one enemy at most once per hitCooldown', () => {

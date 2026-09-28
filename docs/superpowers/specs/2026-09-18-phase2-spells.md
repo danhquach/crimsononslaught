@@ -573,7 +573,7 @@ block, and a stun still fills it yellow. Ice Storm is a slow and never freezes.
 | Chain Lightning | `lightning_chain` | Strikes and chains to nearby enemies with falloff | #139 |
 | Tornado | `lightning_tornado` | Drifting vortex pulls enemies in and damages them continuously | #135, #136 |
 | Lightning Companion | `lightning_companion` | Melee ally, charges nearby enemies, staggers | #133 |
-| Lightning Sword | `lightning_sword` | Blade circles the player, staggering what it cuts | — |
+| Lightning Sword | `lightning_sword` | Three blades circle the player, staggering what they cut | — |
 
 | Field | `lightning` | `lightning_chain` | `lightning_tornado` | `lightning_companion` | `lightning_sword` |
 |---|---|---|---|---|---|
@@ -594,8 +594,8 @@ block, and a stun still fills it yellow. Ice Storm is a slow and never freezes.
 | `chaseSpeed` | — | — | — | 240 | — |
 | `leashRadius` | — | — | — | 220 | — |
 | `orbitRadius` | — | — | — | — | 70 |
-| `orbitSpeed` | — | — | — | — | 3.2 rad/s |
-| `count` | — | — | — | — | 1 |
+| `orbitSpeed` | — | — | — | — | 4.5 rad/s |
+| `count` | — | — | — | — | 3 |
 | `size` | — | — | — | — | 18 |
 | `hitCooldown` | — | — | — | — | 0.35 |
 | `duration` | — | — | 5.0 | — | — |

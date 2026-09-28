@@ -19,7 +19,7 @@ import type { Vec2 } from './input';
 
 /**
  * Bodies the ring's pool may ever hold. Earth Shield's base `count` is 3 and
- * Lightning Sword's is 1; the headroom keeps a config change from silently
+ * Lightning Sword's is 3; the headroom keeps a config change from silently
  * spawning nothing rather than exhausting the pool mid-frame.
  */
 export const MAX_BOULDERS = 8;
