@@ -110,14 +110,17 @@ export function itemInfo(tile: Readonly<PauseItem | PauseSpell>): string {
 }
 
 /** The pause menu's buttons, in display order; Resume is first so a reflex Enter is safe. */
-export const PAUSE_ACTIONS = ['resume', 'restart', 'end', 'menu'] as const;
+export const PAUSE_ACTIONS = ['resume', 'settings', 'restart', 'end', 'menu'] as const;
 export type PauseAction = (typeof PAUSE_ACTIONS)[number];
 
-/** Every action that throws the run away (or ends it) asks first. */
-export type ConfirmAction = Exclude<PauseAction, 'resume'>;
+/**
+ * Every action that throws the run away (or ends it) asks first. Resume and
+ * Settings keep the run, so they do not (CO-192).
+ */
+export type ConfirmAction = Exclude<PauseAction, 'resume' | 'settings'>;
 
 export function needsConfirm(action: PauseAction): action is ConfirmAction {
-  return action !== 'resume';
+  return action !== 'resume' && action !== 'settings';
 }
 
 export function isPauseAction(value: unknown): value is PauseAction {
@@ -126,6 +129,7 @@ export function isPauseAction(value: unknown): value is PauseAction {
 
 export const PAUSE_LABELS: Readonly<Record<PauseAction, string>> = {
   resume: 'Resume',
+  settings: 'Settings',
   restart: 'Restart',
   end: 'End run',
   menu: 'Main menu',
@@ -157,7 +161,7 @@ export const PAUSE_EVENT = {
   choose: 'pause:choose',
 } as const;
 
-/** A confirmed choice; Resume never travels, the pause screen resumes Game itself. */
+/** A confirmed choice; Resume and Settings never travel, the pause screen handles them itself. */
 export interface PauseChoosePayload {
   action: ConfirmAction;
 }

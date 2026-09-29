@@ -69,7 +69,7 @@ touch controls, more maps — is tracked as GitHub issues.
   and screen shake, and **Help** explains every pickup, lists what's new and
   sends feedback. Progress is saved in the browser.
 - **In a run.** Esc (or Start on a pad) pauses on the build summary, with
-  Resume, Restart, End run and Main menu. Closing the tab mid-run asks first.
+  Resume, Settings, Restart, End run and Main menu. Closing the tab mid-run asks first.
 - **Sound.** Synthesised and recorded sound effects, a menu theme, and a run
   track and a boss track drawn from two of each per run.
 

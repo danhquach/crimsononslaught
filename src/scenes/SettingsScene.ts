@@ -2,11 +2,16 @@ import Phaser from 'phaser';
 import { type FeedbackSettings } from '../config/hitFeedback';
 import { stepVolume } from '../core/audioMix';
 import { readFeedbackSettings, writeFeedbackSettings } from '../core/hitFeedback';
-import { SAVE_REGISTRY_KEY, SCENE } from '../core/scenePayloads';
+import {
+  SAVE_REGISTRY_KEY,
+  SCENE,
+  isSettingsPayload,
+  type PausePayload,
+} from '../core/scenePayloads';
 import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { audioOf } from '../render/audio';
 import { storeSaveJson } from '../storage/localSave';
-import { attachMenuInput, type MenuItem } from './input';
+import { attachMenuInput, watchStartButton, type MenuItem } from './input';
 import { addTextButton, textButtonItem } from './ui';
 
 const ROW_TOP = 140;
@@ -17,8 +22,15 @@ const SMALL_BUTTON = { fontSize: '22px', padding: { x: 12, y: 6 } } as const;
 type FeedbackToggle = 'numbers' | 'hitStop' | 'shake';
 type VolumeChannel = 'master' | 'music';
 
+/** Over a paused run the panel dims the frozen arena a little more than Pause does. */
+const PAUSED_BACKDROP_ALPHA = 0.9;
+
 /**
- * Settings panel (#121), reached from Intro and back to it. The master and
+ * Settings panel (#121), reached from Intro and back to it, or (CO-192) from
+ * the pause menu and back to that: the pause view travels in the payload and
+ * Back restarts Pause with it, so the run stays frozen and its build reads as
+ * before. Over a run the panel brings itself to the top, hides the HUD and
+ * leaves the run's music playing. Esc or pad Start also go back. The master and
  * music volumes and mute go through the game's `Audio`, which Boot already
  * persists on every change; the hit-feedback switches (#125) are written into
  * the save here, registry and storage at once. So every change holds for the rest of the
@@ -29,6 +41,8 @@ type VolumeChannel = 'master' | 'music';
  */
 export class SettingsScene extends Phaser.Scene {
   private leaving = false;
+  /** The pause view to go back to; `null` when opened from the main menu. */
+  private returnTo: PausePayload | null = null;
   private readonly labels: (() => void)[] = [];
 
   constructor() {
@@ -40,13 +54,23 @@ export class SettingsScene extends Phaser.Scene {
     return isSave(stored) ? stored : emptySave();
   }
 
+  init(data: unknown): void {
+    this.returnTo = isSettingsPayload(data) ? data.pause : null;
+    // Phaser replays the last launch payload on a payload-less start; clear it,
+    // so the main menu's Settings never returns to a pause screen.
+    this.scene.settings.data = {};
+  }
+
   create(): void {
-    // The menu track carries across every menu screen (CO-157); asking again is a no-op.
-    audioOf(this).playMusic('music.menu');
     this.leaving = false;
     this.labels.length = 0;
     const { width, height } = this.scale;
     const audio = audioOf(this);
+
+    if (this.returnTo) this.coverPausedRun(width, height);
+    // The menu track carries across every menu screen (CO-157); asking again is a
+    // no-op. A paused run keeps its own music playing.
+    else audio.playMusic('music.menu');
 
     this.add
       .text(width / 2, 60, 'Settings', {
@@ -120,9 +144,34 @@ export class SettingsScene extends Phaser.Scene {
     attachMenuInput(this, items, { keyboard: true });
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      if (event.key === 'Escape') this.back();
+      if (event.key === 'Escape' && !event.repeat) this.back();
+    });
+    // Start goes back as well; the scene's own emitter keeps its listeners across a restart.
+    const start = watchStartButton(this);
+    const pollStart = (): void => {
+      if (start.pressed()) this.back();
+    };
+    this.events.on(Phaser.Scenes.Events.UPDATE, pollStart);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off(Phaser.Scenes.Events.UPDATE, pollStart);
     });
     this.refresh();
+  }
+
+  /**
+   * Over a paused run (CO-192): on top of Game and its HUD, which would show
+   * through and cannot be told apart from the rows; the HUD comes back as this
+   * panel closes, and Pause hides it again if that is where it goes.
+   */
+  private coverPausedRun(width: number, height: number): void {
+    this.scene.bringToTop();
+    this.scene.setVisible(false, SCENE.hud);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scene.setVisible(true, SCENE.hud));
+    // Interactive, so clicks never reach anything underneath.
+    this.add
+      .rectangle(0, 0, width, height, 0x000000, PAUSED_BACKDROP_ALPHA)
+      .setOrigin(0)
+      .setInteractive();
   }
 
   /** Redrawn every frame as well, so a mute from `M` shows at once; unchanged text is a no-op. */
@@ -180,7 +229,8 @@ export class SettingsScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     audioOf(this).play('ui.confirm');
-    this.scene.start(SCENE.intro);
+    if (this.returnTo) this.scene.start(SCENE.pause, this.returnTo);
+    else this.scene.start(SCENE.intro);
   }
 }
 
