@@ -179,9 +179,42 @@ export function cooldownBadge(secondsLeft: number | null): string | null {
   return String(Math.floor(secondsLeft));
 }
 
-/** The shield bar exists only while the run has a shield equipped (#134). */
-export function shieldBarVisible(model: Readonly<HudModel>): boolean {
-  return model.shieldMax > 0;
+/**
+ * CO-195: the HP bar with the shield drawn on it. The red fill is HP and the
+ * ice segment right after it is the shield, both as shares of the bar. While a
+ * shield is up the bar stands for whichever is more, max HP or HP plus the
+ * shield, so a shield on full HP shrinks the red a little rather than running
+ * off the end; as the shield drains the bar eases back to max HP, with no jump
+ * when it breaks. With no shield up the bar is HP alone.
+ */
+export interface HpBarView {
+  hp: number;
+  shield: number;
+  /** `HP 70 / 100`, or `HP 70` while a shield is up. */
+  hpText: string;
+  /** `+20` while a shield is up, drawn in the shield's colour after `hpText`; '' otherwise. */
+  shieldText: string;
+}
+
+export function hpBarView(model: Readonly<HudModel>): HpBarView {
+  const hp = Math.ceil(model.hp);
+  const up = model.shieldMax > 0 && model.shield > 0;
+  if (!up) {
+    return {
+      hp: fraction(model.hp, model.maxHp),
+      shield: 0,
+      hpText: `HP ${hp} / ${model.maxHp}`,
+      shieldText: '',
+    };
+  }
+  const span = Math.max(model.maxHp, Math.max(0, model.hp) + model.shield);
+  const hpShare = fraction(model.hp, span);
+  return {
+    hp: hpShare,
+    shield: Math.min(1 - hpShare, fraction(model.shield, span)),
+    hpText: `HP ${hp}`,
+    shieldText: `+${Math.ceil(model.shield)}`,
+  };
 }
 
 /** The boss bar exists only during the boss phase (ticket CO-012). */

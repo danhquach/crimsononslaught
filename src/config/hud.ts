@@ -25,7 +25,8 @@ export interface BarArt {
   };
 }
 
-export type BarId = 'hp' | 'shield' | 'xp' | 'boss';
+/** CO-195: the shield is drawn on the HP bar, so its own frame art is no longer used. */
+export type BarId = 'hp' | 'xp' | 'boss';
 
 export const BAR_ART: Readonly<Record<BarId, BarArt>> = {
   hp: {
@@ -34,13 +35,6 @@ export const BAR_ART: Readonly<Record<BarId, BarArt>> = {
     capLeft: 21,
     capRight: 21,
     trough: { left: 15, top: 10, right: 15, bottom: 9 },
-  },
-  shield: {
-    frame: 'hud.shieldFrame.0',
-    mark: 'hud.shieldMark.0',
-    capLeft: 8,
-    capRight: 8,
-    trough: { left: 6, top: 6, right: 6, bottom: 5 },
   },
   xp: {
     frame: 'hud.xpFrame.0',

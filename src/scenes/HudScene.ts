@@ -16,7 +16,7 @@ import {
   bossBarVisible,
   formatTimer,
   fraction,
-  shieldBarVisible,
+  hpBarView,
   slotLabel,
   slotRows,
   type HudModel,
@@ -93,12 +93,12 @@ const SLOT_BADGE_STYLE = { ...LABEL_STYLE, fontSize: '10px', strokeThickness: 0 
  * widest mark, the heart, hangs off their left end inside the margin, and are
  * narrower than the flat bars by that indent so every label keeps its place.
  * Each row clears the marks above it. The boss bar sits under the whole stack,
- * so the shield and XP labels never run into it.
+ * so the XP label never runs into it. CO-195: the shield is drawn on the HP
+ * bar, so the stack is HP and XP, the XP bar's mark just under the heart.
  */
 const FRAMED_X = MARGIN + 24;
 const FRAMED_WIDTH = BAR_WIDTH - 24;
-const FRAMED_SHIELD_Y = MARGIN + 31;
-const FRAMED_XP_Y = MARGIN + 54;
+const FRAMED_XP_Y = MARGIN + 32;
 const FRAMED_BOSS_Y = 96;
 const BOSS_WIDTH = 400;
 /**
@@ -129,11 +129,88 @@ const TILE_FLASH_MS = 250;
 /** How far toward white the glint row along the top of a framed fill is, 0 to 1. */
 const FILL_GLINT = 0.4;
 
+/**
+ * CO-195: a second fill right after a bar's own, and a second label right
+ * after its own in that fill's colour: the shield on the HP bar. Its rectangles
+ * span the whole trough and are scaled and moved, like the main fill.
+ */
+class Segment {
+  private readonly rects: Phaser.GameObjects.Rectangle[];
+  private readonly left: number;
+  private readonly span: number;
+  readonly label: Phaser.GameObjects.Text;
+  /** What `set` last drew, for the browser suite. */
+  shown: SegmentShown = {
+    start: 0,
+    width: 0,
+    text: '',
+    afterText: '',
+    afterRight: 0,
+    left: 0,
+    y: 0,
+  };
+
+  constructor(
+    rects: Phaser.GameObjects.Rectangle[],
+    left: number,
+    span: number,
+    label: Phaser.GameObjects.Text,
+  ) {
+    this.rects = rects;
+    this.left = left;
+    this.span = span;
+    this.label = label;
+  }
+
+  /** From `start01` of the trough, `width01` of it long; `text` beside `after`, the bar's own label. */
+  set(start01: number, width01: number, text: string, after: Phaser.GameObjects.Text): void {
+    for (const rect of this.rects) {
+      rect.setVisible(width01 > 0);
+      rect.setX(this.left + start01 * this.span).setScale(width01, 1);
+    }
+    const afterRight = after.x + after.width;
+    this.label.setText(text).setPosition(afterRight + SEGMENT_LABEL_GAP, after.y);
+    this.shown = {
+      start: start01,
+      width: width01,
+      text,
+      afterText: after.text,
+      afterRight,
+      left: this.label.x,
+      y: this.label.y,
+    };
+  }
+}
+
+/**
+ * A segment as last drawn: where it starts and how long it is, as shares of
+ * the trough; its label's text, left edge and centre line; and the bar's own
+ * label beside it, with its right edge.
+ */
+export interface SegmentShown {
+  start: number;
+  width: number;
+  text: string;
+  afterText: string;
+  afterRight: number;
+  left: number;
+  y: number;
+}
+
+/** Room between a bar's label and its segment's, a little under the monospace space. */
+const SEGMENT_LABEL_GAP = 4;
+
+function segmentLabel(scene: Phaser.Scene, color: number): Phaser.GameObjects.Text {
+  const css = `#${color.toString(16).padStart(6, '0')}`;
+  return scene.add.text(0, 0, '', { ...LABEL_STYLE, color: css }).setOrigin(0, 0.5);
+}
+
 /** Background + fill + label; `set` drives the fill by fraction so callers never touch pixels. */
 class Bar {
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly label: Phaser.GameObjects.Text;
+  private readonly segment: Segment | null = null;
 
   constructor(
     scene: Phaser.Scene,
@@ -142,12 +219,17 @@ class Bar {
     width: number,
     height: number,
     color: number,
+    segmentColor?: number,
   ) {
     this.bg = scene.add
       .rectangle(x, y, width, height, BAR_BG)
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0x555555);
     this.fill = scene.add.rectangle(x, y, width, height, color).setOrigin(0, 0);
+    if (segmentColor !== undefined) {
+      const rect = scene.add.rectangle(x, y, width, height, segmentColor).setOrigin(0, 0);
+      this.segment = new Segment([rect], x, width, segmentLabel(scene, segmentColor));
+    }
     this.label = scene.add.text(x + width + 8, y + height / 2, '', LABEL_STYLE).setOrigin(0, 0.5);
   }
 
@@ -164,6 +246,19 @@ class Bar {
   set(fraction01: number, text: string): void {
     this.fill.setScale(fraction01, 1);
     this.label.setText(text);
+  }
+
+  /**
+   * The second fill after this bar's own and its label, placed from the fill
+   * `set` just drew; only on a bar made with a `segmentColor`, which is the HP
+   * bar, never hidden.
+   */
+  setSegment(width01: number, text: string): void {
+    this.segment?.set(this.fill.scaleX, width01, text, this.label);
+  }
+
+  get segmentShown(): SegmentShown | null {
+    return this.segment?.shown ?? null;
   }
 
   setVisible(visible: boolean): void {
@@ -189,6 +284,7 @@ class FramedBar {
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly glint: Phaser.GameObjects.Rectangle;
   private readonly label: Phaser.GameObjects.Text;
+  private readonly segment: Segment | null = null;
   /** The frame's pieces and its mark: what shows of the bar with an empty fill. */
   readonly solid: readonly Phaser.GameObjects.GameObject[];
 
@@ -199,6 +295,7 @@ class FramedBar {
     width: number,
     art: BarArt,
     color: number,
+    segmentColor?: number,
   ) {
     const box = artBox(art.frame);
     const { left, top, right, bottom } = art.trough;
@@ -212,6 +309,19 @@ class FramedBar {
     this.glint = scene.add
       .rectangle(troughX, troughY, troughW, 1, towardWhite(color, FILL_GLINT))
       .setOrigin(0, 0);
+    const segmentRects =
+      segmentColor === undefined
+        ? []
+        : [
+            scene.add.rectangle(troughX, troughY, troughW, troughH, segmentColor),
+            scene.add.rectangle(
+              troughX,
+              troughY,
+              troughW,
+              1,
+              towardWhite(segmentColor, FILL_GLINT),
+            ),
+          ].map((rect) => rect.setOrigin(0, 0));
 
     const slices = barSlices(scene, art);
     const middleW = width - art.capLeft - art.capRight;
@@ -234,12 +344,24 @@ class FramedBar {
     this.label = scene.add.text(x + width + 8, y + box.h / 2, '', LABEL_STYLE).setOrigin(0, 0.5);
     this.parts = [bg, this.fill, this.glint, ...frame, mark, this.label];
     this.solid = [...frame, mark];
+    if (segmentColor !== undefined) {
+      this.segment = new Segment(segmentRects, troughX, troughW, segmentLabel(scene, segmentColor));
+    }
   }
 
   set(fraction01: number, text: string): void {
     this.fill.setScale(fraction01, 1);
     this.glint.setScale(fraction01, 1);
     this.label.setText(text);
+  }
+
+  /** As `Bar.setSegment`: the HP bar's shield, never hidden. */
+  setSegment(width01: number, text: string): void {
+    this.segment?.set(this.fill.scaleX, width01, text, this.label);
+  }
+
+  get segmentShown(): SegmentShown | null {
+    return this.segment?.shown ?? null;
   }
 
   setVisible(visible: boolean): void {
@@ -451,11 +573,11 @@ class SlotIcon {
 }
 
 /**
- * HUD overlay: timer, HP bar, shield bar, XP bar + level, kill and Ember
- * counts, boss HP bar, the loadout's slot icons and the passives held.
+ * HUD overlay: timer, HP bar, XP bar + level, kill and Ember counts, boss HP
+ * bar, the loadout's slot icons and the passives held.
  *
- * The shield bar (#134) sits under HP and is drawn only while the run has a
- * shield equipped, so a run without one reads exactly as it did before. The
+ * The shield pool (#134) is drawn on the HP bar (CO-195): an ice segment after
+ * the red and its number after the HP label, while a shield is up. The
  * slot icons (#144, #213) run along the bottom-left corner, one per spell
  * casting and one per slot still empty. The top-right corner (CO-193) is a
  * plate with the Kills and Embers counts and, under it, one tile per passive
@@ -472,7 +594,6 @@ export class HudScene extends Phaser.Scene {
   private killsText!: Phaser.GameObjects.Text;
   private embersText!: Phaser.GameObjects.Text;
   private hpBar!: Bar | FramedBar;
-  private shieldBar!: Bar | FramedBar;
   private xpBar!: Bar | FramedBar;
   private bossBar!: Bar | FramedBar;
   private look: 'art' | 'flat' = 'flat';
@@ -516,6 +637,11 @@ export class HudScene extends Phaser.Scene {
     });
   }
 
+  /** CO-195: the HP bar's red and shield segment, and both labels, as last drawn; the browser suite reads it. */
+  get hpBarShown(): SegmentShown | null {
+    return this.hpBar.segmentShown;
+  }
+
   /** The passive tiles on screen, in the order taken; the browser suite reads them. */
   get passiveTiles(): readonly HudPassiveTile[] {
     return this.shownTiles;
@@ -553,13 +679,13 @@ export class HudScene extends Phaser.Scene {
     );
     this.look = art ? 'art' : 'flat';
     if (art) {
-      this.hpBar = new FramedBar(this, FRAMED_X, MARGIN, FRAMED_WIDTH, BAR_ART.hp, HP_COLOR);
-      this.shieldBar = new FramedBar(
+      this.hpBar = new FramedBar(
         this,
         FRAMED_X,
-        FRAMED_SHIELD_Y,
+        MARGIN,
         FRAMED_WIDTH,
-        BAR_ART.shield,
+        BAR_ART.hp,
+        HP_COLOR,
         SHIELD_COLOR,
       );
       this.xpBar = new FramedBar(this, FRAMED_X, FRAMED_XP_Y, FRAMED_WIDTH, BAR_ART.xp, XP_COLOR);
@@ -572,9 +698,8 @@ export class HudScene extends Phaser.Scene {
         BOSS_COLOR,
       );
     } else {
-      this.hpBar = new Bar(this, MARGIN, MARGIN, BAR_WIDTH, 18, HP_COLOR);
-      this.shieldBar = new Bar(this, MARGIN, MARGIN + 22, BAR_WIDTH, 8, SHIELD_COLOR);
-      this.xpBar = new Bar(this, MARGIN, MARGIN + 34, BAR_WIDTH, 10, XP_COLOR);
+      this.hpBar = new Bar(this, MARGIN, MARGIN, BAR_WIDTH, 18, HP_COLOR, SHIELD_COLOR);
+      this.xpBar = new Bar(this, MARGIN, MARGIN + 22, BAR_WIDTH, 10, XP_COLOR);
       this.bossBar = new Bar(this, width / 2 - 200, 56, 400, 14, BOSS_COLOR);
     }
     this.timerText = this.add
@@ -652,9 +777,9 @@ export class HudScene extends Phaser.Scene {
   private render(): void {
     const m = this.model;
     this.timerText.setText(formatTimer(m.elapsedMs));
-    this.hpBar.set(fraction(m.hp, m.maxHp), `HP ${Math.ceil(m.hp)} / ${m.maxHp}`);
-    this.shieldBar.setVisible(shieldBarVisible(m));
-    this.shieldBar.set(fraction(m.shield, m.shieldMax), `Shield ${Math.ceil(m.shield)}`);
+    const hp = hpBarView(m);
+    this.hpBar.set(hp.hp, hp.hpText);
+    this.hpBar.setSegment(hp.shield, hp.shieldText);
     this.xpBar.set(fraction(m.xp, m.xpToNext), `Lv ${m.level}`);
     const counts = cornerCounts(m, this.iconed);
     this.killsText.setText(counts.kills);
