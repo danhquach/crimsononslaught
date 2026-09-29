@@ -900,6 +900,39 @@ once its 110 px ring would catch 3.
   - The spray lands about 3.5 hits a bomb, as much damage as the bursts deal.
   - A fifth to a third of the bursts catch nobody. These are mostly bombs that roll
     their full range through a thin field.
-- **Not yet run:** the ticket's balance check, Ice Storm alone vs Ice Storm + Frost Nova
-  Bomb over 40 pooled 20-minute runs each. It waits for #304 (Ice Storm radius 120,
-  4 s), so the baseline is the storm players will get.
+
+## Ice Storm alone vs Ice Storm + Frost Nova Bomb (the ticket's check)
+
+**Method.**
+- The same bot, mortal, full 20-minute runs.
+- Seeds 1–40 for each arm: 80 runs in all, the arms interleaved, two at a time,
+  `timeScale=8`, one fresh Vite server serving commit `3bdff28`.
+- **What each arm carries:**
+  - Ice Storm alone: `?loadout=ice_blizzard`.
+  - Storm + Bomb: `?loadout=ice_blizzard,ice_nova_bomb`.
+  - Ice Arrow is the default in both.
+  - The bot filtered the other Ice actives out of the level-up offers in the page.
+  - Every logged build was exactly its arm's spells. Passives were picked the usual
+    way.
+- **Why the filter is in the page:** a level-up offers only spells while a slot is
+  open, so a pick score alone could not keep Shield and Companion out. The first
+  launch had them in both arms and was thrown away.
+- **Ice Storm is `main`'s**, radius 80 for 6 s: the PM asked for the sweep now,
+  before #304.
+
+| Arm | Wins | Reached boss | Boss TTK min / median / max | TTK in 45–90 s | Median level | Median survival of losses |
+|---|---|---|---|---|---|---|
+| Arrow + Storm | 13 / 40 | 13 | 37 / 57 / 112 s | 7 of 13 | 27 | 10:04 |
+| Arrow + Storm + Bomb | 30 / 40 | 31 | 21 / 31 / 63 s | 3 of 30 | 46 | 13:43 |
+
+- **Result:**
+  - The bomb clearly adds to Ice Storm: 17 more wins out of 40, more than three times
+    the roughly 5-win noise the #210 rounds measured.
+  - The boss falls in about half the time.
+  - Over full 20-minute runs, 16,392 of 20,289 bursts (81%) caught 3 or more enemies.
+- **The Storm + Bomb arm is fast on the boss:**
+  - Its median time-to-kill is 31 s, below the 45–90 s window, and only 3 of its 30
+    wins land inside it.
+  - This arm carries one active more than the control, and the comparison measures
+    the bomb added, not the bomb against another spell. A full five-active Ice build
+    still has to be read against the window.
