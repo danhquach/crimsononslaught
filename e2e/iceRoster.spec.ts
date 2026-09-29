@@ -154,9 +154,6 @@ test('Frost Nova Bomb rolls spinning, sprays icicles, and bursts on a group', as
   await page.mouse.click(x, y);
   await waitForScene(page, SCENE.game);
 
-  // Rotations seen per bomb, by throw id: one bomb seen at two rotations is a
-  // spin, where two bombs thrown on different headings would not be.
-  const rotations = new Map<number, Set<number>>();
   let bomb: Report[number] | undefined;
   const until = Date.now() + WALL_CAP_MS;
   let runMs = 0;
@@ -166,27 +163,23 @@ test('Frost Nova Bomb rolls spinning, sprays icicles, and bursts on a group', as
     const current = await sample(page);
     if (!current) break;
     bomb = current.find((entry) => entry.id === 'ice_nova_bomb');
-    const spin = bomb?.bombSpin;
-    if (spin) {
-      const seen = rotations.get(spin.id) ?? new Set<number>();
-      seen.add(Math.round(spin.rotation * 100));
-      rotations.set(spin.id, seen);
-    }
     runMs = (await readHud(page)).elapsedMs;
     await page.waitForTimeout(SAMPLE_MS);
   }
 
   const caught = bomb?.burstCaught ?? [];
   const onGroups = caught.filter((n) => n >= 3).length;
-  const spun = [...rotations.values()].filter((seen) => seen.size > 1).length;
+  // Recorded by the spell at each burst, not sampled: a flight is 150–300 ms of
+  // wall clock here, and CI's sample rounds missed every one (CO-185).
+  const spun = bomb?.spunBursts ?? 0;
   // Logged before the asserts, so a CI failure shows the spread it failed on.
   console.log(
     `CO-182 bursts=${caught.length} onGroups=${onGroups} icicleHits=${bomb?.icicleHits} ` +
       `spun=${spun} caught=[${caught.join(',')}]`,
   );
-  expect(spun, 'bombs seen at two or more rotations in one flight').toBeGreaterThan(0);
   expect(bomb?.icicleHits, 'icicle hits over the window').toBeGreaterThan(0);
   expect(caught.length, 'bursts over the window').toBeGreaterThan(0);
+  expect(spun, 'bursts whose bomb turned in flight').toBe(caught.length);
   expect(onGroups, `bursts on >=3 enemies, of ${caught.length}`).toBeGreaterThan(0);
   // Every flight rolls at least the arming distance, so each sprays: 5-7 hits a
   // burst over three runs, well clear of one.

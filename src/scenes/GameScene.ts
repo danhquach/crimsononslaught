@@ -736,7 +736,7 @@ export class GameScene extends Phaser.Scene {
    *
    * CO-182: the bomb's entry also carries `icicleHits` (icicles that broke on
    * an enemy), `burstCaught` (enemies each burst caught, in order) and
-   * `bombSpin` (the first rolling bomb's throw id and rotation, or `null`), so the suite
+   * `spunBursts` (bursts whose bomb turned in flight, CO-185), so the suite
    * can tell the bomb spins, its icicles land and its bursts catch groups.
    */
   get iceReport(): {
@@ -745,7 +745,7 @@ export class GameScene extends Phaser.Scene {
     live: number;
     icicleHits?: number;
     burstCaught?: number[];
-    bombSpin?: { id: number; rotation: number } | null;
+    spunBursts?: number;
   }[] {
     return this.spells.spells
       .filter(
@@ -760,7 +760,7 @@ export class GameScene extends Phaser.Scene {
               live: spell.liveCount,
               icicleHits: spell.icicleHits,
               burstCaught: [...spell.burstCaught],
-              bombSpin: spell.bombSpin,
+              spunBursts: spell.spunBursts,
             }
           : { id: spell.id, hits: spell.hits, live: spell.liveCount },
       );
