@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS } from './boss';
+import { BOSS, BOSS_CC_DR } from './boss';
 import { TEXTURE_KEYS } from './colors';
 
 describe('boss stats (CO-050)', () => {
@@ -17,5 +17,17 @@ describe('boss stats (CO-050)', () => {
 
   it('points at a generated texture key', () => {
     expect(TEXTURE_KEYS).toContain(BOSS.texture);
+  });
+});
+
+describe('boss crowd-control diminishing returns (#315)', () => {
+  it('shortens every repeat, by a positive fraction', () => {
+    expect(BOSS_CC_DR.factor).toBeGreaterThan(0);
+    expect(BOSS_CC_DR.factor).toBeLessThan(1);
+  });
+
+  it('forgets a kind after a finite, positive wait', () => {
+    expect(BOSS_CC_DR.resetS).toBeGreaterThan(0);
+    expect(Number.isFinite(BOSS_CC_DR.resetS)).toBe(true);
   });
 });

@@ -9,7 +9,15 @@ import {
   type BossPhase,
   type BossPhasePayload,
 } from '../core/boss';
+import {
+  NO_BOSS_CC,
+  applyBossCc,
+  diminishFrost,
+  type BossCcKind,
+  type BossCcState,
+} from '../core/bossCrowdControl';
 import type { Vec2 } from '../core/enemy';
+import type { FrostHit } from '../core/frostNova';
 import { emitRunEvent } from '../core/runEvents';
 import { Enemy } from './Enemy';
 
@@ -28,8 +36,9 @@ const TELEGRAPH_TINT = 0xffffff;
  *
  * It lives in the enemy pool's group (`EnemyPool.spawnBoss`), so every spell's
  * targeting and overlap wiring reaches it unchanged, and burns, slows and stuns
- * apply as they do to any enemy — a slow or stun scales the charge too. One of
- * a kind: never recycled as a regular enemy; the pool drops it when it dies.
+ * apply as they do to any enemy — a slow or stun scales the charge too — save
+ * for the diminishing returns below. One of a kind: never recycled as a regular
+ * enemy; the pool drops it when it dies.
  *
  * Its HP is published as `run:bossHp` on the scene emitter (CO-051), on spawn
  * and after every hit, the way `Player` publishes `run:hp`; the HUD boss bar
@@ -41,12 +50,19 @@ const TELEGRAPH_TINT = 0xffffff;
  * It faces its last velocity: the player while it chases, so the telegraph
  * that follows the stop faces them too, and the locked line while it charges.
  *
+ * Its crowd control diminishes (#315): every stun, stagger and slow repeated
+ * within a few seconds lasts a fraction of the last (`core/bossCrowdControl.ts`),
+ * so Persistence can interrupt the boss but never lock it down.
+ *
  * All the decisions live in `core/boss.ts`; this class only moves the sprite.
  */
 export class Boss extends Enemy {
   private cycle: BossCycle = startBossCycle();
   /** Whether the atlas is drawing the telegraph, so the tint fallback can stand down. */
   private animated = false;
+  /** Seconds this boss has been alive, run time; the clock its crowd-control windows are read on (#315). */
+  private clockS = 0;
+  private cc: BossCcState = NO_BOSS_CC;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y);
@@ -69,8 +85,38 @@ export class Boss extends Enemy {
   /** Come alive at (x, y) at full HP with the cycle at its start. */
   spawnBoss(x: number, y: number): void {
     this.cycle = startBossCycle();
+    this.clockS = 0;
+    this.cc = NO_BOSS_CC;
     this.arise(BOSS, x, y);
     this.emitHp();
+  }
+
+  /** Diminishing returns (#315): a repeated stun is shorter. The roll that landed it was drawn before this. */
+  override applyStun(stunS: number): void {
+    super.applyStun(this.diminish('stun', stunS));
+  }
+
+  /** Diminishing returns (#315): a repeated stagger is shorter. */
+  override applyStagger(staggerS: number): void {
+    super.applyStagger(this.diminish('stagger', staggerS));
+  }
+
+  /**
+   * Diminishing returns (#315): a freeze is a stun, so it shares the stun count,
+   * and never cuts a running freeze short; a slow is scaled in length, not in
+   * strength (`diminishFrost`).
+   */
+  override applyFrost(hit: Readonly<FrostHit>): void {
+    const applied = diminishFrost(this.cc, hit, this.crowdControlRemainingS.frozenS, this.clockS);
+    this.cc = applied.state;
+    super.applyFrost(applied.hit);
+  }
+
+  /** The length `durationS` of `kind` takes on this boss now, counting it as an application. */
+  private diminish(kind: BossCcKind, durationS: number): number {
+    const applied = applyBossCc(this.cc, kind, durationS, this.clockS);
+    this.cc = applied.state;
+    return applied.durationS;
   }
 
   /** Every hit redraws the boss bar; the killing blow shows it empty. */
@@ -93,6 +139,7 @@ export class Boss extends Enemy {
 
   /** Advance the cycle by the frame and move as the current phase asks. */
   protected override steer(deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
+    this.clockS += deltaS;
     const wasTelegraphing = this.telegraphing;
     const before = this.cycle.phase;
     const step = stepBossCycle(this.cycle, deltaS, this, target, speedFactor);

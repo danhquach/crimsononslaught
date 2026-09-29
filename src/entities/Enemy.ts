@@ -193,6 +193,21 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return this.staggerS > 0;
   }
 
+  /** Test hook (#315): seconds left on each stop and on the slow, for the browser suite. */
+  get crowdControlRemainingS(): {
+    stunS: number;
+    staggerS: number;
+    frozenS: number;
+    slowS: number;
+  } {
+    return {
+      stunS: this.stunS,
+      staggerS: this.staggerS,
+      frozenS: this.frost.frozenS,
+      slowS: this.frost.slowRemainingS,
+    };
+  }
+
   /** #125: showing the white hit flash, which paints over the status tint while it lasts. */
   get isFlashing(): boolean {
     return this.flashMs > 0;

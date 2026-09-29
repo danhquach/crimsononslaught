@@ -1,9 +1,10 @@
 import type { RosterSpellId } from '../config/loadout';
 import { LEVEL_UP_CHARGES, type ChargeCard } from '../config/offerActions';
-import { PASSIVES, isPassiveId, type Passive } from '../config/passives';
+import { PASSIVES, isPassiveId, type PlayerProfile, type Passive } from '../config/passives';
 import type { SpellStatField } from '../config/spellFields';
 import { MAX_OFFER_SIZE, type OfferCard } from './levelUp';
 import { equippableSpells, openSlots, passiveRank, type Loadout } from './loadout';
+import { atCap } from './profileClamp';
 import type { Rng } from './rng';
 
 /**
@@ -67,16 +68,22 @@ export function offerableActives(loadout: Loadout, catalog: ActiveCatalog): Acti
  * A passive with a `requiresStat` is eligible only while `carried` holds that
  * stat (#206). `carried` defaults to empty, so a caller that does not say what
  * its spells carry can never be offered a dead pick.
+ *
+ * With `profile` (#315) a passive whose field already sits on its clamp is out
+ * too — Haste at the cooldown floor, Ward and Precision at their caps — since
+ * one more rank would change nothing, as a relic offer already reckons.
  */
 export function eligiblePassives(
   loadout: Loadout,
   passives: readonly Passive[] = PASSIVES,
   carried: ReadonlySet<SpellStatField> = new Set(),
+  profile?: Readonly<PlayerProfile>,
 ): Passive[] {
   return passives.filter(
     (passive) =>
       rankOf(loadout, passive.id) < (passive.maxRank ?? Infinity) &&
-      (passive.requiresStat === undefined || carried.has(passive.requiresStat)),
+      (passive.requiresStat === undefined || carried.has(passive.requiresStat)) &&
+      !(profile && atCap(passive, profile)),
   );
 }
 
@@ -97,6 +104,11 @@ export interface OfferInput {
    * such passive is offered.
    */
   carried?: ReadonlySet<SpellStatField>;
+  /**
+   * The profile as it stands (`Spellbook.profile`). A passive already at a
+   * `PROFILE_CLAMPS` bound is not offered (#315); absent, none is filtered.
+   */
+  profile?: Readonly<PlayerProfile>;
   passives?: readonly Passive[];
   /** Card ids banned this run (#228); never drawn. */
   banned?: ReadonlySet<string>;
@@ -118,7 +130,7 @@ const NONE: ReadonlySet<string> = new Set();
  * and, once a passive caps, the unbanned charge cards.
  */
 export function offerPool(input: OfferInput): OfferCard[] {
-  const { loadout, level, actives, carried, passives = PASSIVES } = input;
+  const { loadout, level, actives, carried, profile, passives = PASSIVES } = input;
   const { charges = LEVEL_UP_CHARGES, banned = NONE } = input;
   const open = (card: { id: string }): boolean => !banned.has(card.id);
 
@@ -127,7 +139,7 @@ export function offerPool(input: OfferInput): OfferCard[] {
     if (offerable.length > 0) return offerable.map(activeCard);
   }
 
-  const pool = eligiblePassives(loadout, passives, carried)
+  const pool = eligiblePassives(loadout, passives, carried, profile)
     .filter(open)
     .map((passive) => passiveCard(loadout, passive));
   if (anyPassiveCapped(loadout, passives)) pool.push(...charges.filter(open).map(chargeCard));
