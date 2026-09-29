@@ -16,10 +16,12 @@ import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { PauseScene } from '../src/scenes/PauseScene';
 import type { ResultScene } from '../src/scenes/ResultScene';
+import { expectRingReadable } from './ringProbe';
 import {
   cardCenter,
   clickRow,
   collectErrors,
+  focusRing,
   isSceneActive,
   menuRows,
   startFromIntro,
@@ -1125,4 +1127,100 @@ test('Settings from the pause menu still hides the run when the menu backdrop is
   await expectRunCovered(page);
   // The aborted backdrop is logged by the browser as a failed load, and nothing else.
   expect(errors.filter((text) => !text.includes('404'))).toEqual([]);
+});
+
+type Rect = { x: number; y: number; width: number; height: number };
+const overlaps = (a: Rect, b: Rect): boolean =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+test('the focus ring follows the arrows over the menu rows, the strips and Yes / No (CO-196)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await pauseWithLoadout(page, LONG_LOADOUT, BUILD);
+
+  // Nothing is lit until the first press, and the pointer alone never draws the ring.
+  let rows = await menuRows(page, SCENE.pause);
+  expect(rows.map((row) => row.label)).toEqual([
+    'Resume',
+    'Settings',
+    'Restart',
+    'End run',
+    'Main menu',
+  ]);
+  expect(rows.filter((row) => row.selected)).toEqual([]);
+  expect((await focusRing(page, SCENE.pause)).visible).toBe(false);
+
+  await page.keyboard.press('ArrowDown'); // wakes the highlight on Resume
+  rows = await menuRows(page, SCENE.pause);
+  expect(rows.findIndex((row) => row.selected)).toBe(0);
+  let ring = await focusRing(page, SCENE.pause);
+  expect(ring.visible).toBe(true);
+  expect(ring.box).toEqual(rows[0]!.bounds);
+  // The ring stays clear of the rows beside it, whichever it is round.
+  for (const row of rows.slice(1)) expect(overlaps(ring.outer!, row.bounds), row.label).toBe(false);
+
+  // Into the strips: the ring is on the item the pad reads, and no row is lit.
+  await page.keyboard.press('ArrowRight');
+  const nav = await readNav(page);
+  expect(nav.focus).toMatchObject({ zone: 'build' });
+  expect((await menuRows(page, SCENE.pause)).filter((row) => row.selected)).toEqual([]);
+  ring = await focusRing(page, SCENE.pause);
+  expect(ring.visible).toBe(true);
+  expect(ring.box!.x + ring.box!.width / 2).toBe(nav.cursor!.x);
+  expect(ring.box!.y + ring.box!.height / 2).toBe(nav.cursor!.y);
+  await expectRingReadable(page, SCENE.pause, 'pause spell slot');
+
+  // A passive tile, 48 px from its neighbour: the ring clears the next tile's face (radius 19).
+  await page.keyboard.press('ArrowDown');
+  const tile = await focusRing(page, SCENE.pause);
+  expect(tile.outer!.width / 2).toBeLessThanOrEqual(48 - 19);
+  await expectRingReadable(page, SCENE.pause, 'pause passive tile');
+  // Every count badge is drawn over the ring, so it can never clip one.
+  await frames(page, 3);
+  const order = await page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    const list = game.scene.getScene(key).children.list;
+    const at = (keep: (o: (typeof list)[number]) => boolean): number[] =>
+      list.flatMap((o, i) => (keep(o) ? [i] : []));
+    const depth = (o: (typeof list)[number]): number => (o as unknown as { depth: number }).depth;
+    return {
+      // The ring is the scene's only Graphics left at depth 0: its core and its halo.
+      ring: at((o) => o.type === 'Graphics' && depth(o) === 0),
+      // A count badge is a pill (Graphics) and its text, both lifted to depth 1.
+      pills: at((o) => o.type === 'Graphics' && depth(o) === 1),
+      texts: at((o) => o.type === 'Text' && o.getData('badgeFill') !== undefined),
+    };
+  }, SCENE.pause);
+  expect(order.ring, 'the ring is its core and halo').toHaveLength(2);
+  expect(order.pills.length).toBeGreaterThan(0);
+  expect(order.texts).toHaveLength(order.pills.length);
+  expect(Math.max(...order.ring)).toBeLessThan(Math.min(...order.pills, ...order.texts));
+  await page.keyboard.press('ArrowUp');
+  expect((await readNav(page)).focus).toMatchObject({ zone: 'build', row: 0, col: 0 });
+
+  // Back to the menu, and on to End run: the ring is round exactly that row.
+  await page.keyboard.press('ArrowLeft');
+  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowDown');
+  rows = await menuRows(page, SCENE.pause);
+  expect(rows.findIndex((row) => row.selected)).toBe(3);
+  ring = await focusRing(page, SCENE.pause);
+  expect(ring.box).toEqual(rows[3]!.bounds);
+  await page.keyboard.press('Enter');
+  await waitForPause(page, 'end');
+
+  // Yes / No: a fresh screen with nothing lit, then the ring on each in turn.
+  rows = await menuRows(page, SCENE.pause);
+  expect(rows.map((row) => row.label)).toEqual(['Yes', 'No']);
+  expect(rows.filter((row) => row.selected)).toEqual([]);
+  expect((await focusRing(page, SCENE.pause)).visible).toBe(false);
+  await page.keyboard.press('ArrowLeft'); // wakes the highlight on Yes
+  ring = await focusRing(page, SCENE.pause);
+  expect(ring.box).toEqual(rows[0]!.bounds);
+  expect(overlaps(ring.outer!, rows[1]!.bounds)).toBe(false);
+  await page.keyboard.press('ArrowRight');
+  ring = await focusRing(page, SCENE.pause);
+  expect(ring.box).toEqual(rows[1]!.bounds);
+  expect(overlaps(ring.outer!, rows[0]!.bounds)).toBe(false);
+  expect(errors).toEqual([]);
 });

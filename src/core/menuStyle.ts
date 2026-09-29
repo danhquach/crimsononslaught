@@ -26,6 +26,8 @@ export interface RowLook {
   /** How strongly the wine bar behind the label is filled. */
   fillAlpha: number;
   text: RowText;
+  /** The arrows or a pad have it, so the shared focus ring (`core/focusStyle.ts`) draws round it. */
+  focused: boolean;
 }
 
 const FILL_SELECTED = 1;
@@ -43,13 +45,19 @@ const DIM_FILL = 0.4;
 export function rowLook(state: RowState, restAlpha = 0): RowLook {
   if (state.selected) {
     const text = state.enabled ? 'lit' : 'off';
-    return { lit: true, fillAlpha: state.enabled ? FILL_SELECTED : FILL_HOVERED, text };
+    return {
+      lit: true,
+      fillAlpha: state.enabled ? FILL_SELECTED : FILL_HOVERED,
+      text,
+      focused: true,
+    };
   }
-  if (!state.enabled) return { lit: false, fillAlpha: restAlpha, text: 'off' };
-  if (state.hovered) return { lit: true, fillAlpha: FILL_HOVERED, text: 'lit' };
-  if (state.active) return { lit: false, fillAlpha: FILL_ACTIVE, text: 'active' };
-  if (state.dim) return { lit: false, fillAlpha: restAlpha * DIM_FILL, text: 'dim' };
-  return { lit: false, fillAlpha: restAlpha, text: 'rest' };
+  if (!state.enabled) return { lit: false, fillAlpha: restAlpha, text: 'off', focused: false };
+  if (state.hovered) return { lit: true, fillAlpha: FILL_HOVERED, text: 'lit', focused: false };
+  if (state.active) return { lit: false, fillAlpha: FILL_ACTIVE, text: 'active', focused: false };
+  if (state.dim)
+    return { lit: false, fillAlpha: restAlpha * DIM_FILL, text: 'dim', focused: false };
+  return { lit: false, fillAlpha: restAlpha, text: 'rest', focused: false };
 }
 
 /** One drifting spark on the front door, all values fixed at creation. */

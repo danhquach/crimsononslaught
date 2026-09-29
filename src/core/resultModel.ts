@@ -123,7 +123,7 @@ export const RESULT_LAYOUT = {
   relics: { x: 308, y: 320, width: 616, height: 112 },
   /** Where a strip's contents start, right of its label. */
   contentInset: 104,
-  button: { x: 370, y: 451, width: 220, height: 34 },
+  button: { x: 370, y: 444, width: 220, height: 34 },
   hintY: 500,
   /** The save-failed line (#316), under the hint; 24 px clears two CI-height 14 px lines. */
   saveNoticeY: 524,

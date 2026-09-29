@@ -4,7 +4,17 @@ import { SPELL_IDS } from '../src/config/spells';
 import { emptySave } from '../src/core/save';
 import { SCENE } from '../src/core/scenePayloads';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
-import { PAD, addFakePad, frames, menuRows, padPress, sceneTexts, waitForScene } from './game';
+import {
+  PAD,
+  addFakePad,
+  focusRing,
+  frames,
+  menuRows,
+  padPress,
+  sceneTexts,
+  waitForScene,
+} from './game';
+import { expectRingReadable } from './ringProbe';
 
 /**
  * The menu screens read (CO-191): on every one, the arrows highlight a row, the
@@ -139,6 +149,9 @@ for (const screen of SCREENS) {
     const before = await menuRows(page, screen.scene);
     expect(before.length, 'rows drawn').toBeGreaterThan(0);
     expect(before.filter((row) => row.selected)).toEqual([]);
+    expect((await focusRing(page, screen.scene)).visible, 'no ring before the first press').toBe(
+      false,
+    );
     const rest = PNG.sync.read(await page.screenshot());
     await info.attach(`${screen.name}-rest`, {
       body: await page.screenshot(),
@@ -159,6 +172,15 @@ for (const screen of SCREENS) {
     const shot = await page.screenshot();
     await info.attach(`${screen.name}-lit`, { body: shot, contentType: 'image/png' });
     const png = PNG.sync.read(shot);
+
+    // The ring: round the lit row, outside it, and the brightest thing near it.
+    const litBounds = rows[lit]!.bounds;
+    const ring = await expectRingReadable(page, screen.scene, screen.name);
+    expect(ring.box).toEqual(litBounds);
+    expect(ring.outer!.x).toBeLessThan(litBounds.x);
+    expect(ring.outer!.y).toBeLessThan(litBounds.y);
+    expect(ring.outer!.x + ring.outer!.width).toBeGreaterThan(litBounds.x + litBounds.width);
+    expect(ring.outer!.y + ring.outer!.height).toBeGreaterThan(litBounds.y + litBounds.height);
 
     for (const row of rows) {
       const { bounds: r, labelBounds: l } = row;

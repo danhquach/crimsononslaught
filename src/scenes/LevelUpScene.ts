@@ -6,12 +6,14 @@ import {
   type OfferCard,
 } from '../core/levelUp';
 import { SKIP_REROLL_BONUS } from '../config/offerActions';
+import type { ItemLook } from '../core/focusStyle';
 import type { OfferActionCounts } from '../core/offerActions';
 import { MAX_RANK_CSS, grantsMaxRank, rankLabel } from '../core/maxRank';
 import { CARD_FILL, CARD_FILL_HOVER, cssColor, offerColor } from '../core/offerColors';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
+import { focusable, frameBox } from './focusRing';
 import { attachMenuInput, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
@@ -220,32 +222,29 @@ export class LevelUpScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    let selected = false;
+    // Ban mode keeps its rim while the pointer and the pad come and go.
+    let look: ItemLook = { raised: false, ring: false };
     let banning = false;
     const draw = (): void => {
-      const rim = banning ? BAN_COLOR : stroke;
       frame
-        .setFillStyle(selected && enabled ? CARD_FILL_HOVER : CARD_FILL)
-        .setStrokeStyle(selected || banning ? 4 : 2, rim);
+        .setFillStyle(look.raised && enabled ? CARD_FILL_HOVER : CARD_FILL)
+        .setStrokeStyle(look.raised || banning ? 4 : 2, banning ? BAN_COLOR : stroke);
     };
+    const focus = focusable(this, frameBox(x, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT), (next) => {
+      look = next;
+      draw();
+    });
     if (enabled) {
       frame.setInteractive({ useHandCursor: true });
       frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-        selected = true;
-        draw();
+        focus.setHovered(true);
         audioOf(this).play('ui.move');
       });
-      frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-        selected = false;
-        draw();
-      });
+      frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => focus.setHovered(false));
       frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, confirm);
     }
     return {
-      setSelected: (on) => {
-        selected = on;
-        draw();
-      },
+      setSelected: focus.setFocused,
       // A greyed-out button does nothing, however it is reached.
       confirm: () => {
         if (enabled) confirm();
@@ -311,21 +310,23 @@ export class LevelUpScene extends Phaser.Scene {
 
     this.add.container(x, y, [frame, ...icon, key, rank, name, kind, description]);
 
-    // Gamepad selection reuses the hover look, so a card reads the same however
-    // it was reached.
-    const highlight = (on: boolean): void => {
-      frame.setFillStyle(on ? CARD_FILL_HOVER : CARD_FILL).setStrokeStyle(on ? 4 : 2, stroke);
-    };
+    // The pointer and the pad raise the card the same way; the pad's focus also
+    // draws the shared ring round it (CO-196).
+    const focus = focusable(this, frameBox(x, y, CARD_WIDTH, height), ({ raised }) => {
+      frame
+        .setFillStyle(raised ? CARD_FILL_HOVER : CARD_FILL)
+        .setStrokeStyle(raised ? 4 : 2, stroke);
+    });
 
     frame.setInteractive({ useHandCursor: true });
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      highlight(true);
+      focus.setHovered(true);
       audioOf(this).play('ui.move');
     });
-    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => highlight(false));
+    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => focus.setHovered(false));
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.choose(card));
 
-    return { setSelected: highlight, confirm: () => this.choose(card) };
+    return { setSelected: focus.setFocused, confirm: () => this.choose(card) };
   }
 
   /** A card chosen: banned in ban mode, else picked. */
