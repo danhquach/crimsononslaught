@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PASSIVE_COLOR, RELIC_COLOR, offerColor } from '../core/offerColors';
+import { MAX_BADGE_TEXT_CSS, MAX_RANK_CSS, badgeText } from '../core/maxRank';
 import type { PauseItem } from '../core/pauseModel';
 import { FRAMES } from '../config/frames';
 import { artFrame } from '../core/animation';
@@ -83,7 +84,7 @@ export function addBuildIcon(
   scene: Phaser.Scene,
   x: number,
   y: number,
-  tile: Pick<PauseItem, 'id' | 'count'>,
+  tile: Pick<PauseItem, 'id' | 'count' | 'maxed'>,
   rim: number,
   parts?: Phaser.GameObjects.GameObject[],
 ): Phaser.GameObjects.Arc | null {
@@ -91,8 +92,8 @@ export function addBuildIcon(
   if (!frame) return null;
   const face = scene.add.circle(x, y, TILE / 2 + 2, 0x000000).setStrokeStyle(1, rim);
   const image = scene.add.image(x, y, FRAMES[frame].page, artFrame(frame));
-  const badge = addBadge(scene, x + TILE / 2 - 2, y + TILE / 2 - 2, tile.count);
-  parts?.push(face, image, badge);
+  const badge = addBadge(scene, x + TILE / 2 - 2, y + TILE / 2 - 2, tile.count, tile.maxed);
+  parts?.push(face, image, ...badge);
   return face;
 }
 
@@ -104,15 +105,15 @@ export function addPassiveTile(
   scene: Phaser.Scene,
   x: number,
   y: number,
-  tile: Pick<PauseItem, 'abbr' | 'count'>,
+  tile: Pick<PauseItem, 'abbr' | 'count' | 'maxed'>,
   parts?: Phaser.GameObjects.GameObject[],
 ): Phaser.GameObjects.Rectangle {
   const face = scene.add.rectangle(x, y, TILE, TILE, 0x241a14).setStrokeStyle(1, PASSIVE_COLOR);
   const letters = scene.add
     .text(x, y, tile.abbr, { fontFamily: 'monospace', fontSize: '13px', color: '#e8d8b0' })
     .setOrigin(0.5);
-  const badge = addBadge(scene, x + TILE / 2, y + TILE / 2, tile.count);
-  parts?.push(face, letters, badge);
+  const badge = addBadge(scene, x + TILE / 2, y + TILE / 2, tile.count, tile.maxed);
+  parts?.push(face, letters, ...badge);
   return face;
 }
 
@@ -130,25 +131,45 @@ export function addRelicGem(
   scene.add
     .text(x, y, tile.abbr, { fontFamily: 'monospace', fontSize: '11px', color: '#ffffff' })
     .setOrigin(0.5);
-  addBadge(scene, x + 14, y + 12, tile.count);
+  addBadge(scene, x + 14, y + 12, tile.count, tile.maxed);
   return face;
 }
 
+/**
+ * A count on a crimson pill. A `maxed` one (CO-197) reads MAX on gold. Text
+ * cannot round its own ground, so a pill is drawn under it, sized to the
+ * text's padded box; the text's `badgeFill` data names its colour. Returns
+ * both, the pill first, for a caller that collects its objects.
+ */
 export function addBadge(
   scene: Phaser.Scene,
   x: number,
   y: number,
   count: number,
-): Phaser.GameObjects.Text {
-  return scene.add
-    .text(x, y, `${count}`, {
+  maxed = false,
+): [Phaser.GameObjects.Graphics, Phaser.GameObjects.Text] {
+  const fill = maxed ? MAX_RANK_CSS : CRIMSON_CSS;
+  const pill = scene.add.graphics();
+  const text = scene.add
+    .text(x, y, badgeText(count, maxed), {
       fontFamily: 'monospace',
       fontSize: '10px',
-      color: '#ffffff',
-      backgroundColor: CRIMSON_CSS,
-      padding: { x: 3, y: 0 },
+      fontStyle: 'bold',
+      color: maxed ? MAX_BADGE_TEXT_CSS : '#ffffff',
+      padding: { x: 4, y: 1 },
     })
-    .setOrigin(0.5);
+    .setOrigin(0.5)
+    .setData('badgeFill', fill);
+  pill
+    .fillStyle(Phaser.Display.Color.HexStringToColor(fill).color)
+    .fillRoundedRect(
+      x - text.width / 2,
+      y - text.height / 2,
+      text.width,
+      text.height,
+      text.height / 2,
+    );
+  return [pill, text];
 }
 
 /**

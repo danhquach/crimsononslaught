@@ -17,31 +17,53 @@ const WARD: LoadoutPassiveView = { id: 'passive_ward', name: 'Ward', rank: 2 };
 
 describe('passiveTileLayout', () => {
   it('has no tiles for no passives', () => {
-    expect(passiveTileLayout([], 806, 72)).toEqual([]);
+    expect(passiveTileLayout([], 778, 72)).toEqual([]);
   });
 
   it('keeps the order taken, with the abbreviation and the rank', () => {
-    expect(passiveTileLayout([POWER, HASTE], 806, 72)).toEqual([
-      { id: 'passive_power', abbr: 'Po', count: 3, x: 806, y: 72 },
-      { id: 'passive_haste', abbr: 'Ha', count: 1, x: 806 + PASSIVE_TILE_PITCH_X, y: 72 },
+    expect(passiveTileLayout([POWER, HASTE], 778, 72)).toEqual([
+      { id: 'passive_power', abbr: 'Po', count: 3, maxed: false, x: 778, y: 72 },
+      {
+        id: 'passive_haste',
+        abbr: 'Ha',
+        count: 1,
+        maxed: false,
+        x: 778 + PASSIVE_TILE_PITCH_X,
+        y: 72,
+      },
     ]);
+  });
+
+  it('marks a capped passive at its cap as maxed, and nothing else (CO-197)', () => {
+    const view = (rank: number, maxRank?: number): LoadoutPassiveView => ({
+      id: 'p',
+      name: 'Pa',
+      rank,
+      ...(maxRank === undefined ? {} : { maxRank }),
+    });
+    const maxed = (p: LoadoutPassiveView): boolean | undefined =>
+      passiveTileLayout([p], 0, 0)[0]?.maxed;
+    expect(maxed(view(5, 5))).toBe(true);
+    expect(maxed(view(4, 5))).toBe(false);
+    expect(maxed(view(99))).toBe(false);
+    expect(maxed(view(10, 10))).toBe(true);
   });
 
   it('wraps after four across, the fifth starting the next row', () => {
     const five = [POWER, HASTE, WARD, POWER, HASTE].map((p, i) => ({ ...p, id: `p${i}` }));
-    const tiles = passiveTileLayout(five, 806, 72);
+    const tiles = passiveTileLayout(five, 778, 72);
     expect(tiles.slice(0, 4).map((t) => t.y)).toEqual([72, 72, 72, 72]);
-    expect(tiles[4]).toMatchObject({ x: 806, y: 72 + PASSIVE_TILE_PITCH_Y });
+    expect(tiles[4]).toMatchObject({ x: 778, y: 72 + PASSIVE_TILE_PITCH_Y });
   });
 
   it('lays the whole roster in four rows inside the corner', () => {
     const all = PASSIVES.map(({ id, name }) => ({ id, name, rank: 1 }));
-    const tiles = passiveTileLayout(all, 806, 72);
+    const tiles = passiveTileLayout(all, 778, 72);
     expect(tiles).toHaveLength(14);
     expect(new Set(tiles.map((t) => t.y)).size).toBe(4);
-    expect(Math.min(...tiles.map((t) => t.x))).toBe(806);
-    expect(Math.max(...tiles.map((t) => t.x))).toBe(926);
-    expect(Math.max(...tiles.map((t) => t.y))).toBe(204);
+    expect(Math.min(...tiles.map((t) => t.x))).toBe(778);
+    expect(Math.max(...tiles.map((t) => t.x))).toBe(922);
+    expect(Math.max(...tiles.map((t) => t.y))).toBe(216);
   });
 });
 

@@ -82,11 +82,32 @@ describe('pauseView', () => {
       relics: new Map([['lost' as RelicBuffId, 2]]),
     });
     expect(view.passives).toEqual([
-      { id: 'gone', name: 'gone', abbr: 'Go', description: '', count: 1 },
+      { id: 'gone', name: 'gone', abbr: 'Go', description: '', count: 1, maxed: false },
     ]);
     expect(view.relics).toEqual([
-      { id: 'lost', name: 'lost', abbr: 'Lo', description: '', count: 2 },
+      { id: 'lost', name: 'lost', abbr: 'Lo', description: '', count: 2, maxed: false },
     ]);
+  });
+
+  it("carries a capped passive's cap and whether it is maxed, never on an uncapped one or a relic (CO-197)", () => {
+    const view = pauseView({
+      ...empty,
+      passives: new Map<PassiveId, number>([
+        ['passive_swift', 5],
+        ['passive_avarice', 3],
+        ['passive_power', 2],
+      ]),
+      relics: new Map<RelicBuffId, number>([['relic_hourglass', 9]]),
+    });
+    expect(view.passives.map(({ id, maxRank, maxed }) => ({ id, maxRank, maxed }))).toEqual([
+      { id: 'passive_swift', maxRank: 5, maxed: true },
+      { id: 'passive_avarice', maxRank: 5, maxed: false },
+      { id: 'passive_power', maxRank: undefined, maxed: false },
+    ]);
+    expect('maxRank' in (view.passives[2] ?? {})).toBe(false);
+    expect(view.relics[0]).toMatchObject({ maxed: false });
+    expect('maxRank' in (view.relics[0] ?? {})).toBe(false);
+    expect(isPauseView(view)).toBe(true);
   });
 
   it('carries only this run: never the shop upgrades', () => {
@@ -124,10 +145,61 @@ describe('statsLine and itemInfo', () => {
     expect(itemInfo({ ...tile, description: '' })).toBe('Power ×2');
   });
 
+  it("shows a capped passive's cap, and says max at the cap (CO-197)", () => {
+    const tile = { name: 'Swift', description: 'Faster.', count: 5, maxRank: 5 };
+    expect(itemInfo(tile)).toBe('Swift  5/5 (max)  —  Faster.');
+    expect(itemInfo({ ...tile, name: 'Avarice', count: 3 })).toBe('Avarice  3/5  —  Faster.');
+    expect(itemInfo({ ...tile, name: 'Precision', count: 10, maxRank: 10 })).toBe(
+      'Precision  10/10 (max)  —  Faster.',
+    );
+    expect(itemInfo({ ...tile, description: '' })).toBe('Swift  5/5 (max)');
+  });
+
   it('names a spell with no count, since spells have no level of their own', () => {
     const spell = { id: 'fire', name: 'Fire Bolt', color: 0, description: 'A bolt.' };
     expect(itemInfo(spell)).toBe('Fire Bolt  —  A bolt.');
     expect(itemInfo({ ...spell, description: '' })).toBe('Fire Bolt');
+  });
+});
+
+describe('isPauseView on the rank cap (CO-197)', () => {
+  const stats = { kills: 0, embers: 0, elapsedMs: 0 };
+  const swift = {
+    id: 'passive_swift',
+    name: 'Swift',
+    abbr: 'Sw',
+    description: 'Faster.',
+    count: 5,
+    maxRank: 5,
+    maxed: true,
+  };
+  const viewOf = (passive: unknown): unknown => ({
+    level: 1,
+    spells: [],
+    passives: [passive],
+    relics: [],
+    stats,
+  });
+
+  it('accepts a maxed item, a capped one below its cap and an uncapped one', () => {
+    expect(isPauseView(viewOf(swift))).toBe(true);
+    expect(isPauseView(viewOf({ ...swift, count: 3, maxed: false }))).toBe(true);
+    expect(isPauseView(viewOf({ ...swift, maxRank: undefined, maxed: false }))).toBe(true);
+  });
+
+  it('rejects a maxed flag that is missing, not a boolean or inconsistent with the cap', () => {
+    expect(isPauseView(viewOf({ ...swift, maxed: undefined }))).toBe(false);
+    expect(isPauseView(viewOf({ ...swift, maxed: 'yes' }))).toBe(false);
+    expect(isPauseView(viewOf({ ...swift, maxRank: undefined, maxed: true }))).toBe(false);
+    expect(isPauseView(viewOf({ ...swift, maxed: false }))).toBe(false);
+    expect(isPauseView(viewOf({ ...swift, count: 3, maxed: true }))).toBe(false);
+  });
+
+  it('rejects a cap that is not a whole number of one or more, or that the count passed', () => {
+    expect(isPauseView(viewOf({ ...swift, maxRank: 0, count: 0, maxed: true }))).toBe(false);
+    expect(isPauseView(viewOf({ ...swift, maxRank: 2.5, maxed: false }))).toBe(false);
+    expect(isPauseView(viewOf({ ...swift, maxRank: '5' }))).toBe(false);
+    expect(isPauseView(viewOf({ ...swift, count: 6 }))).toBe(false);
   });
 });
 
@@ -165,7 +237,7 @@ describe('isPauseView', () => {
     expect(isPauseView({ level: 1, spells: [noText], passives: [], relics: [], stats })).toBe(
       false,
     );
-    const noId = { name: 'a', abbr: 'A', description: '', count: 1 };
+    const noId = { name: 'a', abbr: 'A', description: '', count: 1, maxed: false };
     expect(isPauseView({ level: 1, spells: [], passives: [noId], relics: [], stats })).toBe(false);
     const numericText = { ...noText, description: 5 };
     expect(isPauseView({ level: 1, spells: [numericText], passives: [], relics: [], stats })).toBe(
@@ -179,7 +251,7 @@ describe('isPauseView', () => {
       isPauseView({
         level: 1,
         spells: [],
-        passives: [{ id: 'a', name: 'a', abbr: 'A', description: '', count: -1 }],
+        passives: [{ id: 'a', name: 'a', abbr: 'A', description: '', count: -1, maxed: false }],
         relics: [],
         stats,
       }),

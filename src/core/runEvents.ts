@@ -73,6 +73,8 @@ export interface LoadoutPassiveView {
   id: string;
   name: string;
   rank: number;
+  /** The rank cap (CO-197); absent on a passive that never caps. */
+  maxRank?: number;
 }
 
 /** Discriminated union of every event, for reducers that handle them uniformly. */

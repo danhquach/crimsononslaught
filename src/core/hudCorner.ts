@@ -1,5 +1,6 @@
 import { CURRENCY_NAME } from '../config/meta';
 import type { HudModel } from './hudModel';
+import { isMaxed } from './maxRank';
 import { abbreviate } from './pauseModel';
 import type { LoadoutPassiveView } from './runEvents';
 
@@ -12,12 +13,14 @@ import type { LoadoutPassiveView } from './runEvents';
  */
 
 /**
- * A passive tile is 32 px with its rim and a badge straddling the corner, so a
- * pitch of 40 across leaves a gap even for a two-digit badge, and 44 down keeps
- * the badge off the row below. Four across fit the corner's plate width.
+ * A passive tile is a disc of radius 18 with a badge pill on its corner, the
+ * widest (`MAX`) reaching 27 px right of the tile's centre and 22 px below it.
+ * A pitch of 48 leaves a 12 px gap between discs, that pill 3 px short of the
+ * next disc, and 8 px between it and the row below. The pause and result
+ * screens use the same pitch.
  */
-export const PASSIVE_TILE_PITCH_X = 40;
-export const PASSIVE_TILE_PITCH_Y = 44;
+export const PASSIVE_TILE_PITCH_X = 48;
+export const PASSIVE_TILE_PITCH_Y = 48;
 export const PASSIVE_TILES_PER_ROW = 4;
 
 /** One passive tile: where its centre goes and what its face and badge say. */
@@ -27,6 +30,8 @@ export interface HudPassiveTile {
   abbr: string;
   /** The rank, on the badge. */
   count: number;
+  /** CO-197: at its rank cap, so the badge reads MAX in gold. */
+  maxed: boolean;
   x: number;
   y: number;
 }
@@ -40,10 +45,11 @@ export function passiveTileLayout(
   left: number,
   top: number,
 ): HudPassiveTile[] {
-  return passives.map(({ id, name, rank }, index) => ({
+  return passives.map(({ id, name, rank, maxRank }, index) => ({
     id,
     abbr: abbreviate(name),
     count: rank,
+    maxed: isMaxed(rank, maxRank),
     x: left + (index % PASSIVE_TILES_PER_ROW) * PASSIVE_TILE_PITCH_X,
     y: top + Math.floor(index / PASSIVE_TILES_PER_ROW) * PASSIVE_TILE_PITCH_Y,
   }));

@@ -2,6 +2,7 @@ import { CURRENCY_NAME } from '../config/meta';
 import { passiveById, type PassiveId } from '../config/passives';
 import { relicBuffById, type RelicBuffId } from '../config/relics';
 import { formatTimer } from './hudModel';
+import { isMaxed, rankFraction } from './maxRank';
 
 /**
  * View-model behind the pause screen (#252): the run's build as it stands, and
@@ -20,6 +21,10 @@ export interface PauseItem {
   abbr: string;
   description: string;
   count: number;
+  /** CO-197: the rank cap of a capped passive; absent on an uncapped one and on every relic. */
+  maxRank?: number;
+  /** At its cap, so its badge reads MAX in gold. */
+  maxed: boolean;
 }
 
 /** What the pause screen shows, fixed at the moment Game paused. */
@@ -61,8 +66,23 @@ export function abbreviate(name: string): string {
   return first.charAt(0).toUpperCase() + first.charAt(1).toLowerCase();
 }
 
-function item(id: string, name: string, description: string, count: number): PauseItem {
-  return { id, name, abbr: abbreviate(name), description, count };
+function item(
+  id: string,
+  name: string,
+  description: string,
+  count: number,
+  maxRank?: number,
+): PauseItem {
+  const tile: PauseItem = {
+    id,
+    name,
+    abbr: abbreviate(name),
+    description,
+    count,
+    maxed: isMaxed(count, maxRank),
+  };
+  if (maxRank !== undefined) tile.maxRank = maxRank;
+  return tile;
 }
 
 /**
@@ -80,7 +100,7 @@ export function pauseView(build: PauseBuild): PauseView {
     })),
     passives: [...build.passives].map(([id, rank]) => {
       const passive = passiveById(id);
-      return item(id, passive?.name ?? id, passive?.description ?? '', rank);
+      return item(id, passive?.name ?? id, passive?.description ?? '', rank, passive?.maxRank);
     }),
     relics: [...build.relics].map(([id, stacks]) => {
       const buff = relicBuffById(id);
@@ -101,11 +121,18 @@ export function statsLine(view: Readonly<PauseView>): string {
 
 /**
  * The info line for a pointed-at or selected tile: `Power ×2  —  Every spell
- * deals 10% more damage.` A spell has no count of its own, so it reads its
+ * deals 10% more damage.` A capped passive shows its cap, `Swift  3/5` and
+ * `Swift  5/5 (max)` (CO-197). A spell has no count of its own, so it reads its
  * name and description alone.
  */
-export function itemInfo(tile: Readonly<PauseItem | PauseSpell>): string {
-  const head = 'count' in tile ? `${tile.name} ×${tile.count}` : tile.name;
+export function itemInfo(
+  tile: Readonly<Pick<PauseItem, 'name' | 'description' | 'count' | 'maxRank'> | PauseSpell>,
+): string {
+  let head = tile.name;
+  if ('count' in tile) {
+    head += tile.maxRank === undefined ? ' ' : '  ';
+    head += rankFraction(tile.count, tile.maxRank);
+  }
   return tile.description ? `${head}  —  ${tile.description}` : head;
 }
 
@@ -169,6 +196,10 @@ export interface PauseChoosePayload {
 const isCount = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0;
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 
+/** A rank cap of one or more that `count` has not passed. */
+const isCapFor = (cap: unknown, count: number): boolean =>
+  Number.isInteger(cap) && (cap as number) >= 1 && count <= (cap as number);
+
 function isPauseItem(v: unknown): boolean {
   return (
     isRecord(v) &&
@@ -176,7 +207,9 @@ function isPauseItem(v: unknown): boolean {
     typeof v.name === 'string' &&
     typeof v.abbr === 'string' &&
     typeof v.description === 'string' &&
-    isCount(v.count)
+    isCount(v.count) &&
+    (v.maxRank === undefined || isCapFor(v.maxRank, v.count)) &&
+    v.maxed === isMaxed(v.count, v.maxRank as number | undefined)
   );
 }
 

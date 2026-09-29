@@ -91,10 +91,10 @@ const BOSS_WIDTH = 400;
  * — the boss bar's frame at `CORNER_PLATE_WIDTH`, its skull mark hanging off
  * the left end for Kills and the Ember pickup's own art beside the Embers
  * count — with the passive tiles in a block under it. `CORNER_TILES_LEFT` is
- * the first tile's centre: four tiles across at the tile pitch, the last badge
- * ending just inside the right edge. The whole block stays right of x = 736
- * with the largest build, clear of the arena centre and of the boss bar's
- * label, which ends near 724.
+ * the first tile's centre: four tiles across at the tile pitch, the last one
+ * centred on x = 922 so its MAX badge ends near 949, 11 px inside the right
+ * edge. The whole block stays right of x = 736 with the largest build, clear
+ * of the arena centre and of the boss bar's label, which ends near 724.
  */
 const CORNER_PLATE_X = 788;
 const CORNER_PLATE_WIDTH = 156;
@@ -104,7 +104,7 @@ const CORNER_EMBER_ICON_Y = 18;
 const CORNER_EMBERS_X = 881;
 /** The counts' centre line: the middle of the plate's trough. */
 const CORNER_COUNT_Y = 30;
-const CORNER_TILES_LEFT = 806;
+const CORNER_TILES_LEFT = 778;
 const CORNER_TILES_TOP = 72;
 /** Without the atlas the two text lines are all that is above the tiles. */
 const CORNER_FLAT_TILES_TOP = 80;
@@ -442,6 +442,8 @@ export class HudScene extends Phaser.Scene {
     let right = -Infinity;
     let bottom = -Infinity;
     for (const part of parts) {
+      // A badge's pill (Graphics) has no bounds; its Text is the same box.
+      if (part.type === 'Graphics') continue;
       const box = (
         part as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.GetBounds
       ).getBounds();

@@ -114,6 +114,7 @@ describe('isPausePayload', () => {
     abbr: 'Po',
     description: 'More damage.',
     count: 2,
+    maxed: false,
   };
   const stats = { kills: 12, embers: 3, elapsedMs: 61_000 };
   const view = {
@@ -134,6 +135,22 @@ describe('isPausePayload', () => {
     for (const confirm of ['restart', 'end', 'menu']) {
       expect(isPausePayload({ view, confirm }), confirm).toBe(true);
     }
+  });
+
+  it('accepts a maxed capped passive and rejects a maxed flag that disagrees (CO-197)', () => {
+    const swift = {
+      ...power,
+      id: 'passive_swift',
+      name: 'Swift',
+      count: 5,
+      maxRank: 5,
+      maxed: true,
+    };
+    expect(isPausePayload({ view: { ...view, passives: [swift] } })).toBe(true);
+    expect(isSettingsPayload({ pause: { view: { ...view, passives: [swift] } } })).toBe(true);
+    const bad = { ...power, maxed: true };
+    expect(isPausePayload({ view: { ...view, passives: [bad] } })).toBe(false);
+    expect(isSettingsPayload({ pause: { view: { ...view, passives: [bad] } } })).toBe(false);
   });
 
   it('rejects a missing or malformed view, and Resume as a confirmation', () => {
