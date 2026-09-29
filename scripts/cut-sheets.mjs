@@ -45,6 +45,7 @@ import {
   unionBounds,
 } from './lib/spriteCut.mjs';
 import { encodeIndexedPng } from './lib/indexedPng.mjs';
+import { findProvenance } from './lib/provenance.mjs';
 import { checkSheetFiles } from './lib/sheetFiles.mjs';
 
 const require = createRequire(import.meta.url);
@@ -328,6 +329,16 @@ function main() {
   const manifest = JSON.parse(readFileSync(join(SHEET_DIR, 'manifest.json'), 'utf8'));
   // A missing or mislabelled file would otherwise crash mid-cut, inside a decoder.
   for (const problem of checkSheetFiles(manifest.sheets, SHEET_DIR)) fail(problem);
+  exitOnFailures();
+  // Delivered art carries the generator's provenance; the repo is public (#317).
+  for (const { file } of manifest.sheets) {
+    try {
+      const found = findProvenance(readFileSync(join(SHEET_DIR, file)));
+      if (found.length > 0) fail(`${file}: carries ${found.join(', ')}; run npm run art:strip`);
+    } catch (err) {
+      fail(`${file}: ${err.message}`);
+    }
+  }
   exitOnFailures();
 
   const frames = [];

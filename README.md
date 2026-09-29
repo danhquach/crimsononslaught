@@ -210,6 +210,15 @@ checks that every file the manifest names exists, that its PNG or JPEG
 signature matches its extension, and that no same-named file in another format
 sits beside it; `npm test` runs the same check.
 
+Delivered art carries the generator's provenance: C2PA content credentials,
+Exif and XMP, comments, PNG text chunks. This repo is public, so run
+`npm run art:strip` on new art before committing. It never re-encodes: it
+keeps the image data and the colour, density and animation chunks and drops
+everything else, and it writes a file only once the decoded pixels are
+unchanged. `art:cut` refuses a sheet that still
+carries any, and `npm test` fails on any PNG or JPEG under `docs/` or
+`public/` that does.
+
 A sheet's `page` in the manifest says which page its frames are packed into
 (1 by default), and each page is packed, quantised and held under 400 KB on
 its own — which is what makes room for a roster bigger than one page. A page
