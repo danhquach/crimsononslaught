@@ -2,12 +2,14 @@ import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
 import {
   CONSUMABLE_TEXTURES,
+  PICKUP_FLASH,
   PICKUP_TEXTURES,
   type ConsumableKind,
   type PickupKind,
 } from '../config/pickups';
 import { pickupAnimation } from '../core/animation';
 import { gemDrift, type Vec2 } from '../core/gems';
+import { flashOn } from '../core/pickups';
 import { clearClip, clipDurationMs, showClip } from '../render/animate';
 
 /**
@@ -35,6 +37,9 @@ export class Pickup extends Phaser.Physics.Arcade.Sprite {
   private burstMs = 0;
   private collected = false;
   private bodyRadius = 0;
+  /** Run-clock ms since it landed; times the CO-194 blink. */
+  private ageMs = 0;
+  private flashing = false;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y, PICKUP_TEXTURES.ember);
@@ -59,6 +64,16 @@ export class Pickup extends Phaser.Physics.Arcade.Sprite {
     return this.collected;
   }
 
+  /** How it is blinking right now (CO-194), for the browser suite. */
+  get flashState(): { ageMs: number; flashing: boolean; tinted: boolean; bodyRadius: number } {
+    return {
+      ageMs: this.ageMs,
+      flashing: this.flashing,
+      tinted: this.isTinted && this.tintFill,
+      bodyRadius: this.bodyRadius,
+    };
+  }
+
   /**
    * Take this pooled object out of the pool as a `kind` pickup lying at (x, y).
    * `consumable` is the kind of a consumable, and ignored for the rest.
@@ -75,6 +90,9 @@ export class Pickup extends Phaser.Physics.Arcade.Sprite {
     this.consumable = consumable;
     this.collected = false;
     this.burstMs = 0;
+    this.ageMs = 0;
+    this.flashing = false;
+    this.clearTint();
     clearClip(this);
     const texture = kind === 'consumable' ? CONSUMABLE_TEXTURES[consumable] : PICKUP_TEXTURES[kind];
     this.setTexture(texture);
@@ -89,6 +107,7 @@ export class Pickup extends Phaser.Physics.Arcade.Sprite {
       this.height / 2 - this.bodyRadius,
     );
     this.show();
+    this.blink();
   }
 
   /** Return to the pool: inactive, invisible, body disabled. */
@@ -107,6 +126,8 @@ export class Pickup extends Phaser.Physics.Arcade.Sprite {
       if (this.burstMs <= 0) this.despawn();
       return;
     }
+    this.ageMs += deltaMs;
+    this.blink();
     if (this.kindValue === 'relic') return;
     const { x, y } = gemDrift(this, target, radius);
     this.setVelocity(x, y);
@@ -118,10 +139,26 @@ export class Pickup extends Phaser.Physics.Arcade.Sprite {
    */
   collect(): void {
     this.collected = true;
+    this.flashing = false;
+    this.clearTint();
     this.setVelocity(0, 0);
     this.disableBody(false, false);
     this.burstMs = this.show();
     if (this.burstMs <= 0) this.despawn();
+  }
+
+  /**
+   * The CO-194 blink: a flat tint for the first part of every period, set or
+   * cleared only when it flips, so a bomb costs one toggle per edge. A pickup
+   * whose kind has no rule never blinks.
+   */
+  private blink(): void {
+    const rule = this.kindValue === 'consumable' ? PICKUP_FLASH[this.consumable] : undefined;
+    const on = rule !== undefined && flashOn(this.ageMs, rule);
+    if (on === this.flashing) return;
+    this.flashing = on;
+    if (rule && on) this.setTintFill(rule.color);
+    else this.clearTint();
   }
 
   /** The clip for this step; returns its run-clock length for the burst to wait on. */

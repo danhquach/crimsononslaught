@@ -16,12 +16,16 @@ import {
   insetRect,
   isPreKeyed,
   keyCell,
+  liftLevels,
   nextPowerOfTwo,
   opaqueBounds,
   opaqueCell,
   padImage,
   packFrames,
   quantize,
+  recolour,
+  recolourProblems,
+  rimLight,
   softAlpha,
   trimBorderLines,
   unionBounds,
@@ -729,6 +733,22 @@ describe('expandRow', () => {
     ]);
   });
 
+  it('carries recolour onto every frame of the segment, and defaults it to none', () => {
+    const rule = { gamma: 0.8 };
+    const { frames } = expandRow(
+      'arena',
+      [
+        { anim: 'rocks', cols: [1, 1] },
+        { anim: 'tree', cols: [2, 2], recolour: rule },
+      ],
+      4,
+    );
+    expect(frames.map((f) => [f.name, f.recolour])).toEqual([
+      ['arena.rocks.0', null],
+      ['arena.tree.0', rule],
+    ]);
+  });
+
   it('rejects a segment outside the grid or one that overlaps another', () => {
     expect(() => expandRow('x', [{ anim: 'a', cols: [1, 7] }], 6)).toThrow(/outside/);
     expect(() =>
@@ -756,5 +776,148 @@ describe('insetRect', () => {
 
   it('refuses an inset that would leave nothing', () => {
     expect(() => insetRect({ x: 0, y: 0, w: 4, h: 4 }, 0.5)).toThrow();
+  });
+});
+
+/** A 5x5 image, opaque in the 3x3 middle (grey 60 with a red centre), else clear. */
+function blob() {
+  return image(5, 5, (x, y) => {
+    if (x < 1 || x > 3 || y < 1 || y > 3) return [90, 80, 70, 0];
+    return x === 2 && y === 2 ? [120, 30, 30, 255] : [60, 60, 60, 255];
+  });
+}
+
+const alphaOf = (img) =>
+  Array.from({ length: img.width * img.height }, (_, p) => img.data[p * 4 + 3]);
+
+describe('liftLevels', () => {
+  it('brightens dark pixels, keeps their hue, and leaves alpha and clear pixels alone', () => {
+    const src = blob();
+    const lifted = liftLevels(src, 0.7);
+    const at = (img, x, y) => [...img.data.slice((y * 5 + x) * 4, (y * 5 + x) * 4 + 4)];
+    expect(at(lifted, 1, 1)[0]).toBeGreaterThan(60);
+    expect(at(lifted, 1, 1).slice(0, 3)).toEqual(Array(3).fill(at(lifted, 1, 1)[0]));
+    // Red stays the dominant channel by the same ratio, within rounding.
+    const [r, g, b] = at(lifted, 2, 2);
+    expect(r / g).toBeCloseTo(4, 0);
+    expect(g).toBe(b);
+    expect(alphaOf(lifted)).toEqual(alphaOf(src));
+    expect(at(lifted, 0, 0)).toEqual([90, 80, 70, 0]);
+  });
+
+  it('is a no-op at gamma 1, deterministic, and does not touch its input', () => {
+    const src = blob();
+    const before = [...src.data];
+    expect([...liftLevels(src, 1).data]).toEqual(before);
+    expect([...liftLevels(src, 0.6).data]).toEqual([...liftLevels(src, 0.6).data]);
+    expect([...src.data]).toEqual(before);
+  });
+
+  it('keeps black black and never overflows a channel', () => {
+    const img = image(2, 1, (x) => (x === 0 ? [0, 0, 0, 255] : [250, 10, 10, 255]));
+    const lifted = liftLevels(img, 0.5);
+    expect([...lifted.data.slice(0, 4)]).toEqual([0, 0, 0, 255]);
+    // Red would scale past 255 and clamps there; the pixel stays red.
+    expect([...lifted.data.slice(4, 8)].map((v, i) => (i === 0 ? v : v > 10))).toEqual([
+      255,
+      true,
+      true,
+      true,
+    ]);
+  });
+});
+
+describe('rimLight', () => {
+  const RIM = [200, 220, 240];
+  const changed = (a, b) =>
+    Array.from({ length: a.width * a.height }, (_, p) => p).filter((p) =>
+      [0, 1, 2, 3].some((c) => a.data[p * 4 + c] !== b.data[p * 4 + c]),
+    );
+
+  it('paints every edge pixel of the silhouette on all sides, and only those', () => {
+    const src = blob();
+    const out = rimLight(src, { color: RIM });
+    const hit = changed(src, out).map((p) => [p % 5, Math.floor(p / 5)]);
+    expect(hit).toHaveLength(8);
+    expect(hit.every(([x, y]) => x === 1 || x === 3 || y === 1 || y === 3)).toBe(true);
+    expect([...out.data.slice((1 * 5 + 1) * 4, (1 * 5 + 1) * 4 + 3)]).toEqual(RIM);
+    // The middle pixel is interior: it keeps its own colour.
+    expect([...out.data.slice((2 * 5 + 2) * 4, (2 * 5 + 2) * 4 + 3)]).toEqual([120, 30, 30]);
+  });
+
+  it('paints only the top and left edges for topleft', () => {
+    const src = blob();
+    const out = rimLight(src, { color: RIM, sides: 'topleft' });
+    const hit = changed(src, out).map((p) => `${p % 5},${Math.floor(p / 5)}`);
+    expect(hit.sort()).toEqual(['1,1', '1,2', '1,3', '2,1', '3,1']);
+  });
+
+  it('mixes part of the way when mix is under 1', () => {
+    const out = rimLight(blob(), { color: [160, 160, 160], mix: 0.5 });
+    expect([...out.data.slice((1 * 5 + 1) * 4, (1 * 5 + 1) * 4 + 3)]).toEqual([110, 110, 110]);
+  });
+
+  it('never moves the silhouette, so opaqueBounds is the same', () => {
+    const src = blob();
+    const out = rimLight(src, { color: RIM });
+    expect(alphaOf(out)).toEqual(alphaOf(src));
+    expect(opaqueBounds(out)).toEqual(opaqueBounds(src));
+  });
+
+  it('counts the image border as see-through, and ignores soft pixels below 128', () => {
+    const full = image(2, 2, () => [50, 50, 50, 255]);
+    expect(changed(full, rimLight(full, { color: RIM }))).toHaveLength(4);
+    const soft = image(3, 1, (x) => [50, 50, 50, x === 1 ? 255 : 100]);
+    expect([...rimLight(soft, { color: RIM }).data.slice(0, 4)]).toEqual([50, 50, 50, 100]);
+  });
+
+  it('does not touch its input', () => {
+    const src = blob();
+    const before = [...src.data];
+    rimLight(src, { color: RIM });
+    expect([...src.data]).toEqual(before);
+  });
+});
+
+describe('recolour', () => {
+  it('lifts then rims, from a manifest rule', () => {
+    const out = recolour(blob(), { gamma: 0.7, rim: '#c8dcf0', sides: 'topleft' });
+    const px = (x, y) => [...out.data.slice((y * 5 + x) * 4, (y * 5 + x) * 4 + 3)];
+    expect(px(1, 1)).toEqual([200, 220, 240]);
+    expect(px(3, 3)[0]).toBeGreaterThan(60);
+    expect(px(3, 3)[0]).toBeLessThan(200);
+  });
+
+  it('does only the lift when the rule has no rim', () => {
+    const out = recolour(blob(), { gamma: 0.7 });
+    expect([...out.data]).toEqual([...liftLevels(blob(), 0.7).data]);
+  });
+});
+
+describe('recolourProblems', () => {
+  it('accepts a lift, a rim, or both', () => {
+    expect(recolourProblems({ gamma: 0.75 })).toEqual([]);
+    expect(recolourProblems({ rim: '#FFD24A' })).toEqual([]);
+    expect(recolourProblems({ gamma: 0.7, rim: '#dce8f4', sides: 'topleft', mix: 0.6 })).toEqual(
+      [],
+    );
+  });
+
+  it.each([
+    [{ gamma: 0.7, glow: 1 }, /unknown field "glow"/],
+    [{ gamma: 0 }, /gamma must be/],
+    [{ gamma: 1.4 }, /gamma must be/],
+    [{ gamma: '0.7' }, /gamma must be/],
+    [{ rim: 'red' }, /rim must be/],
+    [{ rim: '#fff' }, /rim must be/],
+    [{ rim: '#ffffff', sides: 'top' }, /sides must be/],
+    [{ rim: '#ffffff', mix: 0 }, /mix must be/],
+    [{ rim: '#ffffff', mix: 1.5 }, /mix must be/],
+    [{ gamma: 0.7, mix: 0.5 }, /need a rim/],
+    [{}, /needs a gamma or a rim/],
+    [null, /must be an object/],
+    [[0.7], /must be an object/],
+  ])('rejects %j', (rule, message) => {
+    expect(recolourProblems(rule).join('; ')).toMatch(message);
   });
 });

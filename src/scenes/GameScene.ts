@@ -845,6 +845,11 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
+  /** Test hook (CO-194): every bomb on the floor and how it is blinking. */
+  get bombFlashReport(): ReturnType<PickupPool['flashView']> {
+    return this.pickups.flashView();
+  }
+
   /**
    * Test hook (#128): drop a `kind` consumable `offset` px right of the
    * player, through the pool like a death's drop, so the browser suite can

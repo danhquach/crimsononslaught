@@ -70,6 +70,24 @@ export class PickupPool {
     return counts;
   }
 
+  /** Every bomb on the floor and how it is blinking (CO-194): the test hook's view of the flash. */
+  flashView(): {
+    ageMs: number;
+    flashing: boolean;
+    tinted: boolean;
+    bodyRadius: number;
+    x: number;
+    y: number;
+  }[] {
+    const views = [];
+    for (const child of this.group.getChildren()) {
+      if (live(child) && child.kind === 'consumable' && child.consumableKind === 'bomb') {
+        views.push({ ...child.flashState, x: child.x, y: child.y });
+      }
+    }
+    return views;
+  }
+
   /**
    * Drop an Ember worth `value` at (x, y). Returns false when the drop cap is
    * full and nothing was placed: the caller credits it to the run (spec §4).

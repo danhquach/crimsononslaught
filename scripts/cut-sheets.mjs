@@ -41,6 +41,8 @@ import {
   packFrames,
   padImage,
   quantize,
+  recolour,
+  recolourProblems,
   trimBorderLines,
   unionBounds,
 } from './lib/spriteCut.mjs';
@@ -220,7 +222,15 @@ function cutSheet(sheet) {
     const pad = FRAME_MARGIN;
 
     for (const c of group) {
-      const image = padImage(downscaleNearest(crop(c.keyed, box), width, height), pad);
+      // Recoloured at native size, after the downscale, so a 1 px rim is 1 screen
+      // px, then the purple cap is held again: the lift brings the fringe out.
+      let native = downscaleNearest(crop(c.keyed, box), width, height);
+      const rule = c.recolour ?? sheet.recolour;
+      if (rule) {
+        native = recolour(native, rule);
+        if (sheet.maxMagenta !== undefined) capMagenta(native, sheet.maxMagenta, c.keepPink);
+      }
+      const image = padImage(native, pad);
       out.push({
         name: c.name,
         anim: c.anim,
@@ -349,6 +359,19 @@ function main() {
       fail(`${sheet.file}: page must be a whole number from 1, not ${JSON.stringify(sheet.page)}`);
       continue;
     }
+    const rules = [
+      ['', sheet.recolour],
+      ...sheet.rowSpecs.flatMap((row) => (row ?? []).map((seg) => [`${seg.anim} `, seg.recolour])),
+    ];
+    let bad = false;
+    for (const [where, rule] of rules) {
+      if (rule === undefined) continue;
+      for (const problem of recolourProblems(rule)) {
+        fail(`${sheet.file}: ${where}${problem}`);
+        bad = true;
+      }
+    }
+    if (bad) continue;
     for (const frame of cutSheet(sheet)) {
       if (seen.has(frame.name)) fail(`${sheet.file}: duplicate frame name ${frame.name}`);
       seen.add(frame.name);

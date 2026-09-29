@@ -5,6 +5,7 @@ import {
   CONSUMABLE_WEIGHTS,
   EMBER_DROPS,
   MAX_LIVE_PICKUPS,
+  PICKUP_FLASH,
   RELIC_COUNT,
   RELIC_PLACEMENT,
   type ConsumableKind,
@@ -12,6 +13,7 @@ import {
 import {
   bombTargets,
   canDrop,
+  flashOn,
   consumableFor,
   PICKUP_EVENT,
   placeRelics,
@@ -289,6 +291,46 @@ describe('bombTargets', () => {
     const live = [at(500, 500)];
     expect(bombTargets(live, view)).not.toBe(live);
     expect(bombTargets([], view)).toEqual([]);
+  });
+});
+
+describe('flashOn', () => {
+  const rule = { periodMs: 900, onMs: 140, color: 0xffffff };
+
+  it('is on for the first onMs of every period and off for the rest', () => {
+    expect(flashOn(0, rule)).toBe(true);
+    expect(flashOn(139, rule)).toBe(true);
+    expect(flashOn(140, rule)).toBe(false);
+    expect(flashOn(899, rule)).toBe(false);
+    expect(flashOn(900, rule)).toBe(true);
+    expect(flashOn(1039, rule)).toBe(true);
+    expect(flashOn(1040, rule)).toBe(false);
+  });
+
+  it('keeps blinking at a large age', () => {
+    expect(flashOn(900 * 10_000, rule)).toBe(true);
+    expect(flashOn(900 * 10_000 + 500, rule)).toBe(false);
+  });
+
+  it('never flashes for a bad rule or a negative age', () => {
+    expect(flashOn(-1, rule)).toBe(false);
+    expect(flashOn(0, { ...rule, onMs: 0 })).toBe(false);
+    expect(flashOn(0, { ...rule, periodMs: 0 })).toBe(false);
+    expect(flashOn(0, { ...rule, periodMs: Number.NaN })).toBe(false);
+  });
+
+  it('a rule as long on as its period is always on', () => {
+    expect(flashOn(500, { ...rule, onMs: 900 })).toBe(true);
+  });
+});
+
+describe('PICKUP_FLASH', () => {
+  it('blinks only the bomb, and its on-time fits inside its period', () => {
+    expect(Object.keys(PICKUP_FLASH)).toEqual(['bomb']);
+    const bomb = PICKUP_FLASH.bomb;
+    expect(bomb).toBeDefined();
+    expect(bomb?.onMs).toBeGreaterThan(0);
+    expect(bomb?.onMs).toBeLessThan(bomb?.periodMs ?? 0);
   });
 });
 
