@@ -31,14 +31,20 @@ const ICICLE_LOOK: ProjectileLook = { texture: 'proj_icicle' };
 
 const SPIN_RAD_PER_S = (BOMB_SPIN_DEG_PER_S * Math.PI) / 180;
 
+/**
+ * The least turn in one step that counts as a spin. `setRotation` re-wraps the
+ * angle, so setting the same rotation again can move it by a float ulp.
+ */
+const TURN_EPSILON_RAD = 1e-6;
+
 /** One rolling bomb's own clock, and the numbers it was thrown with (spec §6.2 snapshot). */
 interface Flight {
-  /** Which throw this is, counting from 1 — what the test hook tells one bomb from the next by. */
-  readonly id: number;
   readonly aimRad: number;
   readonly stats: Readonly<NovaBombStats>;
   elapsedS: number;
   thrown: number;
+  /** Test hook (CO-185): a step of this flight turned the sprite. */
+  turned: boolean;
 }
 
 /**
@@ -85,8 +91,8 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
   private icicleLanded = 0;
   /** Test hook (CO-182): how many enemies each burst caught, in order. */
   private readonly caught: number[] = [];
-  /** Bombs thrown so far, the next flight's id. */
-  private thrownBombs = 0;
+  /** Test hook (CO-185): bursts whose bomb sprite turned during its flight. */
+  private spun = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -147,14 +153,12 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
   }
 
   /**
-   * The first live bomb's throw id and rotation in radians, or `null` with none
-   * rolling: two samples of one id show whether that bomb turned in between.
+   * Bursts whose bomb sprite turned during its flight. Recorded here rather than
+   * sampled by the suite: a flight is 150–300 ms of wall clock at time scale 10,
+   * shorter than a CI sample round (CO-185).
    */
-  get bombSpin(): { id: number; rotation: number } | null {
-    for (const [bomb, flight] of this.flights) {
-      if (bomb.active) return { id: flight.id, rotation: bomb.rotation };
-    }
-    return null;
+  get spunBursts(): number {
+    return this.spun;
   }
 
   /**
@@ -179,8 +183,13 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
         continue;
       }
       flight.elapsedS += deltaS;
-      bomb.setRotation(bomb.rotation + SPIN_RAD_PER_S * deltaS);
+      const before = bomb.rotation;
+      bomb.setRotation(before + SPIN_RAD_PER_S * deltaS);
+      if (Math.abs(Phaser.Math.Angle.Wrap(bomb.rotation - before)) > TURN_EPSILON_RAD) {
+        flight.turned = true;
+      }
       if (shouldBurst(bomb, live, bomb.travelled, flight.stats.range, flight.stats.radius)) {
+        if (flight.turned) this.spun += 1;
         this.detonate(bomb, flight.stats);
         continue;
       }
@@ -205,13 +214,12 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
     if (!bomb) return;
     const to = { x: x + aim.x * stats.range, y: y + aim.y * stats.range };
     bomb.fire(x, y, to, stats.speed, stats.range, BOMB_LOOK);
-    this.thrownBombs += 1;
     this.flights.set(bomb, {
-      id: this.thrownBombs,
       aimRad: Math.atan2(aim.y, aim.x),
       stats,
       elapsedS: 0,
       thrown: 0,
+      turned: false,
     });
   }
 
