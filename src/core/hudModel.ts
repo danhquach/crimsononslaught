@@ -169,11 +169,6 @@ export function cooldownBadge(secondsLeft: number | null): string | null {
   return String(Math.floor(secondsLeft));
 }
 
-/** One line per passive, in the order taken, each with its rank (spec §10). */
-export function passiveLines(model: Readonly<HudModel>): string[] {
-  return model.passives.map(({ name, rank }) => `${name} ×${rank}`);
-}
-
 /** The shield bar exists only while the run has a shield equipped (#134). */
 export function shieldBarVisible(model: Readonly<HudModel>): boolean {
   return model.shieldMax > 0;

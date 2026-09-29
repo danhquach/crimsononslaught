@@ -5,7 +5,6 @@ import {
   bossBarVisible,
   formatTimer,
   fraction,
-  passiveLines,
   shieldBarVisible,
   cooldownBadge,
   shortSpellName,
@@ -160,10 +159,10 @@ describe('applyRunEvent', () => {
   });
 
   it('loadout sets the spells casting and the passives held (#144)', () => {
-    const payload = { spells: [FIRE, COLUMN], passives: [{ name: 'Haste', rank: 2 }] };
-    const m = withLoadout(INITIAL_HUD, payload);
+    const passives = [{ id: 'passive_haste', name: 'Haste', rank: 2 }];
+    const m = withLoadout(INITIAL_HUD, { spells: [FIRE, COLUMN], passives });
     expect(m.spells).toEqual([FIRE, COLUMN]);
-    expect(m.passives).toEqual([{ name: 'Haste', rank: 2 }]);
+    expect(m.passives).toEqual(passives);
   });
 
   it('leaves unrelated fields untouched and never mutates its input', () => {
@@ -302,19 +301,5 @@ describe('cooldownBadge', () => {
     expect(cooldownBadge(0)).toBeNull();
     expect(cooldownBadge(null)).toBeNull();
     expect(cooldownBadge(Number.POSITIVE_INFINITY)).toBeNull();
-  });
-});
-
-describe('passiveLines', () => {
-  it('lists each passive with its rank, in the order taken', () => {
-    const m = withLoadout(INITIAL_HUD, {
-      spells: [],
-      passives: [
-        { name: 'Haste', rank: 3 },
-        { name: 'Power', rank: 1 },
-      ],
-    });
-    expect(passiveLines(m)).toEqual(['Haste ×3', 'Power ×1']);
-    expect(passiveLines(INITIAL_HUD)).toEqual([]);
   });
 });

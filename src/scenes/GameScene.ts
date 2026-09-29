@@ -1209,6 +1209,7 @@ export class GameScene extends Phaser.Scene {
       };
     });
     const passives = [...this.spells.loadout.passives].map(([id, rank]) => ({
+      id,
       name: passiveById(id)?.name ?? id,
       rank,
     }));
