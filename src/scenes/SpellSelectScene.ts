@@ -10,6 +10,7 @@ import {
 import { emptySave, isSave } from '../core/save';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
+import { focusable, frameBox } from './focusRing';
 import { attachMenuInput, type MenuItem } from './input';
 import { addHintLine, addMenuRow, addMenuTitle, drawMenuBackdrop } from './menuUi';
 
@@ -167,21 +168,23 @@ export class SpellSelectScene extends Phaser.Scene {
 
     this.add.container(x, y, [frame, swatch, key, ...icon, name, description, ...stats]);
 
-    // Gamepad selection reuses the hover look, so a card reads the same however
-    // it was reached.
-    const highlight = (on: boolean): void => {
-      frame.setFillStyle(on ? CARD_FILL_HOVER : CARD_FILL).setStrokeStyle(on ? 4 : 2, card.color);
-    };
+    // The pointer and the pad raise the card the same way; the pad's focus also
+    // draws the shared ring round it (CO-196).
+    const focus = focusable(this, frameBox(x, y, CARD_WIDTH, CARD_HEIGHT), ({ raised }) => {
+      frame
+        .setFillStyle(raised ? CARD_FILL_HOVER : CARD_FILL)
+        .setStrokeStyle(raised ? 4 : 2, card.color);
+    });
 
     frame.setInteractive({ useHandCursor: true });
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      highlight(true);
+      focus.setHovered(true);
       audioOf(this).play('ui.move');
     });
-    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => highlight(false));
+    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => focus.setHovered(false));
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.startGame(spellId));
 
-    return { setSelected: highlight, confirm: () => this.startGame(spellId) };
+    return { setSelected: focus.setFocused, confirm: () => this.startGame(spellId) };
   }
 
   /** Idempotent: a click and a key press in the same frame start exactly one run. */

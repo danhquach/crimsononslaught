@@ -4,7 +4,7 @@ import { PASSIVES } from '../src/config/passives';
 import { RELIC_BUFFS } from '../src/config/relics';
 import { PASSIVE_COLOR, RELIC_COLOR } from '../src/core/offerColors';
 import { abbreviate } from '../src/core/pauseModel';
-import { RESULT_HEADLINES } from '../src/core/resultModel';
+import { RESULT_HEADLINES, RESULT_LAYOUT } from '../src/core/resultModel';
 import {
   MAX_BUILD_COUNT,
   SCENE,
@@ -12,7 +12,8 @@ import {
   type ResultPayload,
 } from '../src/core/scenePayloads';
 import type { ResultControls, ResultScene } from '../src/scenes/ResultScene';
-import { collectErrors, isSceneActive, waitForScene } from './game';
+import { collectErrors, focusRing, isSceneActive, waitForScene } from './game';
+import { expectRingReadable } from './ringProbe';
 
 /**
  * #290 in the browser: the result screen holds the largest build the game
@@ -328,8 +329,20 @@ test('pad A lights Play again, then starts exactly one SpellSelect', async ({ pa
   await waitForScene(page, SCENE.result);
   await frames(page, 4); // the first poll after a connect only takes a baseline
 
+  expect((await focusRing(page, SCENE.result)).visible, 'no ring before the pad wakes').toBe(false);
   await pressA(); // reveals the highlight
   expect(await isSceneActive(page, SCENE.result)).toBe(true);
+  // The shared focus ring (CO-196) is round the button, and the press did not confirm.
+  const ring = await focusRing(page, SCENE.result);
+  expect(ring.visible).toBe(true);
+  expect(ring.box).toEqual(RESULT_LAYOUT.button);
+  await expectRingReadable(page, SCENE.result, 'Play again');
+  // The ring's outer edge stays clear of the hint under it, with room for CI's taller fonts.
+  const controls = await page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    return (game.scene.getScene(key) as unknown as { controls: ResultControls }).controls;
+  }, SCENE.result);
+  expect(ring.outer!.y + ring.outer!.height).toBeLessThanOrEqual(controls.hint.y);
   await pressA();
   await waitForScene(page, SCENE.spellSelect);
   await frames(page, 10);
