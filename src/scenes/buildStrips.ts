@@ -3,6 +3,7 @@ import { PASSIVE_COLOR, RELIC_COLOR, offerColor } from '../core/offerColors';
 import { MAX_BADGE_TEXT_CSS, MAX_RANK_CSS, badgeText } from '../core/maxRank';
 import type { PauseItem } from '../core/pauseModel';
 import { FRAMES } from '../config/frames';
+import { MAX_SPELL_LEVEL } from '../config/spellLevels';
 import { artFrame } from '../core/animation';
 import {
   SPELL_ICON_ART_SIZE,
@@ -58,18 +59,23 @@ export function drawStrip(
 
 /**
  * A spell's icon on a black disc whose rim wears its kind's colour (CO-164),
- * as its level-up card did. Returns the rim.
+ * as its level-up card did. With a `level` (#326) its level sits on a badge at
+ * the rim's bottom right, gold `MAX` at the top level, like a passive's rank.
+ * Returns the rim.
  */
 export function addSpellDisc(
   scene: Phaser.Scene,
   x: number,
   y: number,
-  spell: IconSpell,
+  spell: IconSpell & { level?: number },
 ): Phaser.GameObjects.Arc {
   const rim = scene.add
     .circle(x, y, SPELL_ICON_SIZE / 2 + 3, 0x000000)
     .setStrokeStyle(2, offerColor('active', spell.id));
   addSpellIcon(scene, x, y, spell, 1);
+  if (spell.level !== undefined) {
+    addBadge(scene, x + 14, y + 14, spell.level, spell.level >= MAX_SPELL_LEVEL);
+  }
   return rim;
 }
 

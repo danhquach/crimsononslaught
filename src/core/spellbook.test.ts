@@ -302,3 +302,52 @@ describe('Spellbook.equipActive (CO-110)', () => {
     expect(extra.casts).toBe(3);
   });
 });
+
+describe('Spellbook spell levels (#326)', () => {
+  it('reads level 1 for a spell casting and for one that is not', () => {
+    const spells = book();
+    equip(spells, 'fire');
+    expect(spells.spellLevel('fire')).toBe(1);
+    expect(spells.spellLevel('fire_meteor')).toBe(1);
+  });
+
+  it('sets a level on a spell casting outside the slots, the way a `?loadout=` extra is', () => {
+    const spells = book();
+    equip(spells, 'fire');
+    equip(spells, 'ice');
+    expect(spells.loadout.slots).toEqual([null, null]);
+    expect(spells.setSpellLevel('ice', 3)).toBe(true);
+    expect(spells.spellLevel('ice')).toBe(3);
+    expect(spells.spellLevel('fire')).toBe(1);
+  });
+
+  it('refuses to set a level on a spell that is not casting', () => {
+    const spells = book();
+    equip(spells, 'fire');
+    expect(spells.setSpellLevel('fire_meteor', 2)).toBe(false);
+    expect(spells.spellLevel('fire_meteor')).toBe(1);
+  });
+
+  it('upgrades a level at a time, and refuses past the top', () => {
+    const spells = book();
+    equip(spells, 'fire');
+    spells.upgradeSpell('fire');
+    spells.upgradeSpell('fire');
+    expect(spells.spellLevel('fire')).toBe(3);
+    expect(() => spells.upgradeSpell('fire')).toThrow(RangeError);
+  });
+
+  it('re-resolves every casting spell when a level lands', () => {
+    let damage = BASE_SPELL_STATS.fire.damage;
+    const spells = book(factory, (spellId) =>
+      spellId === 'fire' ? { ...BASE_SPELL_STATS.fire, damage } : undefined,
+    );
+    const fire = equip(spells, 'fire');
+    damage = 100;
+    spells.upgradeSpell('fire');
+    expect(fire.stats.damage).toBe(100);
+    damage = 200;
+    spells.setSpellLevel('fire', 3);
+    expect(fire.stats.damage).toBe(200);
+  });
+});

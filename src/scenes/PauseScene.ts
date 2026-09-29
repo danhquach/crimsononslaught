@@ -273,9 +273,12 @@ export class PauseScene extends Phaser.Scene {
     const pitch = Math.min(SPELL_PITCH, room / Math.max(1, spells.length));
     return spells.map((spell, i) => {
       const x = STRIP_CONTENT_X + pitch / 2 + i * pitch;
-      const rim = addSpellDisc(this, x, cy, spell);
+      const slot = this.badgesAboveRing(() => {
+        const rim = addSpellDisc(this, x, cy, spell);
+        return this.slot(rim, x, cy, SPELL_ICON_SIZE + 6, itemInfo(spell), rim.strokeColor, 2);
+      });
       this.addFittedName(x, cy + SPELL_ICON_SIZE / 2 + 12, spell.name, pitch - 8);
-      return this.slot(rim, x, cy, SPELL_ICON_SIZE + 6, itemInfo(spell), rim.strokeColor, 2);
+      return slot;
     });
   }
 
@@ -345,7 +348,7 @@ export class PauseScene extends Phaser.Scene {
 
   /**
    * Draws one tile with `draw`, then lifts its count badge (a pill and its text,
-   * and any letters) over the focus ring, which sits at depth 0, so the ring
+   * and any letters), or a spell's level pill (#326), over the focus ring, which sits at depth 0, so the ring
    * never clips the count or a MAX pill.
    */
   private badgesAboveRing(draw: () => BuildSlot): BuildSlot {

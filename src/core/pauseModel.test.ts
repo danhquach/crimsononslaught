@@ -11,6 +11,7 @@ import {
   needsConfirm,
   pauseView,
   statsLine,
+  type PauseView,
 } from './pauseModel';
 
 const empty = {
@@ -27,11 +28,23 @@ describe('pauseView', () => {
   it('shows an empty build as the level, the spell and the stats alone', () => {
     const view = pauseView({
       ...empty,
-      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.' }],
+      spells: [
+        { id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.', level: 1 },
+      ],
     });
     expect(view).toEqual({
       level: 1,
-      spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.' }],
+      spells: [
+        {
+          id: 'fire',
+          name: 'Fire Bolt',
+          color: 0xff4400,
+          description: 'A bolt.',
+          level: 1,
+          maxLevel: 3,
+          maxed: false,
+        },
+      ],
       passives: [],
       relics: [],
       stats: { kills: 0, embers: 0, elapsedMs: 0 },
@@ -44,8 +57,8 @@ describe('pauseView', () => {
       ...empty,
       level: 9,
       spells: [
-        { id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.' },
-        { id: 'ice', name: 'Ice Arrow', color: 0x66ccff, description: 'An arrow.' },
+        { id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.', level: 1 },
+        { id: 'ice', name: 'Ice Arrow', color: 0x66ccff, description: 'An arrow.', level: 1 },
       ],
       passives: new Map<PassiveId, number>([
         ['passive_vitality', 3],
@@ -155,10 +168,22 @@ describe('statsLine and itemInfo', () => {
     expect(itemInfo({ ...tile, description: '' })).toBe('Swift  5/5 (max)');
   });
 
-  it('names a spell with no count, since spells have no level of their own', () => {
-    const spell = { id: 'fire', name: 'Fire Bolt', color: 0, description: 'A bolt.' };
-    expect(itemInfo(spell)).toBe('Fire Bolt  —  A bolt.');
-    expect(itemInfo({ ...spell, description: '' })).toBe('Fire Bolt');
+  it('reads a spell with its level, `Lv 2/3`, and `(max)` at the top (#326)', () => {
+    const spell = {
+      id: 'lightning_sword',
+      name: 'Lightning Sword',
+      color: 0,
+      description: 'Blades circle you.',
+      level: 1,
+      maxLevel: 3,
+      maxed: false,
+    };
+    expect(itemInfo(spell)).toBe('Lightning Sword  Lv 1/3  —  Blades circle you.');
+    expect(itemInfo({ ...spell, level: 2 })).toBe('Lightning Sword  Lv 2/3  —  Blades circle you.');
+    expect(itemInfo({ ...spell, level: 3, maxed: true })).toBe(
+      'Lightning Sword  Lv 3/3 (max)  —  Blades circle you.',
+    );
+    expect(itemInfo({ ...spell, description: '' })).toBe('Lightning Sword  Lv 1/3');
   });
 });
 
@@ -256,5 +281,39 @@ describe('isPauseView', () => {
         stats,
       }),
     ).toBe(false);
+  });
+});
+
+describe('isPauseView on spell levels (#326)', () => {
+  const view = (): PauseView =>
+    pauseView({
+      ...empty,
+      spells: [
+        { id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.', level: 3 },
+        { id: 'ice', name: 'Ice Arrow', color: 0x66ccff, description: 'An arrow.', level: 2 },
+      ],
+    });
+  const withFirst = (patch: Record<string, unknown>): unknown => ({
+    ...view(),
+    spells: [{ ...view().spells[0], ...patch }, ...view().spells.slice(1)],
+  });
+
+  it('fills the level, the top one and whether a spell is at it', () => {
+    const [fire, ice] = view().spells;
+    expect(fire).toMatchObject({ level: 3, maxLevel: 3, maxed: true });
+    expect(ice).toMatchObject({ level: 2, maxLevel: 3, maxed: false });
+    expect(isPauseView(view())).toBe(true);
+  });
+
+  it('rejects a level outside 1 to 3, or not a whole number', () => {
+    for (const level of [0, 4, 2.5, -1, NaN, Infinity, '2', null, undefined]) {
+      expect(isPauseView(withFirst({ level, maxed: false })), String(level)).toBe(false);
+    }
+  });
+
+  it('rejects a wrong top level, or a maxed flag that disagrees with the level', () => {
+    expect(isPauseView(withFirst({ maxLevel: 4 }))).toBe(false);
+    expect(isPauseView(withFirst({ maxed: false }))).toBe(false);
+    expect(isPauseView(withFirst({ level: 2, maxed: true }))).toBe(false);
   });
 });

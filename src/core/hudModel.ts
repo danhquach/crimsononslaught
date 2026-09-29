@@ -1,4 +1,6 @@
 import { SLOT_UNLOCK_LEVELS } from '../config/loadout';
+import { MAX_SPELL_LEVEL } from '../config/spellLevels';
+import { badgeText } from './maxRank';
 import type { LoadoutPassiveView, LoadoutSpellView, RunEvent, RunPhase } from './runEvents';
 
 /**
@@ -48,6 +50,10 @@ export type SlotRow =
       ready: boolean;
       waiting: number;
       badge: string | null;
+      /** #326: the spell's level, whether it is at the top one, and the text its pill reads (`1`, `2`, `MAX`). */
+      level: number;
+      maxed: boolean;
+      levelBadge: string;
     }
   | { kind: 'open' }
   | { kind: 'locked'; unlockLevel: number };
@@ -110,8 +116,9 @@ export function applyRunEvent(model: Readonly<HudModel>, event: RunEvent): HudMo
  * gets an icon for each.
  */
 export function slotRows(model: Readonly<HudModel>): SlotRow[] {
-  const rows: SlotRow[] = model.spells.map(({ id, name, color, progress, secondsLeft }) => {
+  const rows: SlotRow[] = model.spells.map(({ id, name, color, progress, secondsLeft, level }) => {
     const waiting = progress === null ? 0 : 1 - fraction(progress, 1);
+    const maxed = level >= MAX_SPELL_LEVEL;
     return {
       kind: 'spell',
       id,
@@ -122,6 +129,9 @@ export function slotRows(model: Readonly<HudModel>): SlotRow[] {
       ready: waiting === 0,
       waiting,
       badge: waiting > 0 ? cooldownBadge(secondsLeft) : null,
+      level,
+      maxed,
+      levelBadge: badgeText(level, maxed),
     };
   });
   // Row 0 is the default spell's, which is always equipped; it is only empty

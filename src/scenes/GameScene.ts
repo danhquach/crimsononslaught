@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   ENEMIES_REGISTRY_KEY,
   INVULNERABLE_REGISTRY_KEY,
+  LOADOUT_LEVELS_REGISTRY_KEY,
   LOADOUT_REGISTRY_KEY,
   SAVE_REGISTRY_KEY,
   SCENE,
@@ -31,6 +32,7 @@ import { audioOf, type Audio } from '../render/audio';
 import {
   LEVEL_UP_EVENT,
   resolveLevelUp,
+  spellIdOfLevelCard,
   type LevelUpPickPayload,
   type OfferCard,
 } from '../core/levelUp';
@@ -102,11 +104,18 @@ import type {
   SwordStats,
   TornadoStats,
 } from '../core/spellStats';
-import { buildLoadout } from '../core/loadout';
+import { buildLoadout, canUpgradeSpell, spellLevel } from '../core/loadout';
 import { emptySave, isSave, recordRun, serializeSave, type Save } from '../core/save';
 import { upgradeRanks } from '../core/upgrades';
 import { storeSaveJson } from '../storage/localSave';
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
+import {
+  SPELL_LEVELS,
+  isSpellLevel,
+  spellLevelText,
+  type SpellLevel,
+  type SpellLevelTable,
+} from '../config/spellLevels';
 import {
   BASE_PLAYER_PROFILE,
   isPassiveId,
@@ -384,6 +393,12 @@ export class GameScene extends Phaser.Scene {
    * (#144), and its description for the pause screen's info line (CO-179).
    */
   private cards!: ReadonlyMap<string, { name: string; color: number; description: string }>;
+  /**
+   * What each spell's levels add (#326): the offer's `spellLevels`, and what a
+   * pick is checked against. A plain field so a browser test can put level
+   * text in it before any spell has shipped its own.
+   */
+  spellLevelTable: SpellLevelTable = SPELL_LEVELS;
   /** Kept so a spell equipped mid-run can be given the arena's overlaps. */
   private collisions!: CollisionSystem;
   /** Level-ups earned but not yet offered; drained one overlay at a time in `update`. */
@@ -561,6 +576,14 @@ export class GameScene extends Phaser.Scene {
   /** Test hook (CO-109): the actives casting right now, in equip order. */
   get equippedSpellIds(): RosterSpellId[] {
     return this.spells.spells.map((spell) => spell.id);
+  }
+
+  /** Test hook (#326): the level of every spell casting right now, in equip order. */
+  get spellLevels(): { id: RosterSpellId; level: number }[] {
+    return this.spells.spells.map((spell) => ({
+      id: spell.id,
+      level: this.spells.spellLevel(spell.id),
+    }));
   }
 
   /**
@@ -1090,6 +1113,9 @@ export class GameScene extends Phaser.Scene {
     this.syncPlayerStats(BASE_PLAYER_PROFILE);
     this.equipSpell(spellId);
     for (const extra of this.extraActives()) this.equipSpell(extra);
+    // `?loadout=fire:3` (#326): after the extras are casting, since a level can
+    // only be set on a spell that is; the default spell's level is set here too.
+    for (const [id, level] of this.extraLevels()) this.spells.setSpellLevel(id, level);
 
     const onPick = (pick: LevelUpPickPayload): void => this.applyPick(pick.offerId);
     this.events.on(LEVEL_UP_EVENT.pick, onPick);
@@ -1216,6 +1242,7 @@ export class GameScene extends Phaser.Scene {
         color: card?.color ?? 0xffffff,
         progress: spell.castProgress,
         secondsLeft: Number.isFinite(spell.timeToNextCast) ? spell.timeToNextCast : null,
+        level: this.spells.spellLevel(spell.id),
       };
     });
     const passives = [...this.spells.loadout.passives].map(([id, rank]) => {
@@ -1611,6 +1638,22 @@ export class GameScene extends Phaser.Scene {
   private extraActives(): RosterSpellId[] {
     const extra: unknown = this.registry.get(LOADOUT_REGISTRY_KEY);
     return Array.isArray(extra) ? extra.filter(isRosterSpellId) : [];
+  }
+
+  /**
+   * `?loadout=fire:3` (test hook, #326): the levels Boot parsed out of the query
+   * string. The registry holds unknowns, so each pair is checked again here.
+   */
+  private extraLevels(): [RosterSpellId, SpellLevel][] {
+    const pairs: unknown = this.registry.get(LOADOUT_LEVELS_REGISTRY_KEY);
+    if (!Array.isArray(pairs)) return [];
+    return pairs.flatMap((pair: unknown) => {
+      if (!Array.isArray(pair) || pair.length !== 2) return [];
+      const [id, level] = pair as unknown[];
+      return isRosterSpellId(id) && isSpellLevel(level)
+        ? [[id, level] as [RosterSpellId, SpellLevel]]
+        : [];
+    });
   }
 
   /** `?timeScale=` is resolved once in Boot; a Game started without it runs real time. */
@@ -2101,7 +2144,19 @@ export class GameScene extends Phaser.Scene {
       carried: this.spells.carriedStats,
       profile: this.spells.profile,
       banned: this.offerActions.banned,
+      casting: this.castingCards(),
+      spellLevels: this.spellLevelTable,
     };
+  }
+
+  /** Every spell casting now as its card reads, `?loadout=` extras included: the upgrades' candidates (#326). */
+  private castingCards(): ActiveCard[] {
+    return this.spells.spells.flatMap((spell) => {
+      const card = this.cards.get(spell.id);
+      return isRosterSpellId(spell.id) && card
+        ? [{ id: spell.id, name: card.name, description: card.description, color: card.color }]
+        : [];
+    });
   }
 
   /**
@@ -2258,7 +2313,14 @@ export class GameScene extends Phaser.Scene {
     return this.spells.spells.flatMap((spell) => {
       if (!isRosterSpellId(spell.id)) return [];
       const card = this.cards.get(spell.id);
-      return [{ id: spell.id, name: card?.name ?? spell.id, color: card?.color ?? 0xffffff }];
+      return [
+        {
+          id: spell.id,
+          name: card?.name ?? spell.id,
+          color: card?.color ?? 0xffffff,
+          level: this.spells.spellLevel(spell.id),
+        },
+      ];
     });
   }
 
@@ -2308,21 +2370,58 @@ export class GameScene extends Phaser.Scene {
       console.warn(`[Game] ignoring pick of unoffered card "${offerId}"`);
       return;
     }
-    // A charge (#228) adds to the run's rerolls or bans; it is no perk.
-    if (card.kind === 'charge') {
-      const charge = chargeById(card.id);
-      if (!charge) return;
-      this.offerActions = grantCharge(this.offerActions, charge);
-      this.audio.play('progress.perk');
-      return;
+    const taken = this.takePick(card);
+    if (taken) this.audio.play('progress.perk');
+  }
+
+  /**
+   * Apply one card the overlay showed. An exhaustive switch (#326): a kind
+   * added to `OfferCard` fails to compile here rather than being dropped.
+   */
+  private takePick(card: OfferCard): boolean {
+    switch (card.kind) {
+      case 'active':
+        return this.equipActive(card.id);
+      case 'passive':
+        return this.takePassive(card.id);
+      case 'relic':
+        return this.takeRelic(card.id);
+      case 'upgrade':
+        return this.upgradeSpell(card.id);
+      case 'charge': {
+        // A charge (#228) adds to the run's rerolls or bans; it is no perk.
+        const charge = chargeById(card.id);
+        if (!charge) return false;
+        this.offerActions = grantCharge(this.offerActions, charge);
+        return true;
+      }
+      default: {
+        const unhandled: never = card.kind;
+        console.warn(`[Game] ignoring pick of unknown kind "${String(unhandled)}"`);
+        return false;
+      }
     }
-    if (card.kind === 'relic') {
-      if (this.takeRelic(card.id)) this.audio.play('progress.perk');
-      return;
+  }
+
+  /**
+   * A picked upgrade takes a casting spell up one level (#326). The card must
+   * name a spell that is casting, below the top level and with level text for
+   * the next one, or it is dropped like a stale pick.
+   */
+  private upgradeSpell(cardId: string): boolean {
+    const id = spellIdOfLevelCard(cardId);
+    const ok =
+      id !== undefined &&
+      this.spells.spells.some((spell) => spell.id === id) &&
+      canUpgradeSpell(this.spells.loadout, id) &&
+      spellLevelText(this.spellLevelTable, id, spellLevel(this.spells.loadout, id) + 1) !==
+        undefined;
+    if (!ok) {
+      console.warn(`[Game] could not upgrade "${cardId}"`);
+      return false;
     }
-    const taken = card.kind === 'active' ? this.equipActive(card.id) : this.takePassive(card.id);
-    if (!taken) return;
-    this.audio.play('progress.perk');
+    this.spells.upgradeSpell(id);
+    return true;
   }
 
   /** A picked active fills the lowest open slot and starts casting (spec §3.1). */

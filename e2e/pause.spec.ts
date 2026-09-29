@@ -195,7 +195,9 @@ test('Esc pauses the whole run over the build, and Esc resumes it without a jump
   expect(paused.hudVisible).toBe(false);
   expect(paused.pause?.view.level).toBe(paused.level);
   const { name, color, description } = SPELL_CARDS[PICKED];
-  expect(paused.pause?.view.spells).toEqual([{ id: PICKED, name, color, description }]);
+  expect(paused.pause?.view.spells).toEqual([
+    { id: PICKED, name, color, description, level: 1, maxLevel: 3, maxed: false },
+  ]);
   expect(paused.pause?.view.stats.kills).toBe(paused.kills);
 
   // Frozen: a second of wall time moves nothing (spec: enemies, spells,
@@ -543,10 +545,14 @@ function sampleStrip(page: Page) {
       box !== undefined && t.y > box.y + 30 && t.y < box.bottom;
     return {
       strip: box ? { x: box.x, y: box.y, right: box.right, bottom: box.bottom } : null,
-      names: texts.filter(inBand).map((t) => {
-        const b = t.getBounds();
-        return { text: t.text, x: b.x, y: b.y, right: b.right, bottom: b.bottom };
-      }),
+      // A level badge (#326) is a Text in the band too; it is not a name.
+      names: texts
+        .filter(inBand)
+        .filter((t) => t.getData('badgeFill') === undefined)
+        .map((t) => {
+          const b = t.getBounds();
+          return { text: t.text, x: b.x, y: b.y, right: b.right, bottom: b.bottom };
+        }),
       icons: (scene.children.list as Phaser.GameObjects.Image[])
         .filter((o) => o.type === 'Image' && o.frame.name.startsWith('icon.'))
         .map((o) => o.frame.name),
@@ -595,7 +601,7 @@ test('the arrows walk from the menu through every strip and read each item', asy
   const info = (id: string, kind: 'spell' | 'passive' | 'relic'): string => {
     if (kind === 'spell') {
       const card = SPELL_CARDS[id as SpellId];
-      return card ? itemInfo({ ...card, id }) : id;
+      return card ? itemInfo({ ...card, id, level: 1, maxLevel: 3, maxed: false }) : id;
     }
     const entry = kind === 'passive' ? passiveById(id) : relicBuffById(id);
     const maxRank = kind === 'passive' ? passiveById(id)?.maxRank : undefined;

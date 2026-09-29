@@ -2,11 +2,15 @@ import type { RosterSpellId } from '../config/loadout';
 import type { PassiveId, PlayerProfile } from '../config/passives';
 import type { RelicBuffId } from '../config/relics';
 import type { SpellStatBlock, SpellStatField } from '../config/spellFields';
+import type { SpellLevel } from '../config/spellLevels';
 import {
   equip as equipInLoadout,
   profileOf,
+  spellLevel,
   takePassive,
   takeRelic,
+  upgradeSpell,
+  withSpellLevel,
   type Loadout,
 } from './loadout';
 import { resolveSpellStats } from './playerProfile';
@@ -131,10 +135,37 @@ export class Spellbook {
     this.refresh();
   }
 
+  /** The level of `id` this run holds (#326): 1 until it is upgraded, whether casting or not. */
+  spellLevel(id: RosterSpellId): SpellLevel {
+    return spellLevel(this.current, id);
+  }
+
+  /**
+   * Take one level of a spell (#326) and re-resolve every equipped spell, the
+   * hook the element tickets hang a level's behaviour on. Throws on what
+   * `upgradeSpell` rejects — an unknown id or a spell already at the top level.
+   */
+  upgradeSpell(id: RosterSpellId): void {
+    this.current = upgradeSpell(this.current, id);
+    this.refresh();
+  }
+
+  /**
+   * Put a spell straight at `level` (#326), for the `?loadout=` test switch.
+   * `false` — and nothing changed — when the spell is not casting, so a level
+   * cannot be set on a spell the run does not have.
+   */
+  setSpellLevel(id: RosterSpellId, level: SpellLevel): boolean {
+    if (!this.live.some((spell) => spell.id === id)) return false;
+    this.current = withSpellLevel(this.current, id, level);
+    this.refresh();
+    return true;
+  }
+
   /**
    * Re-resolve every equipped spell's block against the loadout as it stands.
-   * Called for a passive, and by the caller for anything else that moves the
-   * numbers a spell's base block comes from.
+   * Called for a passive or a spell level, and by the caller for anything else
+   * that moves the numbers a spell's base block comes from.
    */
   refresh(): void {
     for (const spell of this.live) {

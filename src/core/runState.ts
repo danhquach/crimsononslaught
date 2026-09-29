@@ -1,5 +1,6 @@
 import { isEnemyType, type EnemyType } from '../config/enemies';
 import { isRosterSpellId, type RosterSpellId } from '../config/loadout';
+import { isSpellLevel, type SpellLevel } from '../config/spellLevels';
 import type { SpellId } from '../config/spells';
 import { BOSS_START_TIME } from '../config/waves';
 import { NO_HIT_STOP, requestHitStop, spendHitStop, type HitStopState } from './hitFeedback';
@@ -350,21 +351,53 @@ export function resolveInvulnerable(search: string): boolean {
  * unlock the slots, and it ignores the element a spell belongs to, so one run
  * can exercise spells a real loadout would never carry together.
  *
+ * A spell may carry a level, `fire:3,fire_meteor:2` (#326): a colon and one of
+ * 1 to 3, so each level can be tried without playing up to it. The whole token
+ * is dropped when the suffix is anything else — `:0`, `:4`, `:2.5`, `:-1`,
+ * `: 2`, a second colon, a digit that is not ASCII — so a bad level never
+ * quietly becomes level 1.
+ *
  * Any roster id is accepted, not only the Phase 1 four (#133): an id this build
  * has no implementation for is refused later by `Spellbook.equip`, which is
  * where the one rule about it belongs. Ids are returned in the order they were
  * written; unknown ids are dropped, and the chosen spell repeating here is
  * harmless (`Spellbook.equip` refuses a second copy of anything equipped).
- * Repeats are dropped and the list stops at `MAX_SWITCH_LIST`.
+ * Repeats are dropped, the first one written winning, and the list stops at
+ * `MAX_SWITCH_LIST`.
  */
 export function resolveLoadout(search: string): RosterSpellId[] {
+  return parseLoadoutSwitch(search).map((entry) => entry.id);
+}
+
+/** A spell id, then optionally `:` and a level of 1 to 3: ASCII only, one digit, anchored. */
+const LOADOUT_TOKEN = /^([a-z_]{1,32})(?::([1-3]))?$/;
+
+/** One `?loadout=` token that passed the allow-list; `level` is absent when none was written. */
+export interface LoadoutSwitchEntry {
+  id: RosterSpellId;
+  level?: SpellLevel;
+}
+
+/** The `?loadout=` list as written (#326): each token allow-listed, repeats dropped, capped. */
+export function parseLoadoutSwitch(search: string): LoadoutSwitchEntry[] {
   const raw = new URLSearchParams(search).get('loadout');
   if (raw === null) return [];
-  const ids = raw
-    .split(',', MAX_SWITCH_TOKENS)
-    .map((id) => id.trim())
-    .filter(isRosterSpellId);
-  return [...new Set(ids)].slice(0, MAX_SWITCH_LIST);
+  const entries = new Map<RosterSpellId, LoadoutSwitchEntry>();
+  for (const token of raw.split(',', MAX_SWITCH_TOKENS)) {
+    const match = LOADOUT_TOKEN.exec(token.trim());
+    const id = match?.[1];
+    if (!isRosterSpellId(id) || entries.has(id)) continue;
+    const level = Number(match?.[2]);
+    entries.set(id, isSpellLevel(level) ? { id, level } : { id });
+  }
+  return [...entries.values()].slice(0, MAX_SWITCH_LIST);
+}
+
+/** The `[spell, level]` pairs of `?loadout=` tokens that wrote a level (#326). */
+export function resolveLoadoutLevels(search: string): [RosterSpellId, SpellLevel][] {
+  return parseLoadoutSwitch(search).flatMap(({ id, level }) =>
+    level === undefined ? [] : [[id, level] as [RosterSpellId, SpellLevel]],
+  );
 }
 
 /**

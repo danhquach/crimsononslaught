@@ -1,6 +1,7 @@
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
 import { PASSIVES, isPassiveId, type PassiveId } from '../config/passives';
 import { RELIC_BUFFS, isRelicBuffId, type RelicBuffId } from '../config/relics';
+import { isSpellLevel, type SpellLevel } from '../config/spellLevels';
 import { isSpellId, type SpellId } from '../config/spells';
 import { MAX_OFFER_SIZE, isOfferCard, type OfferCard } from './levelUp';
 import type { OfferActionCounts } from './offerActions';
@@ -63,6 +64,13 @@ export const ENEMIES_REGISTRY_KEY = 'enemies';
  * run, so it travels in the registry rather than the `Game` payload.
  */
 export const LOADOUT_REGISTRY_KEY = 'loadout';
+
+/**
+ * Registry key under which Boot stores the spell levels of the `?loadout=` test
+ * hook (#326) as `[spell id, level]` pairs (default none). A key of its own, so
+ * `LOADOUT_REGISTRY_KEY` keeps its plain list of ids.
+ */
+export const LOADOUT_LEVELS_REGISTRY_KEY = 'loadoutLevels';
 
 /**
  * Registry key under which Boot stores the parsed `Save` (CO-101). Game reads
@@ -146,6 +154,8 @@ export interface BuildSpell {
   id: RosterSpellId;
   name: string;
   color: number;
+  /** #326: the spell's level, 1 to 3, for the badge on its icon and the info line. */
+  level: SpellLevel;
 }
 
 /**
@@ -254,7 +264,8 @@ function isBuildSpell(data: unknown): data is BuildSpell {
     SPELL_NAME.test(data.name) &&
     Number.isInteger(data.color) &&
     (data.color as number) >= 0 &&
-    (data.color as number) <= 0xffffff
+    (data.color as number) <= 0xffffff &&
+    isSpellLevel(data.level)
   );
 }
 

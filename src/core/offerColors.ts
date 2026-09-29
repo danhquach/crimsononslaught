@@ -1,6 +1,6 @@
 import { elementOf } from '../config/loadout';
 import { SPELL_CARDS } from '../config/spells';
-import type { OfferCard } from './levelUp';
+import { cardSpellId, type OfferCard } from './levelUp';
 
 /**
  * CO-164 (#253): each kind of pick wears one border colour, so a card reads
@@ -33,7 +33,8 @@ export function offerColor(kind: OfferCard['kind'], id: string): number {
   if (kind === 'passive') return PASSIVE_COLOR;
   if (kind === 'relic') return RELIC_COLOR;
   if (kind === 'charge') return CHARGE_COLOR;
-  const element = elementOf(id);
+  // An upgrade card's id is `spell_level_<spell>`; it wears its spell's colour (#326).
+  const element = elementOf(kind === 'upgrade' ? (cardSpellId({ kind, id }) ?? id) : id);
   return element === undefined ? FALLBACK_COLOR : SPELL_CARDS[element].color;
 }
 

@@ -22,13 +22,14 @@ import {
   type HudModel,
   type SlotRow,
 } from '../core/hudModel';
+import { MAX_BADGE_TEXT_CSS, MAX_RANK_CSS } from '../core/maxRank';
 import { PASSIVE_COLOR } from '../core/offerColors';
 import { onRunEvents, type LoadoutPassiveView, type RunEvent } from '../core/runEvents';
 import { SCENE } from '../core/scenePayloads';
 import { hasFrameArt } from '../render/atlas';
 import { barSlices } from '../render/barFrame';
 import { SPELL_ICON_ART_SIZE, spellIconArt } from '../render/spellIcon';
-import { addBuildIcon, addPassiveTile } from './buildStrips';
+import { CRIMSON_CSS, addBuildIcon, addPassiveTile } from './buildStrips';
 
 const MARGIN = 16;
 const BAR_WIDTH = 240;
@@ -70,6 +71,20 @@ const SLOT_BADGE_RADIUS = 8;
  * its nearest point to the icon's centre stays clear of the glyph's box.
  */
 const SLOT_BADGE_OFFSET = 15;
+/**
+ * #326: the spell's level on a pill at the rim's top right, the mirror of the
+ * cooldown badge, so the two never meet. At the top level it reads MAX on the
+ * same gold as a maxed passive's badge (#324). A slot's pitch (72 across, 62
+ * up) leaves room for the ~26 px MAX pill beside the next icon and the row
+ * above's label.
+ */
+const SLOT_LEVEL_OFFSET = 15;
+const SLOT_LEVEL_STYLE = {
+  fontFamily: 'monospace',
+  fontSize: '10px',
+  fontStyle: 'bold',
+  padding: { x: 4, y: 1 },
+} as const;
 const SLOT_LABEL_STYLE = { ...LABEL_STYLE, fontSize: '11px', strokeThickness: 3 } as const;
 const SLOT_GLYPH_STYLE = { ...LABEL_STYLE, fontSize: '13px', strokeThickness: 2 } as const;
 const SLOT_BADGE_STYLE = { ...LABEL_STYLE, fontSize: '10px', strokeThickness: 0 } as const;
@@ -296,7 +311,8 @@ function ensureSlotTextures(scene: Phaser.Scene): void {
  * One slot icon (#213): the spell's icon art in a circle (CO-154) — or, with no
  * art for it or no atlas, its colour and its initials — with the cooldown still
  * to run drawn as a dark wedge that shrinks clockwise from 12 o'clock, the whole
- * seconds left in a badge on the rim, and a short name underneath. Ready brightens the ring. An
+ * seconds left in a badge on the rim, the spell's level (#326) on a pill opposite it,
+ * and a short name underneath. Ready brightens the ring. An
  * open slot is an empty circle; a locked one is dashed, with a lock and the
  * level that opens it. Every part is a shape or an image whose properties
  * change; nothing is redrawn.
@@ -309,7 +325,13 @@ class SlotIcon {
   private readonly glyph: Phaser.GameObjects.Text;
   private readonly badgeDisc: Phaser.GameObjects.Arc;
   private readonly badge: Phaser.GameObjects.Text;
+  private readonly levelPill: Phaser.GameObjects.Graphics;
+  private readonly levelText: Phaser.GameObjects.Text;
   private readonly label: Phaser.GameObjects.Text;
+  private x = 0;
+  private y = 0;
+  /** What the level pill was last drawn for, so a redraw waits for a change. */
+  private pillKey = '';
 
   constructor(scene: Phaser.Scene) {
     ensureSlotTextures(scene);
@@ -324,11 +346,15 @@ class SlotIcon {
       .circle(0, 0, SLOT_BADGE_RADIUS, 0x111111)
       .setStrokeStyle(1, 0xaaaaaa);
     this.badge = scene.add.text(0, 0, '', SLOT_BADGE_STYLE).setOrigin(0.5);
+    this.levelPill = scene.add.graphics();
+    this.levelText = scene.add.text(0, 0, '', SLOT_LEVEL_STYLE).setOrigin(0.5).setVisible(false);
     this.label = scene.add.text(0, 0, '', SLOT_LABEL_STYLE).setOrigin(0.5, 0);
   }
 
   /** Centre of the circle. */
   setPosition(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
     this.disc.setPosition(x, y);
     this.icon.setPosition(x, y);
     this.wedge.setPosition(x, y);
@@ -337,6 +363,14 @@ class SlotIcon {
     this.badgeDisc.setPosition(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET);
     this.badge.setPosition(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET);
     this.label.setPosition(x, y + SLOT_RADIUS + 3);
+    this.levelText.setPosition(x + SLOT_LEVEL_OFFSET, y - SLOT_LEVEL_OFFSET);
+    this.drawLevelPill();
+  }
+
+  /** The level pill as drawn now, or `null` on a slot with no spell: what the browser suite reads. */
+  get levelBadge(): { text: string; fill: string } | null {
+    if (!this.levelText.visible) return null;
+    return { text: this.levelText.text, fill: String(this.levelText.getData('badgeFill')) };
   }
 
   set(row: Readonly<SlotRow>): void {
@@ -348,6 +382,7 @@ class SlotIcon {
     this.badge.setText(spell?.badge ?? '');
     this.badgeDisc.setVisible(spell?.badge != null);
     this.locked.setVisible(row.kind === 'locked');
+    this.setLevel(spell);
 
     // Any time still to run shows at least one step, so a spell reads ready only when it is.
     const step = spell ? Math.ceil(spell.waiting * SLOT_WEDGE_STEPS) : 0;
@@ -364,6 +399,46 @@ class SlotIcon {
       if (row.kind === 'open') this.disc.setStrokeStyle(2, SLOT_EMPTY_COLOR);
       else this.disc.setStrokeStyle();
     }
+  }
+
+  /** Show the spell's level on its pill, redrawing the pill only when the badge changes (#326). */
+  private setLevel(spell: Extract<SlotRow, { kind: 'spell' }> | null): void {
+    this.levelText.setVisible(spell !== null);
+    if (!spell) {
+      this.levelPill.clear();
+      this.pillKey = '';
+      return;
+    }
+    const fill = spell.maxed ? MAX_RANK_CSS : CRIMSON_CSS;
+    // `set` runs every frame and `setColor` re-renders the text's texture even
+    // when the colour is the same, so only a change reaches it.
+    if (this.levelText.getData('badgeFill') !== fill) {
+      this.levelText
+        .setColor(spell.maxed ? MAX_BADGE_TEXT_CSS : '#ffffff')
+        .setData('badgeFill', fill);
+    }
+    this.levelText.setText(spell.levelBadge);
+    this.drawLevelPill();
+  }
+
+  /** The pill under the level text, sized to its padded box; skipped while nothing about it changed. */
+  private drawLevelPill(): void {
+    if (!this.levelText.visible) return;
+    const fill = String(this.levelText.getData('badgeFill'));
+    const key = `${this.levelText.text}|${fill}|${this.x}|${this.y}`;
+    if (key === this.pillKey) return;
+    this.pillKey = key;
+    const { width, height } = this.levelText;
+    this.levelPill
+      .clear()
+      .fillStyle(Phaser.Display.Color.HexStringToColor(fill).color)
+      .fillRoundedRect(
+        this.x + SLOT_LEVEL_OFFSET - width / 2,
+        this.y - SLOT_LEVEL_OFFSET - height / 2,
+        width,
+        height,
+        height / 2,
+      );
   }
 
   /** Point the icon at `frame`'s art box, or hide it; unchanged frames are left alone. */
@@ -426,6 +501,19 @@ export class HudScene extends Phaser.Scene {
    */
   get barLook(): 'art' | 'flat' {
     return this.look;
+  }
+
+  /**
+   * Test hook (#326): the level pill on every slot casting a spell, in slot
+   * order — the level, whether it is the top one, the text on the pill and the
+   * colour under it.
+   */
+  get slotLevels(): { id: string; level: number; maxed: boolean; text: string; fill: string }[] {
+    return slotRows(this.model).flatMap((row, index) => {
+      const pill = this.slotIcons[index]?.levelBadge;
+      if (row.kind !== 'spell' || !pill) return [];
+      return [{ id: row.id, level: row.level, maxed: row.maxed, ...pill }];
+    });
   }
 
   /** The passive tiles on screen, in the order taken; the browser suite reads them. */
