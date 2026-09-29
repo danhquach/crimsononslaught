@@ -1123,6 +1123,8 @@ export class GameScene extends Phaser.Scene {
     const onResume = (): void => {
       this.pausing = false;
       this.startButton.reset();
+      // Settings opened from the pause screen (CO-192) may have changed these.
+      this.feedback = readFeedbackSettings(this.save().settings);
     };
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
     // Losing focus pauses too, so a run is not lost in the background. The

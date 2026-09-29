@@ -3,10 +3,13 @@ import type Phaser from 'phaser';
 import { passiveById, type PassiveId } from '../src/config/passives';
 import { relicBuffById, type RelicBuffId } from '../src/config/relics';
 import { SPELL_CARDS, SPELL_IDS, type SpellId } from '../src/config/spells';
+import { FEEDBACK_SETTING_KEYS } from '../src/config/hitFeedback';
+import { AUDIO_SETTING_KEYS } from '../src/config/sounds';
 import { abbreviate, itemInfo } from '../src/core/pauseModel';
 import { spellGlyph } from '../src/core/hudModel';
 import type { PausePayload, ResultPayload } from '../src/core/scenePayloads';
-import { SCENE } from '../src/core/scenePayloads';
+import { AUDIO_REGISTRY_KEY, SCENE } from '../src/core/scenePayloads';
+import type { Audio } from '../src/render/audio';
 import type { RunState } from '../src/core/runState';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
 import type { GameScene } from '../src/scenes/GameScene';
@@ -16,9 +19,10 @@ import { cardCenter, collectErrors, isSceneActive, startFromIntro, waitForScene 
 
 /**
  * #252 in the browser: Esc or pad Start pauses the run under the pause screen,
- * which shows the build and offers Resume, Restart, End run and Main menu, the
- * last three behind a Yes / No. What the screen lists and which actions ask
- * are `core/pauseModel.test.ts`'s.
+ * which shows the build and offers Resume, Settings, Restart, End run and Main
+ * menu, the last three behind a Yes / No. Settings (CO-192) opens the Settings
+ * panel over the frozen run and goes back to the same pause screen. What the
+ * screen lists and which actions ask are `core/pauseModel.test.ts`'s.
  */
 
 const PICKED: SpellId = 'fire';
@@ -259,14 +263,15 @@ test('End run by keyboard goes to the results with the run banked once', async (
 
   await page.keyboard.press('Escape');
   await waitForPause(page, undefined);
-  // The first arrow wakes the highlight on Resume; two more reach End run.
-  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowDown');
+  // The first arrow wakes the highlight on Resume; three more reach End run
+  // (past Settings and Restart).
+  for (let i = 0; i < 4; i += 1) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await waitForPause(page, 'end');
   // Enter with nothing highlighted is No.
   await page.keyboard.press('Enter');
   await waitForPause(page, undefined);
-  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowDown');
+  for (let i = 0; i < 4; i += 1) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await waitForPause(page, 'end');
   await page.keyboard.press('ArrowLeft'); // wakes the highlight on Yes
@@ -363,7 +368,7 @@ test('a gamepad pauses with Start, resumes with Start, and leaves for the main m
   await waitForPause(page, undefined);
   await frames(page, 4);
   await press(DOWN); // wakes the highlight on Resume
-  for (let i = 0; i < 3; i += 1) await press(DOWN); // to Main menu
+  for (let i = 0; i < 4; i += 1) await press(DOWN); // to Main menu
   await press(A);
   await waitForPause(page, 'menu');
   await frames(page, 4);
@@ -587,7 +592,7 @@ test('the arrows walk from the menu through every strip and read each item', asy
 
   expect((await readNav(page)).focus).toBeNull();
   await page.keyboard.press('ArrowDown'); // wakes the highlight on Resume
-  await page.keyboard.press('ArrowDown'); // Restart
+  await page.keyboard.press('ArrowDown'); // Settings
   expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 1 });
 
   await page.keyboard.press('ArrowRight');
@@ -696,4 +701,304 @@ test('with no icon art, passives and relics keep their letters and badges', asyn
     const name = (passiveById(id) ?? relicBuffById(id))!.name;
     expect(read.texts, id).toContain(abbreviate(name));
   }
+});
+
+/**
+ * CO-192: Settings from the pause menu. Positions mirror `SettingsScene`: rows
+ * 58 px apart from y = 140, master volume's "-" 70 px left of the value 120 px
+ * right of centre, switches 120 px right of centre; Intro's Settings entry.
+ */
+const MASTER_DOWN = { x: 480 + 120 - 70, y: 140 };
+const SHAKE_SWITCH = { x: 600, y: 140 + 5 * 58 };
+const INTRO_SETTINGS = { x: 480, y: 298 };
+
+/** What the pause -> Settings tests compare, read in one evaluate so the running game cannot move between them. */
+interface Panel {
+  settingsActive: boolean;
+  pauseActive: boolean;
+  gamePaused: boolean;
+  introActive: boolean;
+  hudVisible: boolean;
+  /** Settings is the last scene in the draw order, so it draws over Game, HUD and Pause. */
+  settingsOnTop: boolean;
+  elapsedMs: number;
+  kills: number;
+  track: string | null;
+  runTrack: string | null;
+  master: number;
+  /** The Game scene's live feedback settings, and how many times Settings has been created. */
+  feedbackShake: number;
+  creates: number;
+}
+
+function readPanel(page: Page): Promise<Panel> {
+  return page.evaluate(
+    async ([scene, audioKey]) => {
+      const { game } = await import('/src/main.ts');
+      const inner = game.scene.getScene(scene.game) as unknown as Inner & {
+        feedback: { shake: number };
+      };
+      const audio = game.registry.get(audioKey) as Audio;
+      const order = game.scene.getScenes(false).map((s) => s.sys.settings.key);
+      return {
+        settingsActive: game.scene.isActive(scene.settings),
+        pauseActive: game.scene.isActive(scene.pause),
+        gamePaused: game.scene.isPaused(scene.game),
+        introActive: game.scene.isActive(scene.intro),
+        hudVisible: game.scene.getScene(scene.hud).sys.settings.visible,
+        settingsOnTop: order.indexOf(scene.settings) > order.indexOf(scene.pause),
+        elapsedMs: inner.run.elapsedMs,
+        kills: inner.run.kills,
+        track: audio.music.track,
+        runTrack: audio.music.run?.run ?? null,
+        master: audio.settings.master,
+        feedbackShake: inner.feedback.shake,
+        creates: (window as unknown as { settingsCreates?: number }).settingsCreates ?? 0,
+      };
+    },
+    [SCENE, AUDIO_REGISTRY_KEY] as const,
+  );
+}
+
+/** Count Settings' creations; call before opening it. The scene's emitter outlives its restarts. */
+function countSettingsCreates(page: Page): Promise<void> {
+  return page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    const w = window as unknown as { settingsCreates?: number };
+    w.settingsCreates = 0;
+    game.scene.getScene(key).events.on('create', () => (w.settingsCreates! += 1));
+  }, SCENE.settings);
+}
+
+async function pauseRun(page: Page): Promise<void> {
+  await startRun(page);
+  await page.waitForTimeout(1000);
+  await page.keyboard.press('Escape');
+  await waitForPause(page, undefined);
+}
+
+test('Settings opens from the pause menu over the frozen run, and Back returns to the same pause screen', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await pauseRun(page);
+  const before = await snapshot(page);
+  await countSettingsCreates(page);
+
+  // Straight away: no Yes / No, no run left behind.
+  await clickButton(page, 'Settings');
+  await waitForScene(page, SCENE.settings);
+  await expect.poll(async () => (await readPanel(page)).pauseActive).toBe(false);
+  const open = await readPanel(page);
+  expect(open.creates).toBe(1);
+  expect(open.gamePaused).toBe(true);
+  expect(open.hudVisible).toBe(false);
+  expect(open.settingsOnTop).toBe(true);
+  // The run's own track keeps playing; the menu track never comes in.
+  expect(open.runTrack).not.toBeNull();
+  expect(open.track).toBe(open.runTrack);
+
+  // Frozen for as long as the panel is open.
+  await page.waitForTimeout(600);
+  const later = await readPanel(page);
+  expect(later.elapsedMs).toBe(open.elapsedMs);
+  expect(later.kills).toBe(open.kills);
+  expect(later.track).toBe(open.runTrack);
+
+  // Volume and shake changes land at once and are saved as from the main menu.
+  await page.mouse.click(MASTER_DOWN.x, MASTER_DOWN.y);
+  await page.mouse.click(SHAKE_SWITCH.x, SHAKE_SWITCH.y);
+  await expect
+    .poll(async () => JSON.parse((await readStoredSave(page)) ?? '{"settings":{}}').settings)
+    .toEqual(
+      expect.objectContaining({
+        [AUDIO_SETTING_KEYS.master]: 0.9,
+        [FEEDBACK_SETTING_KEYS.shake]: 0,
+      }),
+    );
+  expect((await readPanel(page)).master).toBe(0.9);
+
+  // Esc goes back to the pause screen with the same build, still frozen.
+  await page.keyboard.press('Escape');
+  await waitForPause(page, undefined);
+  await waitForScene(page, SCENE.pause);
+  const back = await snapshot(page);
+  expect(back.pause?.view).toEqual(before.pause?.view);
+  expect(back.gamePaused).toBe(true);
+  expect(back.hudVisible).toBe(false);
+  expect(back.elapsedMs).toBe(before.elapsedMs);
+  const closed = await readPanel(page);
+  expect(closed.settingsActive).toBe(false);
+  expect(closed.creates).toBe(1);
+
+  // Resume: the run picks the new feedback up without a restart.
+  await clickButton(page, 'Resume');
+  await expect.poll(async () => (await readPanel(page)).gamePaused).toBe(false);
+  await frames(page, 4);
+  const resumed = await readPanel(page);
+  expect(resumed.feedbackShake).toBe(0);
+  expect(resumed.master).toBe(0.9);
+  expect(resumed.hudVisible).toBe(true);
+  expect(resumed.pauseActive).toBe(false);
+  expect(resumed.settingsActive).toBe(false);
+  expect(resumed.elapsedMs).toBeGreaterThan(before.elapsedMs);
+  expect(errors).toEqual([]);
+});
+
+test('arrows + Enter open Settings from the pause menu, and Esc goes back', async ({ page }) => {
+  const errors = collectErrors(page);
+  await pauseRun(page);
+  const before = await snapshot(page);
+
+  // The first arrow wakes the highlight on Resume; the next is Settings.
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 1 });
+  await page.keyboard.press('Enter');
+  await waitForScene(page, SCENE.settings);
+  await frames(page, 10);
+  const open = await readPanel(page);
+  expect(open.gamePaused).toBe(true);
+  expect(open.pauseActive).toBe(false);
+
+  await page.keyboard.press('Escape');
+  await waitForPause(page, undefined);
+  const back = await snapshot(page);
+  expect(back.pause?.view).toEqual(before.pause?.view);
+  expect(back.gamePaused).toBe(true);
+  // The Esc that closed Settings does not also resume the run.
+  await frames(page, 10);
+  expect((await snapshot(page)).gamePaused).toBe(true);
+
+  // Enter with nothing highlighted is still Resume.
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await snapshot(page)).gamePaused).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('a gamepad opens Settings from the pause menu, and Start goes back to it', async ({
+  page,
+}) => {
+  await installPad(page);
+  const errors = collectErrors(page);
+  await startRun(page);
+  await frames(page, 4); // the first poll after a connect only takes a baseline
+
+  await pressPad(page, START);
+  await waitForPause(page, undefined);
+  const before = await snapshot(page);
+  await frames(page, 4);
+  await pressPad(page, DOWN); // wakes the highlight on Resume
+  await pressPad(page, DOWN); // Settings
+  await pressPad(page, A);
+  await waitForScene(page, SCENE.settings);
+  await frames(page, 4);
+  expect((await readPanel(page)).gamePaused).toBe(true);
+
+  await pressPad(page, START);
+  await waitForPause(page, undefined);
+  await frames(page, 4);
+  const back = await snapshot(page);
+  expect(back.pause?.view).toEqual(before.pause?.view);
+  // The Start that closed Settings does not also resume the run.
+  expect(back.gamePaused).toBe(true);
+  expect((await readPanel(page)).settingsActive).toBe(false);
+
+  await pressPad(page, START);
+  await expect.poll(async () => (await snapshot(page)).gamePaused).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('a click and a key in one frame open Settings once and never resume the run with it', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await pauseRun(page);
+  await countSettingsCreates(page);
+
+  // Both paths end in the pause screen's `choose`; fire it three times in one frame.
+  await page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    const pause = game.scene.getScene(key) as unknown as {
+      view: PausePayload;
+      choose(action: string, view: unknown): void;
+    };
+    const { view } = pause.view;
+    pause.choose('settings', view);
+    pause.choose('settings', view);
+    pause.choose('resume', view);
+  }, SCENE.pause);
+  await waitForScene(page, SCENE.settings);
+  // Sample past the frames the first step's leftovers would land in.
+  for (let i = 0; i < 3; i += 1) {
+    await frames(page, 5);
+    const read = await readPanel(page);
+    expect(read.creates).toBe(1);
+    expect(read.settingsActive).toBe(true);
+    expect(read.pauseActive).toBe(false);
+    expect(read.gamePaused).toBe(true);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('losing focus while Settings is open neither reopens Pause nor resumes the run', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await pauseRun(page);
+  await clickButton(page, 'Settings');
+  await waitForScene(page, SCENE.settings);
+  const before = await readPanel(page);
+
+  await page.evaluate(async () => {
+    const { game } = await import('/src/main.ts');
+    game.events.emit('blur');
+    game.events.emit('hidden');
+  });
+  await frames(page, 10);
+  const after = await readPanel(page);
+  expect(after.settingsActive).toBe(true);
+  expect(after.pauseActive).toBe(false);
+  expect(after.gamePaused).toBe(true);
+  expect(after.elapsedMs).toBe(before.elapsedMs);
+  expect(errors).toEqual([]);
+});
+
+test('the main menu Settings still goes back to Intro after a pause Settings', async ({ page }) => {
+  const errors = collectErrors(page);
+  await pauseRun(page);
+  await clickButton(page, 'Settings');
+  await waitForScene(page, SCENE.settings);
+  await page.keyboard.press('Escape');
+  await waitForPause(page, undefined);
+
+  // Leave the run through Main menu -> Yes.
+  await clickButton(page, 'Main menu');
+  await waitForPause(page, 'menu');
+  await clickButton(page, 'Yes');
+  await waitForScene(page, SCENE.intro);
+  await frames(page, 10);
+
+  // Intro starts Settings with no payload; Phaser would replay the pause one.
+  await page.mouse.click(INTRO_SETTINGS.x, INTRO_SETTINGS.y);
+  await waitForScene(page, SCENE.settings);
+  const menu = await page.evaluate(async (audioKey) => {
+    const { game } = await import('/src/main.ts');
+    return (game.registry.get(audioKey) as Audio).music.track;
+  }, AUDIO_REGISTRY_KEY);
+  expect(menu).toBe('music.menu');
+  await page.keyboard.press('Escape');
+  await waitForScene(page, SCENE.intro);
+  await frames(page, 10);
+  const read = await page.evaluate(async (scene) => {
+    const { game } = await import('/src/main.ts');
+    return {
+      intro: game.scene.isActive(scene.intro),
+      settings: game.scene.isActive(scene.settings),
+      pause: game.scene.isActive(scene.pause),
+      game: game.scene.isActive(scene.game) || game.scene.isPaused(scene.game),
+    };
+  }, SCENE);
+  expect(read).toEqual({ intro: true, settings: false, pause: false, game: false });
+  expect(errors).toEqual([]);
 });

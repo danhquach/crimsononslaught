@@ -4,7 +4,13 @@ import { RELIC_BUFFS, isRelicBuffId, type RelicBuffId } from '../config/relics';
 import { isSpellId, type SpellId } from '../config/spells';
 import { MAX_OFFER_SIZE, isOfferCard, type OfferCard } from './levelUp';
 import type { OfferActionCounts } from './offerActions';
-import { isPauseAction, isPauseView, type ConfirmAction, type PauseView } from './pauseModel';
+import {
+  isPauseAction,
+  isPauseView,
+  needsConfirm,
+  type ConfirmAction,
+  type PauseView,
+} from './pauseModel';
 
 /**
  * Typed payloads carried across scene transitions (spec §7: transitions always
@@ -98,6 +104,15 @@ export interface PausePayload {
   confirm?: ConfirmAction;
 }
 
+/**
+ * `Pause -> Settings` (CO-192): the pause view Settings hands back to Pause on
+ * Back, so the run's build reads the same as before. Left out, as from the
+ * main menu, Back returns to Intro.
+ */
+export interface SettingsPayload {
+  pause: PausePayload;
+}
+
 /** What the Help screen shows (#226): a tab, or the About tab's feedback form. */
 export const HELP_VIEWS = ['pickups', 'about', 'feedback'] as const;
 
@@ -185,8 +200,13 @@ export function isPausePayload(data: unknown): data is PausePayload {
   return (
     isRecord(data) &&
     isPauseView(data.view) &&
-    (data.confirm === undefined || (isPauseAction(data.confirm) && data.confirm !== 'resume'))
+    (data.confirm === undefined || (isPauseAction(data.confirm) && needsConfirm(data.confirm)))
   );
+}
+
+/** `pause` must be the plain menu view: a confirmation is never what Settings returns to. */
+export function isSettingsPayload(data: unknown): data is SettingsPayload {
+  return isRecord(data) && isPausePayload(data.pause) && data.pause.confirm === undefined;
 }
 
 export function isHelpPayload(data: unknown): data is HelpPayload {

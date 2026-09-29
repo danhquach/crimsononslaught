@@ -4,6 +4,7 @@ import { RELIC_BUFFS, type RelicBuffId } from '../config/relics';
 import {
   CONFIRM_PROMPTS,
   PAUSE_ACTIONS,
+  PAUSE_LABELS,
   abbreviate,
   isPauseView,
   itemInfo,
@@ -131,11 +132,14 @@ describe('statsLine and itemInfo', () => {
 });
 
 describe('pause actions', () => {
-  it('offers Resume first, then the three ways out', () => {
-    expect(PAUSE_ACTIONS).toEqual(['resume', 'restart', 'end', 'menu']);
+  it('offers Resume first, then Settings, then the three ways out', () => {
+    expect(PAUSE_ACTIONS).toEqual(['resume', 'settings', 'restart', 'end', 'menu']);
+    expect(PAUSE_LABELS.settings).toBe('Settings');
   });
 
-  it('asks before every action but Resume', () => {
+  it('asks before every action that ends or abandons the run, not Resume or Settings', () => {
+    expect(needsConfirm('resume')).toBe(false);
+    expect(needsConfirm('settings')).toBe(false);
     expect(PAUSE_ACTIONS.filter(needsConfirm)).toEqual(['restart', 'end', 'menu']);
     for (const action of ['restart', 'end', 'menu'] as const) {
       expect(CONFIRM_PROMPTS[action].question, action).toMatch(/\?$/);

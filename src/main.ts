@@ -50,7 +50,7 @@ const config: Phaser.Types.Core.GameConfig = {
     createContainer: true,
   },
   // Flow: Boot -> Intro -> SpellSelect -> Game (+ Hud overlay, LevelUp overlay on level-up, Pause overlay on Esc / Start) -> Result -> SpellSelect.
-  // Intro <-> Settings, Intro <-> Profile (#121) and Intro <-> Help (#226) are its panels; SpellSelect <-> Upgrades is the meta loop (CO-101).
+  // Intro <-> Settings (and Pause <-> Settings, CO-192), Intro <-> Profile (#121) and Intro <-> Help (#226) are its panels; SpellSelect <-> Upgrades is the meta loop (CO-101).
   scene: [
     BootScene,
     IntroScene,

@@ -17,7 +17,12 @@ import {
   type PauseView,
 } from '../core/pauseModel';
 import { stepPauseFocus, type NavDirection, type PauseFocus } from '../core/pauseNav';
-import { SCENE, isPausePayload, type PausePayload } from '../core/scenePayloads';
+import {
+  SCENE,
+  isPausePayload,
+  type PausePayload,
+  type SettingsPayload,
+} from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import {
   CRIMSON,
@@ -79,11 +84,12 @@ interface BuildSlot {
  * menu under it; beside it, framed strips hold the spells' icons, the passives
  * as tiles with their ranks and the relic buffs as gems with their stacks, and
  * pointing at one, or reaching it with the arrows or a pad (CO-179), reads it
- * out. Resume, Restart, End run and Main menu by mouse, arrows + Enter or a
- * gamepad; Esc or pad Start resumes. The last three
- * ask first: the scene restarts itself with `confirm` set, which shows Yes / No
- * (No is Enter's default) and goes back to the menu on No, Esc or Start. A
- * confirmed choice is emitted as `PAUSE_EVENT.choose` on Game's emitter; Game
+ * out. Resume, Settings, Restart, End run and Main menu by mouse, arrows +
+ * Enter or a gamepad; Esc or pad Start resumes. Settings (CO-192) opens the
+ * Settings scene over the still-paused Game, straight away, and its Back
+ * returns here with the same view. The last three ask first: the scene
+ * restarts itself with `confirm` set, which shows Yes / No (No is Enter's
+ * default) and goes back to the menu on No, Esc or Start. A confirmed choice is emitted as `PAUSE_EVENT.choose` on Game's emitter; Game
  * stops this scene as it leaves. The HUD keeps running underneath, and holds
  * still because Game sends it nothing while paused.
  */
@@ -467,6 +473,10 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private choose(action: PauseAction, view: PauseView): void {
+    if (action === 'settings') {
+      this.openSettings(view);
+      return;
+    }
     if (!needsConfirm(action)) {
       this.resume();
       return;
@@ -475,6 +485,17 @@ export class PauseScene extends Phaser.Scene {
     this.leaving = true;
     audioOf(this).play('ui.confirm');
     this.scene.restart({ view, confirm: action } satisfies PausePayload);
+  }
+
+  /**
+   * Game stays paused; Settings hands back the view on Back. Guarded like
+   * every way out of this screen.
+   */
+  private openSettings(view: PauseView): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    audioOf(this).play('ui.confirm');
+    this.scene.start(SCENE.settings, { pause: { view } } satisfies SettingsPayload);
   }
 
   private backToMenu(view: PauseView): void {

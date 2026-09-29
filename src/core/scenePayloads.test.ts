@@ -21,6 +21,7 @@ import {
   isResultPayload,
   isRunBuild,
   isRunStats,
+  isSettingsPayload,
   type ResultPayload,
   type RunBuild,
 } from './scenePayloads';
@@ -139,6 +140,7 @@ describe('isPausePayload', () => {
     expect(isPausePayload(undefined)).toBe(false);
     expect(isPausePayload({})).toBe(false);
     expect(isPausePayload({ view, confirm: 'resume' })).toBe(false);
+    expect(isPausePayload({ view, confirm: 'settings' })).toBe(false);
     expect(isPausePayload({ view, confirm: 'quit' })).toBe(false);
     expect(isPausePayload({ view: { ...view, level: 1.5 } })).toBe(false);
     expect(isPausePayload({ view: { ...view, spells: ['Fire Bolt'] } })).toBe(false);
@@ -146,6 +148,20 @@ describe('isPausePayload', () => {
     expect(isPausePayload({ view: { ...view, relics: [{ ...power, count: -1 }] } })).toBe(false);
     expect(isPausePayload({ view: { ...view, stats: undefined } })).toBe(false);
     expect(isPausePayload({ view: { ...view, stats: { ...stats, elapsedMs: NaN } } })).toBe(false);
+  });
+
+  it('accepts a Settings payload only with a plain pause view to go back to', () => {
+    expect(isSettingsPayload({ pause: { view } })).toBe(true);
+    expect(isSettingsPayload({ pause: { view: empty } })).toBe(true);
+    expect(isSettingsPayload(undefined)).toBe(false);
+    expect(isSettingsPayload({})).toBe(false);
+    expect(isSettingsPayload({ pause: undefined })).toBe(false);
+    expect(isSettingsPayload({ pause: {} })).toBe(false);
+    expect(isSettingsPayload({ pause: { view: { ...view, level: -1 } } })).toBe(false);
+    // The bare pause payload is not a Settings payload, and Settings never returns to a prompt.
+    expect(isSettingsPayload({ view })).toBe(false);
+    expect(isSettingsPayload({ pause: { view, confirm: 'end' } })).toBe(false);
+    expect(isSettingsPayload({ pause: { view, confirm: 'settings' } })).toBe(false);
   });
 });
 
