@@ -11,7 +11,7 @@ import { emptySave, isSave } from '../core/save';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
 import { attachMenuInput, type MenuItem } from './input';
-import { addTextButton, textButtonItem } from './ui';
+import { addHintLine, addMenuRow, addMenuTitle, drawMenuBackdrop } from './menuUi';
 
 const CARD_WIDTH = 200;
 /**
@@ -52,20 +52,8 @@ export class SpellSelectScene extends Phaser.Scene {
     const { width, height } = this.scale;
     this.seed = this.registry.get(SEED_REGISTRY_KEY) as number;
 
-    this.add
-      .text(width / 2, 60, 'Choose a spell', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '48px',
-        color: '#dc143c',
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(width / 2, 112, 'click a card, press 1–4, or use a gamepad', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '20px',
-        color: '#cccccc',
-      })
-      .setOrigin(0.5);
+    drawMenuBackdrop(this, 'quiet');
+    addMenuTitle(this, width / 2, 50, 'Choose a spell');
 
     const rowWidth = SPELL_IDS.length * CARD_WIDTH + (SPELL_IDS.length - 1) * CARD_GAP;
     const firstX = (width - rowWidth) / 2 + CARD_WIDTH / 2;
@@ -73,23 +61,23 @@ export class SpellSelectScene extends Phaser.Scene {
     const items = SPELL_IDS.map((spellId, i) =>
       this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, spellId, i + 1),
     );
-    const upgradesButton = addTextButton(
-      this,
-      width - 110,
-      height - 32,
-      'Upgrades  (U)',
-      () => this.openUpgrades(),
-      { fontSize: '20px', padding: { x: 12, y: 6 } },
-    );
-    const menuButton = addTextButton(this, 90, 32, 'Menu  (Esc)', () => this.openMenu(), {
-      fontSize: '18px',
-      padding: { x: 10, y: 5 },
+    const upgradesRow = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Upgrades  (U)',
+      x: width - 120,
+      y: 32,
+      width: 220,
+      onConfirm: () => this.openUpgrades(),
     });
-    attachMenuInput(this, [
-      ...items,
-      textButtonItem(upgradesButton, () => this.openUpgrades()),
-      textButtonItem(menuButton, () => this.openMenu()),
-    ]);
+    const menuRow = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Menu  (Esc)',
+      x: 120,
+      y: 32,
+      width: 210,
+      onConfirm: () => this.openMenu(),
+    });
+    attachMenuInput(this, [...items, upgradesRow, menuRow]);
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       const spellId = spellIdForKey(event.key);
@@ -100,19 +88,22 @@ export class SpellSelectScene extends Phaser.Scene {
 
     const stored: unknown = this.registry.get(SAVE_REGISTRY_KEY);
     const save = isSave(stored) ? stored : emptySave();
-    this.add.text(24, height - 44, `${CURRENCY_NAME}: ${save.currency.toLocaleString('en-US')}`, {
-      fontFamily: 'Georgia, serif',
-      fontSize: '20px',
-      color: '#ffa040',
-    });
-
     this.add
-      .text(width / 2, height - 24, `seed ${this.seed}`, {
+      .text(width - 24, 66, `${CURRENCY_NAME}: ${save.currency.toLocaleString('en-US')}`, {
+        fontFamily: 'Georgia, serif',
+        fontSize: '20px',
+        color: '#ffa040',
+      })
+      .setOrigin(1, 0);
+
+    addHintLine(this, 'click a card, press 1–4, or use a gamepad');
+    this.add
+      .text(width - 16, height - 15, `seed ${this.seed}`, {
         fontFamily: 'monospace',
         fontSize: '14px',
-        color: '#888888',
+        color: '#a89f94',
       })
-      .setOrigin(0.5);
+      .setOrigin(1, 0.5);
   }
 
   private addCard(x: number, y: number, spellId: SpellId, hotkey: number): MenuItem {

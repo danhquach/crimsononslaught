@@ -6,23 +6,15 @@ import { FEEDBACK_URL } from '../src/core/feedback';
 import { pickupHelpRows } from '../src/core/helpModel';
 import { AUDIO_REGISTRY_KEY, SCENE, type HelpView } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
-import { collectErrors, sceneTexts, waitForScene } from './game';
+import { clickRow, collectErrors, menuRows, sceneTexts, waitForScene } from './game';
+import type { MenuRowReport } from '../src/scenes/menuUi';
 
 /**
  * The Help screen (#226): Intro's fourth entry opens it by mouse, keys or pad;
  * the Pickups tab has a row with art for every pickup; About shows the version,
  * what's new and a feedback form, which posts to the service's URL (routed
- * here, never really sent). Positions mirror `IntroScene` (entries 58 px apart
- * from y = 240) and `HelpScene` (tabs at y = 96, 156 px apart; Back at
- * y = 494; Send feedback at y = 406; Send and Cancel at y = 446).
+ * here, never really sent). Rows are found where the scene drew them (`menuRows`).
  */
-
-const HELP_ENTRY = { x: 480, y: 240 + 3 * 58 };
-const TAB = { pickups: { x: 402, y: 96 }, about: { x: 558, y: 96 } } as const;
-const BACK = { x: 480, y: 494 };
-const SEND_FEEDBACK = { x: 480, y: 406 };
-const SEND = { x: 390, y: 446 };
-const CANCEL = { x: 570, y: 446 };
 
 const VERSION = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
 const NAMES = pickupHelpRows().map((row) => row.name);
@@ -69,11 +61,11 @@ async function expectOnScreen(page: Page): Promise<void> {
 async function openFeedbackForm(page: Page): Promise<void> {
   await page.goto('/?seed=1');
   await waitForScene(page, SCENE.intro);
-  await page.mouse.click(HELP_ENTRY.x, HELP_ENTRY.y);
+  await clickRow(page, SCENE.intro, 'Help');
   await waitForView(page, 'pickups');
-  await page.mouse.click(TAB.about.x, TAB.about.y);
+  await clickRow(page, SCENE.help, 'About');
   await waitForView(page, 'about');
-  await page.mouse.click(SEND_FEEDBACK.x, SEND_FEEDBACK.y);
+  await clickRow(page, SCENE.help, 'Send feedback');
   await waitForView(page, 'feedback');
   await expect(page.locator('input[name="subject"]')).toBeFocused();
 }
@@ -99,7 +91,7 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
   const errors = collectErrors(page);
   await page.goto('/?seed=1');
   await waitForScene(page, SCENE.intro);
-  await page.mouse.click(HELP_ENTRY.x, HELP_ENTRY.y);
+  await clickRow(page, SCENE.intro, 'Help');
   await waitForView(page, 'pickups');
 
   const texts = await sceneTexts(page, SCENE.help);
@@ -131,10 +123,14 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
     expect(icon.playing).toBe(true);
     expect(icon.size).toBeCloseTo(32, 0);
   }
+  // The open tab is marked apart from whatever the arrows have lit.
+  const rows = await menuRows(page, SCENE.help);
+  expect(rows.filter((row) => row.active).map((row) => row.label)).toEqual(['Pickups']);
+  expect(rows.filter((row) => row.selected)).toEqual([]);
   await expectOnScreen(page);
   await page.screenshot({ path: test.info().outputPath('help-pickups.png') });
 
-  await page.mouse.click(BACK.x, BACK.y);
+  await clickRow(page, SCENE.help, 'Back  (Esc)');
   await waitForScene(page, SCENE.intro);
   expect(errors).toEqual([]);
 });
@@ -256,7 +252,7 @@ test('the feedback form refuses blank input, sends a prefixed subject, and keeps
   await page.keyboard.press('Shift+Tab');
 
   // Blank: refused in the form, nothing posted.
-  await page.mouse.click(SEND.x, SEND.y);
+  await clickRow(page, SCENE.help, 'Send');
   await expect.poll(() => sceneTexts(page, SCENE.help)).toContain('Enter a subject and a message.');
   expect(bodies).toEqual([]);
 
@@ -290,7 +286,7 @@ test('the feedback form refuses blank input, sends a prefixed subject, and keeps
   await expect(page.locator('input[name="subject"]')).toHaveValue('wasd m');
   await expect(page.locator('textarea[name="message"]')).toHaveValue('line one\nline two');
 
-  await page.mouse.click(SEND.x, SEND.y);
+  await clickRow(page, SCENE.help, 'Send');
   await expect.poll(() => sceneTexts(page, SCENE.help)).toContain('Thanks, feedback sent');
   expect(bodies).toEqual([
     {
@@ -304,12 +300,22 @@ test('the feedback form refuses blank input, sends a prefixed subject, and keeps
   // Send rests after a success, so a second click posts nothing.
   await page.locator('input[name="subject"]').fill('again');
   await page.locator('textarea[name="message"]').fill('again');
-  await page.mouse.click(SEND.x, SEND.y);
+  // Read once per poll: the row as one evaluate saw it, label, bounds and enabled together.
+  let resting: MenuRowReport | undefined;
+  await expect
+    .poll(async () => {
+      resting = (await menuRows(page, SCENE.help)).find((row) => row.label.startsWith('Send ('));
+      return resting?.label;
+    })
+    .toMatch(/^Send \(\d+ s\)$/);
+  expect(resting?.enabled).toBe(false);
+  const { x, y, width, height } = resting!.bounds;
+  await page.mouse.click(x + width / 2, y + height / 2);
   await page.waitForTimeout(300);
   expect(bodies).toHaveLength(1);
 
   // Cancel returns to About and takes the DOM form with it.
-  await page.mouse.click(CANCEL.x, CANCEL.y);
+  await clickRow(page, SCENE.help, 'Cancel  (Esc)');
   await waitForView(page, 'about');
   await expect(page.locator('input[name="subject"]')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -323,7 +329,7 @@ test('a failed send says so and keeps what was typed; Esc in a field closes the 
   await page.keyboard.type('Crash');
   await page.keyboard.press('Tab');
   await page.keyboard.type('It froze on wave 3');
-  await page.mouse.click(SEND.x, SEND.y);
+  await clickRow(page, SCENE.help, 'Send');
   await expect.poll(() => sceneTexts(page, SCENE.help)).toContain("Couldn't send, try again");
   expect(bodies).toHaveLength(1);
   await expect(page.locator('input[name="subject"]')).toHaveValue('Crash');

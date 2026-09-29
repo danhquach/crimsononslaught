@@ -28,6 +28,7 @@ import { installAtlas, queueAtlas, warnIfAtlasMissing } from '../render/atlas';
 import { installAudio, queueSounds, warnIfSoundsMissing } from '../render/audio';
 import { writeAudioSettings } from '../core/audioMix';
 import { generatePlaceholderTextures } from '../render/textures';
+import { queueMenuArt, warnIfMenuArtMissing } from './menuUi';
 
 /**
  * First scene: loads the sprite atlas, fills any gap with a placeholder
@@ -44,6 +45,8 @@ export class BootScene extends Phaser.Scene {
   preload(): void {
     queueAtlas(this);
     queueSounds(this);
+    // The menus' painted art and title font (CO-191); Intro builds its Text once these are in.
+    queueMenuArt(this);
   }
 
   create(): void {
@@ -51,6 +54,7 @@ export class BootScene extends Phaser.Scene {
     // key the atlas already provides alone, so a key only falls back to a
     // generated shape when the atlas has nothing for it (spec §6, CO-080).
     warnIfAtlasMissing(this);
+    warnIfMenuArtMissing(this);
     installAtlas(this);
     generatePlaceholderTextures(this);
 

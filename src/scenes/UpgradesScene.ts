@@ -6,12 +6,22 @@ import { buyUpgrade, canBuy, isUnlocked, nextCost, upgradeRank } from '../core/u
 import { storeSaveJson } from '../storage/localSave';
 import { audioOf } from '../render/audio';
 import { attachMenuInput, type MenuItem } from './input';
-import { addTextButton, textButtonItem } from './ui';
+import {
+  addHintLine,
+  addMenuRow,
+  addMenuTitle,
+  drawMenuBackdrop,
+  drawPanel,
+  type MenuRow,
+} from './menuUi';
 
-const ROW_TOP = 128;
+const PANEL_X = 40;
+const PANEL_Y = 108;
+const ROW_TOP = 122;
 const ROW_HEIGHT = 54;
-const LEFT = 60;
+const LEFT = 64;
 const BUY_X = 860;
+const BUTTONS_Y = 476;
 
 /**
  * Permanent upgrade shop (CO-101): one row per upgrade with its rank, what the
@@ -39,43 +49,43 @@ export class UpgradesScene extends Phaser.Scene {
     audioOf(this).playMusic('music.menu');
     this.leaving = false;
     this.wipeArmed = false;
-    const { width, height } = this.scale;
+    const { width } = this.scale;
     const save = this.save;
 
+    drawMenuBackdrop(this, 'quiet');
+    addMenuTitle(this, width / 2, 40, 'Upgrades');
     this.add
-      .text(width / 2, 44, 'Upgrades', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '44px',
-        color: '#dc143c',
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(width / 2, 90, `${CURRENCY_NAME}: ${save.currency.toLocaleString('en-US')}`, {
+      .text(width / 2, 84, `${CURRENCY_NAME}: ${save.currency.toLocaleString('en-US')}`, {
         fontFamily: 'Georgia, serif',
         fontSize: '22px',
         color: '#ffa040',
       })
       .setOrigin(0.5);
 
+    drawPanel(this, PANEL_X, PANEL_Y, width - PANEL_X * 2, UPGRADES.length * ROW_HEIGHT + 20);
     const items: MenuItem[] = UPGRADES.map((upgrade, i) =>
       this.addRow(upgrade, save, ROW_TOP + i * ROW_HEIGHT),
     );
 
-    const backButton = addTextButton(this, 140, height - 36, 'Back  (Esc)', () => this.back(), {
-      fontSize: '20px',
-      padding: { x: 12, y: 6 },
+    const backRow = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Back  (Esc)',
+      x: 150,
+      y: BUTTONS_Y,
+      width: 200,
+      onConfirm: () => this.back(),
     });
-    const wipeButton = addTextButton(
-      this,
-      width - 160,
-      height - 36,
-      'Wipe progress',
-      () => this.onWipePressed(wipeButton),
-      { fontSize: '20px', padding: { x: 12, y: 6 }, color: '#ff6666' },
-    );
-    items.push(textButtonItem(backButton, () => this.back()));
-    items.push(textButtonItem(wipeButton, () => this.onWipePressed(wipeButton)));
+    const wipeRow = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Wipe progress',
+      x: width - 210,
+      y: BUTTONS_Y,
+      width: 320,
+      onConfirm: () => this.onWipePressed(wipeRow),
+    });
+    items.push(backRow, wipeRow);
     attachMenuInput(this, items);
+    addHintLine(this, 'click, Esc to go back, or a gamepad');
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape') this.back();
@@ -104,7 +114,7 @@ export class UpgradesScene extends Phaser.Scene {
     this.commit({ ...fresh, profile: { ...fresh.profile, name: this.save.profile.name } });
   }
 
-  private addRow(upgrade: Upgrade, save: Save, y: number): MenuItem {
+  private addRow(upgrade: Upgrade, save: Save, y: number): MenuRow {
     const owned = upgradeRank(save, upgrade.id);
     const cost = nextCost(save, upgrade.id);
     const reason = canBuy(save, upgrade.id);
@@ -138,22 +148,24 @@ export class UpgradesScene extends Phaser.Scene {
       })
       .setOrigin(1, 0.5);
 
-    const canAfford = reason === undefined;
-    const button = addTextButton(this, BUY_X, y + 12, 'Buy', () => this.buy(upgrade.id), {
-      fontSize: '18px',
-      padding: { x: 14, y: 4 },
-      color: canAfford ? '#ffffff' : '#666666',
+    const buy = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Buy',
+      x: BUY_X,
+      y: y + 12,
+      width: 90,
+      onConfirm: () => this.buy(upgrade.id),
     });
-    if (!canAfford) button.disableInteractive().setAlpha(0.5);
-    return textButtonItem(button, () => this.buy(upgrade.id));
+    buy.setEnabled(reason === undefined);
+    return buy;
   }
 
   /** First press arms the wipe and relabels the button; the second wipes. Leaving the scene disarms it. */
-  private onWipePressed(button: Phaser.GameObjects.Text): void {
+  private onWipePressed(button: MenuRow): void {
     audioOf(this).play('ui.confirm');
     if (!this.wipeArmed) {
       this.wipeArmed = true;
-      button.setText('Really wipe? Click again');
+      button.setLabel('Really wipe? Click again');
       return;
     }
     this.wipe();

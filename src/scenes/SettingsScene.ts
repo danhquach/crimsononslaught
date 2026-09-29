@@ -12,18 +12,33 @@ import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { audioOf } from '../render/audio';
 import { storeSaveJson } from '../storage/localSave';
 import { attachMenuInput, watchStartButton, type MenuItem } from './input';
-import { addTextButton, textButtonItem } from './ui';
+import {
+  addHintLine,
+  addMenuRow,
+  addMenuTitle,
+  drawMenuBackdrop,
+  drawPanel,
+  type MenuRow,
+} from './menuUi';
 
-const ROW_TOP = 140;
-const ROW_HEIGHT = 58;
-const TOGGLE_WIDTH = 120;
-const SMALL_BUTTON = { fontSize: '22px', padding: { x: 12, y: 6 } } as const;
+/** The two framed groups (CO-191): where each sits and how its rows are laid out. */
+const PANEL_X = 200;
+const PANEL_WIDTH = 560;
+const PANEL_HEIGHT = 172;
+const VOLUME_PANEL_Y = 76;
+const FEEDBACK_PANEL_Y = 264;
+const PANEL_ROW_TOP = 50;
+const PANEL_ROW_PITCH = 46;
+const PANEL_PADDING = 24;
+/** The −, value and + of a volume row are centred here, right of its label. */
+const VOLUME_CONTROL_X = PANEL_X + PANEL_WIDTH - 120;
+const STEP_WIDTH = 44;
+/** A list row's label starts this far in from its left edge, after the ▶ marker. */
+const LIST_INDENT = 32;
+const BACK_Y = 470;
 
 type FeedbackToggle = 'numbers' | 'hitStop' | 'shake';
 type VolumeChannel = 'master' | 'music';
-
-/** Over a paused run the panel dims the frozen arena a little more than Pause does. */
-const PAUSED_BACKDROP_ALPHA = 0.9;
 
 /**
  * Settings panel (#121), reached from Intro and back to it, or (CO-192) from
@@ -65,83 +80,27 @@ export class SettingsScene extends Phaser.Scene {
     this.leaving = false;
     this.labels.length = 0;
     const { width, height } = this.scale;
-    const audio = audioOf(this);
 
     if (this.returnTo) this.coverPausedRun(width, height);
     // The menu track carries across every menu screen (CO-157); asking again is a
     // no-op. A paused run keeps its own music playing.
-    else audio.playMusic('music.menu');
+    else audioOf(this).playMusic('music.menu');
 
-    this.add
-      .text(width / 2, 60, 'Settings', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '44px',
-        color: '#dc143c',
-      })
-      .setOrigin(0.5);
-
-    const items: MenuItem[] = [];
-    const controlX = width / 2 + 120;
-
-    // Volumes: − value +. Music (CO-157) scales only the tracks, master both.
-    const volumeRows: readonly (readonly [VolumeChannel, string])[] = [
-      ['master', 'Master volume'],
-      ['music', 'Music volume'],
-    ];
-    volumeRows.forEach(([channel, label], i) => {
-      const y = ROW_TOP + i * ROW_HEIGHT;
-      this.addLabel(width / 2, y, label);
-      const nudge = (direction: 1 | -1): void => {
-        audio.setSettings({ [channel]: stepVolume(audio.settings[channel], direction) });
-        audio.play('ui.move');
-        this.refresh();
-      };
-      const down = addTextButton(this, controlX - 70, y, '−', () => nudge(-1), SMALL_BUTTON);
-      const volume = this.add
-        .text(controlX, y, '', { fontFamily: 'monospace', fontSize: '22px', color: '#eeeeee' })
-        .setOrigin(0.5);
-      const up = addTextButton(this, controlX + 70, y, '+', () => nudge(1), SMALL_BUTTON);
-      this.labels.push(() => volume.setText(`${Math.round(audio.settings[channel] * 100)}%`));
-      items.push(
-        textButtonItem(down, () => nudge(-1)),
-        textButtonItem(up, () => nudge(1)),
-      );
+    // The same backdrop, title, panels and rows from either door (CO-191), so
+    // Settings looks the same from the main menu and from the pause screen.
+    drawMenuBackdrop(this, 'quiet');
+    addMenuTitle(this, width / 2, 44, 'Settings');
+    const items = this.drawPanels();
+    const back = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Back  (Esc)',
+      x: width / 2,
+      y: BACK_Y,
+      width: 220,
+      onConfirm: () => this.back(),
     });
-
-    // Mute: the same switch as `M`, so the label follows a key press too.
-    items.push(
-      this.addToggle(
-        width / 2,
-        ROW_TOP + volumeRows.length * ROW_HEIGHT,
-        'Sound',
-        () => !audio.settings.muted,
-        () => audio.toggleMute(),
-      ),
-    );
-
-    const feedbackRows: readonly (readonly [FeedbackToggle, string])[] = [
-      ['numbers', 'Damage numbers'],
-      ['hitStop', 'Hit-stop'],
-      ['shake', 'Screen shake'],
-    ];
-    feedbackRows.forEach(([key, label], i) => {
-      items.push(
-        this.addToggle(
-          width / 2,
-          ROW_TOP + (i + volumeRows.length + 1) * ROW_HEIGHT,
-          label,
-          () => isOn(readFeedbackSettings(this.save.settings), key),
-          () => this.toggleFeedback(key),
-        ),
-      );
-    });
-
-    const back = addTextButton(this, width / 2, height - 60, 'Back  (Esc)', () => this.back(), {
-      fontSize: '22px',
-      padding: { x: 14, y: 6 },
-    });
-    items.push(textButtonItem(back, () => this.back()));
-    attachMenuInput(this, items, { keyboard: true });
+    attachMenuInput(this, [...items, back], { keyboard: true });
+    addHintLine(this);
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.repeat) this.back();
@@ -159,19 +118,94 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   /**
+   * The Volume and Feedback panels with their rows, drawn apart from the
+   * backdrop and the title. The pause screen (CO-192) opens this same scene
+   * rather than drawing its own, so both doors show these panels.
+   */
+  private drawPanels(): MenuItem[] {
+    const audio = audioOf(this);
+    const items: MenuItem[] = [];
+    drawPanel(this, PANEL_X, VOLUME_PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT, 'Volume');
+    drawPanel(this, PANEL_X, FEEDBACK_PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT, 'Feedback');
+    const rowY = (panelY: number, i: number): number =>
+      panelY + PANEL_ROW_TOP + i * PANEL_ROW_PITCH;
+
+    // Volumes: − value +. Music (CO-157) scales only the tracks, master both.
+    const volumeRows: readonly (readonly [VolumeChannel, string])[] = [
+      ['master', 'Master volume'],
+      ['music', 'Music volume'],
+    ];
+    volumeRows.forEach(([channel, label], i) => {
+      const y = rowY(VOLUME_PANEL_Y, i);
+      this.addLabel(y, label);
+      const nudge = (direction: 1 | -1): void => {
+        audio.setSettings({ [channel]: stepVolume(audio.settings[channel], direction) });
+        audio.play('ui.move');
+        this.refresh();
+      };
+      const step = (x: number, label: string, direction: 1 | -1): MenuRow =>
+        addMenuRow(this, {
+          kind: 'bar',
+          label,
+          x,
+          y,
+          width: STEP_WIDTH,
+          onConfirm: () => nudge(direction),
+        });
+      const down = step(VOLUME_CONTROL_X - 70, '−', -1);
+      const volume = this.add
+        .text(VOLUME_CONTROL_X, y, '', {
+          fontFamily: 'monospace',
+          fontSize: '20px',
+          color: '#eeeeee',
+        })
+        .setOrigin(0.5);
+      const up = step(VOLUME_CONTROL_X + 70, '+', 1);
+      this.labels.push(() => volume.setText(`${Math.round(audio.settings[channel] * 100)}%`));
+      items.push(down, up);
+    });
+
+    // Mute: the same switch as `M`, so the label follows a key press too.
+    items.push(
+      this.addToggle(
+        rowY(VOLUME_PANEL_Y, volumeRows.length),
+        'Sound',
+        () => !audio.settings.muted,
+        () => audio.toggleMute(),
+      ),
+    );
+
+    const feedbackRows: readonly (readonly [FeedbackToggle, string])[] = [
+      ['numbers', 'Damage numbers'],
+      ['hitStop', 'Hit-stop'],
+      ['shake', 'Screen shake'],
+    ];
+    feedbackRows.forEach(([key, label], i) => {
+      items.push(
+        this.addToggle(
+          rowY(FEEDBACK_PANEL_Y, i),
+          label,
+          () => isOn(readFeedbackSettings(this.save.settings), key),
+          () => this.toggleFeedback(key),
+        ),
+      );
+    });
+    return items;
+  }
+
+  /**
    * Over a paused run (CO-192): on top of Game and its HUD, which would show
    * through and cannot be told apart from the rows; the HUD comes back as this
-   * panel closes, and Pause hides it again if that is where it goes.
+   * panel closes, and Pause hides it again if that is where it goes. A solid
+   * black plate that takes the pointer sits under the menu backdrop, so
+   * clicks never reach the run and a menu backdrop that failed to load still
+   * leaves the arena hidden.
    */
   private coverPausedRun(width: number, height: number): void {
     this.scene.bringToTop();
     this.scene.setVisible(false, SCENE.hud);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scene.setVisible(true, SCENE.hud));
-    // Interactive, so clicks never reach anything underneath.
-    this.add
-      .rectangle(0, 0, width, height, 0x000000, PAUSED_BACKDROP_ALPHA)
-      .setOrigin(0)
-      .setInteractive();
+    this.add.rectangle(0, 0, width, height, 0x000000).setOrigin(0).setInteractive();
   }
 
   /** Redrawn every frame as well, so a mute from `M` shows at once; unchanged text is a no-op. */
@@ -183,35 +217,38 @@ export class SettingsScene extends Phaser.Scene {
     for (const label of this.labels) label();
   }
 
-  private addLabel(x: number, y: number, text: string): void {
+  private addLabel(y: number, text: string): void {
     this.add
-      .text(x, y, text, { fontFamily: 'Georgia, serif', fontSize: '24px', color: '#dddddd' })
-      .setOrigin(1, 0.5);
+      .text(PANEL_X + PANEL_PADDING + LIST_INDENT, y, text, {
+        fontFamily: 'Georgia, serif',
+        fontSize: '20px',
+        color: '#dddddd',
+      })
+      .setOrigin(0, 0.5);
   }
 
-  private addToggle(
-    x: number,
-    y: number,
-    label: string,
-    read: () => boolean,
-    flip: () => void,
-  ): MenuItem {
-    this.addLabel(x, y, label);
+  /** A switch is one row across the panel reading "Label: On", so it is a single click target. */
+  private addToggle(y: number, label: string, read: () => boolean, flip: () => void): MenuRow {
     const toggle = (): void => {
       flip();
       audioOf(this).play('ui.confirm');
       this.refresh();
     };
-    const button = addTextButton(this, x + 120, y, '', toggle, {
-      ...SMALL_BUTTON,
-      fixedWidth: TOGGLE_WIDTH,
-      align: 'center',
+    const row = addMenuRow(this, {
+      kind: 'bar',
+      label: `${label}: On`,
+      x: PANEL_X + PANEL_WIDTH / 2,
+      y,
+      width: PANEL_WIDTH - PANEL_PADDING * 2,
+      onConfirm: toggle,
+      align: 'left',
     });
     this.labels.push(() => {
       const on = read();
-      button.setText(on ? 'On' : 'Off').setColor(on ? '#ffffff' : '#888888');
+      row.setLabel(`${label}: ${on ? 'On' : 'Off'}`);
+      row.setDim(!on);
     });
-    return textButtonItem(button, toggle);
+    return row;
   }
 
   private toggleFeedback(key: FeedbackToggle): void {

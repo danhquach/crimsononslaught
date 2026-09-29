@@ -1,18 +1,31 @@
 import Phaser from 'phaser';
+import { MENU_ART } from '../config/menuArt';
+import { emberPose, makeEmbers } from '../core/menuStyle';
+import { createRng } from '../core/rng';
 import { saveNotice } from '../core/save';
 import { SAVE_RESET_REGISTRY_KEY, SCENE } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { saveStoreFailed } from '../storage/localSave';
 import { attachMenuInput } from './input';
-import { addTextButton, textButtonItem } from './ui';
+import { TITLE_FONT, addHintLine, addMenuRow, drawMenuBackdrop } from './menuUi';
 
-// Four entries (#226) end above the save-reset notice at `height - 72`.
-const MENU_TOP = 240;
-const MENU_GAP = 58;
-const BUTTON_WIDTH = 280;
+// The title image (letters 205 px tall in a 27 px margin) is centred here: its
+// letters span y 17 to 222. Four entries (#226) stack 54 px apart from the first
+// plate's centre, its top 21 px under the letters and the last plate ending 11 px
+// above the save notice at `height - 72`.
+const TITLE_Y = 120;
+const MENU_TOP = 262;
+const MENU_GAP = 54;
+/** Where the lettering stands in for the title image when that did not load. */
+const FALLBACK_TITLE_Y = 130;
+const PLATE_WIDTH = 340;
+const EMBER_COUNT = 24;
+/** The embers' fixed seed: the same sparks every time, from no run's stream. */
+const EMBER_SEED = 191;
 
 /**
- * The front door (#121): the title and a four-entry menu. Start Game goes to
+ * The front door (#121): the painted title and a four-entry menu on the painted arena
+ * with embers drifting up (CO-191). Start Game goes to
  * SpellSelect, which starts the run exactly as it did when it was the first
  * screen — the seed is Boot's, read from the registry there. Settings,
  * Profile and Help (#226) are panels that come back here.
@@ -35,13 +48,10 @@ export class IntroScene extends Phaser.Scene {
     this.leaving = false;
     const { width, height } = this.scale;
 
-    this.add
-      .text(width / 2, 150, 'Crimson Onslaught', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '72px',
-        color: '#dc143c',
-      })
-      .setOrigin(0.5);
+    drawMenuBackdrop(this, 'full');
+    this.addEmbers();
+
+    this.addTitle();
 
     const entries: readonly (readonly [label: string, scene: string])[] = [
       ['Start Game', SCENE.spellSelect],
@@ -49,23 +59,19 @@ export class IntroScene extends Phaser.Scene {
       ['Profile', SCENE.profile],
       ['Help', SCENE.help],
     ];
-    const items = entries.map(([label, scene], i) => {
-      const go = (): void => this.go(scene);
-      const button = addTextButton(this, width / 2, MENU_TOP + i * MENU_GAP, label, go, {
-        fixedWidth: BUTTON_WIDTH,
-        align: 'center',
-      });
-      return textButtonItem(button, go);
-    });
+    const items = entries.map(([label, scene], i) =>
+      addMenuRow(this, {
+        kind: 'plate',
+        label,
+        x: width / 2,
+        y: MENU_TOP + i * MENU_GAP,
+        width: PLATE_WIDTH,
+        onConfirm: () => this.go(scene),
+      }),
+    );
     attachMenuInput(this, items, { keyboard: true, enterDefault: 0 });
 
-    this.add
-      .text(width / 2, height - 40, 'click, arrow keys and Enter, or a gamepad', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '16px',
-        color: '#888888',
-      })
-      .setOrigin(0.5);
+    addHintLine(this);
 
     // The reset is said once: Boot leaves the flag up until this screen has
     // shown it. A failed write is said every time, while it holds.
@@ -77,9 +83,60 @@ export class IntroScene extends Phaser.Scene {
         .text(width / 2, height - 72, notice, {
           fontFamily: 'Georgia, serif',
           fontSize: '16px',
-          color: '#ff6666',
+          color: '#ff8a8a',
+          backgroundColor: '#000000aa',
+          padding: { x: 10, y: 4 },
         })
         .setOrigin(0.5);
+    }
+  }
+
+  /** The painted title; lettering in the title face if the image did not load. */
+  private addTitle(): void {
+    const { width } = this.scale;
+    if (this.textures.exists(MENU_ART.title.key)) {
+      this.add.image(width / 2, TITLE_Y, MENU_ART.title.key);
+      return;
+    }
+    // The blood-red glow is a dark stroke under a red shadow blur.
+    this.add
+      .text(width / 2, FALLBACK_TITLE_Y, 'Crimson Onslaught', {
+        fontFamily: TITLE_FONT,
+        fontSize: '92px',
+        color: '#d92b40',
+      })
+      .setOrigin(0.5)
+      .setStroke('#2a0407', 6)
+      .setShadow(0, 0, '#ff2a2a', 16, true, true);
+  }
+
+  /**
+   * Sparks drifting up behind the menu. Additive, so the art's black costs
+   * nothing; each rides one looping tween the scene owns and drops when it stops.
+   */
+  private addEmbers(): void {
+    if (!this.textures.exists(MENU_ART.ember.key)) return;
+    const { width, height } = this.scale;
+    for (const ember of makeEmbers(createRng(EMBER_SEED), EMBER_COUNT, width, height)) {
+      const sprite = this.add
+        .image(ember.x, ember.y, MENU_ART.ember.key, 0)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setAlpha(0);
+      this.tweens.addCounter({
+        from: 0,
+        to: 1,
+        duration: ember.life * 1000,
+        delay: ember.delay * 1000,
+        repeat: -1,
+        onUpdate: (tween) => {
+          const pose = emberPose(ember, tween.getValue() ?? 0, MENU_ART.ember.frames);
+          sprite
+            .setPosition(pose.x, pose.y)
+            .setAlpha(pose.alpha)
+            .setFrame(pose.frame)
+            .setScale(pose.scale);
+        },
+      });
     }
   }
 

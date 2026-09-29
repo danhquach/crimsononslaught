@@ -1,22 +1,31 @@
 import { expect, test, type Page } from '@playwright/test';
 import { FEEDBACK_SETTING_KEYS } from '../src/config/hitFeedback';
+import { MENU_ART } from '../src/config/menuArt';
 import { AUDIO_SETTING_KEYS } from '../src/config/sounds';
 import { emptySave, type Save } from '../src/core/save';
 import { AUDIO_REGISTRY_KEY, SCENE, type GamePayload } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
-import { cardCenter, collectErrors, sceneTexts, startFromIntro, waitForScene } from './game';
+import {
+  PAD,
+  addFakePad,
+  cardCenter,
+  clickRow,
+  collectErrors,
+  frames,
+  menuRows,
+  padPress,
+  sceneTexts,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * The front door (#121): boot lands on Intro; Start Game leads to the same run
  * SpellSelect always started; Settings and Profile open and come back; mouse,
- * keyboard and a gamepad all drive the menus. Button positions mirror
- * `IntroScene` (entries 58 px apart from y = 240, #226) and `SettingsScene` (rows
- * 58 px apart from y = 140, switches 120 px right of centre).
+ * keyboard and a gamepad all drive the menus. Rows are
+ * found where the scene drew them (`menuRows`), not at fixed positions.
  */
-
-const INTRO_ENTRY = { start: { x: 480, y: 240 }, settings: { x: 480, y: 298 } } as const;
-const SHAKE_SWITCH = { x: 600, y: 140 + 5 * 58 };
 
 /** Seed storage on an empty store only, so what the game writes survives a reload. */
 async function seedStorage(page: Page, save: Save): Promise<void> {
@@ -33,19 +42,24 @@ async function storedSettings(page: Page): Promise<Record<string, unknown>> {
   return (JSON.parse(json ?? '{"settings":{}}') as Save).settings;
 }
 
-/** Wait for `n` browser frames; the game loop steps once per frame. */
-async function frames(page: Page, n: number): Promise<void> {
-  await page.evaluate(
-    (count) =>
-      new Promise<void>((resolve) => {
-        const tick = (left: number): void => {
-          if (left <= 0) resolve();
-          else requestAnimationFrame(() => tick(left - 1));
-        };
-        tick(count);
-      }),
-    n,
-  );
+/** The title image(s) Intro shows, by texture key, with their bounds in game pixels. */
+function titleImages(
+  page: Page,
+): Promise<{ top: number; bottom: number; left: number; right: number }[]> {
+  return page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    return game.scene
+      .getScene('Intro')
+      .children.list.filter(
+        (child) =>
+          child.type === 'Image' &&
+          (child as unknown as { texture: { key: string } }).texture.key === key,
+      )
+      .map((child) => {
+        const box = (child as unknown as { getBounds(): DOMRect }).getBounds();
+        return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+      });
+  }, MENU_ART.title.key);
 }
 
 test('boots to Intro, and Start Game plays the run SpellSelect always started', async ({
@@ -54,11 +68,13 @@ test('boots to Intro, and Start Game plays the run SpellSelect always started', 
   const errors = collectErrors(page);
   await page.goto('/?seed=7');
   await waitForScene(page, SCENE.intro);
-  expect(await sceneTexts(page, SCENE.intro)).toEqual(
-    expect.arrayContaining(['Crimson Onslaught', 'Start Game', 'Settings', 'Profile', 'Help']),
-  );
+  // The title is the painted image, not lettering; the entries are texts.
+  const texts = await sceneTexts(page, SCENE.intro);
+  expect(texts).toEqual(expect.arrayContaining(['Start Game', 'Settings', 'Profile', 'Help']));
+  expect(texts).not.toContain('Crimson Onslaught');
+  expect((await titleImages(page)).length).toBe(1);
 
-  await page.mouse.click(INTRO_ENTRY.start.x, INTRO_ENTRY.start.y);
+  await clickRow(page, SCENE.intro, 'Start Game');
   await waitForScene(page, SCENE.spellSelect);
   const { x, y } = cardCenter(2);
   await page.mouse.click(x, y);
@@ -70,6 +86,75 @@ test('boots to Intro, and Start Game plays the run SpellSelect always started', 
   }, SCENE.game);
   expect(payload).toEqual({ spellId: 'lightning', seed: 7 });
   expect(errors).toEqual([]);
+});
+
+test('the painted title clears the top edge and the first plate', async ({ page }) => {
+  await page.goto('/?seed=7');
+  await waitForScene(page, SCENE.intro);
+  const [title] = await titleImages(page);
+  expect(title).toBeDefined();
+  // The image carries a 27 px margin of shadow and glow round the letters.
+  const margin = (MENU_ART.title.height - 205) / 2;
+  const [first, ...rest] = await menuRows(page, SCENE.intro);
+  expect(title!.top + margin, 'letters below the canvas top').toBeGreaterThanOrEqual(12);
+  expect(
+    first!.bounds.y - (title!.bottom - margin),
+    'first plate under the letters',
+  ).toBeGreaterThanOrEqual(12);
+  expect((title!.left + title!.right) / 2).toBe(480);
+  // The last plate keeps 8 px clear of the save notice, which sits at y 468 and is 27 px tall.
+  const last = rest[rest.length - 1]!;
+  expect(468 - 27 / 2 - (last.bounds.y + last.bounds.height)).toBeGreaterThanOrEqual(8);
+});
+
+test('without the title image, Intro letters the title in the title face and warns once', async ({
+  page,
+}) => {
+  const warnings: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'warning') warnings.push(message.text());
+  });
+  await page.route('**/assets/menu/menu_title.png', (route) => route.fulfill({ status: 404 }));
+  await page.goto('/?seed=7');
+  await waitForScene(page, SCENE.intro);
+  expect(await titleImages(page)).toEqual([]);
+  expect(await sceneTexts(page, SCENE.intro)).toContain('Crimson Onslaught');
+  expect((await menuRows(page, SCENE.intro)).map((row) => row.label)).toEqual([
+    'Start Game',
+    'Settings',
+    'Profile',
+    'Help',
+  ]);
+  const menuWarnings = warnings.filter((text) => text.startsWith('[menu]'));
+  expect(menuWarnings).toHaveLength(1);
+  expect(menuWarnings[0]).toContain('menu_title.png');
+});
+
+test('Intro lists its four entries in order, and the arrows and the pointer light them', async ({
+  page,
+}) => {
+  await page.goto('/?seed=7');
+  await waitForScene(page, SCENE.intro);
+  const rows = await menuRows(page, SCENE.intro);
+  expect(rows.map((row) => row.label)).toEqual(['Start Game', 'Settings', 'Profile', 'Help']);
+  expect(rows.every((row) => row.enabled && !row.selected)).toBe(true);
+
+  await page.keyboard.press('ArrowDown'); // reveals Start
+  await page.keyboard.press('ArrowDown');
+  expect((await menuRows(page, SCENE.intro)).map((row) => row.selected)).toEqual([
+    false,
+    true,
+    false,
+    false,
+  ]);
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp'); // wraps to Help
+  expect((await menuRows(page, SCENE.intro)).map((row) => row.selected)).toEqual([
+    false,
+    false,
+    false,
+    true,
+  ]);
 });
 
 test('the keyboard opens Profile and Esc comes back, from SpellSelect too', async ({ page }) => {
@@ -121,7 +206,7 @@ test('Settings changes apply at once, persist, and reach the next run', async ({
   const errors = collectErrors(page);
   await page.goto('/?seed=1');
   await waitForScene(page, SCENE.intro);
-  await page.mouse.click(INTRO_ENTRY.settings.x, INTRO_ENTRY.settings.y);
+  await clickRow(page, SCENE.intro, 'Settings');
   await waitForScene(page, SCENE.settings);
 
   // Keyboard: a reflex Enter only highlights "−" (it changes something, so it
@@ -139,7 +224,14 @@ test('Settings changes apply at once, persist, and reach the next run', async ({
   expect(await sceneTexts(page, SCENE.settings)).toContain('90%');
 
   // Mouse: switch screen shake off.
-  await page.mouse.click(SHAKE_SWITCH.x, SHAKE_SWITCH.y);
+  expect((await menuRows(page, SCENE.settings)).filter((row) => row.dim)).toEqual([]);
+  await clickRow(page, SCENE.settings, 'Screen shake: On');
+  // An off switch is quieter than an on one by more than its word.
+  await expect
+    .poll(async () =>
+      (await menuRows(page, SCENE.settings)).filter((r) => r.dim).map((r) => r.label),
+    )
+    .toEqual(['Screen shake: Off']);
   await expect
     .poll(() => storedSettings(page))
     .toEqual(
@@ -172,41 +264,9 @@ test('Settings changes apply at once, persist, and reach the next run', async ({
 });
 
 test('a gamepad drives Intro into Settings and back', async ({ page }) => {
-  // A fake standard-mapping pad Phaser finds by polling `navigator.getGamepads`.
-  await page.addInitScript(() => {
-    const pad = {
-      id: 'e2e pad',
-      index: 0,
-      connected: true,
-      mapping: 'standard',
-      timestamp: 0,
-      axes: [0, 0, 0, 0],
-      buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
-    };
-    (window as unknown as { e2ePad: typeof pad }).e2ePad = pad;
-    navigator.getGamepads = () => [pad as unknown as Gamepad];
-  });
-  const press = async (button: number): Promise<void> => {
-    for (const down of [true, false]) {
-      await page.evaluate(
-        ([index, pressed]) => {
-          const pad = (
-            window as unknown as {
-              e2ePad: { timestamp: number; buttons: { pressed: boolean; value: number }[] };
-            }
-          ).e2ePad;
-          pad.buttons[index as number] = { pressed: pressed as boolean, value: pressed ? 1 : 0 };
-          // Phaser skips a pad state stamped before it first saw the pad.
-          pad.timestamp = performance.now();
-        },
-        [button, down] as const,
-      );
-      await frames(page, 4);
-    }
-  };
-  const A = 0;
-  const UP = 12;
-  const DOWN = 13;
+  await addFakePad(page);
+  const press = (button: number): Promise<void> => padPress(page, button);
+  const { A, UP, DOWN } = PAD;
 
   await page.goto('/?seed=1');
   await waitForScene(page, SCENE.intro);

@@ -16,19 +16,40 @@ import { cardCenter } from '../e2e/game';
  * violations, console errors and page errors, which is what they exist for.
  * The policy is never bypassed (`bypassCSP` stays off).
  *
- * Positions mirror `e2e/help.spec.ts` (Intro entries 58 px apart from y = 240;
- * Help's tabs at y = 96; Send feedback at y = 406; Send and Cancel at y = 446;
- * Back at y = 494) and `ResultScene` (the Play again bar).
+ * Positions mirror `e2e/help.spec.ts` and the menu rows (CO-191: Intro's plates
+ * 54 px apart from y = 262; Help's tabs at y = 92; Send feedback at y = 410;
+ * Send and Cancel at y = 446; Back at y = 478) and `ResultScene` (the Play again bar).
  */
 
-const HELP_ENTRY = { x: 480, y: 240 + 3 * 58 };
-const ABOUT_TAB = { x: 558, y: 96 };
-const SEND_FEEDBACK = { x: 480, y: 406 };
-const SEND = { x: 390, y: 446 };
-const CANCEL = { x: 570, y: 446 };
-const HELP_BACK = { x: 480, y: 494 };
+const HELP_ENTRY = { x: 480, y: 262 + 3 * 54 };
+const ABOUT_TAB = { x: 568, y: 92 };
+const SEND_FEEDBACK = { x: 480, y: 410 };
+const SEND = { x: 370, y: 446 };
+const CANCEL = { x: 590, y: 446 };
+const HELP_BACK = { x: 480, y: 478 };
 /** Inside the Play again bar's left end, clear of its label. */
 const PLAY_AGAIN_BAR = { x: 380, y: 468 };
+
+/**
+ * Whether the row-label face is in use, not just fetched (the title is a
+ * painted image now; the plates' labels are set in this face): the face is loaded,
+ * and a canvas measures text in it differently from the same text in its
+ * fallback (a missing face would draw both in the fallback, width for width).
+ */
+async function labelFontRenders(page: Page): Promise<{ loaded: boolean; differs: boolean }> {
+  return page.evaluate(() => {
+    const loaded = [...document.fonts].some(
+      (face) => face.family.replaceAll('"', '') === 'GrenzeGotisch' && face.status === 'loaded',
+    );
+    const context = document.createElement('canvas').getContext('2d');
+    if (!context) throw new Error('no 2d context');
+    const width = (family: string): number => {
+      context.font = `26px ${family}`;
+      return context.measureText('Start Game').width;
+    };
+    return { loaded, differs: width('GrenzeGotisch, Georgia, serif') !== width('Georgia, serif') };
+  });
+}
 
 /** What a page reported against its policy, and everything that went wrong on it. */
 interface Watch {
@@ -135,6 +156,7 @@ test('the built page carries one policy meta first in the head, and no inline co
   const decoded = policy.replaceAll('&#39;', "'");
   expect(decoded).toContain("default-src 'none'");
   expect(decoded).toContain("script-src 'self'");
+  expect(decoded).toContain("font-src 'self'");
   expect(decoded).toContain(`connect-src 'self' ${FEEDBACK_URL}`);
   expect(decoded).not.toMatch(/unsafe-inline|unsafe-eval|\*/);
   // Nothing the policy would have to allow inline: no script body, style block or style attribute.
@@ -160,6 +182,10 @@ test('a full walk of the game under the policy logs no violation and no error', 
 
   await boot(page, '?seed=7');
   expect(await litPixels(page), 'Intro is drawn').toBeGreaterThan(50);
+  expect(await labelFontRenders(page), 'the row-label face loads under the policy').toEqual({
+    loaded: true,
+    differs: true,
+  });
 
   // Help -> About -> the feedback form, filled and sent to the routed endpoint.
   await page.mouse.click(HELP_ENTRY.x, HELP_ENTRY.y);
@@ -224,7 +250,15 @@ test('a full walk of the game under the policy logs no violation and no error', 
   // Esc -> End run -> Yes -> Result.
   await page.keyboard.press('Escape');
   await page.waitForTimeout(600);
-  // The first press wakes the highlight on Resume; each one after moves a row.
+  // Settings from the pause screen (CO-192) and back.
+  await page.keyboard.press('ArrowDown'); // wakes the highlight on Resume
+  await page.keyboard.press('ArrowDown'); // Settings
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: test.info().outputPath('prod-pause-settings.png') });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(800);
+  // Back on Pause the first press wakes the highlight on Resume; each one after moves a row.
   const endRunPresses = PAUSE_ACTIONS.indexOf('end') + 1;
   for (let i = 0; i < endRunPresses; i += 1) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');

@@ -6,17 +6,30 @@ import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { audioOf } from '../render/audio';
 import { storeSaveJson } from '../storage/localSave';
 import { attachMenuInput } from './input';
-import { addTextButton, textButtonItem } from './ui';
+import {
+  addHintLine,
+  addMenuRow,
+  addMenuTitle,
+  drawMenuBackdrop,
+  drawPanel,
+  type MenuRow,
+} from './menuUi';
 
 const COLUMN_GAP = 40;
-const ROW_HEIGHT = 40;
-const NAME_Y = 108;
-const MESSAGE_Y = 144;
-const ROWS_TOP = 170;
-/** Name (or its field) and the Rename button sit side by side, this far apart. */
+const ROW_HEIGHT = 34;
+const NAME_Y = 96;
+const MESSAGE_Y = 130;
+/** The stats' panel, under the name; its rows start below its label. */
+const PANEL_X = 190;
+const PANEL_Y = 152;
+const PANEL_WIDTH = 580;
+const ROWS_TOP = PANEL_Y + 44;
+const NOTE_Y = 396;
+const BACK_Y = 452;
+/** The name (or its field) and the Rename row sit side by side, this far apart. */
 const NAME_GAP = 16;
 const FIELD_WIDTH = 340;
-const SMALL_BUTTON = { fontSize: '20px', padding: { x: 12, y: 5 } } as const;
+const RENAME_WIDTH = 150;
 
 /**
  * Profile panel (#121), reached from Intro and back to it: the player's name
@@ -34,7 +47,7 @@ export class ProfileScene extends Phaser.Scene {
   private editing = false;
   private nameText!: Phaser.GameObjects.Text;
   private message!: Phaser.GameObjects.Text;
-  private renameButton!: Phaser.GameObjects.Text;
+  private renameRow!: MenuRow;
   private field!: Phaser.GameObjects.DOMElement;
 
   constructor() {
@@ -51,28 +64,31 @@ export class ProfileScene extends Phaser.Scene {
     audioOf(this).playMusic('music.menu');
     this.leaving = false;
     this.editing = false;
-    const { width, height } = this.scale;
+    const { width } = this.scale;
     const save = this.save;
 
-    this.add
-      .text(width / 2, 60, 'Profile', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '44px',
-        color: '#dc143c',
-      })
-      .setOrigin(0.5);
+    drawMenuBackdrop(this, 'quiet');
+    addMenuTitle(this, width / 2, 44, 'Profile');
 
+    // The name (or its field) and the Rename row are one group, centred as a whole.
+    const groupLeft = (width - (FIELD_WIDTH + NAME_GAP + RENAME_WIDTH)) / 2;
     this.nameText = this.add
-      .text(width / 2, NAME_Y, save.profile.name, {
+      .text(groupLeft + FIELD_WIDTH / 2, NAME_Y, save.profile.name, {
         fontFamily: 'Georgia, serif',
         fontSize: '26px',
         color: '#eeeeee',
       })
       .setOrigin(0.5);
-    this.renameButton = addTextButton(this, width / 2, NAME_Y, 'Rename', () => this.onRename(), {
-      ...SMALL_BUTTON,
+    this.fitName();
+    this.renameRow = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Rename',
+      x: groupLeft + FIELD_WIDTH + NAME_GAP + RENAME_WIDTH / 2,
+      y: NAME_Y,
+      width: RENAME_WIDTH,
+      onConfirm: () => this.onRename(),
     });
-    this.field = this.createField();
+    this.field = this.createField(groupLeft + FIELD_WIDTH / 2);
     this.message = this.add
       .text(width / 2, MESSAGE_Y, '', {
         fontFamily: 'Georgia, serif',
@@ -80,14 +96,21 @@ export class ProfileScene extends Phaser.Scene {
         color: '#ff6666',
       })
       .setOrigin(0.5);
-    this.layoutName();
 
     const rows = profileRows(save.profile);
+    drawPanel(
+      this,
+      PANEL_X,
+      PANEL_Y,
+      PANEL_WIDTH,
+      44 + Math.max(rows.length, 1) * ROW_HEIGHT + 8,
+      'Lifetime',
+    );
     if (rows.length === 0) {
       this.add
-        .text(width / 2, height / 2 - 20, 'No runs recorded yet.', {
+        .text(width / 2, ROWS_TOP + ROW_HEIGHT / 2, 'No runs recorded yet.', {
           fontFamily: 'Georgia, serif',
-          fontSize: '24px',
+          fontSize: '22px',
           color: '#aaaaaa',
         })
         .setOrigin(0.5);
@@ -109,26 +132,24 @@ export class ProfileScene extends Phaser.Scene {
     });
 
     this.add
-      .text(width / 2, height - 108, 'Progress is saved in this browser only.', {
+      .text(width / 2, NOTE_Y, 'Progress is saved in this browser only.', {
         fontFamily: 'Georgia, serif',
         fontSize: '18px',
-        color: '#888888',
+        color: '#a89f94',
       })
       .setOrigin(0.5);
 
-    const back = addTextButton(this, width / 2, height - 60, 'Back  (Esc)', () => this.onBack(), {
-      fontSize: '22px',
-      padding: { x: 14, y: 6 },
+    const back = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Back  (Esc)',
+      x: width / 2,
+      y: BACK_Y,
+      width: 220,
+      onConfirm: () => this.onBack(),
     });
     // Enter with nothing highlighted still means Back, as before Rename existed.
-    attachMenuInput(
-      this,
-      [
-        textButtonItem(this.renameButton, () => this.onRename()),
-        textButtonItem(back, () => this.onBack()),
-      ],
-      { keyboard: true, enterDefault: 1 },
-    );
+    attachMenuInput(this, [this.renameRow, back], { keyboard: true, enterDefault: 1 });
+    addHintLine(this);
 
     // Only reached while the field does not have focus: its own keys stop there.
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
@@ -136,9 +157,14 @@ export class ProfileScene extends Phaser.Scene {
     });
   }
 
-  private createField(): Phaser.GameObjects.DOMElement {
+  /** The widest valid name (16 W) is wider than its slot, so it shrinks to fit rather than run into Rename. */
+  private fitName(): void {
+    this.nameText.setScale(Math.min(1, FIELD_WIDTH / this.nameText.width));
+  }
+
+  private createField(x: number): Phaser.GameObjects.DOMElement {
     const field = this.add.dom(
-      0,
+      x,
       NAME_Y,
       'input',
       `width: ${FIELD_WIDTH}px; box-sizing: border-box; padding: 4px 8px;` +
@@ -175,15 +201,6 @@ export class ProfileScene extends Phaser.Scene {
     return this.field.node as HTMLInputElement;
   }
 
-  /** Centre the name (or the field) and the button beside it as one group. */
-  private layoutName(): void {
-    const left = this.editing ? FIELD_WIDTH : this.nameText.width;
-    const x0 = this.scale.width / 2 - (left + NAME_GAP + this.renameButton.width) / 2;
-    this.nameText.setX(x0 + left / 2);
-    this.field.setX(x0 + left / 2);
-    this.renameButton.setX(x0 + left + NAME_GAP + this.renameButton.width / 2);
-  }
-
   /** The Rename button: opens the field, or saves it while it is open (a pad's A). */
   private onRename(): void {
     if (this.leaving) return;
@@ -195,9 +212,8 @@ export class ProfileScene extends Phaser.Scene {
     audioOf(this).play('ui.confirm');
     this.message.setText('');
     this.nameText.setVisible(false);
-    this.renameButton.setText('Save');
+    this.renameRow.setLabel('Save');
     this.field.setVisible(true);
-    this.layoutName();
     const input = this.fieldInput;
     input.value = this.save.profile.name;
     // The renderer only shows the node on the next frame; focus needs it now.
@@ -222,6 +238,7 @@ export class ProfileScene extends Phaser.Scene {
     if (!stored) console.warn('[save] could not store the player name');
     audioOf(this).play('ui.confirm');
     this.nameText.setText(result.name);
+    this.fitName();
     this.closeField();
     this.message.setText(stored ? '' : 'Could not save the name.');
   }
@@ -239,8 +256,7 @@ export class ProfileScene extends Phaser.Scene {
     this.fieldInput.blur();
     this.field.setVisible(false);
     this.nameText.setVisible(true);
-    this.renameButton.setText('Rename');
-    this.layoutName();
+    this.renameRow.setLabel('Rename');
   }
 
   /** Back and Esc: close an open field without leaving, or leave. */
