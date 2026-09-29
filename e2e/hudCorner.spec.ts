@@ -59,6 +59,8 @@ function drawn(page: Page) {
     const visible = hud.children.list.filter((child) => (child as { visible?: boolean }).visible);
     return {
       kills: hud.view.kills,
+      // Every Graphics, shown or not: each badge's pill is one (CO-197).
+      graphics: hud.children.list.filter((child) => child.type === 'Graphics').length,
       frames: visible
         .filter((child) => child.type === 'Image')
         .map((child) => (child as unknown as { frame: { name: string } }).frame.name),
@@ -139,7 +141,10 @@ test('a passive shows as its icon with its rank, and a rank-up redraws it withou
 
   await takePassives(page, [POWER]);
   await expect.poll(async () => (await tiles(page))[0]?.count).toBe(4);
-  expect(await passiveFrames()).toHaveLength(2);
+  const redrawn = await drawn(page);
+  expect(redrawn.frames.filter((name) => name.startsWith('icon.passive_'))).toHaveLength(2);
+  // The old tiles' badge pills went with them.
+  expect(redrawn.graphics).toBe(corner.graphics);
 
   expect(errors).toEqual([]);
 });
@@ -214,12 +219,12 @@ test('the largest build stays inside the right margin, its tiles apart', async (
   for (const badge of maxBadges) expect(badge.bg).toBe(MAX_RANK_CSS);
   for (const badge of badges) expect(badge.bg).toBe(CRIMSON_CSS);
   expect(tenBadges).toBe(0);
-  // A badge stays clear of the next tile's disc (radius 18) and of the row below's, by 2 px
-  // at least, and inside the canvas's right margin by 8.
+  // A badge stays clear of the next tile's disc (radius 18) by 1 px at least (its width
+  // follows the font), of the row below's by 2, and inside the canvas's right margin by 8.
   for (const badge of [...badges, ...maxBadges]) {
     const right = badge.x + badge.width / 2;
     const bottom = badge.y + badge.height / 2;
-    expect(right).toBeLessThanOrEqual(badge.x - 14 + PASSIVE_TILE_PITCH_X - 18 - 2);
+    expect(right).toBeLessThanOrEqual(badge.x - 14 + PASSIVE_TILE_PITCH_X - 18 - 1);
     expect(bottom).toBeLessThanOrEqual(badge.y - 14 + PASSIVE_TILE_PITCH_Y - 18 - 2);
     expect(right).toBeLessThanOrEqual(960 - 8);
   }

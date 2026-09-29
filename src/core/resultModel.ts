@@ -133,7 +133,7 @@ export const RESULT_LAYOUT = {
 const TILE_PITCH = 48;
 const TILE_ROW_PITCH = 48;
 export const TILE_ROWS = 2;
-/** A tile's half size, badge included: what must stay inside its strip. */
+/** A tile's half height, its disc and the badge under it: what must stay inside its strip. */
 export const TILE_REACH = 22;
 /** The first row's centre, under the strip's top edge. */
 const TILE_TOP = 28;
