@@ -88,6 +88,7 @@ const facings = (base) => ['down', 'up', 'left', 'right'].map((f) => `${base}.${
  * hero) scored 40% or more. The clips whose frames already read (the hurt
  * flashes of the splitter, splitling and ranged, the boss's up and down hurt,
  * its death, the splitling's spawn) are not listed: nothing was wrong there.
+ * CO-204 adds the shielded enemy's up-facing walk, which scored 22% on main.
  */
 const ENEMY_MIN = 0.35;
 const PROP_MIN = 0.15;
@@ -103,6 +104,7 @@ const moving = [
   'splitter.move',
   'splitling.move',
   'ranged.move',
+  'shielded.walk.up',
   'pickupBomb.idle',
   'pickupChest.idle',
 ];
