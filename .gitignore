@@ -22,6 +22,9 @@ test-results/
 .claude/worktrees/
 # Local editor / preview launch config
 .claude/launch.json
+# Local agent settings (permissions, per-machine paths)
+.claude/settings.local.json
+**/.claude/settings.local.json
 
 # OS / editor
 .DS_Store
