@@ -1,6 +1,7 @@
 # Workflow rules (mandatory)
 
 - **One branch per ticket.** Never commit work directly to `main`. For each GitHub issue, create a branch first: `issue-<n>-<short-slug>` (e.g. `issue-1-scaffold`).
+- **One worktree per ticket.** Every ticket is worked in its own git worktree on its own branch, never in the shared main checkout, so parallel sessions never share a working tree or a branch: `git fetch && git worktree add .claude/worktrees/issue-<n> -b issue-<n>-<short-slug> origin/main`. Run `git worktree list` first; a worktree or branch that already exists for another ticket belongs to another session, so leave it alone. The main checkout stays on `main` with a clean tree. Remove the worktree after the PR merges (`git worktree remove .claude/worktrees/issue-<n>`).
 - **Always merge via a GitHub pull request.** Every branch lands on `main` through a PR — never a local `git merge` pushed to `main`. The PR is the merge record.
 - **QA before commit.** Run the full suites from a clean install (`npm ci && npm run lint && npm test && npm run build`; `npm run test:e2e` once Playwright exists) and verify the ticket's acceptance criteria. All green before any commit.
 - **Senior-dev code review before commit.** Run a senior-level code review of the working-tree diff (correctness, tests, spec acceptance criteria, conventions). Findings must be resolved or explicitly accepted.
