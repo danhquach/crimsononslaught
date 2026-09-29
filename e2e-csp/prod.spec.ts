@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { E2E_FEEDBACK_KEY } from '../playwright.config';
 import { FEEDBACK_URL } from '../src/core/feedback';
+import { PAUSE_ACTIONS } from '../src/core/pauseModel';
 import { cardCenter } from '../e2e/game';
 
 /**
@@ -223,7 +224,9 @@ test('a full walk of the game under the policy logs no violation and no error', 
   // Esc -> End run -> Yes -> Result.
   await page.keyboard.press('Escape');
   await page.waitForTimeout(600);
-  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowDown');
+  // The first press wakes the highlight on Resume; each one after moves a row.
+  const endRunPresses = PAUSE_ACTIONS.indexOf('end') + 1;
+  for (let i = 0; i < endRunPresses; i += 1) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
   await page.keyboard.press('ArrowLeft'); // wakes the highlight on Yes
