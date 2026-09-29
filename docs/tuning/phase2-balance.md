@@ -897,7 +897,8 @@ once its 110 px ring would catch 3.
 
 - **Result:**
   - Most bursts land on a group: 55–66% catch 3 or more.
-  - The spray lands about 3.5 hits a bomb, as much damage as the bursts deal.
+  - The spray lands about 3.5 hits a bomb: about 60% of the damage the bursts deal
+    (14 per icicle hit against 24 per burst hit).
   - A fifth to a third of the bursts catch nobody. These are mostly bombs that roll
     their full range through a thin field.
 
@@ -906,7 +907,7 @@ once its 110 px ring would catch 3.
 **Method.**
 - The same bot, mortal, full 20-minute runs.
 - Seeds 1–40 for each arm: 80 runs in all, the arms interleaved, two at a time,
-  `timeScale=8`, one fresh Vite server serving commit `3bdff28`.
+  `timeScale=8`, one fresh Vite server serving this branch's code before its rebase onto #307.
 - **What each arm carries:**
   - Ice Storm alone: `?loadout=ice_blizzard`.
   - Storm + Bomb: `?loadout=ice_blizzard,ice_nova_bomb`.
@@ -917,8 +918,8 @@ once its 110 px ring would catch 3.
 - **Why the filter is in the page:** a level-up offers only spells while a slot is
   open, so a pick score alone could not keep Shield and Companion out. The first
   launch had them in both arms and was thrown away.
-- **Ice Storm is `main`'s**, radius 80 for 6 s: the PM asked for the sweep now,
-  before #304.
+- **Ice Storm is the one from before #304**, radius 80 for 6 s, not what `main` ships
+  now (120 for 4 s, #307): the PM asked for the sweep before that change merged.
 
 | Arm | Wins | Reached boss | Boss TTK min / median / max | TTK in 45–90 s | Median level | Median survival of losses |
 |---|---|---|---|---|---|---|

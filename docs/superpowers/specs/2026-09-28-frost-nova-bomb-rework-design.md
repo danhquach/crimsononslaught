@@ -185,8 +185,8 @@ sheet.
   - Pass: Storm + Bomb wins more runs than Storm alone and kills the boss faster,
     beyond the run-to-run spread the doc records.
   - Record the round in `docs/tuning/phase2-balance.md`.
-  - The sweep runs on a main that already has #304 (Ice Storm radius 120 / 4 s), so
-    the baseline is the storm players will get.
+  - The sweep ran on the Ice Storm from before #304 (radius 80 / 6 s), at the PM's
+    request, before that change merged.
 - **Look:** headless in-game screenshots of the roll with the spray and of the burst,
   attached to the PR.
 - **Injection check:** not needed. The change adds no player text, save data, URL
@@ -210,7 +210,7 @@ sheet.
 - **Sparse early waves.** With fewer than 3 enemies inside its ring, the bomb flies its
   full range and bursts at the end, perhaps on nothing. The icicles still land along
   the way. This is accepted: the acceptance criterion is about crowds. In the bot runs,
-  18–30% of bursts caught nobody.
+  20–30% of bursts caught nobody.
 - **The ring lands on the crowd's near edge.** Once armed, the bomb bursts on the first
   step its ring catches 3, so against a trailing stream it goes off at the front of the
   pack, not in its middle. Waiting for the peak count was not worth the extra rule.
