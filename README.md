@@ -3,43 +3,90 @@
 [![CI](https://github.com/danhquach/crimsononslaught/actions/workflows/ci.yml/badge.svg)](https://github.com/danhquach/crimsononslaught/actions/workflows/ci.yml)
 **Play the latest build:** <https://danhquach.github.io/crimsononslaught/>
 
-A browser-based auto-battler "bullet heaven". You move; your spell fires on
-its own. Survive twenty minutes of escalating waves, then bring down the boss.
+A browser-based auto-battler "bullet heaven". You move; your spells fire on
+their own. Survive twenty minutes of escalating waves, then bring down the boss.
 
-![Five spells casting at once into a late-run crowd](docs/screenshots/combat.png)
+![Lightning Sword, Ice Storm, Frost Nova Bomb, Fire Dragon and companions in a 15-minute crowd](docs/screenshots/combat.png)
 
-| Pick a starting spell                                     | Level up: three cards, pick one                      | The boss                                 |
+| Pick a starting spell                                     | Level up: three cards, pick one                      | The boss at 20:00                        |
 | --------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------- |
 | ![Spell select screen](docs/screenshots/spell-select.png) | ![Level-up card pick](docs/screenshots/level-up.png) | ![Boss fight](docs/screenshots/boss.png) |
+
+| Pause: the run's spells, passives and relics | Spend Embers on permanent upgrades              |
+| -------------------------------------------- | ----------------------------------------------- |
+| ![Pause screen](docs/screenshots/pause.png)  | ![Upgrades shop](docs/screenshots/upgrades.png) |
+
+The run shots use the `?loadout=` test switch (below), so they show more spells,
+and more elements, than one run carries.
 
 Built with [Phaser 3](https://phaser.io/), TypeScript, and Vite.
 
 ## Status
 
-Phase 1 — design complete, implementation in progress. Tracked as GitHub
-issues under the **Phase 1** milestone.
+Playable end to end: menus, a full 20-minute run with every element's five
+spells, the boss, and meta progression between runs. Open work — balance,
+touch controls, more maps — is tracked as GitHub issues.
 
-## Phase 1 at a glance
+## The game
 
-- One character, one arena, one run of 5:00 ending in a boss fight.
-- Pick one of four spells before the run: **Fire** (fireball, area burst),
-  **Ice** (frost nova, slow), **Lightning** (chain bolt), **Earth** (orbiting
-  boulders).
-- Level up to draw three cards: a second and third spell for the run's two
-  active slots while they are open, then global passives — damage, cooldown,
-  area, crit, survivability — for the rest of the run.
-- Enemy archetypes on a time-based spawn schedule: swarm, fast and tank, then
-  ranged enemies from 6:00 that keep their distance and shoot, exploders from
-  8:00 that blow up on the player, splitters from 10:00 that burst into
-  three splitlings, and shielded enemies from 12:00 that block hits on their
-  front and turn too slowly to stop a player getting behind them. Nine elites
-  join at set times: champions of a type already in the crowd, far tougher,
-  marked by a gold rune circle, and each drops a chest.
-- Seeded runs: `?seed=<n>` reproduces a run exactly; `?timeScale=<n>` speeds
-  it up for testing; `?invulnerable=1` drops every hit so an unattended run
-  reaches the boss; `?enemies=ranged,tank` lets only those types spawn.
-- Dev switches: `?debug=textures` plays every atlas animation in a labelled
-  grid; `?debug=collisions` runs the collision pairs on their own.
+- **One run, twenty minutes.** One hero, one arena. Waves escalate on a fixed
+  schedule and stop at 20:00, when the boss arrives: it chases, stands and
+  flashes, then charges.
+- **Pick an element.** The select screen offers each element's default spell —
+  **Fire Bolt**, **Ice Arrow**, **Lightning Bolt** or **Earth Spike** — and the
+  run stays in that element.
+- **Three active slots.** The default spell fills the first; the second and
+  third unlock at levels 2 and 5 and draw from the element's other four spells:
+
+  | Element   | Default        | Other spells                                                   |
+  | --------- | -------------- | -------------------------------------------------------------- |
+  | Fire      | Fire Bolt      | Meteor, Fire Wave, Fire Companion, Fire Dragon                 |
+  | Ice       | Ice Arrow      | Frost Nova Bomb, Ice Shield, Ice Companion, Ice Storm          |
+  | Lightning | Lightning Bolt | Chain Lightning, Tornado, Lightning Companion, Lightning Sword |
+  | Earth     | Earth Spike    | Boulder, Earth Shield, Earthquake, Earth Companion             |
+
+- **Level-ups.** Each level draws three cards: new spells while a slot is open,
+  then 14 ranked passives for the rest of the run (damage, cooldown, area,
+  projectile speed, duration, crit, damage taken, move speed, max HP,
+  regeneration, gem pull, XP, Pierce). **Reroll**, **Skip** (earns a reroll)
+  and **Ban** reshape an offer.
+- **Relics.** Eight relics lie around the arena. Touching one pauses the run
+  on three cards, mostly relic buffs that last the rest of the run, sometimes
+  extra rerolls or bans.
+- **Enemies.** Swarm from the start, fast from 2:00 and tank from 4:00; ranged
+  enemies from 6:00 keep their distance and shoot, exploders from 8:00 blow up on the player,
+  splitters from 10:00 burst into three splitlings, and shielded enemies from
+  12:00 block hits on their front. Nine elites join at set times: champions of
+  a type already in the crowd, far tougher, marked by a gold rune circle, and
+  each drops a chest.
+- **Pickups.** XP gems, Embers, and rare consumables: health, a magnet that
+  pulls every gem in, a bomb that blasts the screen, and the elites' chests,
+  which pay out Embers.
+- **Between runs.** Embers buy permanent upgrades in the **Upgrades** shop,
+  reached from the spell select screen (max HP, damage, cooldown, move speed,
+  XP; a first win unlocks less damage taken). **Profile** keeps a player name and lifetime stats,
+  **Settings** holds master and music volume, mute, damage numbers, hit-stop
+  and screen shake, and **Help** explains every pickup, lists what's new and
+  sends feedback. Progress is saved in the browser.
+- **In a run.** Esc (or Start on a pad) pauses on the build summary, with
+  Resume, Restart, End run and Main menu. Closing the tab mid-run asks first.
+- **Sound.** Synthesised and recorded sound effects, a menu theme, and a run
+  track and a boss track drawn from two of each per run.
+
+### Test and dev switches
+
+URL parameters, read in the deployed build as well as in dev:
+
+| Parameter           | Effect                                                            |
+| ------------------- | ----------------------------------------------------------------- |
+| `?seed=<n>`         | Reproduces a run exactly (on the same build and machine)          |
+| `?timeScale=<n>`    | Multiplies the run clock                                          |
+| `?startAt=<s>`      | Starts the run clock late, e.g. `?startAt=1190` for the boss      |
+| `?invulnerable=1`   | Drops every hit, so an unattended run reaches the boss            |
+| `?loadout=<ids>`    | Equips extra spells by id, e.g. `?loadout=fire_meteor,ice_shield` |
+| `?enemies=<types>`  | Lets only those types spawn, e.g. `?enemies=ranged,tank`          |
+| `?debug=textures`   | Plays every atlas animation in a labelled grid                    |
+| `?debug=collisions` | Runs the collision pairs on their own                             |
 
 ## Controls
 
@@ -79,24 +126,24 @@ from the `FEEDBACK_ACCESS_KEY` Actions secret.
 ## Project layout
 
 ```
-src/config/   tunable data: spells, loadout, passives, meta (upgrades, milestones, currency), enemies, waves, boss, progression, player, gems, animations, FX
-src/core/     pure game logic, no engine imports, unit-tested: run state, loadout, level-up offers, spawn director, spell math, save schema and upgrade shop
-src/scenes/   Boot, Intro, Settings, Profile, SpellSelect, Upgrades, Game, HUD, LevelUp, Result, two dev-only debug scenes
-src/entities/ Player, Enemy, Boss, XpGem, Projectile, Boulder
+src/config/   tunable data: spells and the four element rosters, loadout, passives, relics, meta (upgrades, milestones, currency), enemies, waves, boss, pickups, sounds, changelog, animations, FX
+src/core/     pure game logic, no engine imports, unit-tested: run state, loadout, level-up and relic offers, spawn director, spell math, save schema and upgrade shop, HUD / pause / help view-models
+src/scenes/   Boot, Intro, Settings, Profile, Help, SpellSelect, Upgrades, Game, HUD, LevelUp, Pause, Result, two dev-only debug scenes
+src/entities/ Player, Enemy, Boss, Companion, XpGem, Pickup, Projectile, HomingProjectile, EnemyShot, Boulder, ShieldAura
 src/spells/   one Phaser-side class per spell over its `src/core/` math, plus the damage sink
-src/systems/  Phaser-side wrappers: spawn director, collisions, enemy / gem / FX / overlay pools
-src/render/   texture-key layer: sprite atlas, animation playback, placeholder shapes as fallback
+src/systems/  Phaser-side wrappers: spawn director, collisions, and the enemy / shot / gem / pickup / area / FX / overlay / damage-number pools
+src/render/   texture-key layer: sprite atlas, animation playback, placeholder shapes as fallback; audio playback
 src/storage/  the one `localStorage` adapter; core never imports it
-scripts/      art pipeline (`npm run art:cut`)
-docs/         design spec, ticket list, tuning notes, art sheets + manifest
+scripts/      art pipeline (`npm run art:cut`) and audio pipeline (`npm run audio:gen`, `npm run audio:cut`)
+e2e/          Playwright browser suites
+docs/         design specs and plans, ticket list, tuning notes, art sheets + manifest, screenshots
 ```
 
 ## Rendering and the art pipeline
 
 Nothing in the game references an image file. Every visual asks for a
-**texture key** (`player`, `enemy_swarm`, `enemy_fast`, `enemy_tank`, `boss`,
-`gem`, `proj_fire`, `fx_nova`, `fx_bolt`, `boulder`), typed as `TextureKey`
-in `src/config/colors.ts`.
+**texture key** (`player`, `enemy_swarm`, `boss`, `gem`, `pickup_relic` and so
+on), typed as `TextureKey` in `src/config/colors.ts`.
 
 At boot, `src/render/atlas.ts` loads the sprite atlas and points each texture
 key at a still frame from it; `src/render/textures.ts` then generates a
@@ -177,6 +224,15 @@ RGBA buffers, unit-tested on synthetic pixel buffers in `spriteCut.test.mjs`.
 against both the manifest and the generated atlas by `animations.test.ts`, so
 the three cannot drift apart.
 
+## Audio
+
+Every clip lives in `public/assets/audio/`, keyed by `src/config/sounds.ts`.
+`npm run audio:gen` synthesises the effects and music loops from the recipes in
+`scripts/gen-audio.mjs` and `scripts/lib/music.mjs`, byte-for-byte
+reproducibly. A few effects are recorded clips instead: `npm run audio:cut --
+<dir>` checks each original against its pinned hash and cuts it to game length
+(needs ffmpeg on the PATH). Licences are in `public/assets/audio/CREDITS.md`.
+
 ## CI and deployment
 
 Every pull request runs `npm run lint`, `npm test`, `npm run build`, and the
@@ -191,6 +247,9 @@ lint/test/build job does not depend on it.
 
 - Design spec (Phase 1): [`docs/superpowers/specs/2026-09-14-phase1-design.md`](docs/superpowers/specs/2026-09-14-phase1-design.md)
 - Design spec (Phase 2 — loadout, passives, spell roster): [`docs/superpowers/specs/2026-09-18-phase2-spells.md`](docs/superpowers/specs/2026-09-18-phase2-spells.md)
+- Design spec (the 20-minute run — pickups, relics, Embers): [`docs/superpowers/specs/2026-09-23-twenty-minute-run-design.md`](docs/superpowers/specs/2026-09-23-twenty-minute-run-design.md)
+- Spell reworks: [Meteor](docs/superpowers/specs/2026-09-26-meteor-rework-design.md), [Frost Nova Bomb](docs/superpowers/specs/2026-09-28-frost-nova-bomb-rework-design.md)
+- Tuning notes: [`docs/tuning/`](docs/tuning/)
 - Ticket list: [`docs/tickets/phase1-tickets.md`](docs/tickets/phase1-tickets.md)
 - Contributor workflow rules: [`CLAUDE.md`](CLAUDE.md)
 
