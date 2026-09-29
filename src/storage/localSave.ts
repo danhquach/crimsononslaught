@@ -20,11 +20,26 @@ export function loadSaveJson(): string | null {
   }
 }
 
+/** Whether the latest `storeSaveJson` threw; a later good write clears it (#316). */
+let lastStoreFailed = false;
+
+/**
+ * True when the last write to storage failed — blocked, full or unavailable —
+ * so progress made since is not being kept. Read by the screens that tell the
+ * player (`core/save.ts saveNotice`); every write goes through `storeSaveJson`,
+ * so no caller has to report its own failure.
+ */
+export function saveStoreFailed(): boolean {
+  return lastStoreFailed;
+}
+
 export function storeSaveJson(json: string): boolean {
   try {
     localStorage.setItem(SAVE_STORAGE_KEY, json);
+    lastStoreFailed = false;
     return true;
   } catch {
+    lastStoreFailed = true;
     return false;
   }
 }

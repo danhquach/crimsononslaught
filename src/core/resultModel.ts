@@ -124,7 +124,9 @@ export const RESULT_LAYOUT = {
   /** Where a strip's contents start, right of its label. */
   contentInset: 104,
   button: { x: 370, y: 451, width: 220, height: 34 },
-  hintY: 506,
+  hintY: 500,
+  /** The save-failed line (#316), under the hint; 24 px clears two CI-height 14 px lines. */
+  saveNoticeY: 524,
 } as const;
 
 /** A strip's tiles: `TILE_PITCH` apart in rows `TILE_ROW_PITCH` apart, `TILE_ROWS` rows at most. */

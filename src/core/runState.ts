@@ -40,14 +40,42 @@ export const BOSS_START_MS = BOSS_START_TIME * 1000;
 export const MAX_TIME_SCALE = 30;
 
 /**
+ * The slowest scale accepted. A tiny positive value (`1e-320`) is "slow", not
+ * garbage, so it clamps up to here instead of falling back to real time — and
+ * a frame's step count never rounds to zero, which would freeze the run clock.
+ */
+export const MIN_TIME_SCALE = 0.1;
+
+/** Most comma-separated pieces of a switch list looked at, so a huge value costs little. */
+export const MAX_SWITCH_TOKENS = 64;
+
+/** Most ids a `?loadout=` / `?enemies=` list keeps (2 active slots + 1 pick is the real most). */
+export const MAX_SWITCH_LIST = 8;
+
+/**
+ * The address-bar switches that stay live in the deployed build. Everything
+ * else in the query string is a test switch (`timeScale`, `startAt`,
+ * `invulnerable`, `loadout`, `enemies`, `debug`) and works in development
+ * builds only: a run started with one still banks a win and Embers, so the
+ * live game must not honour them (#316). `seed` stays because it does not
+ * change the outcome and bug reports quote it.
+ */
+export function gateTestSwitches(search: string, dev: boolean): string {
+  if (dev) return search;
+  const seed = new URLSearchParams(search).get('seed');
+  return seed === null ? '' : `?${new URLSearchParams({ seed })}`;
+}
+
+/**
  * Any value to a usable run-clock multiplier. Zero, negative, non-finite and
  * non-numeric all read as real time, so no caller can hand the run a clock
- * that never advances or a frame that never ends.
+ * that never advances or a frame that never ends; a positive value is held
+ * between `MIN_TIME_SCALE` and `MAX_TIME_SCALE`.
  */
 export function clampTimeScale(value: unknown, fallback = 1): number {
   const n = typeof value === 'number' ? value : Number.NaN;
   if (!Number.isFinite(n) || n <= 0) return fallback;
-  return Math.min(n, MAX_TIME_SCALE);
+  return Math.min(Math.max(n, MIN_TIME_SCALE), MAX_TIME_SCALE);
 }
 
 /** What one frame of the run covers. `startMs` is the clock before the frame. */
@@ -279,10 +307,10 @@ export class RunState {
 
 /**
  * `?timeScale=<positive number>` multiplies the run clock — the hook the
- * Playwright smoke runs use to reach the boss in seconds (spec §8). It is read
- * in the built app as well as in dev, because those runs and the acceptance
- * pass (CO-063) drive the deployed build; anything absent, unparseable or
- * non-positive falls back to real time.
+ * Playwright smoke runs use to reach the boss in seconds (spec §8). Boot reads
+ * it in development builds only (`gateTestSwitches`, #316); anything absent,
+ * unparseable or non-positive falls back to real time. The value goes through
+ * `Number()`, so `0x10` reads as 16.
  */
 export function resolveTimeScale(search: string, fallback = 1): number {
   const raw = new URLSearchParams(search).get('timeScale');
@@ -327,14 +355,16 @@ export function resolveInvulnerable(search: string): boolean {
  * where the one rule about it belongs. Ids are returned in the order they were
  * written; unknown ids are dropped, and the chosen spell repeating here is
  * harmless (`Spellbook.equip` refuses a second copy of anything equipped).
+ * Repeats are dropped and the list stops at `MAX_SWITCH_LIST`.
  */
 export function resolveLoadout(search: string): RosterSpellId[] {
   const raw = new URLSearchParams(search).get('loadout');
   if (raw === null) return [];
-  return raw
-    .split(',')
+  const ids = raw
+    .split(',', MAX_SWITCH_TOKENS)
     .map((id) => id.trim())
     .filter(isRosterSpellId);
+  return [...new Set(ids)].slice(0, MAX_SWITCH_LIST);
 }
 
 /**
@@ -343,13 +373,14 @@ export function resolveLoadout(search: string): RosterSpellId[] {
  * a crowd that would hide what it does. The director still draws every spawn
  * it would have, so a seed spends its RNG the same way; the other types' spawns
  * are just dropped. Unknown types are dropped; none left, or the param absent,
- * is no filter.
+ * is no filter. Repeats are dropped and the list stops at `MAX_SWITCH_LIST`.
  */
 export function resolveEnemyFilter(search: string): EnemyType[] {
   const raw = new URLSearchParams(search).get('enemies');
   if (raw === null) return [];
-  return raw
-    .split(',')
+  const types = raw
+    .split(',', MAX_SWITCH_TOKENS)
     .map((type) => type.trim())
     .filter(isEnemyType);
+  return [...new Set(types)].slice(0, MAX_SWITCH_LIST);
 }

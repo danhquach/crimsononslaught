@@ -34,6 +34,9 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser smoke tests
         run: npm run test:e2e
+      - name: Content-Security-Policy check on the built site
+        # Builds into dist-csp/, so the dist/ deployed below is never rebuilt with the stand-in key.
+        run: npm run test:csp
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v7

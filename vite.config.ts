@@ -1,7 +1,50 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import pkg from './package.json' with { type: 'json' };
+import { FEEDBACK_URL } from './src/core/feedback.ts';
+
+/**
+ * The built page's Content-Security-Policy (#316). GitHub Pages sends no
+ * headers, so it rides in a meta tag, which the browser applies to everything
+ * after it; `csp-meta` puts it first in `<head>`. `default-src 'none'` makes
+ * every kind of load not listed here a violation. Each allowance is one the
+ * game was seen to need under `e2e-csp/prod.spec.ts`:
+ *
+ * - `img-src data: blob:`: Phaser builds its default textures from data URLs
+ *   and turns XHR-loaded atlas pages into object URLs.
+ * - `connect-src`: the atlas and audio requests, and the one feedback endpoint.
+ * - `style-src 'self'`: `page.css`; Phaser and the Help form set styles through
+ *   the CSSOM, which the policy does not govern.
+ *
+ * Not settable from a meta tag (accepted): `frame-ancestors`, `report-uri`, `sandbox`.
+ */
+const CSP = [
+  "default-src 'none'",
+  "script-src 'self'",
+  "style-src 'self'",
+  "img-src 'self' data: blob:",
+  "media-src 'self'",
+  `connect-src 'self' ${FEEDBACK_URL}`,
+  "worker-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join('; ');
+
+/** Build only: the dev server's hot reload needs inline script and a websocket. */
+const cspMeta: Plugin = {
+  name: 'csp-meta',
+  apply: 'build',
+  transformIndexHtml: () => [
+    {
+      tag: 'meta',
+      attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP },
+      injectTo: 'head-prepend',
+    },
+  ],
+};
 
 export default defineConfig({
+  plugins: [cspMeta],
   // Relative asset URLs so the same build works at the site root (local preview)
   // and under the repository sub-path on GitHub Pages.
   base: './',

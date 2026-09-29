@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest';
+import { ENEMY_TYPES } from '../config/enemies';
 import { HIT_STOP_BUDGET_MS, HIT_STOP_MS } from '../config/hitFeedback';
+import { ROSTER_SPELL_IDS } from '../config/loadout';
 import { BOSS_START_TIME } from '../config/waves';
 import { RUN_EVENT, RUN_EVENT_NAMES, type RunEvent, type RunEventName } from './runEvents';
+import { resolveSeed } from './rng';
 import { isRunStats } from './scenePayloads';
 import {
   BOSS_START_MS,
+  MAX_SWITCH_LIST,
+  MAX_SWITCH_TOKENS,
   MAX_TIME_SCALE,
+  MIN_TIME_SCALE,
   RunState,
   SIM_STEP_MS,
   type RunFrame,
   clampTimeScale,
+  gateTestSwitches,
   resolveInvulnerable,
   resolveEnemyFilter,
   resolveLoadout,
@@ -350,6 +357,19 @@ describe('clampTimeScale', () => {
     expect(MAX_TIME_SCALE).toBe(30);
   });
 
+  it('holds a tiny positive scale at the floor, so the run clock still moves (#316)', () => {
+    expect(MIN_TIME_SCALE).toBe(0.1);
+    for (const value of [1e-320, Number.MIN_VALUE, 0.01, MIN_TIME_SCALE / 2]) {
+      expect(clampTimeScale(value)).toBe(MIN_TIME_SCALE);
+    }
+    expect(clampTimeScale(MIN_TIME_SCALE)).toBe(MIN_TIME_SCALE);
+    expect(clampTimeScale(0.25)).toBe(0.25);
+  });
+
+  it('reads negative zero as no scale at all', () => {
+    expect(clampTimeScale(-0)).toBe(1);
+  });
+
   it('falls back on anything else, so no caller can divide by it into Infinity', () => {
     for (const value of [0, -3, Number.NaN, Number.POSITIVE_INFINITY, '10', null, undefined]) {
       expect(clampTimeScale(value)).toBe(1);
@@ -379,6 +399,26 @@ describe('resolveTimeScale', () => {
 
   it('clamps to the maximum scale', () => {
     expect(resolveTimeScale(`?timeScale=${MAX_TIME_SCALE * 10}`)).toBe(MAX_TIME_SCALE);
+  });
+
+  it('clamps a scale near zero up to the floor (#316)', () => {
+    expect(resolveTimeScale('?timeScale=1e-320')).toBe(MIN_TIME_SCALE);
+    expect(resolveTimeScale('?timeScale=0.001')).toBe(MIN_TIME_SCALE);
+  });
+
+  it('survives hostile numerics', () => {
+    expect(resolveTimeScale('?timeScale=1e308')).toBe(MAX_TIME_SCALE);
+    // Number() semantics: hex and padding parse, so they are clamped, not refused.
+    expect(resolveTimeScale('?timeScale=%200x10%20')).toBe(16);
+    for (const raw of ['NaN', '-Infinity', '-0', '1e999', '%E2%80%AE5', '5%00']) {
+      expect(resolveTimeScale(`?timeScale=${raw}`)).toBe(1);
+    }
+    // 100 kB of digits overflows to Infinity, which is not a scale.
+    expect(resolveTimeScale(`?timeScale=${'9'.repeat(100_000)}`)).toBe(1);
+  });
+
+  it('takes the first of a repeated param', () => {
+    expect(resolveTimeScale('?timeScale=2&timeScale=20')).toBe(2);
   });
 });
 
@@ -475,6 +515,46 @@ describe('resolveLoadout', () => {
   });
 });
 
+describe('resolveLoadout hardening (#316)', () => {
+  const rosterIds = ROSTER_SPELL_IDS;
+
+  it('drops repeats, keeping the first place', () => {
+    expect(resolveLoadout('?loadout=fire,fire,ice,fire')).toEqual(['fire', 'ice']);
+  });
+
+  it('caps the list', () => {
+    expect(MAX_SWITCH_LIST).toBe(8);
+    expect(rosterIds.length).toBeGreaterThan(MAX_SWITCH_LIST);
+    const list = resolveLoadout(`?loadout=${rosterIds.slice(0, 20).join(',')}`);
+    expect(list).toEqual(rosterIds.slice(0, MAX_SWITCH_LIST));
+  });
+
+  it('looks at a bounded number of pieces, so a huge value is cheap', () => {
+    const huge = `?loadout=${'fire,'.repeat(400_000)}`;
+    const t0 = performance.now();
+    expect(resolveLoadout(huge)).toEqual(['fire']);
+    expect(performance.now() - t0).toBeLessThan(50);
+    // A valid id past the piece limit is never reached.
+    const late = `?loadout=${'x,'.repeat(MAX_SWITCH_TOKENS)}ice`;
+    expect(resolveLoadout(late)).toEqual([]);
+  });
+
+  it('refuses prototype keys and look-alike or invisible ids', () => {
+    expect(resolveLoadout('?loadout=__proto__,constructor,toString,prototype,fire')).toEqual([
+      'fire',
+    ]);
+    for (const bad of ['%EF%AC%81re', 'fire%E2%80%8B', '%E2%80%AEfire', 'FIRE', 'fire%00']) {
+      expect(resolveLoadout(`?loadout=${bad}`)).toEqual([]);
+    }
+    expect(resolveLoadout('?loadout=%20fire%20')).toEqual(['fire']);
+  });
+
+  it('survives a 100 kB value and takes the first of a repeated param', () => {
+    expect(resolveLoadout(`?loadout=${'a'.repeat(100_000)}`)).toEqual([]);
+    expect(resolveLoadout('?loadout=fire&loadout=ice')).toEqual(['fire']);
+  });
+});
+
 describe('resolveEnemyFilter (#126)', () => {
   it('is no filter when the param is absent or names nothing known', () => {
     expect(resolveEnemyFilter('')).toEqual([]);
@@ -486,6 +566,74 @@ describe('resolveEnemyFilter (#126)', () => {
   it('reads the known types, trimmed, dropping the rest', () => {
     expect(resolveEnemyFilter('?enemies=ranged')).toEqual(['ranged']);
     expect(resolveEnemyFilter('?enemies=tank,%20ranged,,Swarm')).toEqual(['tank', 'ranged']);
+  });
+
+  it('drops repeats and stops at the list cap (#316)', () => {
+    expect(resolveEnemyFilter('?enemies=tank,tank,ranged,tank')).toEqual(['tank', 'ranged']);
+    const many = `?enemies=${Array.from({ length: 20 }, () => 'tank').join(',')}`;
+    expect(resolveEnemyFilter(many)).toEqual(['tank']);
+    expect(MAX_SWITCH_LIST).toBeGreaterThanOrEqual(ENEMY_TYPES.length);
+  });
+
+  it('is bounded on a huge value and refuses hostile ids (#316)', () => {
+    const t0 = performance.now();
+    expect(resolveEnemyFilter(`?enemies=${'tank,'.repeat(400_000)}`)).toEqual(['tank']);
+    expect(performance.now() - t0).toBeLessThan(50);
+    expect(resolveEnemyFilter(`?enemies=${'x,'.repeat(MAX_SWITCH_TOKENS)}tank`)).toEqual([]);
+    expect(resolveEnemyFilter('?enemies=__proto__,constructor,toString,tank')).toEqual(['tank']);
+    for (const bad of ['%EF%AC%81', 'tank%E2%80%8B', '%E2%80%AEtank', 'TANK', 'tank%00']) {
+      expect(resolveEnemyFilter(`?enemies=${bad}`)).toEqual([]);
+    }
+    expect(resolveEnemyFilter('?enemies=tank&enemies=ranged')).toEqual(['tank']);
+  });
+});
+
+describe('gateTestSwitches (#316)', () => {
+  const all =
+    '?seed=7&timeScale=30&invulnerable=1&startAt=1170&loadout=fire,ice&enemies=swarm&debug=textures';
+
+  it('leaves every switch alone in a dev build', () => {
+    expect(gateTestSwitches(all, true)).toBe(all);
+    expect(gateTestSwitches('', true)).toBe('');
+  });
+
+  it('keeps only the seed in a production build', () => {
+    expect(gateTestSwitches(all, false)).toBe('?seed=7');
+    expect(gateTestSwitches('?timeScale=30&debug=collisions', false)).toBe('');
+    expect(gateTestSwitches('', false)).toBe('');
+  });
+
+  it('takes the first of a repeated seed, as URLSearchParams does', () => {
+    expect(gateTestSwitches('?seed=1&seed=2', false)).toBe('?seed=1');
+  });
+
+  it('drops a param whose name only differs in case', () => {
+    expect(gateTestSwitches('?SEED=1&Seed=2', false)).toBe('');
+  });
+
+  it('turns every other switch off once composed with its parsers', () => {
+    const gated = gateTestSwitches(all, false);
+    expect(resolveSeed(gated, 99)).toBe(7);
+    expect(resolveTimeScale(gated)).toBe(1);
+    expect(resolveStartAt(gated)).toBe(0);
+    expect(resolveInvulnerable(gated)).toBe(false);
+    expect(resolveLoadout(gated)).toEqual([]);
+    expect(resolveEnemyFilter(gated)).toEqual([]);
+    expect(new URLSearchParams(gated).get('debug')).toBeNull();
+  });
+
+  it('survives hostile queries', () => {
+    const hostile = '?__proto__=1&constructor=1&prototype=1&seed=5';
+    expect(gateTestSwitches(hostile, false)).toBe('?seed=5');
+    // The seed is passed on as text and the seed parser stays the one judge of it.
+    const bidi = gateTestSwitches('?seed=%E2%80%AE5&startAt=1', false);
+    expect(bidi).toBe('?seed=%E2%80%AE5');
+    expect(resolveSeed(bidi, 42)).toBe(42);
+    const zeroWidth = gateTestSwitches('?seed=5%E2%80%8B', false);
+    expect(resolveSeed(zeroWidth, 42)).toBe(42);
+    const huge = `?seed=1&x=${'a'.repeat(100_000)}`;
+    expect(gateTestSwitches(huge, false)).toBe('?seed=1');
+    expect(gateTestSwitches(`?seed=${'9'.repeat(100_000)}`, false).length).toBeGreaterThan(1000);
   });
 });
 

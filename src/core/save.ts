@@ -15,6 +15,15 @@ import type { Outcome, RunStats } from './scenePayloads';
  * Pure TS, no Phaser import.
  */
 
+/**
+ * The most any saved counter (Embers, runs, kills, a spell's tally, a rank) or
+ * best time in ms may hold. Far beyond play, but low enough that its label
+ * ("1,000,000,000") fits the screen. A stored value outside it is a
+ * hand-edited save and is reset like any other bad one (#316); `recordRun`
+ * saturates here so a real run can never push a save past it.
+ */
+export const SAVE_COUNT_MAX = 1_000_000_000;
+
 /** Bump when the shape changes, and add a step to `MIGRATIONS` that lifts the previous shape. */
 export const SAVE_VERSION = 2;
 
@@ -102,7 +111,8 @@ export function parseSave(
 
   let data: unknown;
   try {
-    data = JSON.parse(json);
+    // A stored -0 would draw as "-0" and pass every counter check; read it as 0.
+    data = JSON.parse(json, (_key, value: unknown) => (Object.is(value, -0) ? 0 : value));
   } catch {
     return { save: emptySave(), status: 'reset', reason: 'not valid JSON' };
   }
@@ -156,31 +166,50 @@ export function serializeSave(save: Save): string {
  */
 export function recordRun(save: Save, stats: RunStats, outcome: Outcome, earned: number): Save {
   const profile = save.profile;
+  // Every figure stops at `SAVE_COUNT_MAX`: past it `isSave` would refuse the
+  // save and the next run would start from an empty one (#316).
+  const capped = (n: number) => Math.min(SAVE_COUNT_MAX, n);
   return {
     ...save,
     profile: {
       ...profile,
-      runs: profile.runs + 1,
-      wins: profile.wins + (outcome === 'win' ? 1 : 0),
-      bestTimeMs: Math.max(profile.bestTimeMs, stats.timeSurvivedMs),
-      bestLevel: Math.max(profile.bestLevel, stats.level),
-      totalKills: profile.totalKills + stats.kills,
+      runs: capped(profile.runs + 1),
+      wins: capped(profile.wins + (outcome === 'win' ? 1 : 0)),
+      bestTimeMs: capped(Math.max(profile.bestTimeMs, stats.timeSurvivedMs)),
+      bestLevel: capped(Math.max(profile.bestLevel, stats.level)),
+      totalKills: capped(profile.totalKills + stats.kills),
       spellCounts: {
         ...profile.spellCounts,
-        [stats.spellId]: (profile.spellCounts[stats.spellId] ?? 0) + 1,
+        [stats.spellId]: capped((profile.spellCounts[stats.spellId] ?? 0) + 1),
       },
     },
-    currency: save.currency + Math.max(0, Math.floor(earned)),
+    currency: capped(save.currency + Math.max(0, Math.floor(earned))),
   };
+}
+
+/** Shown on Intro and Result when the browser would not keep the save (#316). */
+export const SAVE_FAILED_TEXT = 'Progress could not be saved in this browser.';
+
+/** Shown once on Intro after Boot reset a save it could not read. */
+export const SAVE_RESET_TEXT = 'Saved progress could not be read and was reset.';
+
+/**
+ * The one line a screen shows about the save, or `null`. A failed write wins
+ * over a reset: it says progress is being lost right now.
+ */
+export function saveNotice(reset: boolean, storeFailed: boolean): string | null {
+  if (storeFailed) return SAVE_FAILED_TEXT;
+  return reset ? SAVE_RESET_TEXT : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+const isCount = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v <= SAVE_COUNT_MAX;
 const isFiniteNonNegative = (v: unknown): v is number =>
-  typeof v === 'number' && Number.isFinite(v) && v >= 0;
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= SAVE_COUNT_MAX;
 
 function isCountRecord(value: unknown): value is Record<string, number> {
   return isRecord(value) && Object.values(value).every(isCount);
