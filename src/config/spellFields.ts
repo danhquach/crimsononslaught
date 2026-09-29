@@ -31,12 +31,14 @@ export const STAT_CATEGORIES = {
   burn: 'damage',
   bleed: 'damage',
   pondTickDamage: 'damage',
+  icicleDamage: 'damage',
 
   // cooldown — scaled by `cooldownMul`
   cooldown: 'cooldown',
   attackCooldown: 'cooldown',
   rechargeDelay: 'cooldown',
   fallDelay: 'cooldown',
+  throwInterval: 'cooldown',
 
   // area — scaled by `areaMul`
   aoeRadius: 'area',
@@ -50,11 +52,13 @@ export const STAT_CATEGORIES = {
   size: 'area',
   pullRadius: 'area',
   pondRadius: 'area',
+  icicleRange: 'area',
 
   // speed — scaled by `projectileSpeedMul`
   speed: 'speed',
   orbitSpeed: 'speed',
   chaseSpeed: 'speed',
+  icicleSpeed: 'speed',
 
   // duration — scaled by `durationMul`
   duration: 'duration',
@@ -74,6 +78,7 @@ export const STAT_CATEGORIES = {
   strikes: 'unscaled',
   chains: 'unscaled',
   count: 'unscaled',
+  icicles: 'unscaled',
   slowPct: 'unscaled',
   freezeChance: 'unscaled',
   stunChance: 'unscaled',

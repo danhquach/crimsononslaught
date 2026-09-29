@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ICE_ROSTER_SPELL_IDS } from '../src/config/iceRoster';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
-import { MAX_LIVE_BOMBS } from '../src/core/frostNova';
+import { MAX_LIVE_BOMBS, MAX_LIVE_ICICLES } from '../src/core/frostNova';
 import { MAX_LIVE_ARROWS } from '../src/core/iceArrow';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
@@ -31,10 +31,17 @@ const RUN_MS = 100_000;
 /** A runner too slow to reach `RUN_MS` in this much wall clock fails outright. */
 const WALL_CAP_MS = 40_000;
 const SAMPLE_MS = 100;
+/** Where the group test's run clock starts (`?startAt=`), and how much run it then watches. */
+const GROUP_START_S = 300;
+const GROUP_RUN_MS = 60_000;
 
+/**
+ * Bombs and the icicles they throw share one `live` count (CO-182), so the
+ * Frost Nova Bomb's cap is both pools together.
+ */
 const CAPS: Readonly<Record<string, number>> = {
   ice: MAX_LIVE_ARROWS,
-  ice_nova_bomb: MAX_LIVE_BOMBS,
+  ice_nova_bomb: MAX_LIVE_BOMBS + MAX_LIVE_ICICLES,
 };
 
 type Report = GameScene['iceReport'];
@@ -121,5 +128,71 @@ test('Ice Arrow and Frost Nova Bomb land hits on a live crowd and hold their cap
   expect(arena?.enemies, 'enemies alive at the reading').toBeGreaterThan(0);
   expect(arena?.fps, `fps over ${arena?.enemies} enemies`).toBeGreaterThan(MIN_FPS);
 
+  expect(errors).toEqual([]);
+});
+
+/**
+ * CO-182: the reworked bomb in a thick crowd — it spins as it rolls, every
+ * flight's icicles land, and an armed bomb goes off on a group. The run's own
+ * enemy mix: swarm alone (`?enemies=swarm`) dies to Ice Arrow in one hit, so it
+ * left 0–3 enemies within the bomb's range and nothing to burst on.
+ *
+ * "Most bursts land on a group" is not asserted here: an invulnerable player
+ * standing still is mobbed, so the crowd hugs the player and a bomb armed
+ * 120 px out has left most of it behind (5–8 of 16 bursts on 3 or more, over
+ * three runs). With a player that kites, the crowd trails it and 55–66% of
+ * bursts catch 3 or more (`docs/tuning/phase2-balance.md`, CO-182).
+ */
+test('Frost Nova Bomb rolls spinning, sprays icicles, and bursts on a group', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto(
+    `/?seed=1&timeScale=10&invulnerable=1&startAt=${GROUP_START_S}&loadout=ice_nova_bomb`,
+  );
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  const { x, y } = cardCenter(SPELL_IDS.indexOf(PICKED));
+  await page.mouse.click(x, y);
+  await waitForScene(page, SCENE.game);
+
+  // Rotations seen per bomb, by throw id: one bomb seen at two rotations is a
+  // spin, where two bombs thrown on different headings would not be.
+  const rotations = new Map<number, Set<number>>();
+  let bomb: Report[number] | undefined;
+  const until = Date.now() + WALL_CAP_MS;
+  let runMs = 0;
+  // The HUD's timer counts from 0:00, so the window ends `GROUP_RUN_MS` past the start.
+  while (runMs < GROUP_START_S * 1000 + GROUP_RUN_MS && Date.now() < until) {
+    await answerLevelUp(page);
+    const current = await sample(page);
+    if (!current) break;
+    bomb = current.find((entry) => entry.id === 'ice_nova_bomb');
+    const spin = bomb?.bombSpin;
+    if (spin) {
+      const seen = rotations.get(spin.id) ?? new Set<number>();
+      seen.add(Math.round(spin.rotation * 100));
+      rotations.set(spin.id, seen);
+    }
+    runMs = (await readHud(page)).elapsedMs;
+    await page.waitForTimeout(SAMPLE_MS);
+  }
+
+  const caught = bomb?.burstCaught ?? [];
+  const onGroups = caught.filter((n) => n >= 3).length;
+  const spun = [...rotations.values()].filter((seen) => seen.size > 1).length;
+  // Logged before the asserts, so a CI failure shows the spread it failed on.
+  console.log(
+    `CO-182 bursts=${caught.length} onGroups=${onGroups} icicleHits=${bomb?.icicleHits} ` +
+      `spun=${spun} caught=[${caught.join(',')}]`,
+  );
+  expect(spun, 'bombs seen at two or more rotations in one flight').toBeGreaterThan(0);
+  expect(bomb?.icicleHits, 'icicle hits over the window').toBeGreaterThan(0);
+  expect(caught.length, 'bursts over the window').toBeGreaterThan(0);
+  expect(onGroups, `bursts on >=3 enemies, of ${caught.length}`).toBeGreaterThan(0);
+  // Every flight rolls at least the arming distance, so each sprays: 5-7 hits a
+  // burst over three runs, well clear of one.
+  expect(
+    bomb?.icicleHits ?? 0,
+    `icicle hits against ${caught.length} bursts`,
+  ).toBeGreaterThanOrEqual(caught.length);
   expect(errors).toEqual([]);
 });

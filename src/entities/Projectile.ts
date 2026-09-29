@@ -88,8 +88,11 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
    * expires it at the same spot.
    */
   get spent(): boolean {
-    return (
-      Phaser.Math.Distance.Between(this.firedFromX, this.firedFromY, this.x, this.y) >= this.range
-    );
+    return this.travelled >= this.range;
+  }
+
+  /** How far the shot has flown from where it was fired, in px (CO-182: when a bomb arms). */
+  get travelled(): number {
+    return Phaser.Math.Distance.Between(this.firedFromX, this.firedFromY, this.x, this.y);
   }
 }

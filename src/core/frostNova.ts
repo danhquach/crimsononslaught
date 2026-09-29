@@ -1,7 +1,8 @@
 import { FREEZE_DURATION } from '../config/spells';
+import { densestSpot } from './groundArea';
 import type { Vec2 } from './input';
 import type { Rng } from './rng';
-import { nearestEnemies } from './spell';
+import { anyWithin, nearestEnemies } from './spell';
 import type { NovaBombStats } from './spellStats';
 
 /**
@@ -18,11 +19,36 @@ import type { NovaBombStats } from './spellStats';
  */
 
 /**
- * Bombs in flight the pool may ever hold. One leaves every 2.2 s and flies its
- * 135 px `range` in about 0.6 s, so one is normally in the air; the cap leaves
+ * Bombs in flight the pool may ever hold. One leaves every 3.5 s and rolls its
+ * 240 px `range` in 3 s (CO-182), so one is normally in the air; the cap leaves
  * room for a Haste build and a long-range one together.
  */
 export const MAX_LIVE_BOMBS = 8;
+
+/** The bomb sprite's turn rate, in degrees per second (CO-182). The look only: no rule reads it. */
+export const BOMB_SPIN_DEG_PER_S = 540;
+
+/** How far the icicle set turns from one throw to the next, in degrees (CO-182): the spiral. */
+export const ICICLE_SPIRAL_STEP_DEG = 40;
+
+/** Live enemies inside an armed bomb's burst `radius` that set it off (CO-182). */
+export const BURST_TRIGGER_COUNT = 3;
+
+/**
+ * How far, in px, a bomb rolls before a group can set it off (CO-182). Without
+ * it a crowd round the player met the trigger on the throw's first frame and
+ * every bomb burst at the player's feet with no icicle thrown; 120 px is 1.5 s
+ * of roll at the base speed, 6 throws.
+ */
+export const BURST_ARM_DISTANCE = 120;
+
+/**
+ * Icicles in the air the pool may ever hold (CO-182). An icicle lives about
+ * 0.34 s (110 px at 320 px/s) and a bomb throws 2 every 0.25 s, so one bomb
+ * keeps about 3 up; the cap leaves room for a hasted, long-range build with
+ * several bombs rolling at once.
+ */
+export const MAX_LIVE_ICICLES = 32;
 
 /** The cold on one enemy; `NO_FROST` when there is none. */
 export interface FrostState {
@@ -99,16 +125,87 @@ export function tickFrost(
 }
 
 /**
- * Where a throw is aimed: the nearest enemy within `range` of the caster, or
- * `undefined` with none in range — the cast is then spent on nothing, the same
- * rule Fireball's volley follows with an empty crowd.
+ * Where a throw heads (CO-182): toward the densest group within `range`, the
+ * spot Ice Storm would drop on (`densestSpot`), as a unit vector. With nobody
+ * in range, `undefined` — the cast waits (#212). Should the densest spot be
+ * the caster itself (an enemy standing on the player), the nearest enemy
+ * decides instead, and one standing exactly on the player sends it right.
  */
-export function bombTarget<T extends Vec2>(
+export function bombAim<T extends Vec2>(
   caster: Readonly<Vec2>,
   enemies: readonly T[],
+  radius: number,
   range: number,
-): T | undefined {
-  return nearestEnemies(caster, enemies, 1, range)[0];
+  rng: Rng,
+): Vec2 | undefined {
+  if (!anyWithin(caster, enemies, range)) return undefined;
+  const spot = densestSpot(caster, enemies, radius, range, rng);
+  let dx = spot.x - caster.x;
+  let dy = spot.y - caster.y;
+  if (dx === 0 && dy === 0) {
+    const offCaster = enemies.filter((enemy) => enemy.x !== caster.x || enemy.y !== caster.y);
+    const [nearest] = nearestEnemies(caster, offCaster, 1, range);
+    if (!nearest) return { x: 1, y: 0 };
+    dx = nearest.x - caster.x;
+    dy = nearest.y - caster.y;
+  }
+  const length = Math.hypot(dx, dy);
+  return { x: dx / length, y: dy / length };
+}
+
+/**
+ * The headings, in radians, of throw number `throwIndex` (0 = the first)
+ * (CO-182): `icicles` spaced evenly round the circle, the set starting a
+ * quarter turn off the aim and turning `ICICLE_SPIRAL_STEP_DEG` per throw, so
+ * the spray spirals out as the bomb rolls.
+ */
+export function throwAngles(aimRad: number, throwIndex: number, icicles: number): number[] {
+  const count = Math.floor(icicles);
+  if (!(count > 0)) return [];
+  const start = aimRad + Math.PI / 2 + (throwIndex * ICICLE_SPIRAL_STEP_DEG * Math.PI) / 180;
+  return Array.from({ length: count }, (_, i) => start + (i * 2 * Math.PI) / count);
+}
+
+/**
+ * Throws owed now (CO-182): one every `throwInterval` s after the launch, the
+ * first a full interval in, less the `thrown` already made. A long step owes
+ * every throw it covered, so a scaled run sprays as many icicles as a real one.
+ */
+export function throwsDue(elapsedS: number, thrown: number, throwInterval: number): number {
+  if (!(throwInterval > 0) || !(elapsedS > 0)) return 0;
+  return Math.max(0, Math.floor(elapsedS / throwInterval) - thrown);
+}
+
+/**
+ * Whether a rolling bomb goes off now (CO-182), having rolled `travelled` px of
+ * its `range`: always once the range has run out; before that, only once it has
+ * rolled `BURST_ARM_DISTANCE` and its burst would catch `BURST_TRIGGER_COUNT`
+ * enemies — that many within `radius` of it, the radius counting as in — so a
+ * lone runner cannot set it off and a crowd at the player's feet cannot either.
+ */
+export function shouldBurst(
+  at: Readonly<Vec2>,
+  enemies: readonly Readonly<Vec2>[],
+  travelled: number,
+  range: number,
+  radius: number,
+): boolean {
+  if (travelled >= range) return true;
+  if (travelled < BURST_ARM_DISTANCE) return false;
+  const radiusSq = radius * radius;
+  let near = 0;
+  for (const enemy of enemies) {
+    const dx = enemy.x - at.x;
+    const dy = enemy.y - at.y;
+    if (dx * dx + dy * dy <= radiusSq) near += 1;
+    if (near >= BURST_TRIGGER_COUNT) return true;
+  }
+  return false;
+}
+
+/** What one icicle leaves on the enemy it breaks on (CO-182): the bomb's slow, never a freeze. */
+export function icicleFrost(stats: Readonly<{ slowPct: number; slowDuration: number }>): FrostHit {
+  return { slowPct: stats.slowPct, slowDuration: stats.slowDuration, freeze: false };
 }
 
 /**

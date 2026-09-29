@@ -48,29 +48,40 @@ export interface IceStats {
 }
 
 /**
- * Frost Nova Bomb (spec §9.3): Phase 1's nova, thrown. A slow bomb flies at
- * the nearest enemy within `range` and detonates on its first hit or where its
- * range runs out, pulsing `radius` around that point.
+ * Frost Nova Bomb (spec §9.3, reworked by CO-182): a slow spinning bomb rolls
+ * toward the densest group within `range`, spraying icicles in a turning
+ * spiral as it goes, and bursts in the pack or where its range runs out,
+ * pulsing `radius` around that point.
  */
 export interface NovaBombStats {
   /** Seconds between throws. */
   cooldown: number;
-  /** Damage the pulse deals to every enemy inside `radius`. */
+  /** Damage the burst deals to every enemy inside `radius`. */
   damage: number;
-  /** Pulse radius in px, measured from where the bomb detonated. */
+  /** Burst radius in px, measured from where the bomb went off. */
   radius: number;
-  /** Bomb speed in px/s. */
+  /** Rolling speed of the bomb in px/s. */
   speed: number;
-  /** How far the bomb flies before it detonates on its own, in px; also the targeting range. */
+  /** How far the bomb rolls before it bursts on its own, in px; also the aiming range. */
   range: number;
   /** Speed cut applied to everything hit, 0–1. */
   slowPct: number;
   /** Seconds a slow lasts. */
   slowDuration: number;
-  /** Chance per enemy hit of a full stop for `freezeDuration` s, 0–1. */
+  /** Chance per enemy the burst catches of a full stop for `freezeDuration` s, 0–1. */
   freezeChance: number;
   /** Seconds a freeze lasts. */
   freezeDuration: number;
+  /** Seconds between icicle throws while the bomb rolls. */
+  throwInterval: number;
+  /** Icicles per throw, spaced evenly round the circle. */
+  icicles: number;
+  /** Damage one icicle deals to the enemy it breaks on. */
+  icicleDamage: number;
+  /** Icicle speed in px/s. */
+  icicleSpeed: number;
+  /** How far an icicle flies before it expires, in px. */
+  icicleRange: number;
 }
 
 /**

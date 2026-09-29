@@ -869,3 +869,71 @@ died there in #210's rounds 1 and 4).
   Tornado and Chain Lightning.
 - **Not tried:** a wider orbit, two blades, blades that grow with a spell level
   (spells have no levels), a lunge or a thrown arc.
+
+# Frost Nova Bomb rework (CO-182, 2026-09-28)
+
+Ticket: [#303](https://github.com/danhquach/crimsononslaught/issues/303) · Spec: `docs/superpowers/specs/2026-09-28-frost-nova-bomb-rework-design.md`
+
+**Question.** Does the reworked bomb land its bursts on groups, and does its
+spray land at all?
+
+**Method.**
+- The 20-minute bot: mortal, kiting, Ice with `?loadout=ice_nova_bomb`.
+- `timeScale=8`, one Vite server on its own port, runs one at a time.
+- Each run stopped at 10:00 of run time and read the bomb's test hook
+  (`iceReport`) for the enemies each burst caught and the icicle hits.
+
+**Burst trigger.** The first cut burst once 3 enemies stood within 50 px, with no
+arming distance. In a crowd round the player, 9 of 11 bombs burst on their first
+frame: 0 throws after 0.02 s. The bomb then acted like the old nova at the
+player's feet and never sprayed. The rule now arms after 120 px and then bursts
+once its 110 px ring would catch 3.
+
+| Seed | Bursts | On ≥3 enemies | On none | Icicle hits | Burst hits |
+|---|---|---|---|---|---|
+| 1 | 219 | 120 (55%) | 66 | 700 | 656 |
+| 2 | 187 | 119 (64%) | 37 | 685 | 715 |
+| 3 | 205 | 136 (66%) | 42 | 775 | 705 |
+
+- **Result:**
+  - Most bursts land on a group: 55–66% catch 3 or more.
+  - The spray lands about 3.5 hits a bomb: about 60% of the damage the bursts deal
+    (14 per icicle hit against 24 per burst hit).
+  - A fifth to a third of the bursts catch nobody. These are mostly bombs that roll
+    their full range through a thin field.
+
+## Ice Storm alone vs Ice Storm + Frost Nova Bomb (the ticket's check)
+
+**Method.**
+- The same bot, mortal, full 20-minute runs.
+- Seeds 1–40 for each arm: 80 runs in all, the arms interleaved, two at a time,
+  `timeScale=8`, one fresh Vite server serving this branch's code before its rebase onto #307.
+- **What each arm carries:**
+  - Ice Storm alone: `?loadout=ice_blizzard`.
+  - Storm + Bomb: `?loadout=ice_blizzard,ice_nova_bomb`.
+  - Ice Arrow is the default in both.
+  - The bot filtered the other Ice actives out of the level-up offers in the page.
+  - Every logged build was exactly its arm's spells. Passives were picked the usual
+    way.
+- **Why the filter is in the page:** a level-up offers only spells while a slot is
+  open, so a pick score alone could not keep Shield and Companion out. The first
+  launch had them in both arms and was thrown away.
+- **Ice Storm is the one from before #304**, radius 80 for 6 s, not what `main` ships
+  now (120 for 4 s, #307): the PM asked for the sweep before that change merged.
+
+| Arm | Wins | Reached boss | Boss TTK min / median / max | TTK in 45–90 s | Median level | Median survival of losses |
+|---|---|---|---|---|---|---|
+| Arrow + Storm | 13 / 40 | 13 | 37 / 57 / 112 s | 7 of 13 | 27 | 10:04 |
+| Arrow + Storm + Bomb | 30 / 40 | 31 | 21 / 31 / 63 s | 3 of 30 | 46 | 13:43 |
+
+- **Result:**
+  - The bomb clearly adds to Ice Storm: 17 more wins out of 40, more than three times
+    the roughly 5-win noise the #210 rounds measured.
+  - The boss falls in about half the time.
+  - Over full 20-minute runs, 16,392 of 20,289 bursts (81%) caught 3 or more enemies.
+- **The Storm + Bomb arm is fast on the boss:**
+  - Its median time-to-kill is 31 s, below the 45–90 s window, and only 3 of its 30
+    wins land inside it.
+  - This arm carries one active more than the control, and the comparison measures
+    the bomb added, not the bomb against another spell. A full five-active Ice build
+    still has to be read against the window.

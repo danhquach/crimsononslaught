@@ -28,6 +28,9 @@ const SPEC_KEYS = [
   // colour on day one; the companions' own sheets land with #146.
   'companion',
   'proj_ice',
+  // CO-182: Frost Nova Bomb's urchin and icicle.
+  'proj_nova_bomb',
+  'proj_icicle',
   // #205: Earth Spike's shot, apart from Boulder's disc.
   'proj_spike',
   'shield_ice',
@@ -60,6 +63,8 @@ describe('enemy shot vs player shots (#126)', () => {
   const PLAYER_SHOTS = [
     'proj_fire',
     'proj_ice',
+    'proj_nova_bomb',
+    'proj_icicle',
     'proj_bolt',
     'proj_spike',
     'fx_bolt',

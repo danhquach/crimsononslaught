@@ -12,6 +12,7 @@ import {
   type SpellStatField,
 } from '../config/spellFields';
 import { BASE_EARTH_ROSTER_STATS } from '../config/earthRoster';
+import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { BASE_METEOR_STATS } from '../config/strikes';
 import { resolveProfile, resolveSpellStats, validateSpellFields } from './playerProfile';
@@ -243,6 +244,42 @@ describe('resolveSpellStats', () => {
     });
   });
 
+  // CO-182 rework spec §4: each passive reaches exactly the Frost Nova Bomb fields it names.
+  describe('Frost Nova Bomb (CO-182)', () => {
+    const at = (id: string, rank: number) =>
+      resolveSpellStats(BASE_NOVA_BOMB_STATS, resolveProfile(ranks([[id, rank]])));
+
+    it('throws faster with Haste', () => {
+      const out = at('passive_haste', 5);
+      expect(out.throwInterval).toBeCloseTo(0.25 * 0.92 ** 5, 9);
+      expect(out.cooldown).toBeCloseTo(3.5 * 0.92 ** 5, 9);
+    });
+
+    it('hits harder with Power, icicles and burst alike', () => {
+      const out = at('passive_power', 3);
+      expect(out.icicleDamage).toBeCloseTo(14 * 1.1 ** 3, 9);
+      expect(out.damage).toBeCloseTo(24 * 1.1 ** 3, 9);
+    });
+
+    it('reaches further with Expanse', () => {
+      const out = at('passive_expanse', 3);
+      expect(out.icicleRange).toBeCloseTo(110 * 1.12 ** 3, 9);
+      expect(out.range).toBeCloseTo(240 * 1.12 ** 3, 9);
+    });
+
+    it('speeds the icicles and the bomb with Velocity', () => {
+      const out = at('passive_velocity', 3);
+      expect(out.icicleSpeed).toBeCloseTo(320 * 1.1 ** 3, 9);
+      expect(out.speed).toBeCloseTo(80 * 1.1 ** 3, 9);
+    });
+
+    it('never changes the icicle count', () => {
+      for (const id of ['passive_power', 'passive_haste', 'passive_expanse', 'passive_velocity']) {
+        expect(at(id, 5).icicles, id).toBe(BASE_NOVA_BOMB_STATS.icicles);
+      }
+    });
+  });
+
   it('passes a field outside the category map through unscaled', () => {
     const out = resolveSpellStats({ mystery: 4 } as unknown as SpellStatBlock, PROBE);
     expect(out).toEqual({ mystery: 4 });
@@ -267,8 +304,9 @@ describe('validateSpellFields', () => {
     // 45 since #143 retired Crush with Phase 1's Orbiting Boulders: `earth` is
     // Earth Spike now, and no spell multiplies damage by enemy type. 46 since
     // Fire Wave's `arc` (#218), 47 since Earth Spike's `bleedChance` (#205),
-    // 52 since Meteor's edge factor and pond (CO-167).
-    expect(fields.length).toBe(52);
+    // 52 since Meteor's edge factor and pond (CO-167), 57 since Frost Nova Bomb's
+    // throw interval, icicle count, damage, speed and range (CO-182).
+    expect(fields.length).toBe(57);
   });
 
   // CO-109 routes every equipped spell's block through the category map, so a

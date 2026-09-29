@@ -26,6 +26,8 @@ export const TEXTURE_KEYS = [
   'boulder',
   'companion',
   'proj_ice',
+  'proj_nova_bomb',
+  'proj_icicle',
   'proj_spike',
   'shield_ice',
   'fx_area',
@@ -84,6 +86,12 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // today, so the second element to shoot needs a look of its own or its bolts
   // read as fireballs; the sheet itself is #145.
   proj_ice: { shape: 'diamond', color: 0x80d8ff, width: 12, height: 12 },
+  // CO-182: Frost Nova Bomb's rolling urchin and the icicles it throws. A disc
+  // and a thin diamond in ice blues of their own (every key's colour is
+  // distinct), so without the atlas the bomb still reads apart from Ice Arrow's
+  // `proj_ice`; with it they wear `ice.urchin` and `ice.icicle`.
+  proj_nova_bomb: { shape: 'circle', color: 0x29b6f6, width: 22, height: 22 },
+  proj_icicle: { shape: 'diamond', color: 0xe1f5fe, width: 14, height: 6 },
   // #205: Earth Spike in flight — a long stone diamond, so it reads as a shot
   // and never as the round `boulder` disc. With the atlas it plays `earth.fly`
   // (CO-138); the body stays this disc's circle, round the shard's middle.

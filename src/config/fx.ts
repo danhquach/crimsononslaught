@@ -22,6 +22,13 @@ export const EXPLOSION_SCALE_RADIUS = 40;
 export const NOVA_SCALE_RADIUS = 90;
 
 /**
+ * Frost Nova Bomb's burst (CO-182) is drawn at `radius / SPIKE_RING_SCALE_RADIUS`:
+ * the half-width of the frost ring in `ice.spikeRing`'s frames, in native px,
+ * so the ring's rim sits on the radius the burst reaches.
+ */
+export const SPIKE_RING_SCALE_RADIUS = 61;
+
+/**
  * The boulder's spin plays at its authored frame rate at the base orbit speed
  * and speeds up in proportion, so a faster ring visibly rolls faster. Earth
  * Shield is the ring the base is read from (spec §9.5): #143 made `earth`
