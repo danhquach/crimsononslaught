@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ensurePlayerName, PLAYER_NAME_STREAM } from '../core/playerName';
 import { createRng, deriveSeed, resolveSeed } from '../core/rng';
 import {
+  gateTestSwitches,
   resolveEnemyFilter,
   resolveInvulnerable,
   resolveLoadout,
@@ -32,7 +33,8 @@ import { generatePlaceholderTextures } from '../render/textures';
  * First scene: loads the sprite atlas, fills any gap with a placeholder
  * texture, fixes the run seed, then hands off to Intro.
  * `?debug=textures` opens the CO-005 texture check instead, `?debug=collisions`
- * the CO-032 overlap check.
+ * the CO-032 overlap check. Every address-bar switch but `?seed=` is read in
+ * development builds only (`gateTestSwitches`, #316).
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -94,40 +96,42 @@ export class BootScene extends Phaser.Scene {
     // Run seed: `?seed=<int>` reproduces a run; otherwise a fresh one per page
     // load. Logged so a bug report can quote it. SpellSelect reads it from the
     // registry and passes it into Game with the chosen spell.
-    const seed = resolveSeed(location.search, Date.now());
+    const search = gateTestSwitches(location.search, import.meta.env.DEV);
+    const seed = resolveSeed(search, Date.now());
     this.registry.set(SEED_REGISTRY_KEY, seed);
     console.info(`[rng] seed=${seed}`);
 
     // `?timeScale=<n>` speeds the run clock up (CO-030); Game reads it from the
-    // registry. Logged only when it is on, so a normal run stays quiet.
-    const timeScale = resolveTimeScale(location.search);
+    // registry. Logged only when it is on, so a normal run stays quiet. It and
+    // the switches below are dev-only: `search` is just `?seed=` in a build.
+    const timeScale = resolveTimeScale(search);
     this.registry.set(TIME_SCALE_REGISTRY_KEY, timeScale);
     if (timeScale !== 1) console.info(`[run] timeScale=${timeScale}`);
 
     // `?startAt=<s>` starts the run clock late (#127) so a hands-off browser run
     // reaches the boss without climbing all 20 minutes.
-    const startAt = resolveStartAt(location.search);
+    const startAt = resolveStartAt(search);
     this.registry.set(START_AT_REGISTRY_KEY, startAt);
     if (startAt > 0) console.info(`[run] startAt=${startAt / 1000}`);
 
     // `?invulnerable=1` lets a hands-off browser run reach the boss (CO-061).
-    const invulnerable = resolveInvulnerable(location.search);
+    const invulnerable = resolveInvulnerable(search);
     this.registry.set(INVULNERABLE_REGISTRY_KEY, invulnerable);
     if (invulnerable) console.info('[run] invulnerable=1');
 
     // `?loadout=fire,ice` casts several actives in one run (CO-109), until the
     // level-up rework (#132) can offer them.
-    const loadout = resolveLoadout(location.search);
+    const loadout = resolveLoadout(search);
     this.registry.set(LOADOUT_REGISTRY_KEY, loadout);
     if (loadout.length > 0) console.info(`[run] loadout=${loadout.join(',')}`);
 
     // `?enemies=ranged` lets only those types spawn (#126), so a browser check
     // can watch one type without the crowd around it.
-    const enemies = resolveEnemyFilter(location.search);
+    const enemies = resolveEnemyFilter(search);
     this.registry.set(ENEMIES_REGISTRY_KEY, enemies);
     if (enemies.length > 0) console.info(`[run] enemies=${enemies.join(',')}`);
 
-    const debug = new URLSearchParams(location.search).get('debug');
+    const debug = new URLSearchParams(search).get('debug');
     if (debug === 'textures') {
       this.scene.start(SCENE.textureDebug);
       return;

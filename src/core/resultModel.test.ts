@@ -173,6 +173,13 @@ describe('RESULT_LAYOUT', () => {
     expect(hintY + 12).toBeLessThanOrEqual(540 - 8);
   });
 
+  it('puts the save-failed line under the hint and inside the screen (#316)', () => {
+    const { hintY, saveNoticeY } = RESULT_LAYOUT;
+    // Both are 14 px lines centred on their y; CI fonts run up to 12 px either side.
+    expect(saveNoticeY).toBeGreaterThanOrEqual(hintY + 24);
+    expect(saveNoticeY + 8).toBeLessThanOrEqual(540 - 8);
+  });
+
   it('keeps the strips clear of each other and of the card', () => {
     const sorted = [...AREAS.slice(1)].sort((a, b) => a.y - b.y);
     for (let i = 1; i < sorted.length; i += 1) {

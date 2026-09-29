@@ -6,5 +6,11 @@
     // runtime; resolve it to the source file so the browser-side code is typed.
     "paths": { "/src/*": ["./src/*"] }
   },
-  "include": ["e2e", "playwright.config.ts", "src/vite-env.d.ts"]
+  "include": [
+    "e2e",
+    "e2e-csp",
+    "playwright.config.ts",
+    "playwright.csp.config.ts",
+    "src/vite-env.d.ts"
+  ]
 }

@@ -1,11 +1,24 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PLAYER_MAX_HP } from '../src/config/player';
 import { upgradeById } from '../src/config/meta';
-import { emptySave, type Save } from '../src/core/save';
+import {
+  SAVE_COUNT_MAX,
+  SAVE_FAILED_TEXT,
+  SAVE_RESET_TEXT,
+  emptySave,
+  type Save,
+} from '../src/core/save';
 import { SCENE } from '../src/core/scenePayloads';
 import type { UpgradesScene } from '../src/scenes/UpgradesScene';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
-import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from './game';
+import {
+  cardCenter,
+  collectErrors,
+  readHud,
+  sceneTexts,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * Persistence (CO-101) through the real storage: what Boot does with a corrupt
@@ -135,4 +148,167 @@ test('wiping progress leaves an empty save in storage, keeping the name', async 
   const wiped = withName(emptySave(), 'Test_Player');
   await expect.poll(() => readSave(page)).toEqual(wiped);
   expect(JSON.parse((await readStorage(page)) ?? 'null')).toEqual(wiped);
+});
+
+/** Every text in a scene with its bounds, for the containment checks below. */
+function textBoxes(
+  page: Page,
+  key: string,
+): Promise<{ text: string; x: number; y: number; width: number; height: number }[]> {
+  return page.evaluate(async (sceneKey) => {
+    const { game } = await import('/src/main.ts');
+    return game.scene
+      .getScene(sceneKey)
+      .children.list.filter((child) => child.type === 'Text')
+      .map((child) => {
+        const { x, y, width, height } = (
+          child as unknown as { getBounds(): Phaser.Geom.Rectangle }
+        ).getBounds();
+        return { text: (child as unknown as { text: string }).text, x, y, width, height };
+      });
+  }, key);
+}
+
+/** The balance line on Upgrades, with its bounds. */
+async function balanceLabel(page: Page) {
+  const boxes = await textBoxes(page, SCENE.upgrades);
+  const label = boxes.find((box) => box.text.startsWith('Embers: '));
+  if (!label) throw new Error('no Embers label on Upgrades');
+  return label;
+}
+
+test.describe('a stored counter outside the ceiling (#316)', () => {
+  test('1e308 resets the save, says so on Intro, and the balance reads 0', async ({ page }) => {
+    const errors = collectErrors(page);
+    await seedStorage(page, JSON.stringify({ ...emptySave(), currency: 1e308 }));
+
+    await page.goto('/?seed=1');
+    await waitForScene(page, SCENE.intro);
+    expect(await sceneTexts(page, SCENE.intro)).toContain(SAVE_RESET_TEXT);
+
+    await openUpgrades(page);
+    expect((await balanceLabel(page)).text).toBe('Embers: 0');
+    expect(errors).toEqual([]);
+  });
+
+  test('a balance exactly at the ceiling draws inside the screen', async ({ page }) => {
+    await seedStorage(page, JSON.stringify({ ...emptySave(), currency: SAVE_COUNT_MAX }));
+
+    await page.goto('/?seed=1');
+    await openUpgrades(page);
+    const label = await balanceLabel(page);
+    expect(label.text).toBe('Embers: 1,000,000,000');
+    expect(label.text.length).toBeLessThanOrEqual(30);
+    expect(label.x).toBeGreaterThanOrEqual(8);
+    expect(label.x + label.width).toBeLessThanOrEqual(960 - 8);
+  });
+
+  test('a stored -0 reads as 0', async ({ page }) => {
+    const raw = JSON.stringify(emptySave()).replace('"currency":0', '"currency":-0');
+    expect(raw).toContain('"currency":-0');
+    await seedStorage(page, raw);
+
+    await page.goto('/?seed=1');
+    await openUpgrades(page);
+    expect((await balanceLabel(page)).text).toBe('Embers: 0');
+  });
+});
+
+/** Make every write to storage throw, as a full quota or a blocked store does. */
+async function breakWrites(page: Page, alsoReads = false): Promise<void> {
+  await page.addInitScript((reads) => {
+    const quota = (): never => {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    };
+    Storage.prototype.setItem = quota;
+    if (reads) {
+      Storage.prototype.getItem = (): never => {
+        throw new DOMException('The operation is insecure.', 'SecurityError');
+      };
+    }
+  }, alsoReads);
+}
+
+/** Click the pause screen's text button with this label, once it is drawn. */
+async function clickPauseButton(page: Page, label: string): Promise<void> {
+  const centre = (): Promise<{ x: number; y: number } | null> =>
+    page.evaluate(
+      async ([key, text]) => {
+        const { game } = await import('/src/main.ts');
+        const button = game.scene
+          .getScene(key)
+          .children.list.find(
+            (child) =>
+              child.type === 'Text' && (child as unknown as { text: string }).text === text,
+          ) as unknown as { getCenter(): { x: number; y: number } } | undefined;
+        return button ? button.getCenter() : null;
+      },
+      [SCENE.pause, label] as const,
+    );
+  await expect.poll(centre, { message: `pause button "${label}"` }).not.toBeNull();
+  const at = await centre();
+  if (!at) throw new Error(`pause button "${label}" vanished`);
+  await page.mouse.click(at.x, at.y);
+}
+
+/** Start a run, let it bank a little, and End run from pause to reach Result. */
+async function endRun(page: Page): Promise<void> {
+  await page.goto('/?seed=1&invulnerable=1&timeScale=10');
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  const { x, y } = cardCenter(0);
+  await page.mouse.click(x, y);
+  await waitForScene(page, SCENE.game);
+  await page.waitForTimeout(1000);
+  await page.keyboard.press('Escape');
+  await waitForScene(page, SCENE.pause);
+  await clickPauseButton(page, 'End run');
+  await clickPauseButton(page, 'Yes');
+  await waitForScene(page, SCENE.result);
+}
+
+test.describe('a browser that will not keep the save (#316)', () => {
+  test('Intro and Result both say so, and the notice clears the hint', async ({ page }) => {
+    const errors = collectErrors(page);
+    await breakWrites(page);
+
+    await page.goto('/?seed=1');
+    await waitForScene(page, SCENE.intro);
+    expect(await sceneTexts(page, SCENE.intro)).toContain(SAVE_FAILED_TEXT);
+
+    await endRun(page);
+    const boxes = await textBoxes(page, SCENE.result);
+    const notice = boxes.find((box) => box.text === SAVE_FAILED_TEXT);
+    expect(notice, 'the notice is on Result').toBeDefined();
+    if (!notice) return;
+    expect(notice.x).toBeGreaterThanOrEqual(8);
+    expect(notice.x + notice.width).toBeLessThanOrEqual(960 - 8);
+    expect(notice.y + notice.height).toBeLessThanOrEqual(540);
+    const hint = boxes.find((box) => box.text.includes('Enter'));
+    expect(hint, 'the hint is on Result').toBeDefined();
+    if (hint) expect(notice.y).toBeGreaterThanOrEqual(hint.y + hint.height);
+    expect(errors).toEqual([]);
+  });
+
+  test('blocked reads as well as writes still boot, with the line shown', async ({ page }) => {
+    const errors = collectErrors(page);
+    await breakWrites(page, true);
+
+    await page.goto('/?seed=1');
+    await waitForScene(page, SCENE.intro);
+    expect(await sceneTexts(page, SCENE.intro)).toContain(SAVE_FAILED_TEXT);
+    expect(errors).toEqual([]);
+  });
+
+  test('working storage shows no such line on Intro or Result', async ({ page }) => {
+    const errors = collectErrors(page);
+
+    await page.goto('/?seed=1');
+    await waitForScene(page, SCENE.intro);
+    expect(await sceneTexts(page, SCENE.intro)).not.toContain(SAVE_FAILED_TEXT);
+
+    await endRun(page);
+    expect(await sceneTexts(page, SCENE.result)).not.toContain(SAVE_FAILED_TEXT);
+    expect(errors).toEqual([]);
+  });
 });

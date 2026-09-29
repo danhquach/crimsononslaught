@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SAVE_COUNT_MAX,
+  SAVE_FAILED_TEXT,
+  SAVE_RESET_TEXT,
   SAVE_VERSION,
   emptySave,
   isSave,
   migrate,
   parseSave,
   recordRun,
+  saveNotice,
   serializeSave,
   type MigrationStep,
   type Save,
@@ -266,5 +270,160 @@ describe('recordRun', () => {
     expect(next.settings).toEqual({ volume: 1 });
     expect(next.currency).toBe(12);
     expect(isSave(next)).toBe(true);
+  });
+});
+
+describe('save counter ceiling (#316)', () => {
+  const base = emptySave();
+  /** One save per counter, each set to `value`. */
+  const withEach = (value: unknown): [string, unknown][] => [
+    ['currency', { ...base, currency: value }],
+    ['runs', { ...base, profile: { ...base.profile, runs: value } }],
+    ['wins', { ...base, profile: { ...base.profile, wins: value } }],
+    ['totalKills', { ...base, profile: { ...base.profile, totalKills: value } }],
+    ['bestLevel', { ...base, profile: { ...base.profile, bestLevel: value } }],
+    ['spellCounts', { ...base, profile: { ...base.profile, spellCounts: { fire: value } } }],
+    ['upgrades', { ...base, upgrades: { upgrade_vigor: value } }],
+  ];
+
+  it('is 1e9, under 2^31 and far past anything reachable', () => {
+    expect(SAVE_COUNT_MAX).toBe(1e9);
+  });
+
+  it.each([1e308, 2 ** 53, SAVE_COUNT_MAX + 1, 1.5, -1, '5', null, true, [], {}])(
+    'resets on a counter of %j, in every counter',
+    (value) => {
+      for (const [name, stored] of withEach(value)) {
+        const parsed = parseSave(JSON.stringify(stored));
+        expect(parsed.status, name).toBe('reset');
+        expect(parsed.save, name).toEqual(emptySave());
+      }
+    },
+  );
+
+  it('resets on a best time past the ceiling, and on NaN or Infinity written as null', () => {
+    for (const bestTimeMs of [1e10, SAVE_COUNT_MAX + 1, 1e308, null, -1]) {
+      const stored = { ...base, profile: { ...base.profile, bestTimeMs } };
+      expect(parseSave(JSON.stringify(stored)).status, String(bestTimeMs)).toBe('reset');
+    }
+    // 1e400 is an overflow to Infinity in JSON.parse, which is not a count either.
+    const raw = serializeSave(base).replace('"currency":0', '"currency":1e400');
+    expect(parseSave(raw).status).toBe('reset');
+  });
+
+  it('accepts a counter exactly at the ceiling', () => {
+    for (const [name, stored] of withEach(SAVE_COUNT_MAX)) {
+      const parsed = parseSave(JSON.stringify(stored));
+      // A rank is capped by normalizeUpgrades, so only that field may differ.
+      expect(parsed.status, name).toBe('ok');
+    }
+    const timed = { ...base, profile: { ...base.profile, bestTimeMs: SAVE_COUNT_MAX } };
+    expect(parseSave(JSON.stringify(timed)).status).toBe('ok');
+  });
+
+  it('reads a stored -0 as 0, so no label draws "-0"', () => {
+    const raw = serializeSave(base)
+      .replace('"currency":0', '"currency":-0')
+      .replace('"runs":0', '"runs":-0')
+      .replace('"settings":{}', '"settings":{"volume":-0}');
+    expect(raw).toContain('-0');
+    const { save, status } = parseSave(raw);
+    expect(status).toBe('ok');
+    expect(Object.is(save.currency, 0)).toBe(true);
+    expect(Object.is(save.profile.runs, 0)).toBe(true);
+    expect(Object.is(save.settings.volume, 0)).toBe(true);
+  });
+
+  it('never lets a __proto__ key reach Object.prototype', () => {
+    const polluted = '{"__proto__":{"polluted":1}}';
+    const at = (where: string) =>
+      serializeSave(base).replace(where, `${where.slice(0, -1)}"__proto__":{"polluted":1}}`);
+    const cases = [
+      polluted,
+      `{"__proto__":{"polluted":1},"version":${SAVE_VERSION}}`,
+      at('"spellCounts":{}'),
+      at('"upgrades":{}'),
+      at('"settings":{}'),
+      serializeSave(base).replace(
+        '"name":""',
+        '"name":"","__proto__":{"polluted":1},"constructor":{"prototype":{"polluted":1}}',
+      ),
+      '{"constructor":{"prototype":{"polluted":1}},"prototype":1}',
+    ];
+    for (const json of cases) {
+      // Each case must be real JSON, or the test would only prove "not valid JSON" resets.
+      expect(() => JSON.parse(json) as unknown, json).not.toThrow();
+      expect(() => parseSave(json), json).not.toThrow();
+      const parsed = parseSave(json);
+      expect(['ok', 'reset']).toContain(parsed.status);
+      expect(isSave(parsed.save)).toBe(true);
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      expect(Object.getPrototypeOf(parsed.save)).toBe(Object.prototype);
+      expect(Object.getPrototypeOf(parsed.save.upgrades)).toBe(Object.prototype);
+    }
+  });
+
+  it('resets on a 1 MB junk string and on oversized or look-alike names without throwing', () => {
+    expect(parseSave('x'.repeat(1_000_000)).status).toBe('reset');
+    expect(parseSave(`"${'a'.repeat(1_000_000)}"`).status).toBe('reset');
+    const named = (name: string) => ({ ...base, profile: { ...base.profile, name } });
+    for (const name of ['\u202eevil', 'a\u200bb', 'ﬁre', 'a'.repeat(100_000)]) {
+      expect(() => parseSave(JSON.stringify(named(name)))).not.toThrow();
+    }
+  });
+});
+
+describe('recordRun ceiling (#316)', () => {
+  it('saturates the balance, and the result is still a valid save', () => {
+    const near = { ...emptySave(), currency: SAVE_COUNT_MAX - 5 };
+    const after = recordRun(near, stats, 'win', 100);
+    expect(after.currency).toBe(SAVE_COUNT_MAX);
+    expect(isSave(after)).toBe(true);
+  });
+
+  it('saturates every counter at the ceiling and survives a parse round trip', () => {
+    const full: Save = {
+      ...emptySave(),
+      currency: SAVE_COUNT_MAX,
+      profile: {
+        name: '',
+        runs: SAVE_COUNT_MAX,
+        wins: SAVE_COUNT_MAX,
+        bestTimeMs: SAVE_COUNT_MAX,
+        bestLevel: SAVE_COUNT_MAX,
+        totalKills: SAVE_COUNT_MAX - 3,
+        spellCounts: { fire: SAVE_COUNT_MAX },
+      },
+    };
+    const after = recordRun(full, { ...stats, timeSurvivedMs: 1e12, level: 5e9 }, 'win', 1e12);
+    expect(after.profile).toEqual({
+      name: '',
+      runs: SAVE_COUNT_MAX,
+      wins: SAVE_COUNT_MAX,
+      bestTimeMs: SAVE_COUNT_MAX,
+      bestLevel: SAVE_COUNT_MAX,
+      totalKills: SAVE_COUNT_MAX,
+      spellCounts: { fire: SAVE_COUNT_MAX },
+    });
+    expect(after.currency).toBe(SAVE_COUNT_MAX);
+    expect(isSave(after)).toBe(true);
+    expect(parseSave(serializeSave(after)).status).toBe('ok');
+  });
+});
+
+describe('saveNotice (#316)', () => {
+  it('says nothing when the save is fine', () => {
+    expect(saveNotice(false, false)).toBeNull();
+  });
+
+  it('announces a reset on its own', () => {
+    expect(saveNotice(true, false)).toBe(SAVE_RESET_TEXT);
+    expect(SAVE_RESET_TEXT).toBe('Saved progress could not be read and was reset.');
+  });
+
+  it('announces a failed write, and that wins over a reset', () => {
+    expect(saveNotice(false, true)).toBe(SAVE_FAILED_TEXT);
+    expect(saveNotice(true, true)).toBe(SAVE_FAILED_TEXT);
+    expect(SAVE_FAILED_TEXT).toBe('Progress could not be saved in this browser.');
   });
 });

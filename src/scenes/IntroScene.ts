@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
+import { saveNotice } from '../core/save';
 import { SAVE_RESET_REGISTRY_KEY, SCENE } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
+import { saveStoreFailed } from '../storage/localSave';
 import { attachMenuInput } from './input';
 import { addTextButton, textButtonItem } from './ui';
 
@@ -17,7 +19,8 @@ const BUTTON_WIDTH = 280;
  *
  * Click, arrow keys and Enter, or a gamepad all drive the menu; Enter with
  * nothing highlighted starts a game. A save Boot had to reset is announced
- * here, once.
+ * here, once; a browser that will not keep the save (#316) is announced every
+ * time this screen opens.
  */
 export class IntroScene extends Phaser.Scene {
   private leaving = false;
@@ -64,11 +67,14 @@ export class IntroScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // Said once: Boot leaves the flag up until this screen has shown it.
-    if (this.registry.get(SAVE_RESET_REGISTRY_KEY) === true) {
-      this.registry.set(SAVE_RESET_REGISTRY_KEY, false);
+    // The reset is said once: Boot leaves the flag up until this screen has
+    // shown it. A failed write is said every time, while it holds.
+    const reset = this.registry.get(SAVE_RESET_REGISTRY_KEY) === true;
+    if (reset) this.registry.set(SAVE_RESET_REGISTRY_KEY, false);
+    const notice = saveNotice(reset, saveStoreFailed());
+    if (notice !== null) {
       this.add
-        .text(width / 2, height - 72, 'Saved progress could not be read and was reset.', {
+        .text(width / 2, height - 72, notice, {
           fontFamily: 'Georgia, serif',
           fontSize: '16px',
           color: '#ff6666',

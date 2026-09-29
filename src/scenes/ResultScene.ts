@@ -12,6 +12,7 @@ import {
   type Box,
   type ResultView,
 } from '../core/resultModel';
+import { saveNotice } from '../core/save';
 import { SCENE, isResultPayload, type ResultPayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import {
@@ -27,6 +28,7 @@ import {
   drawHeroStand,
   drawStrip,
 } from './buildStrips';
+import { saveStoreFailed } from '../storage/localSave';
 import { attachMenuInput } from './input';
 
 const HINT = 'click, press Enter, or gamepad A';
@@ -110,6 +112,17 @@ export class ResultScene extends Phaser.Scene {
         addBuildIcon(scene, x, y, tile, RELIC_COLOR) ?? addRelicGem(scene, x, y, tile),
     );
     this.drawPlayAgain();
+    // The run's save was written just before this screen opened (#316).
+    const notice = saveNotice(false, saveStoreFailed());
+    if (notice !== null) {
+      this.add
+        .text(width / 2, RESULT_LAYOUT.saveNoticeY, notice, {
+          fontFamily: SERIF,
+          fontSize: '14px',
+          color: '#ff6666',
+        })
+        .setOrigin(0.5);
+    }
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (isConfirmKey(event.key)) this.playAgain();

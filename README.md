@@ -75,7 +75,8 @@ touch controls, more maps — is tracked as GitHub issues.
 
 ### Test and dev switches
 
-URL parameters, read in the deployed build as well as in dev:
+URL parameters. Only `?seed=` works in the deployed build; the rest are read in dev builds only
+(`npm run dev`), because a run started with them still banks a win and Embers:
 
 | Parameter           | Effect                                                            |
 | ------------------- | ----------------------------------------------------------------- |
@@ -111,12 +112,17 @@ npm run build      # type-check + production build to dist/
 npm run preview    # serve the production build locally
 npm test           # unit tests (Vitest)
 npm run test:e2e   # browser smoke tests (Playwright)
+npm run test:csp   # the built site under its Content-Security-Policy (Playwright)
 npm run lint       # type-check + ESLint + Prettier check
 npm run format     # Prettier (write)
 ```
 
 `test:e2e` starts its own Vite dev server and drives Chromium; the first run
 needs the browser installed once with `npx playwright install chromium`.
+`test:csp` builds the site into `dist-csp/` (never `dist/`), serves it with
+`vite preview` and walks the game under the page's Content-Security-Policy
+meta tag, failing on any violation or console error. The policy is added at
+build time only (`vite.config.ts`); the dev server carries none.
 
 The Help screen's feedback form posts to a form-to-email service and needs its
 access key in `VITE_FEEDBACK_ACCESS_KEY` (copy `.env.example` to `.env`).
@@ -235,8 +241,9 @@ reproducibly. A few effects are recorded clips instead: `npm run audio:cut --
 
 ## CI and deployment
 
-Every pull request runs `npm run lint`, `npm test`, `npm run build`, and the
-Playwright smoke suite (`npm run test:e2e`) in GitHub Actions
+Every pull request runs `npm run lint`, `npm test`, `npm run build`, the
+Playwright smoke suite (`npm run test:e2e`) and the policy check
+(`npm run test:csp`) in GitHub Actions
 (`.github/workflows/ci.yml`); a failed smoke run uploads its HTML report as a
 workflow artifact. Pushes to `main` additionally
 deploy `dist/` to GitHub Pages at the URL above. The deploy job needs the
