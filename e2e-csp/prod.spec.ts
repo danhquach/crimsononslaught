@@ -223,7 +223,8 @@ test('a full walk of the game under the policy logs no violation and no error', 
   // Esc -> End run -> Yes -> Result.
   await page.keyboard.press('Escape');
   await page.waitForTimeout(600);
-  for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowDown');
+  // The first press wakes the highlight on Resume; then Settings, Restart, End run.
+  for (let i = 0; i < 4; i += 1) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
   await page.keyboard.press('ArrowLeft'); // wakes the highlight on Yes
