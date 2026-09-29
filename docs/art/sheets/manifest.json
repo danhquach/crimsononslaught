@@ -75,7 +75,23 @@
     "keepPink    a row segment of a maxMagenta sheet only. Its frames keep any",
     "            pixel whose green is at least half its red and blue, so the",
     "            cap takes the fringe off art drawn in pink and leaves the pink.",
-    "            The hero's ghost and its fading wisp need it (CO-171)."
+    "            The hero's ghost and its fading wisp need it (CO-171).",
+    "",
+    "recolour    a sheet, or a row segment (the segment wins), whose art reads",
+    "            too dark on the arena floor (CO-194). Applied at native size",
+    "            after the downscale, then maxMagenta is held again, since the",
+    "            lift brings the old purple fringe out. Fields, all optional",
+    "            but at least one of gamma and rim:",
+    "              gamma  0.3 to 1. Levels lift: luma L becomes 255*(L/255)^gamma",
+    "                     with the hue kept. 1 changes nothing.",
+    "              rim    \"#rrggbb\". A 1 px light along the inside edge of the",
+    "                     silhouette. Only colour moves, never alpha or frame",
+    "                     size, so frames.ts and the page JSON do not change.",
+    "              sides  \"all\" (default) or \"topleft\": only the edge px with",
+    "                     see-through above or to the left.",
+    "              mix    above 0 to 1 (default 1): how far a rim px goes to rim.",
+    "            The cut fails on an unknown field or an out-of-range value.",
+    "            Removing the key puts the art back exactly as drawn."
   ],
   "sheets": [
     {
@@ -324,10 +340,12 @@
       "key": "tank",
       "ticket": "CO-073",
       "file": "CO-073/enemy_tank_walk.png",
+      "page": 19,
       "cols": 4,
       "rows": 4,
       "sheetCell": 192,
       "maxMagenta": 20,
+      "recolour": { "gamma": 0.65, "rim": "#dce8f4", "sides": "topleft" },
       "rowSpecs": [
         [
           {
@@ -375,10 +393,12 @@
       "key": "tank",
       "ticket": "CO-073",
       "file": "CO-073/enemy_tank_states.jpg",
+      "page": 19,
       "cols": 6,
       "rows": 3,
       "sheetCell": 192,
       "maxMagenta": 20,
+      "recolour": { "gamma": 0.65, "rim": "#dce8f4", "sides": "topleft" },
       "rowSpecs": [
         [
           {
@@ -442,6 +462,7 @@
       "cols": 4,
       "rows": 4,
       "sheetCell": 384,
+      "recolour": { "gamma": 0.8, "rim": "#ff8a3d" },
       "rowSpecs": [
         [
           {
@@ -493,6 +514,7 @@
       "cols": 4,
       "rows": 4,
       "sheetCell": 384,
+      "recolour": { "gamma": 0.8, "rim": "#ff8a3d" },
       "rowSpecs": [
         [
           {
@@ -576,6 +598,7 @@
       "cols": 4,
       "rows": 3,
       "sheetCell": 432,
+      "recolour": { "gamma": 0.8, "rim": "#ff8a3d" },
       "rowSpecs": [
         [
           {
@@ -1595,6 +1618,7 @@
       "rows": 2,
       "sheetCell": 132,
       "alphaThreshold": 128,
+      "recolour": { "gamma": 0.6, "rim": "#ff66ff" },
       "rowSpecs": [
         [{ "anim": "idle", "cols": [1, 4] }],
         [{ "anim": "pickup", "cols": [1, 4] }]
@@ -1609,6 +1633,7 @@
       "rows": 2,
       "sheetCell": 160,
       "alphaThreshold": 128,
+      "recolour": { "gamma": 0.7, "rim": "#ffd24a" },
       "rowSpecs": [
         [{ "anim": "idle", "cols": [1, 4] }],
         [{ "anim": "pickup", "cols": [1, 4] }]
@@ -1677,13 +1702,13 @@
           { "anim": "rocks", "cols": [1, 1] },
           { "anim": "rubble", "cols": [2, 2] },
           { "anim": "bones", "cols": [3, 3] },
-          { "anim": "tree", "cols": [4, 4] }
+          { "anim": "tree", "cols": [4, 4], "recolour": { "gamma": 0.75 } }
         ],
         [
           { "anim": "pillar", "cols": [1, 1] },
           { "anim": "column", "cols": [2, 2] },
           { "anim": "gravestone", "cols": [3, 3] },
-          { "anim": "bush", "cols": [4, 4] }
+          { "anim": "bush", "cols": [4, 4], "recolour": { "gamma": 0.75 } }
         ]
       ]
     },
@@ -1877,6 +1902,7 @@
       "rows": 4,
       "sheetCell": 144,
       "maxMagenta": 20,
+      "recolour": { "gamma": 0.75, "rim": "#ffc090", "sides": "topleft" },
       "rowSpecs": [
         [{ "anim": "move", "cols": [1, 4] }],
         [{ "anim": "hurt", "cols": [1, 1] }],
@@ -1918,6 +1944,7 @@
       "cols": 6,
       "rows": 4,
       "sheetCell": 184,
+      "recolour": { "gamma": 0.7, "rim": "#d6ccff", "sides": "topleft" },
       "rowSpecs": [
         [{ "anim": "move", "cols": [1, 4] }],
         [{ "anim": "hurt", "cols": [1, 1] }],
@@ -1933,6 +1960,7 @@
       "cols": 6,
       "rows": 4,
       "sheetCell": 108,
+      "recolour": { "gamma": 0.7, "rim": "#d6ccff", "sides": "topleft" },
       "rowSpecs": [
         [{ "anim": "move", "cols": [1, 4] }],
         [{ "anim": "hurt", "cols": [1, 1] }],

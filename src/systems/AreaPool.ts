@@ -58,7 +58,7 @@ export interface AreaView {
   readonly artRadius: number | null;
   /** How far the art stands from its ring, or null with no art: 0 while it keeps up with a moving patch. */
   readonly artOffset: number | null;
-  /** How opaque the art is drawn right now (CO-167's fade), or null with no art. */
+  /** How opaque the art is drawn right now (its look's `alpha` times CO-167's fade), or null with no art. */
   readonly artAlpha: number | null;
   /** Whether the ring is shown: a storm (#219) hides it and has no drawn edge. */
   readonly ringShown: boolean;
@@ -107,6 +107,8 @@ interface LiveArea {
   readonly storm: LiveStorm | null;
   /** Seconds the art fades out over at the end of the patch's life (CO-167); absent, no fade. */
   readonly fadeOutS: number | undefined;
+  /** The art's opacity before any fade (`AreaLook.alpha`); 1 when the look sets none. */
+  readonly artAlpha: number;
   readonly onTick: AreaTick;
   readonly hooks: AreaHooks;
 }
@@ -235,6 +237,7 @@ export class AreaPool {
       art,
       storm,
       fadeOutS: look.fadeOutS,
+      artAlpha: look.alpha ?? 1,
       onTick,
       hooks,
     });
@@ -365,7 +368,7 @@ export class AreaPool {
     // A recycled sprite may have faded out under another patch.
     sprite
       .setScale(areaArtScale(area.radius, box.w))
-      .setAlpha(fadeOutAlpha(area.remainingS, look.fadeOutS));
+      .setAlpha((look.alpha ?? 1) * fadeOutAlpha(area.remainingS, look.fadeOutS));
     return { sprite, clip, box };
   }
 
@@ -403,7 +406,9 @@ export class AreaPool {
         onExpire?.();
       } else {
         if (entry.storm) this.stepStorm(entry, entry.storm, elapsedS, deltaS);
-        entry.art?.sprite.setAlpha(fadeOutAlpha(step.area.remainingS, entry.fadeOutS));
+        entry.art?.sprite.setAlpha(
+          entry.artAlpha * fadeOutAlpha(step.area.remainingS, entry.fadeOutS),
+        );
         surviving.push(entry);
       }
     }

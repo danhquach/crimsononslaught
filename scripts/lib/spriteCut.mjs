@@ -552,6 +552,112 @@ export function padImage(img, margin) {
   return out;
 }
 
+/** Rec.709 luma of a colour, 0..255. */
+function lumaOf(r, g, b) {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * A copy of `img` with its levels lifted (CO-194): every visible pixel's luma
+ * L becomes 255 * (L / 255) ^ gamma and its colour is scaled with it, so hue is
+ * roughly kept (a channel that clamps at 255 shifts it a little) and dark art
+ * comes up while highlights barely move. Pure black has no colour to scale and
+ * stays black. A gamma under 1
+ * lifts; 1 changes nothing. Alpha is untouched, so the silhouette and bounds
+ * are the same as before.
+ */
+export function liftLevels(img, gamma) {
+  const data = new Uint8ClampedArray(img.data);
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const luma = Math.max(1, lumaOf(data[i], data[i + 1], data[i + 2]));
+    const k = (255 * (luma / 255) ** gamma) / luma;
+    data[i] *= k;
+    data[i + 1] *= k;
+    data[i + 2] *= k;
+  }
+  return { width: img.width, height: img.height, data };
+}
+
+/**
+ * A copy of `img` with a 1 px inner rim: every opaque pixel (alpha 128 or
+ * more) with a see-through 4-neighbour on one of `sides` is mixed `mix` of the
+ * way to `color` ([r, g, b]). `sides` is 'all' (any neighbour) or 'topleft'
+ * (the one above or the one to the left, a light from the top left). Off the
+ * image counts as see-through. Only colour moves, never alpha and never the
+ * frame size: an outer ring would fill the frame margin (CO-127).
+ */
+export function rimLight(img, { color, sides = 'all', mix = 1 }) {
+  const { width, height } = img;
+  const data = new Uint8ClampedArray(img.data);
+  const opaque = (x, y) =>
+    x >= 0 && y >= 0 && x < width && y < height && img.data[(y * width + x) * 4 + 3] >= 128;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (!opaque(x, y)) continue;
+      const lit = !opaque(x, y - 1) || !opaque(x - 1, y);
+      if (!(sides === 'topleft' ? lit : lit || !opaque(x + 1, y) || !opaque(x, y + 1))) continue;
+      const i = (y * width + x) * 4;
+      for (let c = 0; c < 3; c += 1) data[i + c] = data[i + c] * (1 - mix) + color[c] * mix;
+    }
+  }
+  return { width, height, data };
+}
+
+/** Fields a manifest `recolour` rule may carry. */
+const RECOLOUR_FIELDS = ['gamma', 'rim', 'sides', 'mix'];
+
+/**
+ * Why a manifest `recolour` rule is not usable, one message per problem, or an
+ * empty list when it is. `gamma` is a lift, so 0.3 to 1; `rim` is '#rrggbb';
+ * `sides` and `mix` only make sense with a rim.
+ */
+export function recolourProblems(rule) {
+  if (rule === null || typeof rule !== 'object' || Array.isArray(rule)) {
+    return ['recolour must be an object'];
+  }
+  const problems = [];
+  for (const field of Object.keys(rule)) {
+    if (!RECOLOUR_FIELDS.includes(field)) problems.push(`recolour has an unknown field "${field}"`);
+  }
+  if (
+    'gamma' in rule &&
+    !(typeof rule.gamma === 'number' && rule.gamma >= 0.3 && rule.gamma <= 1)
+  ) {
+    problems.push(
+      `recolour gamma must be a number from 0.3 to 1, not ${JSON.stringify(rule.gamma)}`,
+    );
+  }
+  if ('rim' in rule && !(typeof rule.rim === 'string' && /^#[0-9a-fA-F]{6}$/.test(rule.rim))) {
+    problems.push(`recolour rim must be a colour like "#rrggbb", not ${JSON.stringify(rule.rim)}`);
+  }
+  if ('sides' in rule && rule.sides !== 'all' && rule.sides !== 'topleft') {
+    problems.push(`recolour sides must be "all" or "topleft", not ${JSON.stringify(rule.sides)}`);
+  }
+  if ('mix' in rule && !(typeof rule.mix === 'number' && rule.mix > 0 && rule.mix <= 1)) {
+    problems.push(
+      `recolour mix must be a number above 0 and up to 1, not ${JSON.stringify(rule.mix)}`,
+    );
+  }
+  if (!('rim' in rule) && ('sides' in rule || 'mix' in rule)) {
+    problems.push('recolour sides and mix need a rim');
+  }
+  if (!('gamma' in rule) && !('rim' in rule)) problems.push('recolour needs a gamma or a rim');
+  return problems;
+}
+
+/** A validated manifest `recolour` rule applied to a frame: lift, then rim. */
+export function recolour(img, rule) {
+  let out = img;
+  if ('gamma' in rule) out = liftLevels(out, rule.gamma);
+  if ('rim' in rule) {
+    const hex = rule.rim.slice(1);
+    const color = [0, 2, 4].map((at) => parseInt(hex.slice(at, at + 2), 16));
+    out = rimLight(out, { color, sides: rule.sides, mix: rule.mix });
+  }
+  return out;
+}
+
 /**
  * Shelf-pack frames into a square-ish atlas.
  *
@@ -640,6 +746,7 @@ export function expandRow(sheetKey, rowSpecs, cols, startIndex = {}) {
         allowEdge: seg.allowEdge ?? [],
         centred: seg.centred ?? false,
         keepPink: seg.keepPink ?? false,
+        recolour: seg.recolour ?? null,
       });
     }
   }

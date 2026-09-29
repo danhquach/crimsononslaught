@@ -54,9 +54,10 @@ export const BASE_CHAIN_LIGHTNING_STATS: Readonly<ChainLightningStats> = {
  * Tornado draws its funnel as wide as the patch it ticks and centred on it
  * (#179): the side-on art stands taller than it is wide, so it rises past the
  * patch rather than being squeezed into it. Since CO-153 it is drawn without
- * the ring, like Earthquake (#220): the funnel itself says where it is.
+ * the ring, like Earthquake (#220): the funnel itself says where it is. CO-194:
+ * drawn at 60 % so the floor and props read through it.
  */
-export const TORNADO_LOOK: AreaLook = { clip: 'lightning.tornado', ringless: true };
+export const TORNADO_LOOK: AreaLook = { clip: 'lightning.tornado', ringless: true, alpha: 0.6 };
 
 /**
  * Spec §9.4 base block, the eye cut 110 → 60 and the pull 150 → 80 (#220): at
