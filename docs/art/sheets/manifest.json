@@ -1983,8 +1983,18 @@
           { "anim": "hurt", "facing": "down", "cols": [5, 5] }
         ],
         [
-          { "anim": "walk", "facing": "up", "cols": [1, 4] },
-          { "anim": "hurt", "facing": "up", "cols": [5, 5] }
+          {
+            "anim": "walk",
+            "facing": "up",
+            "cols": [1, 4],
+            "recolour": { "gamma": 0.7, "rim": "#ffe08a", "sides": "topleft" }
+          },
+          {
+            "anim": "hurt",
+            "facing": "up",
+            "cols": [5, 5],
+            "recolour": { "gamma": 0.7, "rim": "#ffe08a", "sides": "topleft" }
+          }
         ],
         [
           { "anim": "walk", "facing": "right", "cols": [1, 4] },
