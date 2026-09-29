@@ -14,10 +14,8 @@ import {
   keyGreen,
   keyMagenta,
   openAlpha,
-  pngChunks,
-  scanData,
-  stripMetadata,
 } from './menuArt.mjs';
+import { findProvenance, pngChunks, scanData } from './provenance.mjs';
 
 const require = createRequire(import.meta.url);
 const { PNG } = require('pngjs');
@@ -207,32 +205,6 @@ describe('crushDark', () => {
   });
 });
 
-describe('stripMetadata', () => {
-  const segment = (marker, length) =>
-    Buffer.concat([Buffer.from([0xff, marker, 0, length + 2]), Buffer.alloc(length, 7)]);
-  const jpegOf = (...segments) =>
-    Buffer.concat([
-      Buffer.from([0xff, 0xd8]),
-      ...segments,
-      Buffer.from([0xff, 0xda, 0, 2, 1, 2, 3]),
-    ]);
-
-  it('drops the APP1 and APP11 segments and nothing else', () => {
-    const app0 = segment(0xe0, 14);
-    const app1 = segment(0xe1, 10);
-    const app11 = segment(0xeb, 30);
-    const dqt = segment(0xdb, 5);
-    const stripped = stripMetadata(jpegOf(app0, app1, app11, dqt));
-    expect(stripped).toEqual(jpegOf(app0, dqt));
-    expect(scanData(stripped)).toEqual(scanData(jpegOf(app1)));
-  });
-
-  it('hands back the same bytes when there is no metadata', () => {
-    const bytes = jpegOf(segment(0xe0, 14), segment(0xdb, 5));
-    expect(stripMetadata(bytes)).toBe(bytes);
-  });
-});
-
 describe('the menu art as shipped', () => {
   it('has sources with no metadata left, and the image data as it was delivered', () => {
     // SHA-256 of each file's scan data (SOS to the end) taken before the metadata was stripped.
@@ -245,7 +217,7 @@ describe('the menu art as shipped', () => {
     };
     for (const [name, hash] of Object.entries(delivered)) {
       const bytes = readFileSync(join(SHEET_DIR, `${name}.jpg`));
-      expect(stripMetadata(bytes), name).toBe(bytes);
+      expect(findProvenance(bytes), name).toEqual([]);
       expect(createHash('sha256').update(scanData(bytes)).digest('hex'), name).toBe(hash);
       expect(jpeg.decode(bytes).width, name).toBeGreaterThan(0);
     }

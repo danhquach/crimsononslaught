@@ -114,40 +114,6 @@ export function crushDark(img, floor) {
   return img;
 }
 
-/** The JPEG segments that carry metadata and no pixels: APP1 (Exif and XMP, where the generator writes its prompt) and APP11 (C2PA / JUMBF content credentials). */
-const METADATA_MARKERS = [0xe1, 0xeb];
-
-/**
- * `bytes` (a JPEG) without its metadata segments. Only whole segments in the
- * header are dropped, so the scan data from SOS to the end is byte-identical.
- * Returns `bytes` itself when there is nothing to drop.
- */
-export function stripMetadata(bytes) {
-  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new Error('not a JPEG');
-  const kept = [bytes.subarray(0, 2)];
-  let i = 2;
-  let dropped = false;
-  // Header segments run up to the scan (SOS); everything from there on is image data.
-  while (i < bytes.length && bytes[i] === 0xff && bytes[i + 1] !== 0xda) {
-    const end = i + 2 + bytes.readUInt16BE(i + 2);
-    if (METADATA_MARKERS.includes(bytes[i + 1])) dropped = true;
-    else kept.push(bytes.subarray(i, end));
-    i = end;
-  }
-  if (!dropped) return bytes;
-  kept.push(bytes.subarray(i));
-  return Buffer.concat(kept);
-}
-
-/** The bytes from the scan header (SOS) to the end: the image data a strip must leave untouched. */
-export function scanData(bytes) {
-  let i = 2;
-  while (i < bytes.length && bytes[i] === 0xff && bytes[i + 1] !== 0xda) {
-    i += 2 + bytes.readUInt16BE(i + 2);
-  }
-  return bytes.subarray(i);
-}
-
 /**
  * Key a title painted on flat #00FF00 to alpha, in place: the more a pixel's
  * green leads its red and blue, the more it is background (fully so past a lead
@@ -284,13 +250,4 @@ export function glowTitle(title, { pad, shadow, glow }) {
     out.data.set([r, g, b, a * 255], p * 4);
   }
   return out;
-}
-
-/** The chunk types of a PNG file, in order. */
-export function pngChunks(bytes) {
-  const types = [];
-  for (let i = 8; i < bytes.length; i += 12 + bytes.readUInt32BE(i)) {
-    types.push(bytes.toString('latin1', i + 4, i + 8));
-  }
-  return types;
 }

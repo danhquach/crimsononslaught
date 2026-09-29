@@ -28,9 +28,8 @@ import {
   keyGreen,
   keyMagenta,
   openAlpha,
-  scanData,
-  stripMetadata,
 } from './lib/menuArt.mjs';
+import { scanData, stripProvenance } from './lib/provenance.mjs';
 import { blit, capMagenta, crop, opaqueBounds } from './lib/spriteCut.mjs';
 
 const require = createRequire(import.meta.url);
@@ -82,16 +81,17 @@ function writePng(name, img) {
 }
 
 /**
- * The sources are delivered with metadata: Exif that holds the generation
- * prompt and, in principle, C2PA content credentials. Drop those header segments
- * and keep every other byte, and refuse to write unless the scan data still
+ * The sources are delivered with provenance: Exif that holds the generation
+ * prompt, comments, C2PA content credentials. `stripProvenance` drops the
+ * comment and every APPn segment except APP0, APP14 and an ICC profile, keeps
+ * every other byte, and this refuses to write unless the scan data still
  * hashes the same.
  */
-function stripMetadataFromSources() {
+function stripProvenanceFromSources() {
   for (const name of SOURCES) {
     const file = join(SRC, `${name}.jpg`);
     const bytes = readFileSync(file);
-    const clean = stripMetadata(bytes);
+    const clean = stripProvenance(bytes);
     if (clean === bytes) continue;
     const hash = (data) => createHash('sha256').update(scanData(data)).digest('hex');
     if (hash(bytes) !== hash(clean))
@@ -237,7 +237,7 @@ function prepTitle() {
 }
 
 mkdirSync(OUT, { recursive: true });
-stripMetadataFromSources();
+stripProvenanceFromSources();
 prepBackground();
 prepPlates();
 prepEmbers();
