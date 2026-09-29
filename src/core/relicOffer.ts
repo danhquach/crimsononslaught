@@ -1,8 +1,9 @@
 import { RELIC_CHARGES, type ChargeCard } from '../config/offerActions';
-import { PROFILE_CLAMPS, type PlayerProfile } from '../config/passives';
+import type { PlayerProfile } from '../config/passives';
 import { RELIC_BUFFS, type RelicBuff } from '../config/relics';
 import { MAX_OFFER_SIZE, type OfferCard } from './levelUp';
 import { chargeCard } from './levelUpOffer';
+import { atCap } from './profileClamp';
 import type { Rng } from './rng';
 
 /**
@@ -45,19 +46,6 @@ export function relicOffer(rng: Rng, input: RelicOfferInput): OfferCard[] {
     ...charges.map((charge) => ({ weight: charge.weight, card: chargeCard(charge) })),
   ];
   return weightedSample(rng, pool, (entry) => entry.weight, size).map((entry) => entry.card);
-}
-
-/**
- * True when `buff`'s field sits at the clamp in the direction the buff moves
- * it — Hourglass lowers `cooldownMul` towards its floor, Windstep raises
- * `moveSpeed` towards its ceiling. A field with no clamp that way never caps.
- */
-export function atCap(buff: RelicBuff, profile: Readonly<PlayerProfile>): boolean {
-  const clamp = PROFILE_CLAMPS[buff.field];
-  const value = profile[buff.field];
-  const lowers = buff.op === 'mul' ? buff.amount < 1 : buff.amount < 0;
-  if (lowers) return clamp?.min !== undefined && value <= clamp.min;
-  return clamp?.max !== undefined && value >= clamp.max;
 }
 
 /**

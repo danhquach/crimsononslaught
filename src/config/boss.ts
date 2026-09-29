@@ -39,3 +39,27 @@ export const BOSS: Readonly<BossConfig> = {
   chargeS: 0.6,
   chargeSpeed: 400,
 };
+
+/**
+ * Diminishing returns on the boss's crowd control (#315). A default the lead
+ * chose, no spec value: Persistence stretches every stun, stagger and slow
+ * without a cap, so a sword build re-staggered the boss before each stop ended
+ * and it never moved or charged again. Each repeat of a kind within `resetS`
+ * lasts `factor` times the one before; a kind that goes `resetS` s without an
+ * application starts over at full length. Stun (an ice freeze included),
+ * stagger and slow count separately. Regular enemies take none of it.
+ *
+ * Slows fall off too, by design: the boss is meant to be harder to affect by
+ * every status, so a standing-area slow fades on it the longer it stands in.
+ */
+export interface BossCcDr {
+  /** Each repeat's duration is this fraction of the last one's. */
+  factor: number;
+  /** Seconds without an application of a kind before its count starts over. */
+  resetS: number;
+}
+
+export const BOSS_CC_DR: Readonly<BossCcDr> = {
+  factor: 0.5,
+  resetS: 4,
+};

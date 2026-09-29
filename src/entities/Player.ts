@@ -90,6 +90,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return this.health.hp;
   }
 
+  /** At 0 HP and playing the death clip out; the run reads it to stop paying out (#315). */
+  get isDead(): boolean {
+    return this.dead;
+  }
+
   get maxHp(): number {
     return this.health.maxHp;
   }
@@ -101,6 +106,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
    */
   get immune(): boolean {
     return isInvulnerable(this.health);
+  }
+
+  /** Test hook (#315): drop the 0.5 s window from the last hit, so the next one lands. */
+  endImmunity(): void {
+    this.setHealth({ ...this.health, invulnMs: 0 });
   }
 
   get speed(): number {

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { SLOT_UNLOCK_LEVELS, type RosterSpellId } from '../config/loadout';
 import { LEVEL_UP_CHARGES } from '../config/offerActions';
-import { PASSIVES, type Passive } from '../config/passives';
+import {
+  BASE_PLAYER_PROFILE,
+  PASSIVES,
+  PROFILE_CLAMPS,
+  type Passive,
+  type PlayerProfile,
+} from '../config/passives';
 import { MAX_OFFER_SIZE, isOfferCard, resolveLevelUp, type OfferCard } from './levelUp';
 import {
   activeCard,
@@ -193,6 +199,51 @@ describe('levelUpOffer — passives once the loadout is full (spec §7.1)', () =
     let loadout = fullLoadout();
     for (let rank = 0; rank < 20; rank++) loadout = takePassive(loadout, 'passive_power');
     expect(eligiblePassives(loadout).map((p) => p.id)).toContain('passive_power');
+  });
+});
+
+describe('levelUpOffer — no passive at its clamp (#315)', () => {
+  const at = (over: Partial<PlayerProfile>): PlayerProfile => ({ ...BASE_PLAYER_PROFILE, ...over });
+  const eligibleIds = (profile?: PlayerProfile): string[] =>
+    eligiblePassives(fullLoadout(), PASSIVES, undefined, profile).map((p) => p.id);
+  const offeredIds = (profile: PlayerProfile | undefined, seed: number): string[] =>
+    levelUpOffer(createRng(seed), {
+      loadout: fullLoadout(),
+      level: SLOT_3_LEVEL + 1,
+      actives: [],
+      profile,
+    }).map((card) => card.id);
+
+  it('drops Haste once cooldownMul is on its floor, and keeps it one step above', () => {
+    expect(eligibleIds(at({ cooldownMul: 0.35 }))).not.toContain('passive_haste');
+    expect(eligibleIds(at({ cooldownMul: 0.36 }))).toContain('passive_haste');
+  });
+
+  it('drops Ward at the damageReduction clamp and Precision at the critChance clamp', () => {
+    const ward = PROFILE_CLAMPS.damageReduction?.max ?? NaN;
+    const crit = PROFILE_CLAMPS.critChance?.max ?? NaN;
+    expect(eligibleIds(at({ damageReduction: ward }))).not.toContain('passive_ward');
+    expect(eligibleIds(at({ damageReduction: ward - 0.05 }))).toContain('passive_ward');
+    expect(eligibleIds(at({ critChance: crit }))).not.toContain('passive_precision');
+    expect(eligibleIds(at({ critChance: crit - 0.05 }))).toContain('passive_precision');
+  });
+
+  it('never draws a capped passive into an offer, whatever the seed', () => {
+    const capped = at({ cooldownMul: 0.35, damageReduction: 0.6, critChance: 0.75 });
+    for (let seed = 1; seed <= 100; seed++) {
+      const ids = offeredIds(capped, seed);
+      for (const dead of ['passive_haste', 'passive_ward', 'passive_precision']) {
+        expect(ids, `seed ${seed}`).not.toContain(dead);
+      }
+    }
+  });
+
+  it('is unchanged without a profile', () => {
+    expect(eligibleIds(undefined)).toEqual(eligibleIds(at({})));
+    expect(eligibleIds(undefined)).toContain('passive_haste');
+    for (let seed = 1; seed <= 20; seed++) {
+      expect(offeredIds(undefined, seed)).toEqual(offeredIds(at({}), seed));
+    }
   });
 });
 

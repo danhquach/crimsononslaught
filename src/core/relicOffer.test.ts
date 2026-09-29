@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_PLAYER_PROFILE, PROFILE_CLAMPS, type PlayerProfile } from '../config/passives';
+import { PROFILE_CLAMPS } from '../config/passives';
 import { RELIC_CHARGES } from '../config/offerActions';
 import { RELIC_BUFFS, type RelicBuff, type RelicBuffId } from '../config/relics';
 import { MAX_OFFER_SIZE, isOfferCard } from './levelUp';
 import { levelUpOffer } from './levelUpOffer';
 import { buildLoadout, profileOf, takePassive, takeRelic, type Loadout } from './loadout';
-import { atCap, relicOffer, weightedSample } from './relicOffer';
+import { relicOffer, weightedSample } from './relicOffer';
 import { createRng } from './rng';
 
 const offerFor = (loadout: Loadout, seed = 1) =>
@@ -124,24 +124,6 @@ describe('relicOffer — reroll and ban charges (#228)', () => {
     const profile = profileOf(buildLoadout('fire'));
     const offer = relicOffer(createRng(1), { ranks: new Map(), profile, buffs: [] });
     expect(offer.map((c) => c.id).sort()).toEqual([...CHARGE_IDS].sort());
-  });
-});
-
-describe('atCap', () => {
-  const at = (over: Partial<PlayerProfile>): PlayerProfile => ({ ...BASE_PLAYER_PROFILE, ...over });
-
-  it('reads the clamp in the direction the buff moves its field', () => {
-    const hourglass = RELIC_BUFFS.find((b) => b.id === 'relic_hourglass') as RelicBuff;
-    const windstep = RELIC_BUFFS.find((b) => b.id === 'relic_windstep') as RelicBuff;
-    expect(atCap(hourglass, at({ cooldownMul: 0.35 }))).toBe(true);
-    expect(atCap(hourglass, at({ cooldownMul: 0.36 }))).toBe(false);
-    expect(atCap(windstep, at({ moveSpeed: 320 }))).toBe(true);
-    expect(atCap(windstep, at({ moveSpeed: 319 }))).toBe(false);
-  });
-
-  it('never caps a field with no clamp', () => {
-    const fury = RELIC_BUFFS.find((b) => b.id === 'relic_ancient_fury') as RelicBuff;
-    expect(atCap(fury, at({ damageMul: 1e6 }))).toBe(false);
   });
 });
 

@@ -87,6 +87,11 @@ export function frostSpeedFactor(state: Readonly<FrostState>): number {
   return 1;
 }
 
+/** Seconds the freeze in `hit` lasts: its own `freezeDuration`, or `FREEZE_DURATION` when the spell has no field for it. */
+export function freezeDurationOf(hit: Readonly<FrostHit>): number {
+  return hit.freezeDuration ?? FREEZE_DURATION;
+}
+
 /**
  * A pulse lands on an enemy (spec §5: "slow is max, not additive"). The slow in
  * force becomes the stronger of the two and its clock the longer, so a second
@@ -101,7 +106,7 @@ export function applyFrost(current: Readonly<FrostState>, hit: Readonly<FrostHit
     next.slowPct = Math.max(active, hit.slowPct);
     next.slowRemainingS = Math.max(current.slowRemainingS, hit.slowDuration);
   }
-  if (hit.freeze) next.frozenS = hit.freezeDuration ?? FREEZE_DURATION;
+  if (hit.freeze) next.frozenS = freezeDurationOf(hit);
   return next;
 }
 

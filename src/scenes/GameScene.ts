@@ -69,6 +69,12 @@ import type { Vec2 } from '../core/input';
 import { flushSplits, type Split } from '../core/splitter';
 import { createRng, deriveSeed, type Rng } from '../core/rng';
 import { RUN_EVENT, emitRunEvent, type RunEventPayloads } from '../core/runEvents';
+import {
+  decideOnBossKill,
+  heroHurtable,
+  settleOutcome,
+  type DecidedOutcome,
+} from '../core/runOutcome';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
 import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
@@ -387,6 +393,12 @@ export class GameScene extends Phaser.Scene {
   private offerActions: OfferActions = startingActions();
   /** `?invulnerable=1` (test hook): every hit is dropped before it reaches the player. */
   private invulnerable = false;
+  /** What the boss's killing blow settled (#315); `endRun` records it over the death event that follows. */
+  private decidedOutcome: DecidedOutcome | undefined;
+  /** Test hook (#315): run ms left before the hero is killed, counted down in `simulate`; unset when none is due. */
+  private heroKillInMs: number | undefined;
+  /** Test hook (#315): whether a delayed hero kill has come due this run. */
+  private heroKillFired = false;
   /** The game's one audio layer (CO-102); every cue in the run goes through it. */
   private audio!: Audio;
   /** Hit feedback (#125): the numbers, and the settings that turn the rest down. */
@@ -838,6 +850,117 @@ export class GameScene extends Phaser.Scene {
     return this.pickups.dropConsumable(kind, this.player.x + offset, this.player.y);
   }
 
+  /**
+   * Test hook (#315): the hero's state and what the boss's killing blow has
+   * settled, so the browser suite can read a close death's outcome from one
+   * evaluate instead of racing the run.
+   */
+  get deathReport(): {
+    heroHp: number;
+    heroDead: boolean;
+    decided: DecidedOutcome | undefined;
+    heroKillInMs: number | undefined;
+    heroKillFired: boolean;
+  } {
+    return {
+      heroHp: this.player.hp,
+      heroDead: this.player.isDead,
+      decided: this.decidedOutcome,
+      heroKillInMs: this.heroKillInMs,
+      heroKillFired: this.heroKillFired,
+    };
+  }
+
+  /** Test hook (#315): the run's XP, the level it would take, and the level-ups owed but not yet shown. */
+  get xpReport(): { level: number; xp: number; xpToNext: number; pendingLevelUps: number } {
+    const { level, xp, xpToNext } = this.run;
+    return { level, xp, xpToNext, pendingLevelUps: this.pendingLevelUps };
+  }
+
+  /**
+   * Test hook (#315): the boss takes its killing blow now, through the run's
+   * one damage path. The boss is brought in first when the run has not reached
+   * it, so a test need not wait for the 20-minute mark. Returns whether the
+   * boss is dying.
+   */
+  killBossForTest(): boolean {
+    const boss = this.bossForTest();
+    if (!boss) return false;
+    this.damageEnemy(boss, boss.remainingHp, 'tick');
+    return boss.isDying;
+  }
+
+  /** The live boss, brought in first when the run has not reached it. */
+  private bossForTest(): Boss | undefined {
+    const find = (): Boss | undefined =>
+      this.enemies.live.find((enemy): enemy is Boss => enemy instanceof Boss);
+    if (!find()) this.spawnBoss();
+    return find();
+  }
+
+  /**
+   * Test hook (#315): one `kind` of crowd control lands on the boss for
+   * `durationS` through the same calls a spell makes, and the seconds left on
+   * each stop are returned as they stand right after, so a test can read the
+   * diminished length without the clock moving between. The boss is brought in
+   * first when the run has not reached it.
+   */
+  applyBossCcForTest(
+    kind: 'stun' | 'stagger' | 'freeze',
+    durationS: number,
+  ): Boss['crowdControlRemainingS'] | undefined {
+    const boss = this.bossForTest();
+    if (!boss) return undefined;
+    if (kind === 'stun') boss.applyStun(durationS);
+    else if (kind === 'stagger') boss.applyStagger(durationS);
+    else boss.applyFrost({ slowPct: 0, slowDuration: 0, freeze: true, freezeDuration: durationS });
+    return boss.crowdControlRemainingS;
+  }
+
+  /**
+   * Test hook (#315): a lethal hit on the hero through `hurtPlayer`, so the
+   * shields and the win guard apply as they would to a real one. The 0.5 s
+   * immunity window from an earlier hit does not save the hero. Returns
+   * whether the hero is dead after it.
+   */
+  killHeroForTest(): boolean {
+    if (heroHurtable(this.decidedOutcome)) this.player.endImmunity();
+    this.hurtPlayer(this.player.maxHp * 1000);
+    return this.player.isDead;
+  }
+
+  /**
+   * Test hook (#315): kill the hero once `runMs` of run time has passed. The
+   * countdown runs in `simulate` on the run clock, so the gap to another death
+   * is the same at any frame rate or `?timeScale=`.
+   */
+  killHeroInForTest(runMs: number): void {
+    this.heroKillInMs = Math.max(0, runMs);
+  }
+
+  private tickHeroKill(deltaMs: number): void {
+    if (this.heroKillInMs === undefined) return;
+    this.heroKillInMs -= deltaMs;
+    if (this.heroKillInMs > 0) return;
+    this.heroKillInMs = undefined;
+    this.heroKillFired = true;
+    this.killHeroForTest();
+  }
+
+  /** Test hook (#315): `count` XP gems on the hero, as a death would drop them. Returns how many landed. */
+  dropGemsForTest(count: number): number {
+    let placed = 0;
+    for (let i = 0; i < count; i++) {
+      if (this.gems.spawn(this.player.x, this.player.y)) placed += 1;
+    }
+    return placed;
+  }
+
+  /** Test hook (#315): an Ember worth `value` on the hero. Returns false when the drop cap is full. */
+  dropEmberForTest(value: number): boolean {
+    return this.pickups.dropEmber(this.player.x, this.player.y, value);
+  }
+
   get earthReport(): { id: RosterSpellId; hits: number; live: number }[] {
     return this.spells.spells
       .filter(
@@ -878,6 +1001,9 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.fixedStep = false;
     this.pendingLevelUps = 0;
     this.pendingRelics = 0;
+    this.decidedOutcome = undefined;
+    this.heroKillInMs = undefined;
+    this.heroKillFired = false;
     this.pausing = false;
     this.magnetMsLeft = 0;
     this.offer = [];
@@ -1048,7 +1174,9 @@ export class GameScene extends Phaser.Scene {
     // from one gem: each overlay pauses Game, and the next update after it
     // closes opens the following one. A relic's offer (#227) queues behind
     // them the same way, so one owed on the same frame is shown next, not lost.
-    if (this.drainLevelUps() || this.drainRelics()) return;
+    // A dead hero is owed nothing (#315): the run is ending under its death
+    // clip, and an overlay would pause it in the middle.
+    if (!this.player.isDead && (this.drainLevelUps() || this.drainRelics())) return;
     for (const step of simulationSteps(this.run.tick(delta))) {
       // The step that ends the run (spec §4 step 4) is the frame's last: Result
       // is queued, and nothing after it should move or land a second outcome.
@@ -1114,6 +1242,7 @@ export class GameScene extends Phaser.Scene {
    * once a frame, in `postUpdate`, which is what made a long frame one decision.
    */
   private simulate(time: number, step: RunFrame): void {
+    this.tickHeroKill(step.deltaMs);
     // Spec §4 step 2: the director spends the step's budget before anything
     // moves, so a new enemy chases from the moment it lands.
     this.spawns.update(step.startMs / 1000, step.deltaMs / 1000);
@@ -1520,6 +1649,9 @@ export class GameScene extends Phaser.Scene {
    */
   private hurtPlayer(amount: number): number {
     if (this.invulnerable) return 0;
+    // The boss's killing blow has won the run (#315): nothing hurts the hero
+    // after it, so its death clip cannot turn the win into a loss.
+    if (!heroHurtable(this.decidedOutcome)) return 0;
     // A hit the player is still immune to costs nothing: `core/health.ts` would
     // swallow it, so a shield must not pay for it out of its pool either.
     //
@@ -1572,6 +1704,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Spec §5: a gem is XP on touch; the drop itself is handled where the enemy dies. */
   private onGemPickup(gem: XpGem): void {
+    // A dead hero collects nothing (#315): the gem stays where it lies.
+    if (this.player.isDead) return;
     const gained = this.gems.collect(gem, this.player);
     if (gained === 0) return;
     this.audio.play('progress.gem');
@@ -1586,6 +1720,7 @@ export class GameScene extends Phaser.Scene {
    * (#128), and a relic queues its offer (#227).
    */
   private onPickup(pickup: Pickup): void {
+    if (this.player.isDead) return;
     const collected = this.pickups.collect(pickup);
     if (!collected) return;
     if (collected.kind === 'ember') {
@@ -1762,6 +1897,8 @@ export class GameScene extends Phaser.Scene {
     // there is no time to walk to a pile, and `endRun` reads them after.
     this.audio.play(boss ? 'boss.death' : 'enemy.death');
     if (boss) {
+      // The blow decides the run (#315): a win unless the hero is already dead.
+      this.decidedOutcome = decideOnBossKill(this.decidedOutcome, this.player.isDead);
       this.run.addEmbers(BOSS_EMBERS);
       return;
     }
@@ -1948,6 +2085,7 @@ export class GameScene extends Phaser.Scene {
       level: this.run.level,
       actives: this.activeCatalog(),
       carried: this.spells.carriedStats,
+      profile: this.spells.profile,
       banned: this.offerActions.banned,
     };
   }
@@ -2229,8 +2367,11 @@ export class GameScene extends Phaser.Scene {
    * Spec §4 step 4. The first outcome stands: a frame in which the boss's last
    * hit and the player's death both land must not start Result twice.
    */
-  private endRun(outcome: Outcome): void {
+  private endRun(reached: Outcome): void {
     if (!this.payload || this.run.phase === 'over') return;
+    // The boss's killing blow decided a win or a loss (#315); a death event or
+    // an early exit that arrives after it records that, not its own.
+    const outcome = settleOutcome(this.decidedOutcome, reached);
     this.run.end();
     const stats = this.run.stats(this.payload.spellId);
     // The one write per run (CO-101): fold the stats and the payout into the
