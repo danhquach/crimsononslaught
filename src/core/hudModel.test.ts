@@ -15,13 +15,21 @@ import {
 } from './hudModel';
 import type { RunEventPayloads } from './runEvents';
 
-const FIRE = { id: 'fire', name: 'Fire Bolt', color: 0xff4400, progress: 0.25, secondsLeft: 1.5 };
+const FIRE = {
+  id: 'fire',
+  name: 'Fire Bolt',
+  color: 0xff4400,
+  progress: 0.25,
+  secondsLeft: 1.5,
+  level: 1,
+};
 const COLUMN = {
   id: 'fire_column',
   name: 'Fire Column',
   color: 0xffaa00,
   progress: 0.75,
   secondsLeft: 0.5,
+  level: 2,
 };
 const FIRE_ROW = {
   kind: 'spell',
@@ -33,6 +41,9 @@ const FIRE_ROW = {
   ready: false,
   waiting: 0.75,
   badge: '1',
+  level: 1,
+  maxed: false,
+  levelBadge: '1',
 } as const;
 const COLUMN_ROW = {
   kind: 'spell',
@@ -44,6 +55,9 @@ const COLUMN_ROW = {
   ready: false,
   waiting: 0.25,
   badge: null,
+  level: 2,
+  maxed: false,
+  levelBadge: '2',
 } as const;
 
 function withLoadout(model: Readonly<HudModel>, payload: RunEventPayloads['loadout']): HudModel {
@@ -264,6 +278,29 @@ describe('slotRows', () => {
 
   it('reads as open, not locked, before the first loadout event lands', () => {
     expect(slotRows(INITIAL_HUD).map((row) => row.kind)).toEqual(['open', 'locked', 'locked']);
+  });
+});
+
+describe('slotRows spell levels (#326)', () => {
+  const rowAt = (level: number) =>
+    slotRows(withLoadout(INITIAL_HUD, { spells: [{ ...FIRE, level }], passives: [] }))[0];
+
+  it('reads the level for the pill, and MAX at the top one', () => {
+    expect(rowAt(1)).toMatchObject({ level: 1, maxed: false, levelBadge: '1' });
+    expect(rowAt(2)).toMatchObject({ level: 2, maxed: false, levelBadge: '2' });
+    expect(rowAt(3)).toMatchObject({ level: 3, maxed: true, levelBadge: 'MAX' });
+  });
+
+  it('keeps each spell at its own level', () => {
+    const m = withLoadout(INITIAL_HUD, {
+      spells: [{ ...FIRE, level: 3 }, COLUMN],
+      passives: [],
+    });
+    expect(slotRows(m).map((row) => (row.kind === 'spell' ? row.levelBadge : null))).toEqual([
+      'MAX',
+      '2',
+      null,
+    ]);
   });
 });
 

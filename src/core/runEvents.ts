@@ -65,6 +65,8 @@ export interface LoadoutSpellView {
   progress: number | null;
   /** #213: seconds until the next cast, for the badge on the slot icon. */
   secondsLeft: number | null;
+  /** #326: the spell's level, 1 to 3, for the pill on the slot icon. */
+  level: number;
 }
 
 /** One passive held, with the ranks taken of it. */

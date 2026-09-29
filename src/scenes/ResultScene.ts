@@ -35,6 +35,8 @@ import { attachMenuInput } from './input';
 const HINT = 'click, press Enter, or gamepad A';
 const BUTTON_REST_ALPHA = 0.6;
 const BUTTON_REST_TEXT = '#dddddd';
+/** A spell's name starts this far right of its icon's centre: clear of the icon and its level badge. */
+const NAME_INSET = SPELL_ICON_SIZE / 2 + 12;
 
 /** On-screen bounds of the button and its hint, for the browser suite. */
 export interface ResultControls {
@@ -178,11 +180,11 @@ export class ResultScene extends Phaser.Scene {
       addSpellDisc(this, x, y, spell);
       if (!named) return;
       this.add
-        .text(x + SPELL_ICON_SIZE / 2 + 8, y, spell.name, {
+        .text(x + NAME_INSET, y, spell.name, {
           fontFamily: SERIF,
           fontSize: '14px',
           color: '#dddddd',
-          wordWrap: { width: SPELL_PITCH - SPELL_ICON_SIZE - 20 },
+          wordWrap: { width: SPELL_PITCH - NAME_INSET - SPELL_ICON_SIZE / 2 - 12 },
         })
         .setOrigin(0, 0.5);
     });

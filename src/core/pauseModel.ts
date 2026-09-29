@@ -1,8 +1,9 @@
 import { CURRENCY_NAME } from '../config/meta';
 import { passiveById, type PassiveId } from '../config/passives';
 import { relicBuffById, type RelicBuffId } from '../config/relics';
+import { MAX_SPELL_LEVEL, isSpellLevel } from '../config/spellLevels';
 import { formatTimer } from './hudModel';
-import { isMaxed, rankFraction } from './maxRank';
+import { isMaxed, levelFraction, rankFraction } from './maxRank';
 
 /**
  * View-model behind the pause screen (#252): the run's build as it stands, and
@@ -29,7 +30,7 @@ export interface PauseItem {
 
 /** What the pause screen shows, fixed at the moment Game paused. */
 export interface PauseView {
-  /** The run's level; spells have no level of their own. */
+  /** The run's level; each spell in `spells` has a level of its own (#326). */
   level: number;
   /** The equipped spells in equip order; the id picks the icon art, the colour its fallback disc. */
   spells: readonly PauseSpell[];
@@ -40,18 +41,26 @@ export interface PauseView {
   stats: { kills: number; embers: number; elapsedMs: number };
 }
 
-/** An equipped spell; the info line reads its name and description (CO-179). */
+/**
+ * An equipped spell; the info line reads its name, level and description
+ * (CO-179, #326). `maxed` is the level at `maxLevel`, so its badge reads MAX in gold.
+ */
 export interface PauseSpell {
   id: string;
   name: string;
   color: number;
   description: string;
+  level: number;
+  maxLevel: number;
+  maxed: boolean;
 }
 
 export interface PauseBuild {
   level: number;
   /** The result screen's build (#290) carries no descriptions; it has no info line. */
-  spells: readonly (Omit<PauseSpell, 'description'> & { description?: string })[];
+  spells: readonly (Pick<PauseSpell, 'id' | 'name' | 'color' | 'level'> & {
+    description?: string;
+  })[];
   passives: ReadonlyMap<PassiveId, number>;
   relics: ReadonlyMap<RelicBuffId, number>;
   kills: number;
@@ -92,11 +101,14 @@ function item(
 export function pauseView(build: PauseBuild): PauseView {
   return {
     level: build.level,
-    spells: build.spells.map(({ id, name, color, description = '' }) => ({
+    spells: build.spells.map(({ id, name, color, level, description = '' }) => ({
       id,
       name,
       color,
       description,
+      level,
+      maxLevel: MAX_SPELL_LEVEL,
+      maxed: isMaxed(level, MAX_SPELL_LEVEL),
     })),
     passives: [...build.passives].map(([id, rank]) => {
       const passive = passiveById(id);
@@ -122,14 +134,15 @@ export function statsLine(view: Readonly<PauseView>): string {
 /**
  * The info line for a pointed-at or selected tile: `Power ×2  —  Every spell
  * deals 10% more damage.` A capped passive shows its cap, `Swift  3/5` and
- * `Swift  5/5 (max)` (CO-197). A spell has no count of its own, so it reads its
- * name and description alone.
+ * `Swift  5/5 (max)` (CO-197). A spell reads its level the same way, `Lightning
+ * Sword  Lv 2/3  —  …` (#326).
  */
 export function itemInfo(
   tile: Readonly<Pick<PauseItem, 'name' | 'description' | 'count' | 'maxRank'> | PauseSpell>,
 ): string {
   let head = tile.name;
-  if ('count' in tile) {
+  if ('level' in tile) head += `  ${levelFraction(tile.level, tile.maxLevel)}`;
+  else if ('count' in tile) {
     head += tile.maxRank === undefined ? ' ' : '  ';
     head += rankFraction(tile.count, tile.maxRank);
   }
@@ -225,7 +238,10 @@ export function isPauseView(data: unknown): data is PauseView {
         typeof s.id === 'string' &&
         typeof s.name === 'string' &&
         typeof s.color === 'number' &&
-        typeof s.description === 'string',
+        typeof s.description === 'string' &&
+        isSpellLevel(s.level) &&
+        s.maxLevel === MAX_SPELL_LEVEL &&
+        s.maxed === s.level >= MAX_SPELL_LEVEL,
     ) &&
     Array.isArray(data.passives) &&
     data.passives.every(isPauseItem) &&

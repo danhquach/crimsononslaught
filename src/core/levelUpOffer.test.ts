@@ -8,6 +8,7 @@ import {
   type Passive,
   type PlayerProfile,
 } from '../config/passives';
+import { MAX_SPELL_LEVEL, type SpellLevelTable } from '../config/spellLevels';
 import { MAX_OFFER_SIZE, isOfferCard, resolveLevelUp, type OfferCard } from './levelUp';
 import {
   activeCard,
@@ -18,10 +19,13 @@ import {
   offerPool,
   offerableActives,
   passiveCard,
+  spellUpgradeCard,
+  upgradeableSpells,
   type ActiveCard,
   type OfferInput,
 } from './levelUpOffer';
-import { buildLoadout, equip, openSlots, takePassive, type Loadout } from './loadout';
+import { OFFER_GOLDEN } from './levelUpOffer.golden';
+import { buildLoadout, equip, openSlots, takePassive, upgradeSpell, type Loadout } from './loadout';
 import { createRng, type Rng } from './rng';
 
 const [SLOT_2_LEVEL, SLOT_3_LEVEL] = SLOT_UNLOCK_LEVELS;
@@ -648,5 +652,220 @@ describe('offerAfterBan (#228)', () => {
       only?.id as string,
     );
     expect(after.map((c) => c.kind)).toEqual(['passive', 'passive', 'passive']);
+  });
+});
+
+/** Every spell of the Fire runs above as its card reads: the default, then the extras. */
+const FIRE_CASTING: ActiveCard[] = [
+  { id: 'fire', name: 'Fire Bolt', description: 'Throws a bolt.', color: 0xff5500 },
+  ...FIRE_CATALOG,
+];
+
+/** Level text for the default spell and Meteor, so both can be offered an upgrade. */
+const TABLE: SpellLevelTable = {
+  fire: { 2: 'Throws a second bolt.', 3: 'Bolts leave a fire trail.' },
+  fire_meteor: { 2: 'Calls a second meteor.', 3: 'Meteors leave a burning pool.' },
+};
+
+/** The draws behind `OFFER_GOLDEN`: cases, seeds 1 to 50, every spell casting, no level text. */
+function replayGolden(): string[] {
+  const shared = { actives: FIRE_CATALOG, casting: FIRE_CASTING, spellLevels: {} };
+  const lines: string[] = [];
+  const cases: [string, Loadout, number, Partial<OfferInput>][] = [
+    ['fresh', buildLoadout('fire'), 1, {}],
+    ['slot2', buildLoadout('fire'), SLOT_2_LEVEL, {}],
+    ['full', fullLoadout(), PASSIVE_LEVEL, {}],
+    ['capped', cappedLoadout(), PASSIVE_LEVEL, {}],
+    [
+      'banned',
+      fullLoadout(),
+      PASSIVE_LEVEL,
+      { banned: new Set(['passive_magnet', 'passive_vitality']) },
+    ],
+    ['bannedActive', buildLoadout('fire'), SLOT_2_LEVEL, { banned: new Set(['fire_meteor']) }],
+    [
+      'exclude',
+      fullLoadout(),
+      PASSIVE_LEVEL,
+      { exclude: new Set(['passive_magnet', 'passive_vitality', 'passive_haste']) },
+    ],
+  ];
+  for (const [name, loadout, level, extra] of cases) {
+    for (let seed = 1; seed <= 50; seed++) {
+      const rng = createRng(seed);
+      const ids = levelUpOffer(rng, { loadout, level, ...shared, ...extra }).map((c) => c.id);
+      lines.push(`${name}:${seed}:${ids.join(',')}|${rng.next()}`);
+    }
+  }
+  for (const [name, loadout, level] of [
+    ['banAfter', fullLoadout(), PASSIVE_LEVEL],
+    ['banAfterActive', buildLoadout('fire'), SLOT_2_LEVEL],
+  ] as const) {
+    for (let seed = 1; seed <= 50; seed++) {
+      const base: OfferInput = { loadout, level, ...shared };
+      const shown = levelUpOffer(createRng(seed), base);
+      const bannedId = shown[0]?.id as string;
+      const rng = createRng(seed + 1000);
+      const input = { ...base, banned: new Set([bannedId]) };
+      const ids = offerAfterBan(rng, input, shown, bannedId).map((c) => c.id);
+      lines.push(`${name}:${seed}:${ids.join(',')}|${rng.next()}`);
+    }
+  }
+  return lines;
+}
+
+describe('levelUpOffer — seeds stay stable without spell levels (#326)', () => {
+  it('replays the offers captured before upgrade cards, draw for draw', () => {
+    expect(OFFER_GOLDEN).toHaveLength(450);
+    expect(replayGolden()).toEqual(OFFER_GOLDEN);
+  });
+
+  it('adds nothing with the shipped, empty level table, whatever is casting', () => {
+    const input: OfferInput = {
+      loadout: fullLoadout(),
+      level: PASSIVE_LEVEL,
+      actives: FIRE_CATALOG,
+      casting: FIRE_CASTING,
+    };
+    expect(offerPool(input)).toEqual(offerPool({ ...input, casting: undefined }));
+    expect(offerPool(input).some((card) => card.kind === 'upgrade')).toBe(false);
+  });
+});
+
+describe('levelUpOffer — spell upgrades in the passive pool (#326)', () => {
+  const upgradeInput = (loadout = fullLoadout()): OfferInput => ({
+    loadout,
+    level: PASSIVE_LEVEL,
+    actives: FIRE_CATALOG,
+    casting: FIRE_CASTING,
+    spellLevels: TABLE,
+  });
+  const upgradesOf = (cards: readonly OfferCard[]): OfferCard[] =>
+    cards.filter((card) => card.kind === 'upgrade');
+
+  it('offers an upgrade for each casting spell with level text, after the passives', () => {
+    const pool = offerPool(upgradeInput());
+    expect(upgradesOf(pool).map((card) => card.id)).toEqual([
+      'spell_level_fire',
+      'spell_level_fire_meteor',
+    ]);
+    const firstUpgrade = pool.findIndex((card) => card.kind === 'upgrade');
+    expect(pool.slice(0, firstUpgrade).every((card) => card.kind === 'passive')).toBe(true);
+  });
+
+  it('builds the card for the level the pick grants, in the spell’s colour', () => {
+    const [fire] = upgradesOf(offerPool(upgradeInput()));
+    expect(fire).toEqual({
+      kind: 'upgrade',
+      id: 'spell_level_fire',
+      name: 'Fire Bolt',
+      description: 'Throws a second bolt.',
+      rank: 2,
+      maxRank: MAX_SPELL_LEVEL,
+      color: 0xff5500,
+    });
+    const atTwo = upgradeSpell(fullLoadout(), 'fire');
+    const [next] = upgradesOf(offerPool(upgradeInput(atTwo)));
+    expect(next).toMatchObject({ rank: 3, maxRank: 3, description: 'Bolts leave a fire trail.' });
+  });
+
+  it('drops a spell at level 3, and every card is a valid card', () => {
+    const atThree = upgradeSpell(upgradeSpell(fullLoadout(), 'fire'), 'fire');
+    const pool = offerPool(upgradeInput(atThree));
+    expect(upgradesOf(pool).map((card) => card.id)).toEqual(['spell_level_fire_meteor']);
+    for (const card of offerPool(upgradeInput())) expect(isOfferCard(card), card.id).toBe(true);
+  });
+
+  it('offers no upgrade for a spell with no level text, or one that is not casting', () => {
+    expect(upgradeableSpells(fullLoadout(), FIRE_CASTING, TABLE).map((s) => s.id)).toEqual([
+      'fire',
+      'fire_meteor',
+    ]);
+    const onlyColumn: SpellLevelTable = {
+      fire_column: { 2: 'Raises a second column.', 3: 'Columns merge into one.' },
+    };
+    const casting = FIRE_CASTING.filter((spell) => spell.id !== 'fire_column');
+    expect(upgradeableSpells(fullLoadout(), casting, onlyColumn)).toEqual([]);
+  });
+
+  it('never offers one while a slot has spells to fill it', () => {
+    const input = { ...upgradeInput(buildLoadout('fire')), level: SLOT_2_LEVEL };
+    expect(offerPool(input).every((card) => card.kind === 'active')).toBe(true);
+  });
+
+  it('offers one once no spell is left for the open slot', () => {
+    const input = { ...upgradeInput(buildLoadout('fire')), level: SLOT_2_LEVEL, actives: [] };
+    const kinds = new Set(offerPool(input).map((card) => card.kind));
+    expect(kinds).toEqual(new Set(['passive', 'upgrade']));
+  });
+
+  it('draws upgrades into offers, seeded and replayable', () => {
+    let seen = 0;
+    for (let seed = 1; seed <= 100; seed++) {
+      const now = levelUpOffer(createRng(seed), upgradeInput());
+      expect(levelUpOffer(createRng(seed), upgradeInput())).toEqual(now);
+      expect(new Set(now.map((card) => card.id)).size).toBe(now.length);
+      seen += upgradesOf(now).length;
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
+
+  it('never draws a banned upgrade, and offerAfterBan fills its place', () => {
+    const banned = new Set(['spell_level_fire']);
+    for (let seed = 1; seed <= 100; seed++) {
+      const ids = levelUpOffer(createRng(seed), { ...upgradeInput(), banned }).map((c) => c.id);
+      expect(ids, `seed ${seed}`).not.toContain('spell_level_fire');
+    }
+    const input = upgradeInput();
+    const shown = [
+      spellUpgradeCard(input.loadout, FIRE_CASTING[0] as ActiveCard, TABLE),
+      ...levelUpOffer(createRng(3), input)
+        .filter((card) => card.kind === 'passive')
+        .slice(0, 2),
+    ];
+    const after = offerAfterBan(createRng(4), { ...input, banned }, shown, 'spell_level_fire');
+    expect(after).toHaveLength(MAX_OFFER_SIZE);
+    expect(after.map((card) => card.id)).not.toContain('spell_level_fire');
+    expect(after[1]).toBe(shown[1]);
+    expect(after[2]).toBe(shown[2]);
+  });
+
+  it('puts the upgrades just shown last in a reroll when the pool is short', () => {
+    const passives: Passive[] = PASSIVES.slice(0, 2);
+    const input = { ...upgradeInput(), passives, charges: [] };
+    const pool = offerPool(input);
+    const exclude = new Set(upgradesOf(pool).map((card) => card.id));
+    const fresh = pool.filter((card) => !exclude.has(card.id)).map((card) => card.id);
+    for (let seed = 1; seed <= 30; seed++) {
+      const rerolled = levelUpOffer(createRng(seed), { ...input, exclude });
+      expect(rerolled).toHaveLength(MAX_OFFER_SIZE);
+      expect(
+        rerolled
+          .slice(0, 2)
+          .map((card) => card.id)
+          .sort(),
+      ).toEqual(fresh.sort());
+      expect(rerolled[2]?.kind).toBe('upgrade');
+    }
+  });
+
+  it('offers upgrades alone once the passives are gone, and the +10 HP fallback once they are too', () => {
+    const noPassives = { ...upgradeInput(), passives: [], charges: [] };
+    const offer = levelUpOffer(createRng(1), noPassives);
+    expect(offer.map((card) => card.kind)).toEqual(['upgrade', 'upgrade']);
+    const atThree = (id: 'fire' | 'fire_meteor', loadout: Loadout): Loadout =>
+      upgradeSpell(upgradeSpell(loadout, id), id);
+    const spent = atThree('fire_meteor', atThree('fire', fullLoadout()));
+    const none = levelUpOffer(createRng(1), { ...noPassives, loadout: spent });
+    expect(none).toEqual([]);
+    expect(resolveLevelUp(none).kind).toBe('fallback');
+  });
+
+  it('draws no more from the RNG than the pool it shuffles needs', () => {
+    const rng = createRng(9);
+    const twin = createRng(9);
+    levelUpOffer(rng, upgradeInput());
+    twin.shuffle(offerPool(upgradeInput()));
+    expect(rng.next()).toBe(twin.next());
   });
 });

@@ -146,7 +146,10 @@ test('the pause screen shows the same MAX badge, and its info line reads the cap
     { id: AVARICE, count: 3, maxRank: AVARICE_CAP, maxed: false },
     { id: POWER, count: 3, maxRank: undefined, maxed: false },
   ]);
-  expect(read.badges.map(({ text, bg }) => ({ text, bg }))).toEqual([
+  // The Spells strip is above the tiles, so its one level badge (#326) comes first.
+  const [spellBadge, ...badges] = read.badges;
+  expect(spellBadge).toMatchObject({ text: '1', bg: CRIMSON });
+  expect(badges.map(({ text, bg }) => ({ text, bg }))).toEqual([
     { text: 'MAX', bg: GOLD },
     { text: '3', bg: CRIMSON },
     { text: '3', bg: CRIMSON },
@@ -169,7 +172,7 @@ test('the pause screen shows the same MAX badge, and its info line reads the cap
     { id: POWER, count: 3, maxRank: undefined, head: /^Power ×3 {2}— / },
   ];
   for (const [i, want] of expected.entries()) {
-    const at = read.badges[i]!;
+    const at = badges[i]!;
     await page.mouse.move(5, 5);
     await page.mouse.move(at.x, at.y);
     const passive = passiveById(want.id)!;

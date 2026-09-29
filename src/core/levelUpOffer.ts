@@ -2,8 +2,21 @@ import type { RosterSpellId } from '../config/loadout';
 import { LEVEL_UP_CHARGES, type ChargeCard } from '../config/offerActions';
 import { PASSIVES, isPassiveId, type PlayerProfile, type Passive } from '../config/passives';
 import type { SpellStatField } from '../config/spellFields';
-import { MAX_OFFER_SIZE, type OfferCard } from './levelUp';
-import { equippableSpells, openSlots, passiveRank, type Loadout } from './loadout';
+import {
+  MAX_SPELL_LEVEL,
+  SPELL_LEVELS,
+  spellLevelText,
+  type SpellLevelTable,
+} from '../config/spellLevels';
+import { MAX_OFFER_SIZE, spellLevelCardId, type OfferCard } from './levelUp';
+import {
+  canUpgradeSpell,
+  equippableSpells,
+  openSlots,
+  passiveRank,
+  spellLevel,
+  type Loadout,
+} from './loadout';
 import { atCap } from './profileClamp';
 import type { Rng } from './rng';
 
@@ -16,14 +29,16 @@ import type { Rng } from './rng';
  * 1. An active slot is unlocked and empty -> offer the element's unequipped
  *    actives, so a slot is always filled before anything else is handed out.
  * 2. Otherwise -> offer passives that are not at `maxRank` and whose
- *    `requiresStat`, if any, a casting spell carries. Four passives never cap,
- *    so this pool never runs dry the way the Phase 1 perk trees did.
+ *    `requiresStat`, if any, a casting spell carries, together with (#326) an
+ *    upgrade for each casting spell below level 3 that has level text. Four
+ *    passives never cap, so this pool never runs dry the way the Phase 1 perk
+ *    trees did.
  * 3. Neither pool has a card -> an empty offer, which `resolveLevelUp` answers
  *    with the silent +10 max HP instead of an overlay.
  *
- * An offer is all actives or all passives, never mixed: a card the player will
- * never see again (an active slot's last chance) should not compete against one
- * they can take at any later level.
+ * An offer is all actives or passives and upgrades, never actives mixed with
+ * the rest: a card the player will never see again (an active slot's last
+ * chance) should not compete against one they can take at any later level.
  *
  * Which actives exist is the caller's to say. `catalog` is every active *this
  * build can actually cast* — the roster spells land with #140-#143, and a card
@@ -38,7 +53,9 @@ import type { Rng } from './rng';
  * cards (+1 Reroll, +1 Ban) join the passive pool for good; they never join a
  * spell offer. None of this draws anything a run that never rerolls or bans,
  * and has no passive capped, did not draw before, so its seed replays the
- * same offers.
+ * same offers. The same holds for #326: a spell without level text has no upgrade
+ * card, so with the shipped (empty) level table the pool, and every draw from
+ * it, is what it was.
  *
  * Pure TS, no Phaser import.
  */
@@ -119,6 +136,17 @@ export interface OfferInput {
   exclude?: ReadonlySet<string>;
   /** The charge cards a capped passive lets into the passive pool (#228). */
   charges?: readonly ChargeCard[];
+  /**
+   * The spells casting now, as their cards read (`Spellbook.spells`, so a
+   * `?loadout=` extra is in it). Only these can be offered an upgrade (#326);
+   * absent, none is.
+   */
+  casting?: readonly ActiveCard[];
+  /**
+   * What each spell's levels add; defaults to `SPELL_LEVELS`. A spell is offered
+   * an upgrade only while it has an entry here and is below level 3.
+   */
+  spellLevels?: SpellLevelTable;
   size?: number;
 }
 
@@ -126,12 +154,14 @@ const NONE: ReadonlySet<string> = new Set();
 
 /**
  * Every card this level-up could show, in config order: the unbanned actives
- * for an open slot while there are any, else the unbanned eligible passives
- * and, once a passive caps, the unbanned charge cards.
+ * for an open slot while there are any, else the unbanned eligible passives,
+ * the unbanned spell upgrades (#326) and, once a passive caps, the unbanned
+ * charge cards.
  */
 export function offerPool(input: OfferInput): OfferCard[] {
   const { loadout, level, actives, carried, profile, passives = PASSIVES } = input;
   const { charges = LEVEL_UP_CHARGES, banned = NONE } = input;
+  const { casting = [], spellLevels = SPELL_LEVELS } = input;
   const open = (card: { id: string }): boolean => !banned.has(card.id);
 
   if (openSlots(loadout, level) > 0) {
@@ -142,8 +172,29 @@ export function offerPool(input: OfferInput): OfferCard[] {
   const pool = eligiblePassives(loadout, passives, carried, profile)
     .filter(open)
     .map((passive) => passiveCard(loadout, passive));
+  pool.push(
+    ...upgradeableSpells(loadout, casting, spellLevels)
+      .map((spell) => spellUpgradeCard(loadout, spell, spellLevels))
+      .filter(open),
+  );
   if (anyPassiveCapped(loadout, passives)) pool.push(...charges.filter(open).map(chargeCard));
   return pool;
+}
+
+/**
+ * The casting spells that can be taken up a level (#326): below level 3, with
+ * level text in `table` for the level a pick would grant.
+ */
+export function upgradeableSpells(
+  loadout: Loadout,
+  casting: readonly ActiveCard[],
+  table: SpellLevelTable,
+): ActiveCard[] {
+  return casting.filter(
+    (spell) =>
+      canUpgradeSpell(loadout, spell.id) &&
+      spellLevelText(table, spell.id, spellLevel(loadout, spell.id) + 1) !== undefined,
+  );
 }
 
 /**
@@ -218,6 +269,29 @@ export function passiveCard(loadout: Loadout, passive: Passive): OfferCard {
     rank: rankOf(loadout, passive.id) + 1,
   };
   if (passive.maxRank !== undefined) card.maxRank = passive.maxRank;
+  return card;
+}
+
+/**
+ * The card for the next level of a casting spell (#326): named for the spell,
+ * reading what the level adds, `rank` the level it grants and `maxRank` the
+ * top one. `spell` must be an `upgradeableSpells` entry for this `table`.
+ */
+export function spellUpgradeCard(
+  loadout: Loadout,
+  spell: ActiveCard,
+  table: SpellLevelTable,
+): OfferCard {
+  const level = spellLevel(loadout, spell.id) + 1;
+  const card: OfferCard = {
+    kind: 'upgrade',
+    id: spellLevelCardId(spell.id),
+    name: spell.name,
+    description: spellLevelText(table, spell.id, level) ?? spell.description,
+    rank: level,
+    maxRank: MAX_SPELL_LEVEL,
+  };
+  if (spell.color !== undefined) card.color = spell.color;
   return card;
 }
 

@@ -7,6 +7,8 @@ import {
   badgeText,
   grantsMaxRank,
   isMaxed,
+  levelFraction,
+  offerRankLabel,
   rankFraction,
   rankLabel,
 } from './maxRank';
@@ -82,5 +84,28 @@ describe('rankLabel and grantsMaxRank', () => {
       expect(rankLabel(passiveCard(at(cap - 2), passive)), passive.id).not.toMatch(/MAX/);
       expect(grantsMaxRank(passiveCard(at(cap - 1), passive)), passive.id).toBe(true);
     }
+  });
+});
+
+describe('levelFraction and offerRankLabel (#326)', () => {
+  it('reads a spell level as Lv n/3, and marks the top one', () => {
+    expect(levelFraction(1)).toBe('Lv 1/3');
+    expect(levelFraction(2)).toBe('Lv 2/3');
+    expect(levelFraction(3)).toBe('Lv 3/3 (max)');
+  });
+
+  it('labels an upgrade card by the level it grants', () => {
+    const card = { kind: 'upgrade', rank: 2, maxRank: 3 } as const;
+    expect(offerRankLabel(card)).toBe('Lv 2/3');
+    expect(offerRankLabel({ ...card, rank: 3 })).toBe('Lv 3/3 · MAX');
+    expect(grantsMaxRank({ ...card, rank: 3 })).toBe(true);
+  });
+
+  it('leaves every other kind to rankLabel', () => {
+    expect(offerRankLabel({ kind: 'passive', rank: 2, maxRank: 5 })).toBe('Rank 2/5');
+    expect(offerRankLabel({ kind: 'passive', rank: 5, maxRank: 5 })).toBe('Rank 5/5 · MAX');
+    expect(offerRankLabel({ kind: 'relic', rank: 2 })).toBe('Rank 2');
+    expect(offerRankLabel({ kind: 'active' })).toBe('');
+    expect(offerRankLabel({ kind: 'charge' })).toBe('');
   });
 });
