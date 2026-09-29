@@ -302,7 +302,9 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...[...PASSIVES, ...RELIC_BUFFS].map(({ id }) => spec(`icon.${id}`, 1, 1, ONCE)),
 
   // HUD bar frames and their end marks (CO-156): stills, never played; each
-  // frame is cut into caps and a middle by `render/barFrame.ts`.
+  // frame is cut into caps and a middle by `render/barFrame.ts`. The shield
+  // bar's art is no longer drawn (CO-195) but stays on its page, so dropping it
+  // would re-quantise the page's palette.
   ...(['hp', 'shield', 'xp', 'boss'] as const).flatMap((bar) => [
     spec(`hud.${bar}Frame`, 1, 1, ONCE),
     spec(`hud.${bar}Mark`, 1, 1, ONCE),

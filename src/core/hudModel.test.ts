@@ -5,7 +5,7 @@ import {
   bossBarVisible,
   formatTimer,
   fraction,
-  shieldBarVisible,
+  hpBarView,
   cooldownBadge,
   shortSpellName,
   slotLabel,
@@ -189,15 +189,80 @@ describe('applyRunEvent', () => {
   });
 });
 
-describe('shieldBarVisible', () => {
-  it('is hidden until a shield is equipped and shown once one is (#134)', () => {
-    expect(shieldBarVisible(INITIAL_HUD)).toBe(false);
-    const equipped = applyRunEvent(INITIAL_HUD, { name: 'shield', payload: { pool: 60, max: 60 } });
-    expect(shieldBarVisible(equipped)).toBe(true);
-    // A broken shield is still equipped, so the empty bar stays on screen.
-    const broken = applyRunEvent(equipped, { name: 'shield', payload: { pool: 0, max: 60 } });
-    expect(shieldBarVisible(broken)).toBe(true);
-    expect(fraction(broken.shield, broken.shieldMax)).toBe(0);
+describe('hpBarView (CO-195)', () => {
+  const hud = (hp: number, maxHp: number, shield: number, shieldMax: number): HudModel => ({
+    ...INITIAL_HUD,
+    hp,
+    maxHp,
+    shield,
+    shieldMax,
+  });
+
+  it('is HP alone with no shield equipped', () => {
+    expect(hpBarView(hud(70, 100, 0, 0))).toEqual({
+      hp: 0.7,
+      shield: 0,
+      hpText: 'HP 70 / 100',
+      shieldText: '',
+    });
+  });
+
+  it('is HP alone while an equipped shield is broken', () => {
+    expect(hpBarView(hud(70, 100, 0, 60))).toEqual(hpBarView(hud(70, 100, 0, 0)));
+  });
+
+  it('draws the shield right after the red while there is room for both', () => {
+    expect(hpBarView(hud(70, 100, 20, 60))).toEqual({
+      hp: 0.7,
+      shield: 0.2,
+      hpText: 'HP 70',
+      shieldText: '+20',
+    });
+  });
+
+  it('shrinks the red on full HP so the shield fills the end, never past it', () => {
+    const view = hpBarView(hud(100, 100, 25, 60));
+    expect(view.hp).toBeCloseTo(0.8);
+    expect(view.shield).toBeCloseTo(0.2);
+    expect(view.hp + view.shield).toBeLessThanOrEqual(1);
+  });
+
+  it('drains the ice first, easing back to HP alone with no jump when it breaks', () => {
+    let last = hpBarView(hud(100, 100, 30, 60));
+    for (let shield = 29; shield >= 0; shield--) {
+      const next = hpBarView(hud(100, 100, shield, 60));
+      expect(next.shield).toBeLessThan(last.shield);
+      // The red grows back by at most one shield point's share each step.
+      expect(next.hp - last.hp).toBeGreaterThanOrEqual(0);
+      expect(next.hp - last.hp).toBeLessThan(0.01);
+      last = next;
+    }
+    expect(last).toEqual(hpBarView(hud(100, 100, 0, 0)));
+  });
+
+  it('rounds partial points up, as the HP label always has', () => {
+    expect(hpBarView(hud(69.2, 100, 0.4, 60))).toMatchObject({
+      hpText: 'HP 70',
+      shieldText: '+1',
+    });
+  });
+
+  it('keeps both shares in [0, 1] on hostile numbers', () => {
+    const cases: [number, number, number][] = [
+      [-5, 100, 10],
+      [NaN, 100, 10],
+      [50, 0, 10],
+      [50, 100, Infinity],
+      [50, NaN, 10],
+    ];
+    for (const [hp, maxHp, shield] of cases) {
+      const view = hpBarView(hud(hp, maxHp, shield, 60));
+      for (const share of [view.hp, view.shield]) {
+        expect(share).toBeGreaterThanOrEqual(0);
+        expect(share).toBeLessThanOrEqual(1);
+      }
+      expect(view.hp + view.shield).toBeLessThanOrEqual(1);
+    }
   });
 });
 
