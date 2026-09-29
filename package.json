@@ -22,7 +22,7 @@
     "audio:cut": "node scripts/cut-audio.mjs"
   },
   "dependencies": {
-    "phaser": "~3.88.2"
+    "phaser": "~4.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
