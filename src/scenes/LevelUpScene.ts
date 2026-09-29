@@ -7,6 +7,7 @@ import {
 } from '../core/levelUp';
 import { SKIP_REROLL_BONUS } from '../config/offerActions';
 import type { OfferActionCounts } from '../core/offerActions';
+import { MAX_RANK_CSS, grantsMaxRank, rankLabel } from '../core/maxRank';
 import { CARD_FILL, CARD_FILL_HOVER, cssColor, offerColor } from '../core/offerColors';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
@@ -286,7 +287,7 @@ export class LevelUpScene extends Phaser.Scene {
       .text(left + innerWidth, top, rankLabel(card), {
         fontFamily: 'monospace',
         fontSize: '14px',
-        color: '#aaaaaa',
+        color: grantsMaxRank(card) ? MAX_RANK_CSS : '#aaaaaa',
       })
       .setOrigin(1, 0);
     const name = this.add.text(left, top + 30 + band, card.name, {
@@ -371,9 +372,3 @@ const KIND_LABEL: Readonly<Record<OfferCard['kind'], string>> = {
   relic: 'Relic',
   charge: 'Charge',
 };
-
-/** `Rank 2/5`, `Rank 2` for a passive or relic that never caps, nothing for a spell. */
-function rankLabel(card: OfferCard): string {
-  if (card.rank === undefined) return '';
-  return card.maxRank === undefined ? `Rank ${card.rank}` : `Rank ${card.rank}/${card.maxRank}`;
-}

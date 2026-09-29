@@ -55,7 +55,7 @@ const STRIP_X = 330;
 const STRIP_WIDTH = 600;
 /** Where a strip's contents start, right of its label. */
 const STRIP_CONTENT_X = STRIP_X + 104;
-const TILE_PITCH = 40;
+const TILE_PITCH = 48;
 const TILES_PER_ROW = Math.floor((STRIP_X + STRIP_WIDTH - STRIP_CONTENT_X) / TILE_PITCH);
 /** Four spells fill the strip at this pitch, room enough for the roster's longest name (CO-179). */
 const SPELL_PITCH = 120;
@@ -321,7 +321,7 @@ export class PauseScene extends Phaser.Scene {
       const col = i % TILES_PER_ROW;
       const row = Math.floor(i / TILES_PER_ROW);
       (rows[row] ??= []).push(
-        add(STRIP_CONTENT_X + TILE / 2 + col * TILE_PITCH, y + 34 + row * 44, tile),
+        add(STRIP_CONTENT_X + TILE / 2 + col * TILE_PITCH, y + 34 + row * TILE_PITCH, tile),
       );
     });
     return rows;

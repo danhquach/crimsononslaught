@@ -68,7 +68,12 @@ import { explosionScale } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { flushSplits, type Split } from '../core/splitter';
 import { createRng, deriveSeed, type Rng } from '../core/rng';
-import { RUN_EVENT, emitRunEvent, type RunEventPayloads } from '../core/runEvents';
+import {
+  RUN_EVENT,
+  emitRunEvent,
+  type LoadoutPassiveView,
+  type RunEventPayloads,
+} from '../core/runEvents';
 import {
   decideOnBossKill,
   heroHurtable,
@@ -1208,11 +1213,12 @@ export class GameScene extends Phaser.Scene {
         secondsLeft: Number.isFinite(spell.timeToNextCast) ? spell.timeToNextCast : null,
       };
     });
-    const passives = [...this.spells.loadout.passives].map(([id, rank]) => ({
-      id,
-      name: passiveById(id)?.name ?? id,
-      rank,
-    }));
+    const passives = [...this.spells.loadout.passives].map(([id, rank]) => {
+      const passive = passiveById(id);
+      const view: LoadoutPassiveView = { id, name: passive?.name ?? id, rank };
+      if (passive?.maxRank !== undefined) view.maxRank = passive.maxRank;
+      return view;
+    });
     emitRunEvent(this.events, 'loadout', { spells, passives });
   }
 

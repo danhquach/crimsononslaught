@@ -147,6 +147,15 @@ describe('resultView', () => {
     expect(view.passives).toHaveLength(PASSIVES.length);
     expect(view.relics).toHaveLength(RELIC_BUFFS.length);
   });
+
+  it('marks every capped passive of a maxed build as maxed, and no uncapped one (CO-197)', () => {
+    const view = resultView(maxed);
+    for (const tile of view.passives) {
+      const cap = PASSIVES.find((p) => p.id === tile.id)?.maxRank;
+      expect(tile.maxed, tile.id).toBe(cap !== undefined);
+    }
+    expect(view.relics.every((tile) => !tile.maxed)).toBe(true);
+  });
 });
 
 /** Everything above the button: the card and the three strips. */

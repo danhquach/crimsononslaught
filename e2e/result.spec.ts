@@ -112,8 +112,10 @@ interface Sample {
   relicIcons: Box[];
   /** Every `icon.*` frame an image on the screen shows. */
   iconFrames: string[];
-  /** The rank and stack badges' count. */
+  /** The rank and stack badges' count, gold MAX ones included. */
   badges: number;
+  /** The gold MAX badges (CO-197). */
+  maxBadges: number;
   /** Every text on the screen, with its bounds. */
   texts: { text: string; box: Box }[];
 }
@@ -152,7 +154,10 @@ function sample(page: Page): Promise<Sample> {
         iconFrames: (list as Phaser.GameObjects.Image[])
           .filter((o) => o.type === 'Image' && o.frame.name.startsWith('icon.'))
           .map((o) => o.frame.name),
-        badges: texts.filter((t) => t.style.backgroundColor === '#dc143c').length,
+        // A badge's Text carries its fill (`buildStrips.ts`).
+        badges: texts.filter((t) => ['#dc143c', '#ffd700'].includes(t.getData('badgeFill'))).length,
+        maxBadges: texts.filter((t) => t.text === 'MAX' && t.getData('badgeFill') === '#ffd700')
+          .length,
         texts: texts.map((t) => ({ text: t.text, box: box(t) })),
       };
     },
@@ -176,6 +181,7 @@ function expectBuildAboveButton(s: Sample, passives: Box[], relics: Box[]): void
   expect(passives).toHaveLength(PASSIVES.length);
   expect(relics).toHaveLength(RELIC_BUFFS.length);
   expect(s.badges).toBe(PASSIVES.length + RELIC_BUFFS.length);
+  expect(s.maxBadges).toBe(PASSIVES.filter((p) => p.maxRank !== undefined).length);
   const buttonTop = s.controls?.button.y ?? 0;
   for (const face of [...passives, ...relics]) {
     expect(within(face, SLACK), JSON.stringify(face)).toBe(true);

@@ -596,7 +596,8 @@ test('the arrows walk from the menu through every strip and read each item', asy
       return card ? itemInfo({ ...card, id }) : id;
     }
     const entry = kind === 'passive' ? passiveById(id) : relicBuffById(id);
-    return itemInfo({ id, name: entry!.name, abbr: '', description: entry!.description, count: 1 });
+    const maxRank = kind === 'passive' ? passiveById(id)?.maxRank : undefined;
+    return itemInfo({ name: entry!.name, description: entry!.description, count: 1, maxRank });
   };
 
   expect((await readNav(page)).focus).toBeNull();
