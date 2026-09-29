@@ -2,26 +2,33 @@ import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
 import { ART_BOXES, FRAMES, type FrameName } from '../config/frames';
 import { BAR_ART, type BarArt } from '../config/hud';
-import { CURRENCY_NAME } from '../config/meta';
 import { artFrame } from '../core/animation';
+import {
+  cornerCounts,
+  passiveTileLayout,
+  risenPassives,
+  samePassives,
+  type HudPassiveTile,
+} from '../core/hudCorner';
 import {
   INITIAL_HUD,
   applyRunEvent,
   bossBarVisible,
   formatTimer,
   fraction,
-  passiveLines,
   shieldBarVisible,
   slotLabel,
   slotRows,
   type HudModel,
   type SlotRow,
 } from '../core/hudModel';
-import { onRunEvents, type RunEvent } from '../core/runEvents';
+import { PASSIVE_COLOR } from '../core/offerColors';
+import { onRunEvents, type LoadoutPassiveView, type RunEvent } from '../core/runEvents';
 import { SCENE } from '../core/scenePayloads';
 import { hasFrameArt } from '../render/atlas';
 import { barSlices } from '../render/barFrame';
 import { SPELL_ICON_ART_SIZE, spellIconArt } from '../render/spellIcon';
+import { addBuildIcon, addPassiveTile } from './buildStrips';
 
 const MARGIN = 16;
 const BAR_WIDTH = 240;
@@ -79,6 +86,31 @@ const FRAMED_SHIELD_Y = MARGIN + 31;
 const FRAMED_XP_Y = MARGIN + 54;
 const FRAMED_BOSS_Y = 96;
 const BOSS_WIDTH = 400;
+/**
+ * CO-193: the top-right corner. With the atlas, Kills and Embers sit on a plate
+ * — the boss bar's frame at `CORNER_PLATE_WIDTH`, its skull mark hanging off
+ * the left end for Kills and the Ember pickup's own art beside the Embers
+ * count — with the passive tiles in a block under it. `CORNER_TILES_LEFT` is
+ * the first tile's centre: four tiles across at the tile pitch, the last badge
+ * ending just inside the right edge. The whole block stays right of x = 736
+ * with the largest build, clear of the arena centre and of the boss bar's
+ * label, which ends near 724.
+ */
+const CORNER_PLATE_X = 788;
+const CORNER_PLATE_WIDTH = 156;
+const CORNER_KILLS_X = 802;
+const CORNER_EMBER_ICON_X = 866;
+const CORNER_EMBER_ICON_Y = 18;
+const CORNER_EMBERS_X = 881;
+/** The counts' centre line: the middle of the plate's trough. */
+const CORNER_COUNT_Y = 30;
+const CORNER_TILES_LEFT = 806;
+const CORNER_TILES_TOP = 72;
+/** Without the atlas the two text lines are all that is above the tiles. */
+const CORNER_FLAT_TILES_TOP = 80;
+/** A picked or ranked-up tile is ringed by a white pulse this long, then it is gone. */
+const TILE_FLASH_RADIUS = 20;
+const TILE_FLASH_MS = 250;
 /** How far toward white the glint row along the top of a framed fill is, 0 to 1. */
 const FILL_GLINT = 0.4;
 
@@ -142,6 +174,8 @@ class FramedBar {
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly glint: Phaser.GameObjects.Rectangle;
   private readonly label: Phaser.GameObjects.Text;
+  /** The frame's pieces and its mark: what shows of the bar with an empty fill. */
+  readonly solid: readonly Phaser.GameObjects.GameObject[];
 
   constructor(
     scene: Phaser.Scene,
@@ -184,6 +218,7 @@ class FramedBar {
 
     this.label = scene.add.text(x + width + 8, y + box.h / 2, '', LABEL_STYLE).setOrigin(0, 0.5);
     this.parts = [bg, this.fill, this.glint, ...frame, mark, this.label];
+    this.solid = [...frame, mark];
   }
 
   set(fraction01: number, text: string): void {
@@ -341,14 +376,16 @@ class SlotIcon {
 }
 
 /**
- * HUD overlay: timer, HP bar, shield bar, XP bar + level, kill count, boss HP
- * bar, the loadout's slot icons and the passives held.
+ * HUD overlay: timer, HP bar, shield bar, XP bar + level, kill and Ember
+ * counts, boss HP bar, the loadout's slot icons and the passives held.
  *
  * The shield bar (#134) sits under HP and is drawn only while the run has a
  * shield equipped, so a run without one reads exactly as it did before. The
  * slot icons (#144, #213) run along the bottom-left corner, one per spell
- * casting and one per slot still empty; the passives list runs down the right
- * edge under the kill count. Both stay in the margins so the arena centre is clear.
+ * casting and one per slot still empty. The top-right corner (CO-193) is a
+ * plate with the Kills and Embers counts and, under it, one tile per passive
+ * held with its rank on a badge, wrapping four across. Both corners stay in
+ * the margins so the arena centre is clear.
  *
  * Runs as a parallel scene launched by Game, so it keeps rendering while Game
  * is paused (level-up overlay). It is driven purely by `RunEvent`s on the Game
@@ -365,7 +402,14 @@ export class HudScene extends Phaser.Scene {
   private bossBar!: Bar | FramedBar;
   private look: 'art' | 'flat' = 'flat';
   private slotIcons: SlotIcon[] = [];
-  private passivesText!: Phaser.GameObjects.Text;
+  /** CO-193: whether the corner wears its art (the plate and icons) or is plain text. */
+  private iconed = false;
+  /** The corner's fixed pieces; the tiles come and go in `passiveParts`. */
+  private cornerParts: Phaser.GameObjects.GameObject[] = [];
+  private cornerPlate: FramedBar | null = null;
+  private passiveParts: Phaser.GameObjects.GameObject[] = [];
+  private shownPassives: readonly LoadoutPassiveView[] = [];
+  private shownTiles: readonly HudPassiveTile[] = [];
 
   constructor() {
     super(SCENE.hud);
@@ -382,6 +426,31 @@ export class HudScene extends Phaser.Scene {
    */
   get barLook(): 'art' | 'flat' {
     return this.look;
+  }
+
+  /** The passive tiles on screen, in the order taken; the browser suite reads them. */
+  get passiveTiles(): readonly HudPassiveTile[] {
+    return this.shownTiles;
+  }
+
+  /** The box round everything in the top-right corner; the browser suite checks it stays in the margin. */
+  get cornerBounds(): { left: number; top: number; right: number; bottom: number } {
+    const parts = [...this.cornerParts, ...this.passiveParts];
+    if (this.cornerPlate) parts.push(...this.cornerPlate.solid);
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const part of parts) {
+      const box = (
+        part as Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.GetBounds
+      ).getBounds();
+      left = Math.min(left, box.left);
+      top = Math.min(top, box.top);
+      right = Math.max(right, box.right);
+      bottom = Math.max(bottom, box.bottom);
+    }
+    return { left, top, right, bottom };
   }
 
   create(): void {
@@ -421,17 +490,62 @@ export class HudScene extends Phaser.Scene {
     this.timerText = this.add
       .text(width / 2, MARGIN - 4, '', { ...LABEL_STYLE, fontSize: '28px' })
       .setOrigin(0.5, 0);
-    this.killsText = this.add.text(width - MARGIN, MARGIN, '', LABEL_STYLE).setOrigin(1, 0);
-    this.embersText = this.add
-      .text(width - MARGIN, MARGIN + 20, '', { ...LABEL_STYLE, color: EMBERS_COLOR })
-      .setOrigin(1, 0);
+    this.createCorner(width);
     this.slotIcons = [];
-    this.passivesText = this.add
-      .text(width - MARGIN, MARGIN + 44, '', { ...LABEL_STYLE, align: 'right' })
-      .setOrigin(1, 0);
     this.render();
 
     this.subscribe();
+  }
+
+  /**
+   * The top-right corner. Iconed, it reuses the boss bar's frame and its skull
+   * as the plate — the bar itself is drawn only in the boss phase, and it sits
+   * elsewhere — with the numbers beside the skull and the Ember pickup's art.
+   * Flat, it is the two text lines it always was.
+   */
+  private createCorner(width: number): void {
+    // The atlas installs every page or none, so the ember's art is there
+    // whenever the bars' is; the check is for a build that ships one without the other.
+    this.iconed = this.look === 'art' && hasFrameArt(this, 'pickupEmber.idle.0');
+    this.cornerParts = [];
+    this.cornerPlate = null;
+    this.passiveParts = [];
+    this.shownPassives = [];
+    this.shownTiles = [];
+    if (this.iconed) {
+      // The plate is the boss bar's frame at rest: an empty fill and no label
+      // leave the hollow tube, and the frame's own mark is the skull.
+      this.cornerPlate = new FramedBar(
+        this,
+        CORNER_PLATE_X,
+        MARGIN,
+        CORNER_PLATE_WIDTH,
+        BAR_ART.boss,
+        BAR_BG,
+      );
+      this.cornerPlate.set(0, '');
+      this.killsText = this.add
+        .text(CORNER_KILLS_X, CORNER_COUNT_Y, '', LABEL_STYLE)
+        .setOrigin(0, 0.5);
+      const ember = this.add
+        .image(
+          CORNER_EMBER_ICON_X,
+          CORNER_EMBER_ICON_Y,
+          FRAMES['pickupEmber.idle.0'].page,
+          artFrame('pickupEmber.idle.0'),
+        )
+        .setOrigin(0, 0);
+      this.embersText = this.add
+        .text(CORNER_EMBERS_X, CORNER_COUNT_Y, '', { ...LABEL_STYLE, color: EMBERS_COLOR })
+        .setOrigin(0, 0.5);
+      this.cornerParts = [this.killsText, ember, this.embersText];
+    } else {
+      this.killsText = this.add.text(width - MARGIN, MARGIN, '', LABEL_STYLE).setOrigin(1, 0);
+      this.embersText = this.add
+        .text(width - MARGIN, MARGIN + 20, '', { ...LABEL_STYLE, color: EMBERS_COLOR })
+        .setOrigin(1, 0);
+      this.cornerParts = [this.killsText, this.embersText];
+    }
   }
 
   /** Listen to every run event on the Game emitter; detach on our own shutdown. */
@@ -452,12 +566,49 @@ export class HudScene extends Phaser.Scene {
     this.shieldBar.setVisible(shieldBarVisible(m));
     this.shieldBar.set(fraction(m.shield, m.shieldMax), `Shield ${Math.ceil(m.shield)}`);
     this.xpBar.set(fraction(m.xp, m.xpToNext), `Lv ${m.level}`);
-    this.killsText.setText(`Kills ${m.kills}`);
-    this.embersText.setText(`${CURRENCY_NAME} ${m.embers}`);
+    const counts = cornerCounts(m, this.iconed);
+    this.killsText.setText(counts.kills);
+    this.embersText.setText(counts.embers);
     this.bossBar.setVisible(bossBarVisible(m));
     this.bossBar.set(fraction(m.bossHp, m.bossMaxHp), 'Boss');
     this.renderSlots(slotRows(m));
-    this.passivesText.setText(passiveLines(m).join('\n'));
+    this.renderPassives(m.passives);
+  }
+
+  /**
+   * CO-193: the passive tiles. The Game scene publishes a new array every
+   * frame, so compare contents and rebuild only when a passive is taken or
+   * ranked up; the tiles that changed get a short white pulse.
+   */
+  private renderPassives(next: readonly LoadoutPassiveView[]): void {
+    if (samePassives(this.shownPassives, next)) return;
+    const risen = risenPassives(this.shownPassives, next);
+    for (const part of this.passiveParts) part.destroy();
+    this.passiveParts = [];
+    this.shownPassives = next;
+    this.shownTiles = passiveTileLayout(
+      next,
+      CORNER_TILES_LEFT,
+      this.iconed ? CORNER_TILES_TOP : CORNER_FLAT_TILES_TOP,
+    );
+    for (const tile of this.shownTiles) {
+      // The pause screen's tiles: the icon on its mint rim, or letters with no art.
+      if (!addBuildIcon(this, tile.x, tile.y, tile, PASSIVE_COLOR, this.passiveParts)) {
+        addPassiveTile(this, tile.x, tile.y, tile, this.passiveParts);
+      }
+      if (risen.includes(tile.id)) this.flash(tile.x, tile.y);
+    }
+  }
+
+  /** A ring that fades out over `TILE_FLASH_MS` on a tile just picked or ranked up. */
+  private flash(x: number, y: number): void {
+    const ring = this.add.circle(x, y, TILE_FLASH_RADIUS).setStrokeStyle(2, 0xffffff);
+    this.tweens.add({
+      targets: ring,
+      alpha: { from: 1, to: 0 },
+      duration: TILE_FLASH_MS,
+      onComplete: () => ring.destroy(),
+    });
   }
 
   /**

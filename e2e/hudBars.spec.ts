@@ -43,14 +43,16 @@ test('the HP, shield and XP bars are drawn in their pixel-art frames', async ({ 
 
   const { look, frames } = await sample(page);
   expect(look).toBe('art');
-  // Three pieces and a mark per bar; the boss bar stays hidden until the boss.
+  // Three pieces and a mark per bar. The boss frame and its skull show once
+  // even so: the top-right plate wears them (CO-193). A boss bar drawn as well
+  // would list them twice, so the single set also shows that bar hidden.
   const pieces = (bar: string) => [
     `hud.${bar}Frame.0.art.l`,
     `hud.${bar}Frame.0.art.m`,
     `hud.${bar}Frame.0.art.r`,
     `hud.${bar}Mark.0.art`,
   ];
-  expect(frames).toEqual(['hp', 'shield', 'xp'].flatMap(pieces));
+  expect(frames).toEqual(['hp', 'shield', 'xp', 'boss'].flatMap(pieces));
 
   expect(errors).toEqual([]);
 });

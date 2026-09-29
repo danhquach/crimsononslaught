@@ -75,35 +75,44 @@ export function addSpellDisc(
 /**
  * A passive's or relic buff's icon art (CO-179) at 1x, the spell icons' size,
  * on a black disc rimmed in `rim`, with its count on a badge. Returns the rim,
- * or `null` with no icon art, where the caller draws its lettered tile.
+ * or `null` with no icon art, where the caller draws its lettered tile. With
+ * `parts` (CO-193) every object added is also pushed there, so the HUD can
+ * destroy a tile it redraws without wrapping it in a container.
  */
 export function addBuildIcon(
   scene: Phaser.Scene,
   x: number,
   y: number,
-  tile: PauseItem,
+  tile: Pick<PauseItem, 'id' | 'count'>,
   rim: number,
+  parts?: Phaser.GameObjects.GameObject[],
 ): Phaser.GameObjects.Arc | null {
   const frame = buildIconArt(scene, tile.id);
   if (!frame) return null;
   const face = scene.add.circle(x, y, TILE / 2 + 2, 0x000000).setStrokeStyle(1, rim);
-  scene.add.image(x, y, FRAMES[frame].page, artFrame(frame));
-  addBadge(scene, x + TILE / 2 - 2, y + TILE / 2 - 2, tile.count);
+  const image = scene.add.image(x, y, FRAMES[frame].page, artFrame(frame));
+  const badge = addBadge(scene, x + TILE / 2 - 2, y + TILE / 2 - 2, tile.count);
+  parts?.push(face, image, badge);
   return face;
 }
 
-/** A passive: a square tile with its letters and its rank on a badge. Returns the face. */
+/**
+ * A passive: a square tile with its letters and its rank on a badge. Returns
+ * the face; `parts` collects every object added, as `addBuildIcon`'s does.
+ */
 export function addPassiveTile(
   scene: Phaser.Scene,
   x: number,
   y: number,
-  tile: PauseItem,
+  tile: Pick<PauseItem, 'abbr' | 'count'>,
+  parts?: Phaser.GameObjects.GameObject[],
 ): Phaser.GameObjects.Rectangle {
   const face = scene.add.rectangle(x, y, TILE, TILE, 0x241a14).setStrokeStyle(1, PASSIVE_COLOR);
-  scene.add
+  const letters = scene.add
     .text(x, y, tile.abbr, { fontFamily: 'monospace', fontSize: '13px', color: '#e8d8b0' })
     .setOrigin(0.5);
-  addBadge(scene, x + TILE / 2, y + TILE / 2, tile.count);
+  const badge = addBadge(scene, x + TILE / 2, y + TILE / 2, tile.count);
+  parts?.push(face, letters, badge);
   return face;
 }
 
@@ -125,8 +134,13 @@ export function addRelicGem(
   return face;
 }
 
-export function addBadge(scene: Phaser.Scene, x: number, y: number, count: number): void {
-  scene.add
+export function addBadge(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  count: number,
+): Phaser.GameObjects.Text {
+  return scene.add
     .text(x, y, `${count}`, {
       fontFamily: 'monospace',
       fontSize: '10px',

@@ -37,7 +37,7 @@ describe('onRunEvents', () => {
     emitRunEvent(emitter, 'shield', { pool: 9, max: 10 });
     const loadout = {
       spells: [{ id: 'fire', name: 'Fire Bolt', color: 0xff0000, progress: 0.5, secondsLeft: 1 }],
-      passives: [{ name: 'Haste', rank: 2 }],
+      passives: [{ id: 'passive_haste', name: 'Haste', rank: 2 }],
     };
     emitRunEvent(emitter, 'loadout', loadout);
     emitter.emit('shutdown', { not: 'ours' });

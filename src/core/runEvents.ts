@@ -69,6 +69,8 @@ export interface LoadoutSpellView {
 
 /** One passive held, with the ranks taken of it. */
 export interface LoadoutPassiveView {
+  /** Picks the tile's icon art on the HUD (CO-193). */
+  id: string;
   name: string;
   rank: number;
 }
