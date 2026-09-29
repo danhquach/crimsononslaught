@@ -12,6 +12,8 @@ import { FEEDBACK_URL } from './src/core/feedback.ts';
  * - `img-src data: blob:`: Phaser builds its default textures from data URLs
  *   and turns XHR-loaded atlas pages into object URLs.
  * - `connect-src`: the atlas and audio requests, and the one feedback endpoint.
+ * - `font-src 'self'`: the menu title face (CO-191), a same-origin woff2 that
+ *   Phaser's `load.font` adds through `FontFace`. It is a file, so no `data:`.
  * - `style-src 'self'`: `page.css`; Phaser and the Help form set styles through
  *   the CSSOM, which the policy does not govern.
  *
@@ -22,6 +24,7 @@ const CSP = [
   "script-src 'self'",
   "style-src 'self'",
   "img-src 'self' data: blob:",
+  "font-src 'self'",
   "media-src 'self'",
   `connect-src 'self' ${FEEDBACK_URL}`,
   "worker-src 'self'",

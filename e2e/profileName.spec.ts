@@ -3,7 +3,14 @@ import { AUDIO_REGISTRY_KEY, SAVE_REGISTRY_KEY, SCENE } from '../src/core/sceneP
 import type { Save } from '../src/core/save';
 import type { Audio } from '../src/render/audio';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
-import { collectErrors, sceneTexts, startFromIntro, waitForScene } from './game';
+import {
+  clickRow,
+  collectErrors,
+  menuRows,
+  sceneTexts,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * The player name (CO-165): generated once on first launch and stored before
@@ -301,6 +308,65 @@ test('a markup name hand-edited into storage never reaches the page, and is repl
   expect(await sceneTexts(page, SCENE.profile)).not.toContain(XSS);
   expect(await injected(page)).toEqual({ pwned: false, imgs: 0, scripts: 0 });
   expect(errors).toEqual([]);
+});
+
+/** Names that read as something else or hide part of themselves; the rule is ASCII letters, digits, spaces and underscores. */
+const HOSTILE_NAMES = [
+  ['a right-to-left override', 'Evil\u202Ename'],
+  ['a zero-width joiner', 'Pla\u200Dyer_One'],
+  ['a Cyrillic look-alike', 'Аdmin'],
+] as const;
+
+for (const [what, name] of HOSTILE_NAMES) {
+  test(`a stored name with ${what} is replaced at boot the way a markup name is`, async ({
+    page,
+  }) => {
+    const errors = collectErrors(page);
+    const tampered = { ...V1_SAVE, version: 2, profile: { ...V1_SAVE.profile, name } };
+    await seedStorage(page, JSON.stringify(tampered));
+    await page.goto('/?seed=1');
+    await openProfile(page);
+
+    const { registry, stored } = await saves(page);
+    expect(registry.profile.name).toMatch(GENERATED);
+    expect(stored?.profile.name).toBe(registry.profile.name);
+    expect(registry.profile.runs).toBe(V1_SAVE.profile.runs); // only the name is repaired
+    expect(await sceneTexts(page, SCENE.profile)).not.toContain(name);
+    expect(errors).toEqual([]);
+  });
+}
+
+test('the widest valid name shrinks to its slot and stays clear of Rename', async ({ page }) => {
+  await page.goto('/?seed=1');
+  await openProfile(page);
+  const widest = 'WWWWWWWWWWWWWWWW'; // 16 of the widest letter
+
+  await clickRow(page, SCENE.profile, 'Rename');
+  const field = page.getByLabel('Player name');
+  await field.fill(widest);
+  await field.press('Enter');
+  await expect(field).toBeHidden();
+  expect((await saves(page)).stored?.profile.name).toBe(widest);
+
+  const drawn = await page.evaluate(
+    async ([key, text]) => {
+      const { game } = await import('/src/main.ts');
+      const named = game.scene
+        .getScene(key)
+        .children.list.find(
+          (child) => child.type === 'Text' && (child as unknown as { text: string }).text === text,
+        ) as unknown as { getBounds(): { left: number; right: number } } | undefined;
+      const box = named?.getBounds();
+      return box ? { left: box.left, right: box.right } : null;
+    },
+    [SCENE.profile, widest] as const,
+  );
+  const rename = (await menuRows(page, SCENE.profile)).find((row) => row.label === 'Rename');
+  expect(drawn).not.toBeNull();
+  expect(rename).toBeDefined();
+  // The name's slot is the 340 px field it is edited in, left of the Rename row.
+  expect(drawn!.left).toBeGreaterThanOrEqual(rename!.bounds.x - 16 - 340 - 1);
+  expect(drawn!.right).toBeLessThan(rename!.bounds.x);
 });
 
 test('a markup, script or SQL name typed or pasted into the field is refused and never runs', async ({

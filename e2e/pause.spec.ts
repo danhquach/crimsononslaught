@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { expect, test, type Page } from '@playwright/test';
 import type Phaser from 'phaser';
 import { passiveById, type PassiveId } from '../src/config/passives';
@@ -15,7 +16,15 @@ import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { PauseScene } from '../src/scenes/PauseScene';
 import type { ResultScene } from '../src/scenes/ResultScene';
-import { cardCenter, collectErrors, isSceneActive, startFromIntro, waitForScene } from './game';
+import {
+  cardCenter,
+  clickRow,
+  collectErrors,
+  isSceneActive,
+  menuRows,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * #252 in the browser: Esc or pad Start pauses the run under the pause screen,
@@ -704,15 +713,10 @@ test('with no icon art, passives and relics keep their letters and badges', asyn
 });
 
 /**
- * CO-192: Settings from the pause menu. Positions mirror `SettingsScene`: rows
- * 58 px apart from y = 140, master volume's "-" 70 px left of the value 120 px
- * right of centre, switches 120 px right of centre; Intro's Settings entry.
+ * CO-192: Settings from the pause menu. Its rows are found where the scene drew
+ * them (`menuRows`). What the pause -> Settings tests compare, read in one
+ * evaluate so the running game cannot move between them.
  */
-const MASTER_DOWN = { x: 480 + 120 - 70, y: 140 };
-const SHAKE_SWITCH = { x: 600, y: 140 + 5 * 58 };
-const INTRO_SETTINGS = { x: 480, y: 298 };
-
-/** What the pause -> Settings tests compare, read in one evaluate so the running game cannot move between them. */
 interface Panel {
   settingsActive: boolean;
   pauseActive: boolean;
@@ -806,8 +810,8 @@ test('Settings opens from the pause menu over the frozen run, and Back returns t
   expect(later.track).toBe(open.runTrack);
 
   // Volume and shake changes land at once and are saved as from the main menu.
-  await page.mouse.click(MASTER_DOWN.x, MASTER_DOWN.y);
-  await page.mouse.click(SHAKE_SWITCH.x, SHAKE_SWITCH.y);
+  await clickRow(page, SCENE.settings, '−'); // Master volume's
+  await clickRow(page, SCENE.settings, 'Screen shake: On');
   await expect
     .poll(async () => JSON.parse((await readStoredSave(page)) ?? '{"settings":{}}').settings)
     .toEqual(
@@ -980,7 +984,7 @@ test('the main menu Settings still goes back to Intro after a pause Settings', a
   await frames(page, 10);
 
   // Intro starts Settings with no payload; Phaser would replay the pause one.
-  await page.mouse.click(INTRO_SETTINGS.x, INTRO_SETTINGS.y);
+  await clickRow(page, SCENE.intro, 'Settings');
   await waitForScene(page, SCENE.settings);
   const menu = await page.evaluate(async (audioKey) => {
     const { game } = await import('/src/main.ts');
@@ -1001,4 +1005,123 @@ test('the main menu Settings still goes back to Intro after a pause Settings', a
   }, SCENE);
   expect(read).toEqual({ intro: true, settings: false, pause: false, game: false });
   expect(errors).toEqual([]);
+});
+
+const { PNG } = createRequire(import.meta.url)('pngjs') as {
+  PNG: { sync: { read(bytes: Buffer): { width: number; data: Buffer } } };
+};
+
+/** Settings as it is drawn: its rows as reported, and the frame as the player sees it. */
+async function settingsLook(page: Page) {
+  await page.mouse.move(2, 2); // nothing under the pointer
+  await frames(page, 10);
+  return { rows: await menuRows(page, SCENE.settings), shot: await page.screenshot() };
+}
+
+/**
+ * Settings opened from Pause has to cover the frozen run: the HUD is hidden and
+ * the pointer goes no further. Nothing in Game or the HUD answers a click of its
+ * own, so a probe is planted where the click lands, in the HUD: it keeps
+ * running under a pause, and a paused Game takes no input at all. It is hit
+ * only if the panel lets the click through. Read in
+ * one evaluate with the run's state, which must not have moved.
+ */
+async function expectRunCovered(page: Page): Promise<void> {
+  await page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    const probe = game.scene.getScene(key).add.rectangle(100, 300, 160, 100, 0xff0000, 0.01);
+    const w = window as unknown as { probeHits?: number };
+    w.probeHits = 0;
+    probe.setInteractive();
+    probe.on('pointerdown', () => (w.probeHits! += 1));
+    probe.on('pointerup', () => (w.probeHits! += 1));
+  }, SCENE.hud);
+  const before = await snapshot(page);
+  // Empty: left of the panels. Phaser hit-tests a pointer it has seen move.
+  await page.mouse.move(90, 290);
+  await page.mouse.move(100, 300);
+  await frames(page, 4);
+  await page.mouse.click(100, 300);
+  await frames(page, 6);
+  const after = await page.evaluate(async (scene) => {
+    const { game } = await import('/src/main.ts');
+    const inner = game.scene.getScene(scene.game) as unknown as Inner;
+    return {
+      hits: (window as unknown as { probeHits?: number }).probeHits,
+      gamePaused: game.scene.isPaused(scene.game),
+      hudVisible: game.scene.getScene(scene.hud).sys.settings.visible,
+      settingsActive: game.scene.isActive(scene.settings),
+      elapsedMs: inner.run.elapsedMs,
+      kills: inner.run.kills,
+    };
+  }, SCENE);
+  expect(after).toEqual({
+    hits: 0,
+    gamePaused: true,
+    hudVisible: false,
+    settingsActive: true,
+    elapsedMs: before.elapsedMs,
+    kills: before.kills,
+  });
+}
+
+test('Settings from the pause menu is the same screen as from the main menu (CO-191)', async ({
+  page,
+}, info) => {
+  const errors = collectErrors(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Settings');
+  await waitForScene(page, SCENE.settings);
+  const fromMenu = await settingsLook(page);
+
+  await pauseRun(page);
+  await clickButton(page, 'Settings');
+  await waitForScene(page, SCENE.settings);
+  const fromPause = await settingsLook(page);
+  await info.attach('settings-from-menu', { body: fromMenu.shot, contentType: 'image/png' });
+  await info.attach('settings-from-pause', { body: fromPause.shot, contentType: 'image/png' });
+
+  // The same rows in the same places with the same look...
+  expect(fromMenu.rows.length).toBeGreaterThan(5);
+  expect(fromPause.rows).toEqual(fromMenu.rows);
+  // ...and the same pixels: the frozen run and the HUD do not show through.
+  const [a, b] = [PNG.sync.read(fromMenu.shot), PNG.sync.read(fromPause.shot)];
+  let total = 0;
+  for (let i = 0; i < a.data.length; i++) total += Math.abs((a.data[i] ?? 0) - (b.data[i] ?? 0));
+  expect(total / a.data.length, 'mean per-channel difference between the two screens').toBeLessThan(
+    1,
+  );
+  await expectRunCovered(page);
+  expect(errors).toEqual([]);
+});
+
+test('Settings from the pause menu still hides the run when the menu backdrop is missing', async ({
+  page,
+}, info) => {
+  const errors = collectErrors(page);
+  await page.route('**/assets/menu/menu_bg.jpg', (route) => route.fulfill({ status: 404 }));
+  await pauseRun(page);
+  await clickButton(page, 'Settings');
+  await waitForScene(page, SCENE.settings);
+  await page.mouse.move(2, 2);
+  await frames(page, 10);
+  const shot = await page.screenshot();
+  await info.attach('settings-from-pause-no-backdrop', { body: shot, contentType: 'image/png' });
+
+  // Beside the panels (x < 180 and x > 780) the screen is the black plate, all
+  // of it: the arena and the HUD's bars would show here otherwise.
+  const png = PNG.sync.read(shot);
+  let brightest = 0;
+  for (let y = 0; y < 540; y++) {
+    for (let x = 0; x < 960; x++) {
+      if (x >= 180 && x < 780) continue;
+      const i = (y * png.width + x) * 4;
+      brightest = Math.max(brightest, png.data[i] ?? 0, png.data[i + 1] ?? 0, png.data[i + 2] ?? 0);
+    }
+  }
+  expect(brightest, 'brightest pixel beside the panels').toBeLessThanOrEqual(6);
+  await expectRunCovered(page);
+  // The aborted backdrop is logged by the browser as a failed load, and nothing else.
+  expect(errors.filter((text) => !text.includes('404'))).toEqual([]);
 });

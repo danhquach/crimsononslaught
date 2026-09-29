@@ -12,20 +12,27 @@ import {
 import { pickupHelpRows } from '../core/helpModel';
 import { SCENE, isHelpPayload, type HelpView } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
+import { CRIMSON_CSS, SERIF } from './buildStrips';
 import { attachMenuInput, type MenuItem } from './input';
-import { addTextButton, textButtonItem } from './ui';
+import {
+  addHintLine,
+  addMenuRow,
+  addMenuTitle,
+  drawMenuBackdrop,
+  drawPanel,
+  type MenuRow,
+} from './menuUi';
 
-const SERIF = 'Georgia, serif';
-const CRIMSON_CSS = '#dc143c';
-const TAB_Y = 96;
-const TAB_WIDTH = 140;
-const TAB_ACTIVE = '#ffd700';
-const SMALL_BUTTON = { fontSize: '22px', padding: { x: 14, y: 6 } } as const;
+const TAB_Y = 92;
+const TAB_WIDTH = 160;
+const BACK_Y = 478;
 
-/** Pickups tab: one 44 px row per pickup between the tabs and Back. */
-const ROW_TOP = 142;
-const ROW_PITCH = 44;
-const ICON_X = 56;
+/** Pickups tab: a panel with one 40 px row per pickup between the tabs and Back. */
+const PANEL_TOP = 112;
+const PANEL_PADDING = 8;
+const ROW_TOP = PANEL_TOP + PANEL_PADDING + 19;
+const ROW_PITCH = 40;
+const ICON_X = 60;
 /** The box every icon is scaled to fit: the relic's art is 3x the Ember's. */
 const ICON_BOX = 32;
 const NAME_X = 92;
@@ -61,7 +68,7 @@ export class HelpScene extends Phaser.Scene {
   /** Bumped on every create, so a send that resolves after the form closed changes nothing. */
   private generation = 0;
   private sending = false;
-  private sendLabel: Phaser.GameObjects.Text | null = null;
+  private sendRow: MenuRow | null = null;
 
   constructor() {
     super(SCENE.help);
@@ -83,29 +90,31 @@ export class HelpScene extends Phaser.Scene {
     audioOf(this).playMusic('music.menu');
     this.leaving = false;
     this.sending = false;
-    this.sendLabel = null;
+    this.sendRow = null;
     this.generation += 1;
-    const { width, height } = this.scale;
+    const { width } = this.scale;
 
-    this.add
-      .text(width / 2, 40, this.current === 'feedback' ? 'Send feedback' : 'Help', {
-        fontFamily: SERIF,
-        fontSize: '40px',
-        color: CRIMSON_CSS,
-      })
-      .setOrigin(0.5);
+    drawMenuBackdrop(this, 'quiet');
+    addMenuTitle(this, width / 2, 40, this.current === 'feedback' ? 'Send feedback' : 'Help');
 
     if (this.current === 'feedback') {
       this.drawForm();
     } else {
-      const items = this.drawTabs();
+      const items: MenuItem[] = this.drawTabs();
       if (this.current === 'pickups') this.drawPickups();
       else items.push(...this.drawAbout());
-      const back = addTextButton(this, width / 2, height - 46, 'Back  (Esc)', () => this.back(), {
-        ...SMALL_BUTTON,
-      });
-      items.push(textButtonItem(back, () => this.back()));
+      items.push(
+        addMenuRow(this, {
+          kind: 'bar',
+          label: 'Back  (Esc)',
+          x: width / 2,
+          y: BACK_Y,
+          width: 220,
+          onConfirm: () => this.back(),
+        }),
+      );
       attachMenuInput(this, items, { keyboard: true });
+      addHintLine(this);
     }
 
     // Phaser applies a restart or a start on its next step and empties the key
@@ -120,18 +129,18 @@ export class HelpScene extends Phaser.Scene {
 
   /** Redraws Send's label as a send or its cooldown ends; unchanged text is a no-op. */
   update(): void {
-    if (!this.sendLabel) return;
+    if (!this.sendRow) return;
     const left = feedbackCooldownLeftMs(lastSentAt, Date.now());
     const label = this.sending
       ? 'Sending…'
       : left > 0
         ? `Send (${Math.ceil(left / 1000)} s)`
         : 'Send';
-    this.sendLabel.setText(label);
-    this.sendLabel.setAlpha(this.sending || left > 0 ? 0.5 : 1);
+    this.sendRow.setLabel(label);
+    this.sendRow.setEnabled(!this.sending && left <= 0);
   }
 
-  private drawTabs(): MenuItem[] {
+  private drawTabs(): MenuRow[] {
     const { width } = this.scale;
     const tabs: readonly (readonly [label: string, view: HelpView])[] = [
       ['Pickups', 'pickups'],
@@ -139,19 +148,23 @@ export class HelpScene extends Phaser.Scene {
     ];
     return tabs.map(([label, view], i) => {
       const open = (): void => this.show(view);
-      const x = width / 2 + (i - 0.5) * (TAB_WIDTH + 16);
-      const tab = addTextButton(this, x, TAB_Y, label, open, {
-        ...SMALL_BUTTON,
-        fixedWidth: TAB_WIDTH,
-        align: 'center',
-        color: view === this.current ? TAB_ACTIVE : '#bbbbbb',
+      const tab = addMenuRow(this, {
+        kind: 'bar',
+        label,
+        x: width / 2 + (i - 0.5) * (TAB_WIDTH + 16),
+        y: TAB_Y,
+        width: TAB_WIDTH,
+        onConfirm: open,
       });
-      return textButtonItem(tab, open);
+      tab.setActive(view === this.current);
+      return tab;
     });
   }
 
   private drawPickups(): void {
-    pickupHelpRows().forEach((row, i) => {
+    const rows = pickupHelpRows();
+    drawPanel(this, 30, PANEL_TOP, 900, rows.length * ROW_PITCH + PANEL_PADDING * 2);
+    rows.forEach((row, i) => {
       const y = ROW_TOP + i * ROW_PITCH;
       const icon = this.add.sprite(ICON_X, y, row.texture);
       // The clips are the game's; each sprite still has to start its own.
@@ -172,15 +185,16 @@ export class HelpScene extends Phaser.Scene {
 
   private drawAbout(): MenuItem[] {
     const { width } = this.scale;
+    drawPanel(this, 130, PANEL_TOP, 700, 262);
     this.add
-      .text(width / 2, 156, `Crimson Onslaught  v${__APP_VERSION__}`, {
+      .text(width / 2, 146, `Crimson Onslaught  v${__APP_VERSION__}`, {
         fontFamily: SERIF,
         fontSize: '24px',
         color: '#eeeeee',
       })
       .setOrigin(0.5);
     this.add
-      .text(width / 2, 202, "What's new", {
+      .text(width / 2, 188, "What's new", {
         fontFamily: SERIF,
         fontSize: '20px',
         color: CRIMSON_CSS,
@@ -188,7 +202,7 @@ export class HelpScene extends Phaser.Scene {
       .setOrigin(0.5);
     CHANGELOG.forEach(({ version, line }, i) => {
       this.add
-        .text(width / 2, 236 + i * 28, `v${version}  ${line}`, {
+        .text(width / 2, 222 + i * 26, `v${version}  ${line}`, {
           fontFamily: SERIF,
           fontSize: '17px',
           color: '#cccccc',
@@ -196,7 +210,7 @@ export class HelpScene extends Phaser.Scene {
         .setOrigin(0.5);
     });
 
-    const y = 406;
+    const y = 410;
     if (!feedbackAvailable(FEEDBACK_KEY)) {
       this.add
         .text(width / 2, y, 'Feedback unavailable in this build', {
@@ -208,12 +222,20 @@ export class HelpScene extends Phaser.Scene {
       return [];
     }
     const open = (): void => this.show('feedback');
-    const button = addTextButton(this, width / 2, y, 'Send feedback', open, SMALL_BUTTON);
-    return [textButtonItem(button, open)];
+    return [
+      addMenuRow(this, {
+        kind: 'bar',
+        label: 'Send feedback',
+        x: width / 2,
+        y,
+        width: 240,
+        onConfirm: open,
+      }),
+    ];
   }
 
   private drawForm(): void {
-    const { width, height } = this.scale;
+    const { width } = this.scale;
     const generation = this.generation;
     const field = (tag: 'input' | 'textarea'): HTMLInputElement | HTMLTextAreaElement => {
       const el = document.createElement(tag);
@@ -312,37 +334,25 @@ export class HelpScene extends Phaser.Scene {
     const sendNow = (): void => void send();
     const cancel = (): void => this.show('about');
 
-    const sendButton = addTextButton(this, width / 2 - 90, 446, 'Send', sendNow, {
-      ...SMALL_BUTTON,
-      fixedWidth: 150,
-      align: 'center',
+    const sendRow = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Send',
+      x: width / 2 - 110,
+      y: 446,
+      width: 200,
+      onConfirm: sendNow,
     });
-    this.sendLabel = sendButton;
-    const cancelButton = addTextButton(this, width / 2 + 90, 446, 'Cancel  (Esc)', cancel, {
-      ...SMALL_BUTTON,
-      fixedWidth: 150,
-      align: 'center',
+    this.sendRow = sendRow;
+    const cancelRow = addMenuRow(this, {
+      kind: 'bar',
+      label: 'Cancel  (Esc)',
+      x: width / 2 + 110,
+      y: 446,
+      width: 200,
+      onConfirm: cancel,
     });
-    attachMenuInput(
-      this,
-      [textButtonItem(sendButton, sendNow), textButtonItem(cancelButton, cancel)],
-      {
-        keyboard: true,
-      },
-    );
-
-    this.add
-      .text(
-        width / 2,
-        height - 30,
-        'Typing needs a keyboard; a gamepad can reach Send and Cancel.',
-        {
-          fontFamily: SERIF,
-          fontSize: '15px',
-          color: '#888888',
-        },
-      )
-      .setOrigin(0.5);
+    attachMenuInput(this, [sendRow, cancelRow], { keyboard: true });
+    addHintLine(this, 'Typing needs a keyboard; a gamepad can reach Send and Cancel.');
 
     subject.focus();
   }

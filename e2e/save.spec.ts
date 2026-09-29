@@ -13,7 +13,9 @@ import type { UpgradesScene } from '../src/scenes/UpgradesScene';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
 import {
   cardCenter,
+  clickRow,
   collectErrors,
+  menuRows,
   readHud,
   sceneTexts,
   startFromIntro,
@@ -311,4 +313,50 @@ test.describe('a browser that will not keep the save (#316)', () => {
     expect(await sceneTexts(page, SCENE.result)).not.toContain(SAVE_FAILED_TEXT);
     expect(errors).toEqual([]);
   });
+});
+
+test('the Wipe progress row wipes on the second press, and leaving the screen disarms the first', async ({
+  page,
+}) => {
+  const funded: Save = {
+    ...withName(emptySave(), 'Test_Player'),
+    currency: 500,
+    upgrades: { upgrade_fleet: 1 },
+  };
+  funded.profile.runs = 3;
+  await seedStorage(page, JSON.stringify(funded));
+  await page.goto('/?seed=1');
+  await openUpgrades(page);
+  const stored = (): Promise<Save> =>
+    readStorage(page).then((json) => JSON.parse(json ?? 'null') as Save);
+
+  const expectRow = (label: string): Promise<void> =>
+    expect
+      .poll(async () => (await menuRows(page, SCENE.upgrades)).map((row) => row.label))
+      .toContain(label);
+
+  // First press: only the row changes.
+  await clickRow(page, SCENE.upgrades, 'Wipe progress');
+  await expectRow('Really wipe? Click again');
+  expect(await readSave(page)).toEqual(funded);
+  expect(await stored()).toEqual(funded);
+
+  // The pointer moving off it does not disarm it; leaving the screen does.
+  await page.mouse.move(5, 5);
+  await expectRow('Really wipe? Click again');
+  await clickRow(page, SCENE.upgrades, 'Back  (Esc)');
+  await waitForScene(page, SCENE.spellSelect);
+  await page.keyboard.press('u');
+  await waitForScene(page, SCENE.upgrades);
+  await expectRow('Wipe progress');
+  expect(await stored()).toEqual(funded);
+
+  // Armed again, the second press wipes and keeps the name (CO-165).
+  await clickRow(page, SCENE.upgrades, 'Wipe progress');
+  await clickRow(page, SCENE.upgrades, 'Really wipe? Click again');
+  const wiped = withName(emptySave(), 'Test_Player');
+  await expect.poll(() => readSave(page)).toEqual(wiped);
+  expect(await stored()).toEqual(wiped);
+  // The scene restarts on the fresh save, so the row is unarmed again.
+  await expectRow('Wipe progress');
 });

@@ -11,7 +11,7 @@ import { emptySave } from '../src/core/save';
 import { AUDIO_REGISTRY_KEY, SCENE } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import { SAVE_STORAGE_KEY } from '../src/storage/localSave';
-import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
+import { cardCenter, clickRow, collectErrors, startFromIntro, waitForScene } from './game';
 
 /**
  * Music (CO-157) in the browser: the menu track comes in with the first key
@@ -26,9 +26,6 @@ import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game'
  * reads the `Audio` in the registry and counts `play` on each track's Phaser
  * sound, so a restart would show as a second play.
  */
-
-/** Settings' Music volume "−": row 1, 70 px left of the value 120 px right of centre. */
-const MUSIC_DOWN = { x: 480 + 120 - 70, y: 140 + 58 };
 
 interface MusicSnapshot {
   track: MusicKey | null;
@@ -158,14 +155,14 @@ test('the menu track carries across the menus, and a run, a level-up and the pau
 
   // The first key press is the gesture that lets the browser play audio.
   await page.keyboard.press('ArrowDown');
-  await page.mouse.click(480, 298);
+  await clickRow(page, SCENE.intro, 'Settings');
   await waitForScene(page, SCENE.settings);
   const menu = await settledOn(page, 'music.menu');
   expect(menu.plays).toEqual({ 'music.menu': 1 });
   expect(menu.playing['music.menu']).toBeCloseTo(MUSIC['music.menu'].volume, 5);
 
   // Music volume: a notch down reaches the playing track at once and is saved.
-  await page.mouse.click(MUSIC_DOWN.x, MUSIC_DOWN.y);
+  await clickRow(page, SCENE.settings, '−', 1); // the second −: Music volume
   await expect.poll(async () => (await music(page)).musicSetting).toBe(0.9);
   expect((await music(page)).playing['music.menu']).toBeCloseTo(
     MUSIC['music.menu'].volume * 0.9,

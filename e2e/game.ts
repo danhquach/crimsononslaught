@@ -5,6 +5,7 @@ import type { HudModel } from '../src/core/hudModel';
 import { AUDIO_REGISTRY_KEY, SCENE } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import type { HudScene } from '../src/scenes/HudScene';
+import type { MenuRowReport } from '../src/scenes/menuUi';
 
 /**
  * Helpers shared by the browser suites. Everything they read comes through
@@ -108,6 +109,92 @@ export function sceneTexts(page: Page, key: string): Promise<string[]> {
       .children.list.filter((child) => child.type === 'Text')
       .map((child) => (child as unknown as { text: string }).text);
   }, key);
+}
+
+/** The rows a menu screen drew (CO-191): label, bounds in game pixels, and whether each is selected or enabled. */
+export function menuRows(page: Page, key: string): Promise<MenuRowReport[]> {
+  return page.evaluate(async (sceneKey) => {
+    const { game } = await import('/src/main.ts');
+    const { menuRowsOf } = await import('/src/scenes/menuUi.ts');
+    return menuRowsOf(game.scene.getScene(sceneKey));
+  }, key);
+}
+
+/** The row labelled `label` (the `nth` of them, when a screen repeats one, as Settings' − and +). */
+export async function findRow(
+  page: Page,
+  key: string,
+  label: string,
+  nth = 0,
+): Promise<MenuRowReport> {
+  const row = (await menuRows(page, key)).filter((r) => r.label === label)[nth];
+  if (!row) throw new Error(`${key} has no row ${nth} labelled "${label}"`);
+  return row;
+}
+
+/** Click a menu row where it is drawn, so a moved layout does not break the suites. */
+export async function clickRow(page: Page, key: string, label: string, nth = 0): Promise<void> {
+  const { x, y, width, height } = (await findRow(page, key, label, nth)).bounds;
+  await page.mouse.click(x + width / 2, y + height / 2);
+}
+
+/** Wait for `n` browser frames; the game loop steps once per frame. */
+export async function frames(page: Page, n: number): Promise<void> {
+  await page.evaluate(
+    (count) =>
+      new Promise<void>((resolve) => {
+        const tick = (left: number): void => {
+          if (left <= 0) resolve();
+          else requestAnimationFrame(() => tick(left - 1));
+        };
+        tick(count);
+      }),
+    n,
+  );
+}
+
+/** Standard-mapping button indexes of the fake pad. */
+export const PAD = { A: 0, UP: 12, DOWN: 13 } as const;
+
+/**
+ * Plug in a fake standard-mapping pad Phaser finds by polling
+ * `navigator.getGamepads`. Call before `goto`; the first poll after a connect
+ * only takes a baseline, so `frames(page, 4)` before the first `padPress`.
+ */
+export async function addFakePad(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const pad = {
+      id: 'e2e pad',
+      index: 0,
+      connected: true,
+      mapping: 'standard',
+      timestamp: 0,
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    };
+    (window as unknown as { e2ePad: typeof pad }).e2ePad = pad;
+    navigator.getGamepads = () => [pad as unknown as Gamepad];
+  });
+}
+
+/** Press and release a pad button, holding each state for a few frames so a poll sees both. */
+export async function padPress(page: Page, button: number): Promise<void> {
+  for (const down of [true, false]) {
+    await page.evaluate(
+      ([index, pressed]) => {
+        const pad = (
+          window as unknown as {
+            e2ePad: { timestamp: number; buttons: { pressed: boolean; value: number }[] };
+          }
+        ).e2ePad;
+        pad.buttons[index as number] = { pressed: pressed as boolean, value: pressed ? 1 : 0 };
+        // Phaser skips a pad state stamped before it first saw the pad.
+        pad.timestamp = performance.now();
+      },
+      [button, down] as const,
+    );
+    await frames(page, 4);
+  }
 }
 
 /** One cue the game asked `Audio` for, as `recordSounds` logs it. */
