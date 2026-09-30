@@ -18,6 +18,16 @@ import type { ChainLightningStats, LightningStats } from './spellStats';
  */
 
 /**
+ * Chain segments that may be up at once. A cast draws `strikes * (chains + 1)`
+ * at most — a maxed build is a handful — and each lives one clip cycle, far
+ * shorter than any cooldown a perk can reach; the headroom covers a stalled
+ * frame paying out several casts. Past it a segment is dropped, never queued.
+ * Here rather than in the spell so the level tests can size against it without
+ * Phaser (#329).
+ */
+export const MAX_SEGMENTS = 32;
+
+/**
  * The numbers a cast is resolved from: Lightning Bolt's block, or Chain
  * Lightning's with its jumps. A missing `chains` is no jump at all.
  */
