@@ -14,6 +14,9 @@ import {
   PICKUP_TEXTURES,
   RELIC_COUNT,
 } from '../config/pickups';
+import { ROSTER_SPELL_IDS, type RosterSpellId } from '../config/loadout';
+import { rosterCards } from '../config/rosterCards';
+import { SPELL_LEVELS, spellLevelText, type SpellLevelTable } from '../config/spellLevels';
 import { MAX_OFFER_SIZE } from './levelUp';
 
 /**
@@ -110,4 +113,44 @@ export function pickupHelpRows(): PickupHelpRow[] {
       effect: `pick 1 of ${MAX_OFFER_SIZE}: a buff for the rest of the run (buffs stack), or more Rerolls or Bans`,
     },
   ];
+}
+
+/** One row of the Help screen's Spells tab (#327): a spell and what its two upgrades add. */
+export interface SpellHelpRow {
+  id: RosterSpellId;
+  name: string;
+  /** The spell's HUD colour, for the icon's fallback disc. */
+  color: number;
+  description: string;
+  lv2: string;
+  lv3: string;
+}
+
+/** The Spells panel fits five 64 px rows above Back; a pager is needed beyond that. */
+export const MAX_SPELL_HELP_ROWS = 5;
+
+/**
+ * The Spells tab: one row per roster spell that has a level entry, in roster
+ * order, so an element's upgrades appear here the moment its ticket fills the
+ * table in (#328-#330). The two lines are the level-up card's own text, one
+ * source, behind a prefix that names the level.
+ */
+export function spellHelpRows(table: SpellLevelTable = SPELL_LEVELS): SpellHelpRow[] {
+  const cards = new Map(rosterCards().map((card) => [card.id, card]));
+  return ROSTER_SPELL_IDS.flatMap((id) => {
+    const card = cards.get(id);
+    const lv2 = spellLevelText(table, id, 2);
+    const lv3 = spellLevelText(table, id, 3);
+    if (!card || lv2 === undefined || lv3 === undefined) return [];
+    return [
+      {
+        id,
+        name: card.name,
+        color: card.color,
+        description: card.description,
+        lv2: `Lv 2: ${lv2}`,
+        lv3: `Lv 3 (max): ${lv3}`,
+      },
+    ];
+  });
 }

@@ -3,7 +3,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import { E2E_FEEDBACK_KEY } from '../playwright.config';
 import { CHANGELOG } from '../src/config/changelog';
 import { FEEDBACK_URL } from '../src/core/feedback';
-import { pickupHelpRows } from '../src/core/helpModel';
+import { pickupHelpRows, spellHelpRows } from '../src/core/helpModel';
 import { AUDIO_REGISTRY_KEY, SCENE, type HelpView } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import { clickRow, collectErrors, menuRows, sceneTexts, waitForScene } from './game';
@@ -135,6 +135,65 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
   expect(errors).toEqual([]);
 });
 
+test('the Spells tab lists every Fire spell with its two upgrades, inside the panel', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Help');
+  await waitForView(page, 'pickups');
+  await clickRow(page, SCENE.help, 'Spells');
+  await waitForView(page, 'spells');
+
+  const rows = spellHelpRows();
+  expect(rows.map((row) => row.id)).toEqual([
+    'fire',
+    'fire_meteor',
+    'fire_column',
+    'fire_companion',
+    'fire_dragon',
+  ]);
+  // The screen is still, so texts, boxes and rows read one after another agree.
+  const boxes = await drawnBounds(page);
+  const boxOf = (label: string): (typeof boxes)[number] => {
+    const box = boxes.find((b) => b.label === label);
+    if (!box) throw new Error(`Help drew no text "${label}"`);
+    return box;
+  };
+  const menu = await menuRows(page, SCENE.help);
+  expect(menu.filter((row) => row.active).map((row) => row.label)).toEqual(['Spells']);
+  const tabs = menu.filter((row) => ['Pickups', 'Spells', 'About'].includes(row.label));
+  expect(tabs.map((row) => row.label)).toEqual(['Pickups', 'Spells', 'About']);
+  const back = menu.find((row) => row.label === 'Back  (Esc)')!;
+
+  // Slack for CI's taller fonts: nothing may come within 8 px of the tabs, Back or the side edges.
+  const SLACK = 8;
+  const tabsBottom = Math.max(...tabs.map((row) => row.bounds.y + row.bounds.height));
+  let previousBottom = tabsBottom;
+  for (const row of rows) {
+    const name = boxOf(row.name);
+    const lv2 = boxOf(row.lv2);
+    const lv3 = boxOf(row.lv3);
+    expect(lv2.t, row.lv2).toBeGreaterThanOrEqual(previousBottom + SLACK / 2);
+    expect(lv3.t, row.lv3).toBeGreaterThanOrEqual(lv2.b);
+    for (const box of [name, lv2, lv3]) {
+      expect(box.l, box.label).toBeGreaterThanOrEqual(30 + SLACK);
+      expect(box.r, box.label).toBeLessThanOrEqual(930 - SLACK);
+    }
+    // The name shares the row: it starts left of the two lines and does not run into them.
+    expect(name.r, row.name).toBeLessThanOrEqual(lv2.l - SLACK);
+    previousBottom = lv3.b;
+  }
+  expect(previousBottom).toBeLessThanOrEqual(back.bounds.y - SLACK);
+  await expectOnScreen(page);
+  await page.screenshot({ path: test.info().outputPath('help-spells.png') });
+
+  await clickRow(page, SCENE.help, 'Back  (Esc)');
+  await waitForScene(page, SCENE.intro);
+  expect(errors).toEqual([]);
+});
+
 test('the keyboard opens Help, switches to About, and Esc returns', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/?seed=1');
@@ -145,6 +204,13 @@ test('the keyboard opens Help, switches to About, and Esc returns', async ({ pag
   await waitForView(page, 'pickups');
 
   await page.keyboard.press('ArrowRight'); // reveals the Pickups tab
+  await page.keyboard.press('ArrowRight'); // Spells
+  await page.keyboard.press('Enter');
+  await waitForView(page, 'spells');
+  expect(await sceneTexts(page, SCENE.help)).toContain(spellHelpRows()[0]!.lv2);
+
+  await page.keyboard.press('ArrowRight'); // reveals the Pickups tab
+  await page.keyboard.press('ArrowRight'); // Spells
   await page.keyboard.press('ArrowRight'); // About
   await page.keyboard.press('Enter');
   await waitForView(page, 'about');
@@ -218,6 +284,7 @@ test('a gamepad opens Help, reaches About, and backs out', async ({ page }) => {
 
   await frames(4);
   await press(DOWN); // reveals the Pickups tab
+  await press(DOWN); // Spells
   await press(DOWN); // About
   await press(A);
   await waitForView(page, 'about');

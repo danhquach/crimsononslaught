@@ -337,6 +337,31 @@ describe('Spellbook spell levels (#326)', () => {
     expect(() => spells.upgradeSpell('fire')).toThrow(RangeError);
   });
 
+  it('pushes the level onto the live spell (#327)', () => {
+    const spells = book();
+    const fire = equip(spells, 'fire');
+    expect(fire.level).toBe(1);
+    spells.upgradeSpell('fire');
+    expect(fire.level).toBe(2);
+    spells.setSpellLevel('fire', 3);
+    expect(fire.level).toBe(3);
+  });
+
+  it('leaves a spell at its level when a set on another spell is refused (#327)', () => {
+    const spells = book();
+    const fire = equip(spells, 'fire');
+    expect(spells.setSpellLevel('fire_meteor', 3)).toBe(false);
+    expect(fire.level).toBe(1);
+  });
+
+  it('keeps the level through a passive taken after an upgrade (#327)', () => {
+    const spells = book();
+    const fire = equip(spells, 'fire');
+    spells.upgradeSpell('fire');
+    spells.takePassive('passive_haste');
+    expect(fire.level).toBe(2);
+  });
+
   it('re-resolves every casting spell when a level lands', () => {
     let damage = BASE_SPELL_STATS.fire.damage;
     const spells = book(factory, (spellId) =>

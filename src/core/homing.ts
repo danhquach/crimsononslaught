@@ -25,9 +25,12 @@ import { nearestEnemies } from './spell';
 /**
  * Dragons in flight the pool may ever hold (spec §9.2 Fire Dragon): a big
  * single-target hit on a 2.5 s cooldown, so one is normally in the air at a
- * time; the cap leaves room for a Haste build.
+ * time. Level 3 sends three, each flying up to 3 s, and Haste clamps the
+ * cooldown to 0.35x: a peak of 12 at once (3 x ceil(3 / 0.875)), so it holds
+ * sixteen (#327). `durationMul` is not clamped and is left out: a dragon dies
+ * on its second strike, and `cast` drops the surplus at the cap.
  */
-export const MAX_LIVE_DRAGONS = 8;
+export const MAX_LIVE_DRAGONS = 16;
 
 /** What a homing shot needs of its target: where it is, and whether it still counts. */
 export interface HomingTarget extends Vec2 {
@@ -74,16 +77,17 @@ function clampTurn(delta: number, limit: number): number {
 }
 
 /**
- * The nearest live enemy within `maxRange` of the shot itself, or null. Ranged
- * from the shot, not the caster: a dragon halfway across the arena picks up
- * whoever is near it there.
+ * The nearest live enemy within `maxRange` of the shot itself, or null, leaving
+ * out anything in `exclude`. Ranged from the shot, not the caster: a dragon
+ * halfway across the arena picks up whoever is near it there.
  */
 export function retarget<T extends HomingTarget>(
   from: Readonly<Vec2>,
   candidates: readonly T[],
   maxRange: number,
+  exclude: ReadonlySet<T> = new Set(),
 ): T | null {
-  const live = candidates.filter((candidate) => isLiveTarget(candidate));
+  const live = candidates.filter((candidate) => isLiveTarget(candidate) && !exclude.has(candidate));
   return nearestEnemies(from, live, 1, maxRange)[0] ?? null;
 }
 

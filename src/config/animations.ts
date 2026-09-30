@@ -184,6 +184,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('fire.meteor', 4, 12, LOOP),
   // Meteor's magma pond (CO-167): a slow simmer, looped for the pond's life.
   spec('fire.pond', 4, 6, LOOP),
+  // Fire Wave's burnt ground (CO-200): four static soot variants, never played; a piece picks one frame.
+  spec('fire.scorch', 4, 1, ONCE),
   // Fire Column's body and hit (CO-123). No spell draws them since Fire Wave
   // replaced the column (CO-143, #218): they are kept as a reserved background
   // prop for later, not a spell body.

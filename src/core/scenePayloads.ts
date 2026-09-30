@@ -122,7 +122,7 @@ export interface SettingsPayload {
 }
 
 /** What the Help screen shows (#226): a tab, or the About tab's feedback form. */
-export const HELP_VIEWS = ['pickups', 'about', 'feedback'] as const;
+export const HELP_VIEWS = ['pickups', 'spells', 'about', 'feedback'] as const;
 
 export type HelpView = (typeof HELP_VIEWS)[number];
 

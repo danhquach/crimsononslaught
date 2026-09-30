@@ -7,6 +7,13 @@ import {
   type CompanionSpellId,
 } from '../config/companions';
 import {
+  COMPANION_EMPOWERED,
+  COMPANION_FIREBALL,
+  COMPANION_SHOT_GAP_PX,
+} from '../config/fireLevels';
+import { METEOR_POND_LOOK } from '../config/strikes';
+import type { SpellLevel } from '../config/spellLevels';
+import {
   chooseTarget,
   followVelocity,
   inReach,
@@ -14,6 +21,7 @@ import {
   meleeTarget,
   spawnPosition,
   stepPosition,
+  volleyLanes,
 } from '../core/companion';
 import { BURN_DURATION } from '../config/spells';
 import {
@@ -22,14 +30,18 @@ import {
   companionFacing,
   type Facing,
 } from '../core/animation';
-import { dustFlip } from '../core/fx';
+import { isEmpoweredAttack, recordCapped } from '../core/fireLevels';
+import { splashTargets } from '../core/fireball';
+import { dustFlip, explosionScale } from '../core/fx';
+import { createArea, membersOf } from '../core/groundArea';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
 import { Spell } from '../core/spell';
 import type { CompanionStats } from '../core/spellStats';
 import { Companion } from '../entities/Companion';
 import type { Enemy } from '../entities/Enemy';
-import { Projectile } from '../entities/Projectile';
+import { Projectile, type ProjectileLook } from '../entities/Projectile';
+import type { AreaPool } from '../systems/AreaPool';
 import type { CollisionSystem, SpellHitbox } from '../systems/CollisionSystem';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
@@ -59,11 +71,36 @@ import type { DamageSink } from './DamageSink';
  * `runChildUpdate` is what keeps a paused Game — a level-up overlay — from
  * letting the ally wander.
  *
+ * Levels (#327): level 2 adds a shot (`projectiles`), and a ranged companion
+ * flies a volley's shots side by side, `COMPANION_SHOT_GAP_PX` apart, so they
+ * read as two and each still connects with a small enemy. Level 3, for the companions in `COMPANION_EMPOWERED`: every
+ * 4th attack's first shot is a fireball, which on hit also blasts what stands
+ * near it and leaves a burning patch. The level is taken when the shot leaves.
+ *
  * The companion itself carries no body (see `entities/Companion.ts`), so it is
  * not damageable, does not block movement and cannot collide with an enemy. Its
  * shots are the only thing the collision system ever sees. Sprite, pool and
  * colliders all belong to the scene, so a run ending takes them with it.
  */
+/** The fireball wears Fire Bolt's clip, larger, so it reads apart from the companion's usual shot. */
+const FIREBALL_LOOK: ProjectileLook = {
+  texture: 'proj_fire',
+  clip: 'fire.ball',
+  scale: COMPANION_FIREBALL.drawScale,
+};
+
+/** A ranged companion's level record, what the test hook reads (#327): cause and effect in one entry. */
+export interface CompanionLevelReport {
+  volleys: { level: SpellLevel; attackNumber: number; shots: number; fireball: boolean }[];
+  fireballs: {
+    level: SpellLevel;
+    caught: number;
+    pondPlaced: boolean;
+    x: number;
+    y: number;
+  }[];
+}
+
 export class CompanionSpell extends Spell<CompanionSpellId> {
   private readonly scene: Phaser.Scene;
   private readonly companion: Companion;
@@ -88,6 +125,13 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   private attackMs = 0;
   /** Test hook (#184): attack clips started, shots and landed swings alike. */
   private attacksStarted = 0;
+  /** Volleys that fired: the count level 3's empowered attack is every Nth of. */
+  private attackNumber = 0;
+  /** Fireballs in the air, with the level each left at. Cleared on every despawn path. */
+  private readonly fireballs = new Map<Projectile, SpellLevel>();
+  private readonly volleyLog: CompanionLevelReport['volleys'] = [];
+  private readonly fireballLog: CompanionLevelReport['fireballs'] = [];
+  private readonly areas: AreaPool | undefined;
 
   constructor(
     scene: Phaser.Scene,
@@ -98,8 +142,10 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     stats: Readonly<CompanionStats>,
     damage: DamageSink,
     fx: FxPool,
+    areas?: AreaPool,
   ) {
     super(id, { ...stats });
+    this.areas = areas;
     this.scene = scene;
     this.caster = caster;
     this.enemies = enemies;
@@ -148,6 +194,11 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     return { current: this.companion.clip, shown: [...this.companion.clipsShown] };
   }
 
+  /** Test hook (#327): the volleys this ally has shot and the fireballs that landed. */
+  get levelReport(): CompanionLevelReport {
+    return { volleys: [...this.volleyLog], fireballs: [...this.fireballLog] };
+  }
+
   /** The live block, as the companion stats every one of these ids resolves to. */
   get companionStats(): Readonly<CompanionStats> {
     return this.stats;
@@ -162,7 +213,7 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     this.animate();
     if (!this.shots) return;
     for (const child of this.shots.getChildren()) {
-      if (child instanceof Projectile && child.active && child.spent) child.despawn();
+      if (child instanceof Projectile && child.active && child.spent) this.retire(child);
     }
   }
 
@@ -246,21 +297,51 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     this.aim = { x: target.x - this.position.x, y: target.y - this.position.y };
   }
 
-  /** Ranged: `projectiles` shots leave the ally at the target it picked. */
+  /**
+   * Ranged: `projectiles` shots leave the ally, side by side along the line to
+   * the target it picked. On level 3's empowered attack the first is a fireball.
+   */
   private shoot(target: Readonly<Vec2>): void {
     const { projectiles = 1, speed = 0, targetRange } = this.companionStats;
     const { x, y } = this.position;
+    const level = this.level;
+    const number = this.attackNumber + 1;
+    const empowered =
+      COMPANION_EMPOWERED[this.id] === 'fireball' &&
+      isEmpoweredAttack(number, level, COMPANION_FIREBALL.every);
+    const lanes = volleyLanes(
+      this.position,
+      target,
+      Math.floor(projectiles),
+      COMPANION_SHOT_GAP_PX,
+    );
     let fired = 0;
-    for (let i = 0; i < Math.floor(projectiles); i += 1) {
-      const shot = this.shots?.get(x, y) as Projectile | null;
+    let fireball = false;
+    for (const [i, lane] of lanes.entries()) {
+      const shot = this.shots?.get(lane.from.x, lane.from.y) as Projectile | null;
       // Pool exhausted: the rest of the volley is dropped, never queued.
       if (!shot) break;
+      const isFireball = empowered && i === 0;
       // A shot expires at the range the ally could see its target from, so it
       // never outlives the reach the stat block promises.
-      shot.fire(x, y, target, speed, targetRange, COMPANION_FX[this.id].shot);
+      shot.fire(
+        lane.from.x,
+        lane.from.y,
+        lane.to,
+        speed,
+        targetRange,
+        isFireball ? FIREBALL_LOOK : COMPANION_FX[this.id].shot,
+      );
+      if (isFireball) this.fireballs.set(shot, level);
+      else this.fireballs.delete(shot);
+      fireball ||= isFireball;
       fired += 1;
     }
-    if (fired > 0) this.startAttack(target);
+    if (fired > 0) {
+      this.attackNumber = number;
+      this.startAttack(target);
+      recordCapped(this.volleyLog, { level, attackNumber: number, shots: fired, fireball });
+    }
     const muzzle = COMPANION_FX[this.id].muzzle;
     if (fired > 0 && muzzle) this.fx.burst(muzzle, x, y);
   }
@@ -280,8 +361,50 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     // A shot is spent on its first hit; a later overlap the same frame, or one
     // with an enemy something else already killed, flies on.
     if (!(hitbox instanceof Projectile) || !hitbox.active || !enemy.active) return;
-    hitbox.despawn();
+    const fireballLevel = this.fireballs.get(hitbox);
+    this.retire(hitbox);
+    // The blast is resolved against the crowd as it stands before the hit lands.
+    const burst = fireballLevel === undefined ? undefined : this.fireballBlast(enemy);
     this.onCompanionHit(enemy, hitbox);
+    if (fireballLevel !== undefined && burst) this.finishFireball(burst, fireballLevel);
+  }
+
+  private retire(shot: Projectile): void {
+    this.fireballs.delete(shot);
+    shot.despawn();
+  }
+
+  /** Who a fireball bursting on `enemy` will catch, before the direct hit lands. */
+  private fireballBlast(enemy: Enemy): { caught: Enemy[]; at: Vec2 } {
+    return {
+      caught: splashTargets(enemy, this.enemies.live, COMPANION_FIREBALL.radius, enemy),
+      at: { x: enemy.x, y: enemy.y },
+    };
+  }
+
+  /** The fireball's burst on top of the normal hit: a blast for whoever stood near, and a burning patch. */
+  private finishFireball({ caught, at }: { caught: Enemy[]; at: Vec2 }, level: SpellLevel): void {
+    const { radius, blastFactor, pond } = COMPANION_FIREBALL;
+    this.fx.burst('fire.explode', at.x, at.y, { scale: explosionScale(radius) });
+    const blast = this.companionStats.damage * blastFactor;
+    for (const other of caught) this.damage(other, blast, 'hit', at);
+    const patch = createArea(at, {
+      radius: pond.radius,
+      durationS: pond.durationS,
+      tickEveryS: pond.tickEveryS,
+    });
+    const pondPlaced =
+      this.areas?.place(
+        patch,
+        (live) => {
+          for (const member of membersOf(live, this.enemies.live)) {
+            this.damage(member, pond.tickDamage, 'tick', live);
+          }
+        },
+        {},
+        METEOR_POND_LOOK,
+      ) ?? false;
+    recordCapped(this.fireballLog, { level, caught: caught.length, pondPlaced, x: at.x, y: at.y });
   }
 
   /**

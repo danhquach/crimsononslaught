@@ -11,7 +11,10 @@ import {
   MAGNET_DURATION_MS,
   RELIC_COUNT,
 } from '../config/pickups';
-import { pickupHelpRows } from './helpModel';
+import { ROSTER_SPELL_IDS, SPELLS_BY_ELEMENT } from '../config/loadout';
+import { rosterCards } from '../config/rosterCards';
+import { SPELL_LEVEL_TEXT_MAX, SPELL_LEVELS, type SpellLevelTable } from '../config/spellLevels';
+import { MAX_SPELL_HELP_ROWS, pickupHelpRows, spellHelpRows } from './helpModel';
 import { MAX_OFFER_SIZE } from './levelUp';
 
 const row = (name: string) => {
@@ -68,5 +71,54 @@ describe('pickupHelpRows', () => {
       expect(r.source.length).toBeLessThanOrEqual(90);
       expect(r.effect.length).toBeLessThanOrEqual(90);
     }
+  });
+});
+
+describe('spellHelpRows', () => {
+  it('lists exactly the five Fire spells, in roster order', () => {
+    expect(spellHelpRows().map((r) => r.id)).toEqual(SPELLS_BY_ELEMENT.fire);
+  });
+
+  it('fits the panel: no more rows than it has room for without a pager', () => {
+    expect(spellHelpRows().length).toBeLessThanOrEqual(MAX_SPELL_HELP_ROWS);
+  });
+
+  it('reads name, colour and description from the same card the level-up uses', () => {
+    const cards = new Map(rosterCards().map((card) => [card.id, card]));
+    for (const r of spellHelpRows()) {
+      const card = cards.get(r.id);
+      expect(r.name).toBe(card?.name);
+      expect(r.description).toBe(card?.description);
+      expect(r.color).toBe(card?.color);
+    }
+  });
+
+  it('shows the very text the level-up card shows for levels 2 and 3', () => {
+    for (const r of spellHelpRows()) {
+      expect(r.lv2).toBe(`Lv 2: ${SPELL_LEVELS[r.id]?.[2]}`);
+      expect(r.lv3).toBe(`Lv 3 (max): ${SPELL_LEVELS[r.id]?.[3]}`);
+    }
+  });
+
+  it('keeps each line inside the level text budget plus its prefix', () => {
+    for (const r of spellHelpRows()) {
+      expect(r.lv2.length).toBeLessThanOrEqual(SPELL_LEVEL_TEXT_MAX + 'Lv 2: '.length);
+      expect(r.lv3.length).toBeLessThanOrEqual(SPELL_LEVEL_TEXT_MAX + 'Lv 3 (max): '.length);
+    }
+  });
+
+  it('follows the table it is given: only spells with an entry, in roster order', () => {
+    const table: SpellLevelTable = {
+      earth: { 2: 'Two.', 3: 'Three.' },
+      ice: { 2: 'Ice two.', 3: 'Ice three.' },
+    };
+    expect(spellHelpRows(table).map((r) => r.id)).toEqual(['ice', 'earth']);
+    expect(spellHelpRows({})).toEqual([]);
+  });
+
+  it('never invents a row for a key that is not a roster spell', () => {
+    const table = { __proto__: null, water: { 2: 'x', 3: 'y' } } as unknown as SpellLevelTable;
+    expect(spellHelpRows(table)).toEqual([]);
+    expect(ROSTER_SPELL_IDS).not.toContain('water');
   });
 });

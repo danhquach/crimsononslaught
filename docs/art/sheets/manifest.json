@@ -2148,6 +2148,19 @@
         [{ "anim": "spikeRing", "cols": [1, 3], "centred": true }],
         [{ "anim": "spikeRing", "cols": [1, 3], "centred": true }]
       ]
+    },
+    {
+      "key": "fire",
+      "ticket": "CO-200",
+      "file": "CO-200/fire_trail_scorch.png",
+      "page": 20,
+      "cols": 2,
+      "rows": 2,
+      "sheetCell": 288,
+      "rowSpecs": [
+        [{ "anim": "scorch", "cols": [1, 2], "centred": true }],
+        [{ "anim": "scorch", "cols": [1, 2], "centred": true }]
+      ]
     }
   ]
 }

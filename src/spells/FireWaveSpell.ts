@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
-import { FIRE_WAVE_ART } from '../config/fireRoster';
+import { FIRE_TRAIL, FIRE_WAVE_ART_ARC_DEG, MAX_LIVE_TRAIL_ZONES } from '../config/fireLevels';
+import { BASE_FIRE_WAVE_STATS, FIRE_WAVE_ART } from '../config/fireRoster';
 import { FRAMES } from '../config/frames';
 import { AREA_DEPTH, FX_DEPTH } from '../config/fx';
+import type { SpellLevel } from '../config/spellLevels';
 import {
   MAX_LIVE_WAVES,
   advanceWave,
@@ -11,14 +13,28 @@ import {
   waveTarget,
   type Wave,
 } from '../core/fireWave';
+import { recordCapped, waveFrontAngles } from '../core/fireLevels';
+import {
+  hasFireTrail,
+  inSweptSector,
+  ringsDue,
+  scorchPieces,
+  stepTrailClock,
+  trailBurnDps,
+  trailRingRadii,
+  type ScorchPiece,
+  type TrailClock,
+} from '../core/fireTrail';
 import { explosionScale } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
+import type { Rng } from '../core/rng';
 import { Spell, anyWithin } from '../core/spell';
 import type { FireWaveStats } from '../core/spellStats';
 import type { Enemy } from '../entities/Enemy';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
+import { ScorchPool } from '../systems/ScorchPool';
 import type { DamageSink } from './DamageSink';
 
 /** The small burst at each hit, the size Fire Column's hits were drawn at. */
@@ -37,12 +53,79 @@ const RIM_WIDTH = 12;
 /** The flame front's first frame: every frame of the clip shares its size and page. */
 const FRONT = FRAMES['fire.wave.0'];
 
+/** What one zone of burnt ground did (#327), updated in place while it lives. */
+export interface TrailZoneRecord {
+  id: number;
+  level: SpellLevel;
+  arc: number;
+  /** Where the wave started, where it pointed and how far it reached: the ground's own geometry. */
+  x: number;
+  y: number;
+  heading: number;
+  range: number;
+  slots: number;
+  laid: number;
+  flames: number;
+  dropped: number;
+  ticks: number;
+  burned: number;
+  burnedAfterWave: number;
+  fresh: number;
+}
+
+/**
+ * The burnt ground one level 3 wave leaves (#327). Everything a wave-and-zone
+ * pair needs is snapshotted at the cast, so a pick taken mid-flight never
+ * changes ground already down; the zone outlives its wave by `FIRE_TRAIL.holdS`.
+ */
+interface LiveZone {
+  id: number;
+  origin: Readonly<Vec2>;
+  heading: number;
+  halfArc: number;
+  range: number;
+  /** The burn band's inner edge; its outer edge is the rim's swept radius. */
+  rMin: number;
+  rSwept: number;
+  radii: number[];
+  pieces: ScorchPiece[];
+  laidRings: Set<number>;
+  clock: TrailClock;
+  dps: number;
+  closed: boolean;
+  record: TrailZoneRecord;
+}
+
 interface LiveWave {
   wave: Wave<Enemy>;
+  /** The burnt ground this wave is laying, or null (levels 1 and 2, or the zone pool was full). */
+  zone: LiveZone | null;
   /** The glow inside the slice, always drawn. */
   glow: Phaser.GameObjects.Graphics;
-  /** The flame front: the `fire.wave` sprite, or a Graphics rim with no atlas. */
-  rim: Phaser.GameObjects.Sprite | Phaser.GameObjects.Graphics;
+  /**
+   * The flame front: one `fire.wave` sprite per `waveFrontAngles` entry (a wider
+   * arc than the art is cut for takes copies side by side), or one Graphics rim
+   * with no atlas, which strokes the whole arc itself.
+   */
+  rims: (Phaser.GameObjects.Sprite | Phaser.GameObjects.Graphics)[];
+}
+
+/** Fire Wave's level record, what the test hook reads (#327): cause and effect in one entry. */
+export interface FireWaveLevelReport {
+  casts: { level: SpellLevel; arc: number; fronts: number; trail: boolean }[];
+  live: { heading: number; fronts: number; frontRotations: number[] }[];
+  trail: {
+    zonesLive: number;
+    piecesLive: number;
+    flamesLive: number;
+    mostZonesLive: number;
+    mostPiecesLive: number;
+    mostFlamesLive: number;
+    /** Level 3 casts that fired without burnt ground because the zone pool was full. */
+    refused: number;
+    zones: TrailZoneRecord[];
+    views: ReturnType<ScorchPool['views']>;
+  };
 }
 
 /**
@@ -62,6 +145,13 @@ interface LiveWave {
  * is the rim that hits (`FIRE_WAVE_ART`), over a faint Graphics glow. With no
  * atlas the rim is drawn as Graphics strokes instead.
  *
+ * Level 3, Fire trail (#327): the wave stays one wave with its 150 degree arc, but
+ * the rim leaves burnt ground behind it. Its layout is drawn once at the cast
+ * (`core/fireTrail.ts`) and a ring of scorch pieces is laid as the rim passes,
+ * out of the spell's own `ScorchPool`. The ground burns every enemy standing in
+ * the fan the rim has swept, never the player, until `FIRE_TRAIL.holdS` after the
+ * wave ends.
+ *
  * FX: `fire.spawn` flashes at the caster as a wave leaves and a small
  * `fire.explode` plays at each hit.
  */
@@ -71,9 +161,19 @@ export class FireWaveSpell extends Spell<'fire_column'> {
   private readonly enemies: EnemyPool;
   private readonly damage: DamageSink;
   private readonly fx: FxPool;
+  private readonly rng: Rng;
+  private readonly scorch: ScorchPool;
   private readonly waves: LiveWave[] = [];
+  private readonly zones: LiveZone[] = [];
+  private nextZoneId = 1;
+  private trailRefused = 0;
+  private mostZones = 0;
+  private mostPieces = 0;
+  private mostFlames = 0;
+  private readonly zoneLog: TrailZoneRecord[] = [];
   /** Test hook (#140): hits this spell has landed, across every wave. */
   private landed = 0;
+  private readonly castLog: FireWaveLevelReport['casts'] = [];
 
   constructor(
     scene: Phaser.Scene,
@@ -82,6 +182,7 @@ export class FireWaveSpell extends Spell<'fire_column'> {
     stats: Readonly<FireWaveStats>,
     damage: DamageSink,
     fx: FxPool,
+    rng: Rng,
   ) {
     super('fire_column', stats);
     this.scene = scene;
@@ -89,11 +190,38 @@ export class FireWaveSpell extends Spell<'fire_column'> {
     this.enemies = enemies;
     this.damage = damage;
     this.fx = fx;
+    this.rng = rng;
+    this.scorch = new ScorchPool(scene);
   }
 
   /** Waves in flight right now. */
   get liveCount(): number {
     return this.waves.length;
+  }
+
+  /** Test hook (#327): the casts this spell has made and the waves in flight, as drawn. */
+  get levelReport(): FireWaveLevelReport {
+    return {
+      casts: [...this.castLog],
+      live: this.waves.map(({ wave, rims }) => ({
+        heading: wave.heading,
+        fronts: rims.length,
+        frontRotations: rims.map((rim) =>
+          rim instanceof Phaser.GameObjects.Sprite ? rim.rotation : wave.heading,
+        ),
+      })),
+      trail: {
+        zonesLive: this.zones.length,
+        piecesLive: this.scorch.pieces,
+        flamesLive: this.scorch.flames,
+        mostZonesLive: this.mostZones,
+        mostPiecesLive: this.mostPieces,
+        mostFlamesLive: this.mostFlames,
+        refused: this.trailRefused,
+        zones: this.zoneLog.map((record) => ({ ...record })),
+        views: this.scorch.views(),
+      },
+    };
   }
 
   /** Hits this spell has landed, across every wave — what the browser suite watches. */
@@ -106,7 +234,8 @@ export class FireWaveSpell extends Spell<'fire_column'> {
     const { speed, range, arc, damage, burn, burnDuration, knockback } = this.stats;
     const halfArc = ((arc / 2) * Math.PI) / 180;
     for (const live of [...this.waves]) {
-      const { wave } = live;
+      const { wave, zone } = live;
+      const prevR = wave.r;
       const struck = advanceWave(
         wave,
         this.enemies.live,
@@ -126,13 +255,80 @@ export class FireWaveSpell extends Spell<'fire_column'> {
         // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
         if (enemy.active) enemy.knockBack(push);
       }
+      if (zone) this.layRings(zone, prevR, wave.r);
       if (waveDone(wave, range)) {
+        if (zone) {
+          zone.closed = true;
+          zone.clock.closedAtS = zone.clock.ageS;
+        }
         live.glow.destroy();
-        live.rim.destroy();
+        for (const rim of live.rims) rim.destroy();
         this.waves.splice(this.waves.indexOf(live), 1);
       } else {
         this.draw(live, halfArc, range);
       }
+    }
+    this.tickZones(deltaS);
+    this.mostZones = Math.max(this.mostZones, this.zones.length);
+    this.mostPieces = Math.max(this.mostPieces, this.scorch.pieces);
+    this.mostFlames = Math.max(this.mostFlames, this.scorch.flames);
+  }
+
+  /** Lay the rings the rim crossed this frame, each piece dropped (and counted) if its pool is full. */
+  private layRings(zone: LiveZone, prevR: number, r: number): void {
+    const lagPx =
+      FIRE_TRAIL.lagFrac * FIRE_TRAIL.pieceSpan * (zone.range / BASE_FIRE_WAVE_STATS.range);
+    for (const ring of ringsDue(prevR, r, zone.radii, lagPx, zone.range)) {
+      if (zone.laidRings.has(ring)) continue;
+      zone.laidRings.add(ring);
+      for (const piece of zone.pieces.filter((p) => p.ring === ring)) {
+        if (this.scorch.lay(zone.record.id, piece, zone.range)) {
+          zone.record.laid += 1;
+          if (piece.flame) zone.record.flames += 1;
+        } else {
+          zone.record.dropped += 1;
+        }
+      }
+    }
+    zone.rSwept = r;
+  }
+
+  /** Burn whoever stands in each zone every `tickEveryS`, fade the ground and retire it when it has expired. */
+  private tickZones(deltaS: number): void {
+    for (const zone of [...this.zones]) {
+      const { tick, expired, alpha } = stepTrailClock(zone.clock, deltaS);
+      if (tick) this.burnZone(zone);
+      if (expired) {
+        this.scorch.release(zone.id);
+        this.zones.splice(this.zones.indexOf(zone), 1);
+      } else if (zone.closed && alpha < FIRE_TRAIL.alpha) {
+        this.scorch.setAlpha(zone.id, alpha);
+      }
+    }
+  }
+
+  /** One burn tick: every live enemy whose body is in the swept fan, never the player. */
+  private burnZone(zone: LiveZone): void {
+    const { record } = zone;
+    record.ticks += 1;
+    for (const enemy of this.enemies.live) {
+      if (
+        !inSweptSector(
+          zone.origin,
+          zone.heading,
+          zone.halfArc,
+          zone.rMin,
+          zone.rSwept,
+          enemy,
+          enemy.bodyRadius,
+        )
+      ) {
+        continue;
+      }
+      if (!enemy.isBurning) record.fresh += 1;
+      enemy.applyBurn(zone.dps, FIRE_TRAIL.burnDurationS);
+      record.burned += 1;
+      if (zone.closed) record.burnedAfterWave += 1;
     }
   }
 
@@ -146,24 +342,91 @@ export class FireWaveSpell extends Spell<'fire_column'> {
     const target = waveTarget(this.caster, this.enemies.live, this.stats.range);
     // Pool at its cap: the cast is dropped, never queued.
     if (!target || this.waves.length >= MAX_LIVE_WAVES) return;
-    const wave = newWave<Enemy>(this.caster, waveHeading(this.caster, target));
+    const { arc, range } = this.stats;
+    const live = this.launch(waveHeading(this.caster, target), arc);
+    live.zone = this.openZone(live, arc, range);
+    this.draw(live, ((arc / 2) * Math.PI) / 180, range);
+    this.fx.burst('fire.spawn', this.caster.x, this.caster.y);
+    recordCapped(this.castLog, {
+      level: this.level,
+      arc,
+      fronts: live.rims.length,
+      trail: live.zone !== null,
+    });
+  }
+
+  /**
+   * Level 3: open the burnt ground for `live`, its layout drawn now. At the zone
+   * cap the wave still fires, without ground, and the refusal is counted.
+   */
+  private openZone(live: LiveWave, arc: number, range: number): LiveZone | null {
+    if (!hasFireTrail(this.level)) return null;
+    if (this.zones.length >= MAX_LIVE_TRAIL_ZONES) {
+      this.trailRefused += 1;
+      return null;
+    }
+    const { origin, heading } = live.wave;
+    const pieces = scorchPieces(origin, heading, range, arc, this.rng);
+    const record: TrailZoneRecord = {
+      id: this.nextZoneId,
+      level: this.level,
+      arc,
+      x: origin.x,
+      y: origin.y,
+      heading,
+      range,
+      slots: pieces.length,
+      laid: 0,
+      flames: 0,
+      dropped: 0,
+      ticks: 0,
+      burned: 0,
+      burnedAfterWave: 0,
+      fresh: 0,
+    };
+    this.nextZoneId += 1;
+    recordCapped(this.zoneLog, record);
+    const zone: LiveZone = {
+      id: record.id,
+      origin,
+      heading,
+      halfArc: ((arc / 2) * Math.PI) / 180,
+      range,
+      rMin: FIRE_TRAIL.burnInnerFrac * range,
+      rSwept: 0,
+      radii: trailRingRadii(range),
+      pieces,
+      laidRings: new Set(),
+      clock: { ageS: 0, closedAtS: null, tickLeftS: 0 },
+      dps: trailBurnDps(this.stats.burn),
+      closed: false,
+      record,
+    };
+    this.zones.push(zone);
+    return zone;
+  }
+
+  /** Put one wave in flight along `heading`, with a flame front for each `waveFrontAngles` entry. */
+  private launch(heading: number, arc: number): LiveWave {
+    const wave = newWave<Enemy>(this.caster, heading);
     const glow = this.scene.add.graphics().setDepth(AREA_DEPTH);
-    const rim = this.scene.anims.exists('fire.wave')
-      ? this.scene.add
-          .sprite(wave.origin.x, wave.origin.y, FRONT.page, 'fire.wave.0')
-          .setOrigin(FIRE_WAVE_ART.tipX / FRONT.w, FIRE_WAVE_ART.tipY / FRONT.h)
-          .setRotation(wave.heading)
-          .setDepth(FX_DEPTH)
-          .play('fire.wave')
-      : this.scene.add.graphics().setDepth(FX_DEPTH);
-    const live = { wave, glow, rim };
+    const rims: LiveWave['rims'] = this.scene.anims.exists('fire.wave')
+      ? waveFrontAngles(heading, arc, FIRE_WAVE_ART_ARC_DEG).map((angle) =>
+          this.scene.add
+            .sprite(wave.origin.x, wave.origin.y, FRONT.page, 'fire.wave.0')
+            .setOrigin(FIRE_WAVE_ART.tipX / FRONT.w, FIRE_WAVE_ART.tipY / FRONT.h)
+            .setRotation(angle)
+            .setDepth(FX_DEPTH)
+            .play('fire.wave'),
+        )
+      : [this.scene.add.graphics().setDepth(FX_DEPTH)];
+    const live: LiveWave = { wave, zone: null, glow, rims };
     this.waves.push(live);
-    this.draw(live, ((this.stats.arc / 2) * Math.PI) / 180, this.stats.range);
-    this.fx.burst('fire.spawn', wave.origin.x, wave.origin.y);
+    return live;
   }
 
   /** Redraw one wave at its current rim radius. */
-  private draw({ wave, glow, rim }: LiveWave, halfArc: number, range: number): void {
+  private draw({ wave, glow, rims }: LiveWave, halfArc: number, range: number): void {
     const r = Math.max(MIN_DRAWN_R, wave.r);
     const fade = Phaser.Math.Clamp((range - wave.r) / (range * (1 - FADE_FROM)), 0, 1);
     const { x, y } = wave.origin;
@@ -181,10 +444,25 @@ export class FireWaveSpell extends Spell<'fire_column'> {
     glow.arc(x, y, r * 0.6, to, from, true);
     glow.closePath().fillPath();
 
-    if (rim instanceof Phaser.GameObjects.Sprite) {
-      rim.setScale(r / FIRE_WAVE_ART.radius).setAlpha(fade);
-      return;
+    for (const rim of rims) {
+      if (rim instanceof Phaser.GameObjects.Sprite) {
+        rim.setScale(r / FIRE_WAVE_ART.radius).setAlpha(fade);
+        continue;
+      }
+      this.strokeRim(rim, x, y, r, from, to, fade);
     }
+  }
+
+  /** The no-atlas rim: a thick front and a thin edge outside it, over the whole arc. */
+  private strokeRim(
+    rim: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    r: number,
+    from: number,
+    to: number,
+    fade: number,
+  ): void {
     rim.clear();
     rim.lineStyle(RIM_WIDTH, RIM_COLOR, fade);
     rim

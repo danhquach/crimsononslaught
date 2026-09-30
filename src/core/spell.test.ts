@@ -289,3 +289,12 @@ describe('anyWithin (#212)', () => {
     expect(anyWithin(origin, [], 150)).toBe(false);
   });
 });
+
+describe('Spell level (#327)', () => {
+  it('starts at level 1 and reads the level it is set to', () => {
+    const spell = new StubSpell();
+    expect(spell.level).toBe(1);
+    spell.setLevel(3);
+    expect(spell.level).toBe(3);
+  });
+});

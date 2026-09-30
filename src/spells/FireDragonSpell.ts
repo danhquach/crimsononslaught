@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import { DRAGON_DRAW_SCALE } from '../config/fireRoster';
-import { splashTargets } from '../core/fireball';
+import type { SpellLevel } from '../config/spellLevels';
+import { dragonHitsPerFlight, dragonStrike, recordCapped } from '../core/fireLevels';
+import { splashTargets, volleyTargets } from '../core/fireball';
 import { explosionScale } from '../core/fx';
 import { MAX_LIVE_DRAGONS } from '../core/homing';
 import type { Vec2 } from '../core/input';
-import { Spell, anyWithin, nearestEnemies } from '../core/spell';
+import { Spell, anyWithin } from '../core/spell';
 import type { FireDragonStats } from '../core/spellStats';
 import type { Enemy } from '../entities/Enemy';
 import { HomingProjectile } from '../entities/HomingProjectile';
@@ -31,6 +33,28 @@ export interface DragonShot {
   readonly vy: number;
 }
 
+/** What one dragon in flight remembers, taken at launch (#327). */
+interface Flight {
+  readonly level: SpellLevel;
+  /** How many different enemies it may strike: level 3 at the launch, so a pick mid-flight changes the next dragon only. */
+  readonly allowed: number;
+  /** Everyone it has struck, in order; none twice. */
+  readonly struck: Enemy[];
+  readonly struckSet: Set<Enemy>;
+}
+
+/** Fire Dragon's level record, what the test hook reads (#327): cause and effect in one entry. */
+export interface DragonLevelReport {
+  casts: { level: SpellLevel; dragons: number; distinctTargets: number }[];
+  /** Every dragon that has ended, with how many enemies it struck. */
+  flights: { level: SpellLevel; allowed: number; hits: number; distinct: number }[];
+  mostHitsOneFlight: number;
+  /** Overlaps with an enemy the dragon had already struck, which it flew through. */
+  refusedRepeats: number;
+}
+
+const NONE: ReadonlySet<Enemy> = new Set();
+
 /**
  * Fire Dragon (#137, spec §9.2): every `cooldown` s a homing missile leaves the
  * caster at the nearest enemy within `targetRange`, bending toward its target
@@ -45,6 +69,14 @@ export interface DragonShot {
  * overlaps are wired, CO-032) and turns an overlap into damage. With nothing in
  * `targetRange` the cast is spent on nothing, like Meteor's.
  *
+ * Levels (#327): level 2's second dragon is a stat add (`projectiles`), each at
+ * its own target where it can. Level 3, Dragon swarm: a third dragon (another
+ * `projectiles` stat add), and a dragon launched at that level strikes
+ * `DRAGON_PIERCE.hitsPerFlight` different enemies instead of dying on the first:
+ * after a strike it homes on the nearest enemy it has not struck, within
+ * `targetRange`, and with none it flies straight on until its lifetime ends.
+ * Each strike is a full hit with the splash; none twice per flight.
+ *
  * FX (CO-082): `fire.spawn` flashes at the caster as a dragon leaves and
  * `fire.explode` plays at the hit point, scaled to the live `aoeRadius`.
  */
@@ -56,6 +88,11 @@ export class FireDragonSpell extends Spell<'fire_dragon'> {
   private readonly fx: FxPool;
   /** Test hook (#140): hits this spell has landed on a direct target. */
   private landed = 0;
+  private readonly flights = new Map<HomingProjectile, Flight>();
+  private readonly castLog: DragonLevelReport['casts'] = [];
+  private readonly flightLog: DragonLevelReport['flights'] = [];
+  private mostHitsOneFlight = 0;
+  private refusedRepeats = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -112,12 +149,31 @@ export class FireDragonSpell extends Spell<'fire_dragon'> {
     return shots;
   }
 
+  /** Test hook (#327): the casts and flights this spell has made, with the level each ran at. */
+  get levelReport(): DragonLevelReport {
+    return {
+      casts: [...this.castLog],
+      flights: [...this.flightLog],
+      mostHitsOneFlight: this.mostHitsOneFlight,
+      refusedRepeats: this.refusedRepeats,
+    };
+  }
+
   protected override tick(deltaS: number): void {
     super.tick(deltaS);
+    const live = this.enemies.live;
     for (const child of this.group.getChildren()) {
       if (!(child instanceof HomingProjectile) || !child.active) continue;
-      child.steer(deltaS, this.enemies.live);
-      if (child.spent) child.despawn();
+      const struckSet = this.flights.get(child)?.struckSet;
+      // Enemies are pooled: one that left the crowd (dead, dying) may come back
+      // as a fresh spawn inside this flight, and must not be skipped then. A
+      // dying enemy's body is off, so it cannot be overlapped again meanwhile.
+      if (struckSet && struckSet.size > 0) {
+        const present = new Set(live);
+        for (const enemy of struckSet) if (!present.has(enemy)) struckSet.delete(enemy);
+      }
+      child.steer(deltaS, live, struckSet ?? NONE);
+      if (child.spent) this.retire(child);
     }
   }
 
@@ -126,25 +182,74 @@ export class FireDragonSpell extends Spell<'fire_dragon'> {
     return anyWithin(this.caster, this.enemies.live, this.stats.targetRange);
   }
 
-  /** One cast: a dragon at the nearest enemy within `targetRange`. */
+  /** One cast: `projectiles` dragons, each at its own nearest enemy within `targetRange`. */
   protected cast(): void {
-    const { speed, targetRange, homingTurnRate, duration } = this.stats;
+    const { speed, targetRange, homingTurnRate, duration, projectiles } = this.stats;
     const { x, y } = this.caster;
-    const [target] = nearestEnemies(this.caster, this.enemies.live, 1, targetRange);
-    if (!target) return;
-    // Pool exhausted: the cast is dropped, never queued.
-    const shot = this.group.get(x, y) as HomingProjectile | null;
-    if (!shot) return;
-    shot.fireAt(x, y, target, speed, homingTurnRate, duration, targetRange, DRAGON_LOOK);
+    const targets = volleyTargets(this.caster, this.enemies.live, projectiles, targetRange);
+    const level = this.level;
+    let launched = 0;
+    for (const target of targets) {
+      // Pool exhausted: the rest of the cast is dropped, never queued.
+      const shot = this.group.get(x, y) as HomingProjectile | null;
+      if (!shot) break;
+      shot.fireAt(x, y, target, speed, homingTurnRate, duration, targetRange, DRAGON_LOOK);
+      this.flights.set(shot, {
+        level,
+        allowed: dragonHitsPerFlight(level),
+        struck: [],
+        struckSet: new Set(),
+      });
+      launched += 1;
+    }
+    if (launched === 0) return;
+    // One flash per cast, not per dragon: they leave the same hand.
     this.fx.burst('fire.spawn', x, y);
+    recordCapped(this.castLog, {
+      level,
+      dragons: launched,
+      distinctTargets: new Set(targets.slice(0, launched)).size,
+    });
+  }
+
+  private retire(dragon: HomingProjectile): void {
+    const flight = this.flights.get(dragon);
+    if (flight) {
+      const { level, allowed, struck } = flight;
+      recordCapped(this.flightLog, {
+        level,
+        allowed,
+        hits: struck.length,
+        distinct: new Set(struck).size,
+      });
+      this.mostHitsOneFlight = Math.max(this.mostHitsOneFlight, struck.length);
+    }
+    this.flights.delete(dragon);
+    dragon.despawn();
   }
 
   private onHit(enemy: Enemy, hitbox: SpellHitbox): void {
-    // A shot is spent on its first hit; a later overlap the same frame, or one
-    // with an enemy something else already killed, flies on.
+    // A shot is spent on its last strike (its first, below level 3); a later
+    // overlap the same frame, one with an enemy something else already killed,
+    // or one with an enemy it already struck, flies on.
     if (!(hitbox instanceof HomingProjectile) || !hitbox.active || !enemy.active) return;
+    const flight = this.flights.get(hitbox);
+    const strike = dragonStrike(
+      flight?.struckSet ?? NONE,
+      flight?.struck.length ?? 0,
+      enemy,
+      flight?.allowed ?? 1,
+    );
+    if (!strike.strikes) {
+      this.refusedRepeats += 1;
+      return;
+    }
+    if (flight) {
+      flight.struck.push(enemy);
+      flight.struckSet.add(enemy);
+    }
     const from = { x: hitbox.x, y: hitbox.y };
-    hitbox.despawn();
+    if (strike.spent) this.retire(hitbox);
 
     const { damage, aoeRadius, aoeDamageFactor } = this.stats;
     const splash = splashTargets(enemy, this.enemies.live, aoeRadius, enemy);

@@ -1,3 +1,4 @@
+import type { SpellLevel } from '../config/spellLevels';
 import type { Vec2 } from './input';
 import type { SpellStatsBySpell, StattedSpellId } from './spellStats';
 
@@ -146,6 +147,7 @@ export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
    */
   onCast: (() => void) | null = null;
   private currentStats: SpellStatsBySpell[S];
+  private currentLevel: SpellLevel = 1;
   private readonly scheduler = new CastScheduler();
 
   constructor(id: S, stats: SpellStatsBySpell[S]) {
@@ -158,6 +160,11 @@ export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
   /** The live block. Read it per cast: a passive can change it between two casts. */
   get stats(): Readonly<SpellStatsBySpell[S]> {
     return this.currentStats;
+  }
+
+  /** The level the run holds this spell at (#327), pushed by the `Spellbook`. Read it per cast. */
+  get level(): SpellLevel {
+    return this.currentLevel;
   }
 
   /** Seconds until the next cast, or `Infinity` for a spell that never fires. */
@@ -183,6 +190,11 @@ export abstract class Spell<S extends StattedSpellId = StattedSpellId> {
    */
   update(deltaMs: number): void {
     this.tick(deltaMs / 1000);
+  }
+
+  /** Told the spell's level by the `Spellbook` when it is equipped and whenever the loadout changes. */
+  setLevel(level: SpellLevel): void {
+    this.currentLevel = level;
   }
 
   /** Overwrite the block wholesale, as the `Spellbook` resolved it. */

@@ -4,6 +4,7 @@ import { validateSpellFields } from '../core/playerProfile';
 import { ANIMATIONS, FACINGS } from './animations';
 import { ART_BOXES } from './frames';
 import { PLACEHOLDERS } from './colors';
+import { SPELL_LEVEL_STATS } from './spellLevels';
 import { TEXTURE_KEYS } from './colors';
 import {
   BASE_COMPANION_STATS,
@@ -138,6 +139,18 @@ describe('companion tunables', () => {
       if (COMPANION_KINDS[id] !== 'ranged') continue;
       const { targetRange, speed = 1, attackCooldown } = BASE_COMPANION_STATS[id];
       const inFlight = targetRange / speed / attackCooldown;
+      expect(MAX_COMPANION_SHOTS, id).toBeGreaterThanOrEqual(inFlight * 4);
+    }
+  });
+});
+
+describe('companion level 2 shots (#327)', () => {
+  it('keeps the shot pool at four times the steady count with the level 2 projectile add', () => {
+    for (const id of COMPANION_SPELL_IDS) {
+      if (COMPANION_KINDS[id] !== 'ranged') continue;
+      const { targetRange, speed = 1, attackCooldown, projectiles = 1 } = BASE_COMPANION_STATS[id];
+      const add = SPELL_LEVEL_STATS[id]?.[2]?.projectiles ?? 0;
+      const inFlight = (targetRange / speed / attackCooldown) * (projectiles + add);
       expect(MAX_COMPANION_SHOTS, id).toBeGreaterThanOrEqual(inFlight * 4);
     }
   });
