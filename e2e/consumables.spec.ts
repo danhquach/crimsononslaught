@@ -204,10 +204,11 @@ test('a bomb on the floor blinks white and keeps its place and hitbox', async ({
     { key: SCENE.game },
   );
   if (!placed) throw new Error('the bomb was not placed');
-  const ours = (bombs: FlashSample[]) => bombs.find((b) => b.x === placed.x && b.y === placed.y);
 
-  // One evaluate per sample, so age, flag, tint and position are the same instant.
-  // Sampling goes on past the minimum until both states have been seen.
+  // Sampled in the page on every frame, so age, flag, tint and position are the same
+  // instant. A fixed wait between evaluates aliased with the 900 ms blink on CI (#355):
+  // evaluates ~450 ms apart never landed in the 140 ms lit window. Each evaluate samples
+  // for a second, then any level-up is answered. Sampling goes on until both states are seen.
   const trace: FlashSample[] = [];
   const until = Date.now() + 15_000;
   const seen = () => ({
@@ -216,14 +217,24 @@ test('a bomb on the floor blinks white and keeps its place and hitbox', async ({
   });
   while (Date.now() < until && (trace.length < 40 || seen().on === 0 || seen().off === 0)) {
     await answerLevelUp(page);
-    const bombs = await page.evaluate(async (key) => {
-      const { game } = await import('/src/main.ts');
-      return (game.scene.getScene(key) as GameScene).bombFlashReport;
-    }, SCENE.game);
-    const bomb = ours(bombs);
-    expect(bomb, 'the placed bomb still lies where it landed').toBeDefined();
-    trace.push(bomb as FlashSample);
-    await page.waitForTimeout(SAMPLE_MS);
+    const chunk = await page.evaluate(
+      async ({ key, at }) => {
+        const { game } = await import('/src/main.ts');
+        const scene = game.scene.getScene(key) as GameScene;
+        const samples: (FlashSample | null)[] = [];
+        const take = () =>
+          samples.push(scene.bombFlashReport.find((b) => b.x === at.x && b.y === at.y) ?? null);
+        scene.events.on('postupdate', take);
+        await new Promise((done) => setTimeout(done, 1_000));
+        scene.events.off('postupdate', take);
+        return samples;
+      },
+      { key: SCENE.game, at: { x: placed.x, y: placed.y } },
+    );
+    for (const bomb of chunk) {
+      expect(bomb, 'the placed bomb still lies where it landed').not.toBeNull();
+      trace.push(bomb as FlashSample);
+    }
   }
   console.log(`bomb flash: ${trace.length} samples, ${seen().on} on, ${seen().off} off`);
 
@@ -240,7 +251,7 @@ test('a bomb on the floor blinks white and keeps its place and hitbox', async ({
     // No scale or alpha pulse: the hitbox and the place it lies stay put.
     expect(s.bodyRadius, `hitbox radius ${i}`).toBe(first.bodyRadius);
     expect([s.x, s.y], `position ${i}`).toEqual([first.x, first.y]);
-    // A level-up can pause the run between two samples, so the age may hold still once.
+    // Two frames can read the same age (a level-up pause, or a frame with no sim step).
     if (i > 0)
       expect(s.ageMs, `age never falls ${i}`).toBeGreaterThanOrEqual(
         (trace[i - 1] as FlashSample).ageMs,
