@@ -108,3 +108,38 @@ export function menuStep(pressed: DirectionState): number {
 export function wrapIndex(index: number, step: number, count: number): number {
   return (((index + step) % count) + count) % count;
 }
+
+/** Standard-mapping gamepad button indices (W3C layout) the menus read (#377). */
+export const PAD_BUTTON = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, START: 9 } as const;
+
+export type PadButton = keyof typeof PAD_BUTTON;
+
+export interface ButtonEdge {
+  /** Feed one poll: true only on the poll where the button goes from up to down. `undefined` is no pad. */
+  step(down: boolean | undefined): boolean;
+  /** Forget the baseline, so the next read only re-baselines. */
+  reset(): void;
+}
+
+/**
+ * A press edge for one pad button (#377). The first read after a connect or a
+ * `reset` only takes a baseline, so a button already held down, such as the B
+ * that closed the previous screen, is not read as a fresh press.
+ */
+export function buttonEdge(): ButtonEdge {
+  let prev: boolean | null = null;
+  return {
+    step: (down) => {
+      if (down === undefined) {
+        prev = null;
+        return false;
+      }
+      const edge = prev === false && down;
+      prev = down;
+      return edge;
+    },
+    reset: () => {
+      prev = null;
+    },
+  };
+}

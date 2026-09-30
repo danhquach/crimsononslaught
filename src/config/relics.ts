@@ -9,7 +9,9 @@ import type { Passive } from './passives';
  * same clamps. No buff caps its own rank: a buff drops out of the offer only
  * once its field is at its `PROFILE_CLAMPS` bound (`core/relicOffer.ts`).
  *
- * Each buff is about 1.5x one passive rank. `weight` is the card's share of the
+ * Each buff is about 1.5x one passive rank, except Impaler at 2x Pierce, since
+ * half a pierce means nothing. A buff with `requiresStat` is offered only while
+ * a casting spell carries that stat (#377). `weight` is the card's share of the
  * draw; it lives on the card, not in the draw, so a later card (#228's rerolls
  * and bans) can be drawn at a different rate. #210 owns the measured tuning.
  *
@@ -41,13 +43,14 @@ const RELIC_BUFF_LIST = [
     weight: 1,
   },
   {
-    id: 'relic_colossus',
-    name: 'Colossus',
-    description: 'Radii, reach and bodies grow 15%.',
-    field: 'areaMul',
-    op: 'mul',
-    amount: 1.15,
+    id: 'relic_impaler',
+    name: 'Impaler',
+    description: 'Piercing spells pass through 2 more enemies.',
+    field: 'pierceBonus',
+    op: 'add',
+    amount: 2,
     weight: 1,
+    requiresStat: 'pierce',
   },
   {
     id: 'relic_tailwind',

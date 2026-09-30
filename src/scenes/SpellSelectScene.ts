@@ -11,7 +11,7 @@ import { emptySave, isSave } from '../core/save';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
 import { focusable, frameBox } from './focusRing';
-import { attachMenuInput, type MenuItem } from './input';
+import { attachMenuInput, attachPadButtons, type MenuItem } from './input';
 import { addHintLine, addMenuRow, addMenuTitle, drawMenuBackdrop } from './menuUi';
 
 const CARD_WIDTH = 200;
@@ -87,6 +87,8 @@ export class SpellSelectScene extends Phaser.Scene {
       else if (event.key === 'Escape') this.openMenu();
     });
 
+    attachPadButtons(this, { B: () => this.openMenu() });
+
     const stored: unknown = this.registry.get(SAVE_REGISTRY_KEY);
     const save = isSave(stored) ? stored : emptySave();
     this.add
@@ -97,7 +99,7 @@ export class SpellSelectScene extends Phaser.Scene {
       })
       .setOrigin(1, 0);
 
-    addHintLine(this, 'click a card, press 1–4, or use a gamepad');
+    addHintLine(this, 'click a card, press 1–4, or use a gamepad (A select, B back)');
     this.add
       .text(width - 16, height - 15, `seed ${this.seed}`, {
         fontFamily: 'monospace',

@@ -39,7 +39,13 @@ import {
   drawHeroStand,
   drawStrip,
 } from './buildStrips';
-import { attachMenuInput, attachNavInput, watchStartButton, type MenuItem } from './input';
+import {
+  attachMenuInput,
+  attachNavInput,
+  attachPadButtons,
+  watchStartButton,
+  type MenuItem,
+} from './input';
 import { addMenuRow } from './menuUi';
 
 const BACKDROP_ALPHA = 0.8;
@@ -152,6 +158,8 @@ export class PauseScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.repeat) back();
     });
+    // Pad B backs out like Esc and Start (#377).
+    attachPadButtons(this, { B: back });
     // The scene's own emitter keeps its listeners across a restart; drop this one.
     const start = watchStartButton(this);
     const pollStart = (): void => {
@@ -178,7 +186,7 @@ export class PauseScene extends Phaser.Scene {
       }),
     );
     const hintY = MENU_TOP + PAUSE_ACTIONS.length * MENU_PITCH + 12;
-    this.addHint(STAND_X, hintY, 'Esc or Start to resume');
+    this.addHint(STAND_X, hintY, 'Esc, Start or B to resume');
     this.addHint(STAND_X, hintY + 22, 'click, arrows + Enter, or a gamepad');
 
     this.info = this.add.text(STRIP_X, 440, INFO_HINT, {

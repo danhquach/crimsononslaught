@@ -5,7 +5,7 @@ import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { buyUpgrade, canBuy, isUnlocked, nextCost, upgradeRank } from '../core/upgrades';
 import { storeSaveJson } from '../storage/localSave';
 import { audioOf } from '../render/audio';
-import { attachMenuInput, type MenuItem } from './input';
+import { attachMenuInput, attachPadButtons, type MenuItem } from './input';
 import {
   addHintLine,
   addMenuRow,
@@ -85,11 +85,12 @@ export class UpgradesScene extends Phaser.Scene {
     });
     items.push(backRow, wipeRow);
     attachMenuInput(this, items);
-    addHintLine(this, 'click, Esc to go back, or a gamepad');
+    addHintLine(this, 'click, Esc to go back, or a gamepad (A select, B back)');
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape') this.back();
     });
+    attachPadButtons(this, { B: () => this.back() });
   }
 
   /**

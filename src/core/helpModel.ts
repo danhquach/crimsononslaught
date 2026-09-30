@@ -1,4 +1,5 @@
 import type { TextureKey } from '../config/colors';
+import type { ChangelogEntry } from '../config/changelog';
 import type { EnemyType } from '../config/enemies';
 import { GEM_XP_VALUE } from '../config/gems';
 import { CURRENCY_NAME } from '../config/meta';
@@ -12,7 +13,6 @@ import {
   HEAL_AMOUNT,
   MAGNET_DURATION_MS,
   PICKUP_TEXTURES,
-  RELIC_COUNT,
 } from '../config/pickups';
 import {
   ELEMENTS,
@@ -24,6 +24,7 @@ import {
 import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVELS, spellLevelText, type SpellLevelTable } from '../config/spellLevels';
 import { MAX_OFFER_SIZE } from './levelUp';
+import type { HelpView } from './scenePayloads';
 
 /**
  * View-model behind the Help screen's Pickups tab (#226): one row per thing on
@@ -115,7 +116,7 @@ export function pickupHelpRows(): PickupHelpRow[] {
       clip: 'pickupRelic.idle',
       texture: PICKUP_TEXTURES.relic,
       name: 'Relic',
-      source: `${RELIC_COUNT} placed round the arena at run start`,
+      source: 'several placed round the map at run start, more on bigger maps',
       effect: `pick 1 of ${MAX_OFFER_SIZE}: a buff for the rest of the run (buffs stack), or more Rerolls or Bans`,
     },
   ];
@@ -192,4 +193,50 @@ export function spellHelpPages(table: SpellLevelTable = SPELL_LEVELS): SpellHelp
 export function clampSpellPage(page: number, count: number): number {
   if (count <= 0 || !Number.isFinite(page)) return 0;
   return Math.min(Math.max(Math.trunc(page), 0), count - 1);
+}
+
+/** One version's lines on the About tab (#377). */
+export interface ChangelogGroup {
+  version: string;
+  lines: string[];
+}
+
+/** Entries grouped under their version, order kept; only neighbours with the same version merge. */
+export function groupChangelog(entries: readonly ChangelogEntry[]): ChangelogGroup[] {
+  const groups: ChangelogGroup[] = [];
+  for (const { version, line } of entries) {
+    const last = groups[groups.length - 1];
+    if (last?.version === version) last.lines.push(line);
+    else groups.push({ version, lines: [line] });
+  }
+  return groups;
+}
+
+/** Rows the About panel has room for: one per version heading and one per line (#377). */
+export const MAX_ABOUT_ROWS = 7;
+
+/** Rows `groups` draw: a heading each, plus every line. */
+export function aboutRowCount(groups: readonly ChangelogGroup[]): number {
+  return groups.reduce((n, g) => n + 1 + g.lines.length, 0);
+}
+
+/**
+ * Where a shoulder button (LB -1, RB +1) takes the Help screen (#377): the tabs
+ * run Pickups, Spells, About without wrapping, and on Spells a press turns the
+ * page before it leaves. `null` when there is nowhere to go, or on the
+ * feedback form, which has no tabs.
+ */
+export function helpShoulderStep(
+  view: HelpView,
+  spellPage: number,
+  pageCount: number,
+  dir: -1 | 1,
+): { view: HelpView; spellPage?: number } | null {
+  if (view === 'feedback') return null;
+  if (view === 'pickups') return dir === 1 ? { view: 'spells', spellPage: 0 } : null;
+  if (view === 'about')
+    return dir === -1 ? { view: 'spells', spellPage: Math.max(pageCount - 1, 0) } : null;
+  const next = spellPage + dir;
+  if (next >= 0 && next < pageCount) return { view: 'spells', spellPage: next };
+  return { view: dir === 1 ? 'about' : 'pickups' };
 }

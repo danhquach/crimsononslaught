@@ -5,7 +5,16 @@ import type { OfferCard } from '../src/core/levelUp';
 import type { OfferActions } from '../src/core/offerActions';
 import { SCENE } from '../src/core/scenePayloads';
 import type { LevelUpScene } from '../src/scenes/LevelUpScene';
-import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
+import {
+  PAD,
+  addFakePad,
+  cardCenter,
+  collectErrors,
+  frames,
+  padPress,
+  startFromIntro,
+  waitForScene,
+} from './game';
 
 /**
  * #228 in the browser: a level-up offer carries Reroll (n), Skip and Ban (n)
@@ -236,5 +245,33 @@ test('banning every card left pays the +10 max HP and closes the offer', async (
   expect(banned.length, 'the whole passive pool').toBeGreaterThan(3);
   await expect.poll(maxHp, { message: 'the +10 max HP landed' }).toBe(before + 10);
   await waitForScene(page, SCENE.game);
+  expect(errors).toEqual([]);
+});
+
+test('pad Y enters ban mode, B only leaves it, and X rerolls (#377)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await addFakePad(page);
+  await startRun(page);
+  await openLevelUp(page);
+  await frames(page, 4); // a fresh overlay baselines its pad first
+
+  // B alone never enters ban mode.
+  await padPress(page, PAD.B);
+  expect((await snap(page)).banning).toBe(false);
+
+  await padPress(page, PAD.Y);
+  await waitFor(page, 'ban mode on', (s) => s.banning);
+  await padPress(page, PAD.B);
+  await waitFor(page, 'ban mode off', (s) => !s.banning);
+  // Y toggles, too.
+  await padPress(page, PAD.Y);
+  await waitFor(page, 'ban mode on again', (s) => s.banning);
+  await padPress(page, PAD.Y);
+  await waitFor(page, 'ban mode off again', (s) => !s.banning);
+  expect((await snap(page)).run.bans).toBe(1);
+
+  await padPress(page, PAD.X);
+  const rerolled = await waitFor(page, 'the reroll landed', (s) => s.shown?.rerolls === 2);
+  expect(rerolled.run.rerolls).toBe(2);
   expect(errors).toEqual([]);
 });

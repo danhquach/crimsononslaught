@@ -150,3 +150,36 @@ describe('weightedSample', () => {
     }
   });
 });
+
+describe('relicOffer requiresStat (#377)', () => {
+  const pierceOnly = [buff('needs_pierce', 1, { requiresStat: 'pierce' })];
+  const offer = (seed: number, carried?: ReadonlySet<'pierce' | 'damage'>) =>
+    relicOffer(createRng(seed), {
+      ranks: new Map(),
+      profile: profileOf(buildLoadout('fire')),
+      buffs: pierceOnly,
+      carried,
+    }).map((card) => card.id);
+
+  it('never offers a buff that needs pierce without it carried', () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      expect(offer(seed), `seed ${seed}`).not.toContain('needs_pierce');
+      expect(offer(seed, new Set(['damage'])), `seed ${seed}`).not.toContain('needs_pierce');
+    }
+  });
+
+  it('offers it once a casting spell carries pierce', () => {
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 100; seed++) {
+      for (const id of offer(seed, new Set(['pierce']))) seen.add(id);
+    }
+    expect(seen.has('needs_pierce')).toBe(true);
+  });
+
+  it('never offers the shipped Impaler when no carried set is passed', () => {
+    const loadout = buildLoadout('fire');
+    for (let seed = 1; seed <= 300; seed++) {
+      expect(offerFor(loadout, seed).map((card) => card.id)).not.toContain('relic_impaler');
+    }
+  });
+});
