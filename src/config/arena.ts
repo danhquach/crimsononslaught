@@ -44,3 +44,9 @@ export const ARENA_PROP_PLACEMENT = {
   /** Candidate spots tried in all before placement settles for fewer props. */
   maxAttempts: 2000,
 } as const;
+
+/**
+ * The arena's size in px: the physics world, the camera bounds, the floor and
+ * (CO-207) the area the minimap draws. A second map would bring its own.
+ */
+export const ARENA_SIZE = { width: 3000, height: 3000 } as const;

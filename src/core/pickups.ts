@@ -145,9 +145,17 @@ export function bombTargets<T extends Readonly<Vec2>>(
   view: ViewRect,
   spared: (target: T) => boolean = () => false,
 ): T[] {
-  const inside = (t: T): boolean =>
-    t.x >= view.x && t.x <= view.x + view.width && t.y >= view.y && t.y <= view.y + view.height;
-  return live.filter((t) => inside(t) && !spared(t));
+  return live.filter((t) => inView(view, t) && !spared(t));
+}
+
+/** Whether `point` is on screen, the view's edges included. */
+export function inView(view: ViewRect, point: Readonly<Vec2>): boolean {
+  return (
+    point.x >= view.x &&
+    point.x <= view.x + view.width &&
+    point.y >= view.y &&
+    point.y <= view.y + view.height
+  );
 }
 
 export interface PlacementRules {

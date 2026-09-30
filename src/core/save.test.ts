@@ -427,3 +427,33 @@ describe('saveNotice (#316)', () => {
     expect(SAVE_FAILED_TEXT).toBe('Progress could not be saved in this browser.');
   });
 });
+
+describe('parseSave minimap settings (CO-207)', () => {
+  const withSettings = (settings: string): string =>
+    `{"version":${SAVE_VERSION},"profile":${JSON.stringify(emptySave().profile)},"currency":0,"upgrades":{},"settings":${settings}}`;
+
+  it('keeps the allowed booleans and drops every other minimap key', () => {
+    const parsed = parseSave(
+      withSettings(
+        '{"minimap.on":false,"minimap.evil":true,"minimap.boss":"yes","minimap.pickups\u200b":true,"audio.master":0.4}',
+      ),
+    );
+    expect(parsed.status).toBe('ok');
+    expect(parsed.save.settings).toEqual({ 'minimap.on': false, 'audio.master': 0.4 });
+  });
+
+  it('resets a save whose settings carry a __proto__ object, leaving Object.prototype alone', () => {
+    const parsed = parseSave(withSettings('{"__proto__":{"minimap.on":false}}'));
+    expect(parsed.status).toBe('reset');
+    expect(({} as Record<string, unknown>)['minimap.on']).toBeUndefined();
+    expect(parsed.save.settings).toEqual({});
+  });
+
+  it('resets a save with a null switch, like any non-primitive setting', () => {
+    expect(parseSave(withSettings('{"minimap.on":null}')).status).toBe('reset');
+  });
+
+  it('resets on broken JSON', () => {
+    expect(parseSave('{"settings":{"minimap.on":').status).toBe('reset');
+  });
+});

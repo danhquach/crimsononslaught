@@ -224,14 +224,17 @@ test('Settings changes apply at once, persist, and reach the next run', async ({
   expect(await sceneTexts(page, SCENE.settings)).toContain('90%');
 
   // Mouse: switch screen shake off.
-  expect((await menuRows(page, SCENE.settings)).filter((row) => row.dim)).toEqual([]);
+  // The minimap's Enemies layer starts off (CO-207), so it is the one dim row.
+  expect(
+    (await menuRows(page, SCENE.settings)).filter((row) => row.dim).map((row) => row.label),
+  ).toEqual(['Enemies: Off']);
   await clickRow(page, SCENE.settings, 'Screen shake: On');
   // An off switch is quieter than an on one by more than its word.
   await expect
     .poll(async () =>
       (await menuRows(page, SCENE.settings)).filter((r) => r.dim).map((r) => r.label),
     )
-    .toEqual(['Screen shake: Off']);
+    .toEqual(['Screen shake: Off', 'Enemies: Off']);
   await expect
     .poll(() => storedSettings(page))
     .toEqual(

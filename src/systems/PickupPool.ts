@@ -70,6 +70,17 @@ export class PickupPool {
     return counts;
   }
 
+  /** Every consumable on the floor, chests too, and where it lies (CO-207: the minimap's markers). */
+  floorConsumables(): { kind: ConsumableKind; x: number; y: number }[] {
+    const found: { kind: ConsumableKind; x: number; y: number }[] = [];
+    for (const child of this.group.getChildren()) {
+      if (live(child) && child.kind === 'consumable') {
+        found.push({ kind: child.consumableKind, x: child.x, y: child.y });
+      }
+    }
+    return found;
+  }
+
   /** Every bomb on the floor and how it is blinking (CO-194): the test hook's view of the flash. */
   flashView(): {
     ageMs: number;

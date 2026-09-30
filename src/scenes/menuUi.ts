@@ -113,6 +113,8 @@ export interface MenuRowSpec {
   onConfirm: () => void;
   /** A bar's label stays left with a ▶ before it, as Pause's menu does; the default is centred. */
   align?: 'left' | 'center';
+  /** A left-aligned label starts this many px further in, to make room for an icon. */
+  indent?: number;
   /** A bar's fill with nothing going on: `BUTTON_REST_ALPHA` by default, 0 for a list row. */
   restAlpha?: number;
 }
@@ -200,7 +202,7 @@ export function addMenuRow(scene: Phaser.Scene, spec: MenuRowSpec): MenuRow {
     };
   }
   const text = scene.add
-    .text(listed ? left + 32 : x, y, spec.label, {
+    .text(listed ? left + 32 + (spec.indent ?? 0) : x, y, spec.label, {
       fontFamily: plated ? TITLE_FONT : SERIF,
       fontSize: plated ? '26px' : '20px',
       color: TEXT_COLOR.rest,

@@ -1,4 +1,5 @@
 import { upgradeById } from '../config/meta';
+import { dropUnknownMinimapKeys } from './minimap';
 import type { Outcome, RunStats } from './scenePayloads';
 
 /**
@@ -151,7 +152,11 @@ export function migrate(
   }
 
   if (!isSave(current)) return { ok: false, reason: 'wrong shape' };
-  return { ok: true, save: normalizeUpgrades(current) };
+  const normalized = normalizeUpgrades(current);
+  return {
+    ok: true,
+    save: { ...normalized, settings: dropUnknownMinimapKeys(normalized.settings) },
+  };
 }
 
 export function serializeSave(save: Save): string {
