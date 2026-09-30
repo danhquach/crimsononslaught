@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ROSTER_SPELL_IDS } from '../config/loadout';
+import { ROSTER_SPELL_CARDS } from '../config/rosterCards';
 import { PASSIVES, type PassiveId } from '../config/passives';
 import { RELIC_BUFFS, type RelicBuffId } from '../config/relics';
 import {
@@ -18,6 +19,8 @@ import {
   tilesPerRow,
   type Box,
 } from './resultModel';
+import { ringOutset } from './focusStyle';
+import { itemInfo } from './pauseModel';
 import { emptySave } from './save';
 import { MAX_BUILD_COUNT, type ResultPayload, type RunStats } from './scenePayloads';
 
@@ -197,6 +200,24 @@ describe('RESULT_LAYOUT', () => {
     expect(saveNoticeY + 8).toBeLessThanOrEqual(540 - 8);
   });
 
+  it('puts the info line under the strips and the card, and clear of the button and its ring (CO-198)', () => {
+    const { info, button, card, relics } = RESULT_LAYOUT;
+    expect(info.y).toBeGreaterThanOrEqual(relics.y + relics.height + 4);
+    expect(info.y).toBeGreaterThanOrEqual(card.y + card.height + 4);
+    expect(info.y + info.height + 8).toBeLessThanOrEqual(button.y);
+    // The focus ring round the button starts `ringOutset()` above it; it must not reach the line.
+    expect(info.y + info.height).toBeLessThan(button.y - ringOutset());
+    expect(info.x).toBeGreaterThanOrEqual(8);
+    expect(info.x + info.width).toBeLessThanOrEqual(960 - 8);
+  });
+
+  it('fits the hero, its badge and the stat rows inside the card', () => {
+    const { card, pedestalY, rows } = RESULT_LAYOUT;
+    // The hero's sprite tops out about 101 px over the pedestal.
+    expect(pedestalY - 101).toBeGreaterThanOrEqual(card.y);
+    expect(rows.y + 3 * rows.pitch + 12).toBeLessThanOrEqual(card.y + card.height);
+  });
+
   it('keeps the strips clear of each other and of the card', () => {
     const sorted = [...AREAS.slice(1)].sort((a, b) => a.y - b.y);
     for (let i = 1; i < sorted.length; i += 1) {
@@ -205,6 +226,49 @@ describe('RESULT_LAYOUT', () => {
     }
     const { card } = RESULT_LAYOUT;
     for (const strip of sorted) expect(card.x + card.width).toBeLessThan(strip.x);
+  });
+});
+
+describe('resultView info lines (CO-198)', () => {
+  it('gives every spell its roster description, so the info line can read it', () => {
+    const everySpell: ResultPayload = {
+      ...maxed,
+      build: {
+        ...maxed.build,
+        spells: ROSTER_SPELL_IDS.map((id) => ({
+          id,
+          name: ROSTER_SPELL_CARDS[id].name,
+          color: ROSTER_SPELL_CARDS[id].color,
+          level: 3,
+        })),
+      },
+    };
+    const { spells } = resultView(everySpell);
+    expect(spells).toHaveLength(ROSTER_SPELL_IDS.length);
+    for (const spell of spells) {
+      expect(spell.description, spell.id).toBe(
+        ROSTER_SPELL_CARDS[spell.id as (typeof ROSTER_SPELL_IDS)[number]].description,
+      );
+      expect(spell.description.length, spell.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps every info line short enough for the two lines it has', () => {
+    const view = resultView({
+      ...maxed,
+      build: {
+        ...maxed.build,
+        spells: ROSTER_SPELL_IDS.map((id) => ({
+          id,
+          name: ROSTER_SPELL_CARDS[id].name,
+          color: ROSTER_SPELL_CARDS[id].color,
+          level: 3,
+        })),
+      },
+    });
+    for (const tile of [...view.spells, ...view.passives, ...view.relics]) {
+      expect(itemInfo(tile).length, tile.id).toBeLessThanOrEqual(170);
+    }
   });
 });
 
