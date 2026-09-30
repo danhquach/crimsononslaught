@@ -1,4 +1,8 @@
 import { AREA_LOOKS, type AreaSpellId } from '../config/areas';
+import { HAIL } from '../config/iceLevels';
+import type { SpellLevel } from '../config/spellLevels';
+import { recordCapped } from '../core/fireLevels';
+import { novaScale } from '../core/fx';
 import {
   areaStaggerS,
   createArea,
@@ -6,13 +10,66 @@ import {
   membersOf,
   type GroundArea,
 } from '../core/groundArea';
+import { deepFreezeHit, hailsDue, isDeepFreezeTick, stormTickCount } from '../core/iceLevels';
 import type { Vec2 } from '../core/input';
 import type { Rng } from '../core/rng';
 import { Spell, anyWithin } from '../core/spell';
 import type { GroundAreaStats } from '../core/spellStats';
-import type { EnemyPool } from '../systems/EnemyPool';
+import { Boss } from '../entities/Boss';
 import type { AreaPool } from '../systems/AreaPool';
+import type { EnemyPool } from '../systems/EnemyPool';
+import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
+
+/**
+ * What only Ice Storm's levels need (#328): the effects pool for the hail and
+ * the deep freeze, and the hail's own random stream, so which enemy a
+ * hailstone picks never shifts any other draw of the run. Handed to
+ * `ice_blizzard` alone; Earthquake never gets it.
+ */
+export interface StormLevelKit {
+  readonly fx: FxPool;
+  readonly hailRng: Rng;
+}
+
+/** One patch's own count of its ticks and what it needs to run a level (#328), closed over at the cast. */
+interface StormPatch {
+  readonly kit: StormLevelKit;
+  readonly level: SpellLevel;
+  readonly patch: number;
+  /** Ticks the patch will pay in all. */
+  readonly count: number;
+  readonly tickEveryS: number;
+  tickNumber: number;
+}
+
+/** Ice Storm's level record, what the test hook reads (#328): cause and effect in one entry. */
+export interface IceStormLevelReport {
+  /** Each hailstone: the patch and tick it fell on, the enemies inside then, and whether it hit one. */
+  hail: {
+    level: SpellLevel;
+    patch: number;
+    tickNumber: number;
+    inside: number;
+    hit: boolean;
+  }[];
+  /** Each deep freeze: the patch's last paid tick, who was inside, how many were frozen after it, the boss's freeze if it was in. */
+  deepFreezes: {
+    level: SpellLevel;
+    patch: number;
+    tickNumber: number;
+    count: number;
+    inside: number;
+    frozenAfter: number;
+    bossFrozenS: number | null;
+  }[];
+  /** Patches placed, whatever their level. */
+  patches: number;
+  /** Hailstones that hit an enemy, all storms so far: a count the capped `hail` log cannot lose. */
+  hailHits: number;
+  /** Hailstones dropped per patch, hit or not, in the order the patches were placed: never dropped from the log's window. */
+  hailPerPatch: number[];
+}
 
 /**
  * A persistent ground area (#135, Phase 2 spec §9): Ice Storm and Earthquake.
@@ -42,6 +99,11 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
   private readonly damage: DamageSink;
   private readonly areas: AreaPool;
   private readonly rng: Rng;
+  private readonly kit: StormLevelKit | undefined;
+  private readonly hailLog: IceStormLevelReport['hail'] = [];
+  private readonly deepFreezeLog: IceStormLevelReport['deepFreezes'] = [];
+  private hailHits = 0;
+  private readonly hailByPatch = new Map<number, number>();
   /** Test hook (#135): patches this spell has put on the ground. */
   private patches = 0;
   /** Test hook (#135): enemy-ticks its patches have paid out, across every cast. */
@@ -57,6 +119,7 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     damage: DamageSink,
     areas: AreaPool,
     rng: Rng,
+    kit?: StormLevelKit,
   ) {
     super(id, { ...stats });
     this.caster = caster;
@@ -64,6 +127,19 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     this.damage = damage;
     this.areas = areas;
     this.rng = rng;
+    // Only Ice Storm has levels; Earthquake ignores a kit it was handed.
+    this.kit = id === 'ice_blizzard' ? kit : undefined;
+  }
+
+  /** Test hook (#328): the hail and deep freezes this spell's storms have made. */
+  get levelReport(): IceStormLevelReport {
+    return {
+      hail: [...this.hailLog],
+      deepFreezes: [...this.deepFreezeLog],
+      patches: this.patches,
+      hailHits: this.hailHits,
+      hailPerPatch: [...this.hailByPatch.values()],
+    };
   }
 
   /** Patches placed so far — what the browser suite watches a run cast. */
@@ -110,9 +186,22 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     const staggerS = areaStaggerS(this.areaStats.staggerDuration ?? 0, tickRate);
     const at = densestSpot(this.caster, this.enemies.live, radius, targetRange, this.rng);
     const area = createArea(at, { radius, durationS: duration, tickEveryS: tickRate });
+    const storm: StormPatch | null = this.kit
+      ? {
+          kit: this.kit,
+          level: this.level,
+          patch: this.patches + 1,
+          count: stormTickCount(duration, tickRate),
+          tickEveryS: tickRate,
+          tickNumber: 0,
+        }
+      : null;
     const placed = this.areas.place(
       area,
-      (live) => this.applyTick(live, tickDamage, slowPct, slowDuration, staggerS),
+      (live) => {
+        this.applyTick(live, tickDamage, slowPct, slowDuration, staggerS);
+        if (storm) this.stormLevels(live, storm, tickDamage, slowPct, slowDuration);
+      },
       {},
       AREA_LOOKS[this.id],
     );
@@ -147,5 +236,76 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
       }
       this.damage(enemy, tickDamage, 'tick', area);
     }
+  }
+
+  /**
+   * What a level adds to one tick (#328), after the tick's own hits: the hail
+   * that fell in this stretch of the patch's life, then, on its last paid tick,
+   * the deep freeze. `storm` is the patch's own count of its ticks, closed over
+   * at the cast so two patches never share one.
+   */
+  private stormLevels(
+    area: Readonly<GroundArea>,
+    storm: StormPatch,
+    tickDamage: number,
+    slowPct: number,
+    slowDuration: number,
+  ): void {
+    storm.tickNumber += 1;
+    const { kit, level, patch, count, tickNumber } = storm;
+    if (level >= 2) {
+      for (let i = 0; i < hailsDue(tickNumber, storm.tickEveryS, HAIL.everyS); i += 1) {
+        this.hailstone(area, storm, tickDamage * HAIL.damageFactor, slowPct, slowDuration);
+      }
+    }
+    if (!isDeepFreezeTick(tickNumber, count, level)) return;
+    // Read fresh: an enemy this tick's hits killed is no longer inside to be frozen.
+    const inside = membersOf(area, this.enemies.live).filter((enemy) => enemy.active);
+    const hit = deepFreezeHit({ slowPct, slowDuration });
+    let frozenAfter = 0;
+    let bossFrozenS: number | null = null;
+    for (const enemy of inside) {
+      enemy.applyFrost(hit);
+      if (enemy.isFrozen) frozenAfter += 1;
+      if (enemy instanceof Boss) {
+        bossFrozenS = Math.max(bossFrozenS ?? 0, enemy.crowdControlRemainingS.frozenS);
+      }
+    }
+    kit.fx.burst('ice.nova', area.x, area.y, { scale: novaScale(area.radius) });
+    recordCapped(this.deepFreezeLog, {
+      level,
+      patch,
+      tickNumber,
+      count,
+      inside: inside.length,
+      frozenAfter,
+      bossFrozenS,
+    });
+  }
+
+  /**
+   * One hailstone: a random enemy inside, chilled and then hit, in that order.
+   * Nothing inside draws nothing, so an empty patch leaves the stream where it was.
+   */
+  private hailstone(
+    area: Readonly<GroundArea>,
+    storm: StormPatch,
+    damage: number,
+    slowPct: number,
+    slowDuration: number,
+  ): void {
+    const { kit, level, patch, tickNumber } = storm;
+    const inside = membersOf(area, this.enemies.live).filter((enemy) => enemy.active);
+    this.hailByPatch.set(patch, (this.hailByPatch.get(patch) ?? 0) + 1);
+    if (inside.length === 0) {
+      recordCapped(this.hailLog, { level, patch, tickNumber, inside: 0, hit: false });
+      return;
+    }
+    const target = kit.hailRng.pick(inside);
+    kit.fx.burst(HAIL.clip, target.x, target.y, { scale: HAIL.drawScale });
+    if (slowPct > 0) target.applyFrost({ slowPct, slowDuration, freeze: false });
+    this.damage(target, damage, 'tick', area);
+    this.hailHits += 1;
+    recordCapped(this.hailLog, { level, patch, tickNumber, inside: inside.length, hit: true });
   }
 }

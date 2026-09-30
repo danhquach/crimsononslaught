@@ -1,0 +1,480 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CLUSTER,
+  DEEP_FREEZE,
+  FROST_AURA,
+  FROST_ORB,
+  HAIL,
+  ICE_ARROW_FAN,
+  SHATTER,
+  SHATTER_RING,
+} from '../config/iceLevels';
+import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
+import { PROFILE_CLAMPS } from '../config/passives';
+import type { SpellLevel } from '../config/spellLevels';
+import { BASE_ICE_SHIELD_STATS } from '../config/shields';
+import { NO_BOSS_CC, diminishFrost } from './bossCrowdControl';
+import { advanceArea, createArea } from './groundArea';
+import { NO_FROST, applyFrost, tickFrost, type FrostHit } from './frostNova';
+import {
+  clusterBurst,
+  clusterHeadings,
+  deepFreezeHit,
+  fanHeadings,
+  frostOrbHit,
+  hailsDue,
+  hasCluster,
+  hasFrostAura,
+  hasShatter,
+  inAura,
+  isDeepFreezeTick,
+  shardDamage,
+  shatterHeadings,
+  shatterRingFrost,
+  shatterRingHeadings,
+  stormTickCount,
+} from './iceLevels';
+import { spawnsDue } from './iceStorm';
+import { createRng } from './rng';
+
+/** #328: the level 2 and 3 rules of the Ice spells, checked without an engine. */
+
+const LEVELS: readonly SpellLevel[] = [1, 2, 3];
+const DEG = Math.PI / 180;
+
+describe('level gates', () => {
+  it('turns each behaviour on at its own level and keeps it on', () => {
+    expect(LEVELS.map(hasShatter)).toEqual([false, false, true]);
+    expect(LEVELS.map(hasCluster)).toEqual([false, false, true]);
+    expect(LEVELS.map(hasFrostAura)).toEqual([false, true, true]);
+  });
+
+  it('marks the deep freeze only on the last paid tick, from level 3', () => {
+    expect(LEVELS.map((level) => isDeepFreezeTick(8, 8, level))).toEqual([false, false, true]);
+    expect(isDeepFreezeTick(7, 8, 3)).toBe(false);
+    expect(isDeepFreezeTick(9, 8, 3)).toBe(false);
+    // A patch that pays nothing has no last tick.
+    expect(isDeepFreezeTick(0, 0, 3)).toBe(false);
+  });
+});
+
+describe('fanHeadings', () => {
+  it('is the aim itself for one arrow and nothing for none', () => {
+    expect(fanHeadings(1.25, 1)).toEqual([1.25]);
+    expect(fanHeadings(1.25, 0)).toEqual([]);
+    expect(fanHeadings(1.25, -3)).toEqual([]);
+  });
+
+  it('puts two arrows 6 degrees either side of the aim by default', () => {
+    const [a, b] = fanHeadings(0.5, 2);
+    expect(a).toBeCloseTo(0.5 - 6 * DEG, 12);
+    expect(b).toBeCloseTo(0.5 + 6 * DEG, 12);
+    expect(b! - a!).toBeCloseTo(ICE_ARROW_FAN.spreadDeg * DEG, 12);
+  });
+
+  it('is symmetric about the aim and spans the spread for any count', () => {
+    for (const aim of [0, 1, -2.5, Math.PI]) {
+      for (const count of [2, 3, 4, 5]) {
+        const h = fanHeadings(aim, count, 30);
+        expect(h).toHaveLength(count);
+        for (let i = 0; i < count; i += 1) {
+          expect(h[i]! - aim, `${aim}/${count}/${i}`).toBeCloseTo(-(h[count - 1 - i]! - aim), 12);
+        }
+        expect(h[count - 1]! - h[0]!).toBeCloseTo(30 * DEG, 12);
+      }
+    }
+  });
+
+  it('floors a fractional count and shrugs off a non-number', () => {
+    expect(fanHeadings(0, 2.9)).toHaveLength(2);
+    expect(fanHeadings(0, Number.NaN)).toEqual([]);
+  });
+});
+
+describe('Shatter', () => {
+  it('throws its shards in a forward cone about the arrow', () => {
+    const h = shatterHeadings(0.7);
+    expect(h).toHaveLength(SHATTER.count);
+    expect(h[1]).toBeCloseTo(0.7, 12);
+    expect(h[2]! - h[0]!).toBeCloseTo(SHATTER.spreadDeg * DEG, 12);
+    for (const heading of h) expect(Math.abs(heading - 0.7)).toBeLessThanOrEqual(15 * DEG + 1e-12);
+  });
+
+  it('deals a fraction of the arrow to each shard', () => {
+    expect(shardDamage(10)).toBe(10 * SHATTER.damageFactor);
+    expect(shardDamage(10, 0.25)).toBe(2.5);
+    expect(shardDamage(0)).toBe(0);
+  });
+});
+
+describe('Cluster', () => {
+  it('spaces the urchins evenly round the circle, the first 60 degrees past the aim', () => {
+    const h = clusterHeadings(0.3);
+    expect(h).toHaveLength(CLUSTER.count);
+    expect(h[0]).toBeCloseTo(0.3 + 60 * DEG, 12);
+    for (let i = 1; i < h.length; i += 1) {
+      expect(h[i]! - h[i - 1]!).toBeCloseTo((Math.PI * 2) / CLUSTER.count, 12);
+    }
+  });
+
+  it('is empty for no urchins', () => {
+    expect(clusterHeadings(0, 0)).toEqual([]);
+    expect(clusterHeadings(0, -1)).toEqual([]);
+  });
+
+  it('bursts at half the radius and 40% of the damage, with the same slow and no freeze', () => {
+    const burst = clusterBurst(BASE_NOVA_BOMB_STATS);
+    expect(burst.radius).toBe(BASE_NOVA_BOMB_STATS.radius * CLUSTER.radiusFactor);
+    expect(burst.damage).toBe(BASE_NOVA_BOMB_STATS.damage * CLUSTER.damageFactor);
+    expect(burst.slowPct).toBe(BASE_NOVA_BOMB_STATS.slowPct);
+    expect(burst.slowDuration).toBe(BASE_NOVA_BOMB_STATS.slowDuration);
+    // Slow only: the burst names no freeze at all, so it never rolls one.
+    expect(Object.keys(burst).sort()).toEqual(['damage', 'radius', 'slowDuration', 'slowPct']);
+  });
+
+  it('follows a bigger bomb (a wider-radius passive) without reading the base block', () => {
+    const wide = clusterBurst({ radius: 200, damage: 50, slowPct: 0.5, slowDuration: 3 });
+    expect(wide).toEqual({ radius: 100, damage: 20, slowPct: 0.5, slowDuration: 3 });
+  });
+});
+
+describe('Frost aura', () => {
+  const centre = { x: 100, y: 100 };
+
+  it('reaches `radius` past the enemy body, inclusive', () => {
+    expect(inAura(centre, { x: 100 + 30 + 12, y: 100, bodyRadius: 12 }, 30)).toBe(true);
+    expect(inAura(centre, { x: 100 + 30 + 12.01, y: 100, bodyRadius: 12 }, 30)).toBe(false);
+    expect(inAura(centre, { x: 100, y: 100, bodyRadius: 0 }, 30)).toBe(true);
+  });
+
+  it('counts a bigger body in from further out', () => {
+    const far = { x: 100, y: 100 + 60 };
+    expect(inAura(centre, { ...far, bodyRadius: 12 }, 30)).toBe(false);
+    expect(inAura(centre, { ...far, bodyRadius: 30 }, 30)).toBe(true);
+  });
+
+  it('pulses floor(time / tickEveryS) times over a stretch of any frame sizes, none while the clock is held', () => {
+    const rng = createRng(7);
+    for (let run = 0; run < 20; run += 1) {
+      let clock = 0;
+      let pulses = 0;
+      while (clock < 6) {
+        const delta = 0.005 + rng.next() * 0.2;
+        pulses += spawnsDue(clock, delta, 1 / FROST_AURA.tickEveryS);
+        clock += delta;
+      }
+      expect(pulses).toBe(Math.floor(clock / FROST_AURA.tickEveryS + 1e-9));
+    }
+    // A paused step (delta 0) pays nothing, and a clock reset to 0 starts the count over.
+    expect(spawnsDue(1, 0, 1 / FROST_AURA.tickEveryS)).toBe(0);
+    expect(spawnsDue(0, FROST_AURA.tickEveryS - 0.01, 1 / FROST_AURA.tickEveryS)).toBe(0);
+  });
+});
+
+describe('Shatter ring', () => {
+  it('fires 8 icicles evenly round the circle', () => {
+    const h = shatterRingHeadings();
+    expect(h).toHaveLength(SHATTER_RING.icicles);
+    expect(h[0]).toBe(0);
+    for (let i = 1; i < h.length; i += 1) expect(h[i]! - h[i - 1]!).toBeCloseTo(Math.PI / 4, 12);
+    expect(shatterRingHeadings(0)).toEqual([]);
+  });
+
+  it('is the break chill it always was below level 3, with no freeze', () => {
+    for (const level of [1, 2] as const) {
+      const hit = shatterRingFrost(BASE_ICE_SHIELD_STATS, level);
+      expect(hit).toEqual({
+        slowPct: BASE_ICE_SHIELD_STATS.slowPct,
+        slowDuration: BASE_ICE_SHIELD_STATS.slowDuration,
+        freeze: false,
+      });
+    }
+  });
+
+  it('adds a fixed 1 s freeze at level 3, on top of the same slow', () => {
+    const hit = shatterRingFrost(BASE_ICE_SHIELD_STATS, 3);
+    expect(hit).toEqual({
+      slowPct: BASE_ICE_SHIELD_STATS.slowPct,
+      slowDuration: BASE_ICE_SHIELD_STATS.slowDuration,
+      freeze: true,
+      freezeDuration: SHATTER_RING.freezeS,
+    });
+  });
+});
+
+describe('Frost orb and Deep freeze hits', () => {
+  it('freezes for the fixed length and carries the companion slow', () => {
+    expect(frostOrbHit({ slowPct: 0.25, slowDuration: 1.5 })).toEqual({
+      slowPct: 0.25,
+      slowDuration: 1.5,
+      freeze: true,
+      freezeDuration: FROST_ORB.freezeS,
+    });
+  });
+
+  it('gives no slow for a companion block that has none, but still freezes', () => {
+    const hit = frostOrbHit({});
+    expect(hit.slowPct).toBe(0);
+    expect(hit.freeze).toBe(true);
+  });
+
+  it('freezes a deep-frozen enemy for the fixed length and keeps the storm slow', () => {
+    expect(deepFreezeHit({ slowPct: 0.5, slowDuration: 1 })).toEqual({
+      slowPct: 0.5,
+      slowDuration: 1,
+      freeze: true,
+      freezeDuration: DEEP_FREEZE.freezeS,
+    });
+  });
+});
+
+describe('stormTickCount', () => {
+  it('is floor(duration / interval)', () => {
+    expect(stormTickCount(4, 0.5)).toBe(8);
+    expect(stormTickCount(4.8, 0.5)).toBe(9);
+    expect(stormTickCount(5, 0.3)).toBe(16);
+  });
+
+  it('pays nothing for an interval or duration that pays nothing', () => {
+    expect(stormTickCount(4, 0)).toBe(0);
+    expect(stormTickCount(4, -1)).toBe(0);
+    expect(stormTickCount(4, Number.NaN)).toBe(0);
+    expect(stormTickCount(4, Number.POSITIVE_INFINITY)).toBe(0);
+    expect(stormTickCount(0, 0.5)).toBe(0);
+    expect(stormTickCount(-2, 0.5)).toBe(0);
+  });
+
+  /** Runs a patch to expiry in `frames` steps and returns the ticks `advanceArea` paid. */
+  function paidTicks(durationS: number, tickEveryS: number, frame: () => number): number[] {
+    let area = createArea({ x: 0, y: 0 }, { radius: 100, durationS, tickEveryS });
+    const paid: number[] = [];
+    for (let guard = 0; guard < 100_000; guard += 1) {
+      const step = advanceArea(area, frame());
+      for (let i = 0; i < step.ticks; i += 1) paid.push(area.ticksPaid + i + 1);
+      area = step.area;
+      if (step.expired) return paid;
+    }
+    throw new Error('the patch never expired');
+  }
+
+  it('equals the ticks advanceArea pays by expiry, on any frame size', () => {
+    const rng = createRng(7);
+    const cases: [number, number][] = [
+      [4, 0.5],
+      [4.8, 0.5],
+      [5, 0.3],
+      [4, 0.1],
+      [0.6, 0.2],
+      [0.9, 0.3],
+      [4, 0.7],
+      [6, 0.5],
+    ];
+    const frames: [string, () => number][] = [
+      ['1/60', () => 1 / 60],
+      ['1/30', () => 1 / 30],
+      ['0.25', () => 0.25],
+      ['one long frame', () => 100],
+      ['random', () => 0.001 + rng.next() * 0.2],
+    ];
+    for (const [duration, tick] of cases) {
+      for (const [name, frame] of frames) {
+        const paid = paidTicks(duration, tick, frame);
+        expect(paid.length, `${duration}/${tick} @ ${name}`).toBe(stormTickCount(duration, tick));
+        // The ticks are numbered 1..count with none skipped: the last is the deep-freeze tick.
+        expect(paid, `${duration}/${tick} @ ${name}`).toEqual(
+          Array.from({ length: paid.length }, (_, i) => i + 1),
+        );
+      }
+    }
+  });
+
+  it('agrees with a hundred random durations, intervals and frame sizes', () => {
+    const rng = createRng(11);
+    for (let n = 0; n < 100; n += 1) {
+      const duration = 0.5 + rng.next() * 8;
+      const tick = 0.05 + rng.next() * 1.2;
+      const paid = paidTicks(duration, tick, () => 0.002 + rng.next() * 0.3);
+      expect(paid.length, `${duration}/${tick}`).toBe(stormTickCount(duration, tick));
+    }
+  });
+});
+
+describe('hailsDue', () => {
+  it('drops a stone on every even tick when ticks are half a second and stones a second', () => {
+    const per = Array.from({ length: 8 }, (_, i) => hailsDue(i + 1, 0.5, HAIL.everyS));
+    expect(per).toEqual([0, 1, 0, 1, 0, 1, 0, 1]);
+  });
+
+  it('drops one stone per tick when the two intervals match, and none for a bad clock', () => {
+    for (let n = 1; n <= 8; n += 1) expect(hailsDue(n, 1, 1)).toBe(1);
+    expect(hailsDue(0, 0.5, 1)).toBe(0);
+    expect(hailsDue(-1, 0.5, 1)).toBe(0);
+    expect(hailsDue(3, 0, 1)).toBe(0);
+    expect(hailsDue(3, 0.5, 0)).toBe(0);
+    expect(hailsDue(Number.NaN, 0.5, 1)).toBe(0);
+  });
+
+  it('totals the whole stones the paid ticks cover, and never one too many', () => {
+    for (const [duration, tick] of [
+      [4, 0.5],
+      [4.8, 0.5],
+      [5, 0.3],
+      [4, 0.25],
+      [6, 0.4],
+      [3.5, 0.7],
+    ] as const) {
+      const count = stormTickCount(duration, tick);
+      let total = 0;
+      for (let n = 1; n <= count; n += 1) {
+        const due = hailsDue(n, tick, HAIL.everyS);
+        expect(due, `${duration}/${tick} tick ${n}`).toBeGreaterThanOrEqual(0);
+        total += due;
+      }
+      // A stone is dropped only on a tick, so the total is what the last paid tick's clock crossed:
+      // exactly `floor(duration / everyS)` when the duration is a whole number of ticks, one less at most otherwise.
+      expect(total).toBe(Math.floor((count * tick) / HAIL.everyS + 1e-9));
+      expect(total).toBeLessThanOrEqual(Math.floor(duration / HAIL.everyS));
+      expect(total).toBeGreaterThanOrEqual(Math.floor(duration / HAIL.everyS) - 1);
+      if (Math.abs(count * tick - duration) < 1e-9)
+        expect(total).toBe(Math.floor(duration / HAIL.everyS));
+    }
+  });
+});
+
+/**
+ * The boss's worst case (#315, #328): every level 3 freeze source lands on it at
+ * the Haste clamp's cadence, each through the very functions `Boss.applyFrost`
+ * runs (`diminishFrost`, then `applyFrost`, then `tickFrost` each frame). Each
+ * source is an always-lands freeze of its fixed length, the strongest reading of
+ * its roll. Diminishing returns count every stun, from any source, so the run of
+ * freezes only shortens; the tests hold it to what a build could ever do to it.
+ */
+describe('boss crowd control, every Ice level 3 freeze at once', () => {
+  const HASTE = PROFILE_CLAMPS.cooldownMul?.min ?? 1;
+  const DT = 1 / 60;
+  const EPS = 2 * DT;
+
+  interface Source {
+    name: string;
+    period: number;
+    hit: FrostHit;
+  }
+  const orb: Source = {
+    name: 'frost orb',
+    period: 4 * 1.4 * HASTE, // every 4th attack of a 1.4 s companion
+    hit: frostOrbHit({ slowPct: 0.25, slowDuration: 1.5 }),
+  };
+  const deep: Source = {
+    name: 'deep freeze',
+    period: 12 * HASTE, // one Ice Storm cast, whose last tick freezes
+    hit: deepFreezeHit({ slowPct: 0.5, slowDuration: 1 }),
+  };
+  const ring: Source = {
+    name: 'shatter ring',
+    period: BASE_ICE_SHIELD_STATS.rechargeDelay * HASTE,
+    hit: shatterRingFrost(BASE_ICE_SHIELD_STATS, 3),
+  };
+  const burst: Source = {
+    name: 'nova burst',
+    period: BASE_NOVA_BOMB_STATS.cooldown * HASTE,
+    // The burst's roll comes up every time; its freeze length is the bomb's own.
+    hit: {
+      slowPct: BASE_NOVA_BOMB_STATS.slowPct,
+      slowDuration: BASE_NOVA_BOMB_STATS.slowDuration,
+      freeze: true,
+      freezeDuration: BASE_NOVA_BOMB_STATS.freezeDuration,
+    },
+  };
+  const all = [orb, deep, ring, burst];
+
+  /** `sources` firing at `first + k * period`, on a boss for `totalS` seconds. */
+  function frozenRun(
+    sources: readonly Source[],
+    firsts: readonly number[],
+    totalS = 60,
+  ): { longestS: number; frozenS: number } {
+    let cc = NO_BOSS_CC;
+    let frost = NO_FROST;
+    const next = [...firsts];
+    let longestS = 0;
+    let runS = 0;
+    let frozenS = 0;
+    for (let frame = 0; frame < Math.round(totalS / DT); frame += 1) {
+      const nowS = frame * DT;
+      sources.forEach((source, i) => {
+        while (nowS >= next[i]! - 1e-9) {
+          const landed = diminishFrost(cc, source.hit, frost.frozenS, nowS);
+          cc = landed.state;
+          frost = applyFrost(frost, landed.hit);
+          next[i]! += source.period;
+        }
+      });
+      frost = tickFrost(frost, DT).state;
+      if (frost.frozenS > 0) {
+        runS += DT;
+        frozenS += DT;
+        longestS = Math.max(longestS, runS);
+      } else {
+        runS = 0;
+      }
+    }
+    return { longestS, frozenS };
+  }
+
+  it('runs at the cadences the plan names', () => {
+    expect(all.map((s) => Number(s.period.toFixed(3)))).toEqual([1.96, 4.2, 2.1, 1.225]);
+    for (const source of all) expect(source.hit.freeze, source.name).toBe(true);
+  });
+
+  it('holds the boss for under 2 s at a stretch and 2.5 s in a minute, at any phasing', () => {
+    // Sweep where in its own period each source lands its first hit. Chained,
+    // overlapping freezes can stretch one stop past a single second, but each
+    // is halved by the last, so the stretch is bounded by 1 + 1/2 + 1/4 ... < 2.
+    const phases = [0, 0.2, 0.4, 0.6, 0.8, 1];
+    let longest = 0;
+    let total = 0;
+    for (const a of phases) {
+      for (const b of phases) {
+        for (const c of phases) {
+          for (const d of phases) {
+            const p = [a, b, c, d];
+            const run = frozenRun(
+              all,
+              all.map((s, i) => s.period * p[i]!),
+            );
+            longest = Math.max(longest, run.longestS);
+            total = Math.max(total, run.frozenS);
+          }
+        }
+      }
+    }
+    expect(longest).toBeLessThan(2);
+    expect(total).toBeLessThanOrEqual(2.5);
+  });
+
+  it('holds a boss with no other source to what the source allows on its own', () => {
+    // One source alone: a single fixed freeze at a time (no chaining), never over its length.
+    for (const source of all) {
+      const run = frozenRun([source], [source.period]);
+      expect(run.longestS, source.name).toBeLessThanOrEqual(1 + EPS);
+    }
+  });
+
+  it('lets a Deep freeze alone hold the boss for no more than its share of the cast', () => {
+    // 4.2 s between casts is past the 4 s diminishing window, so every freeze lands at full length.
+    const run = frozenRun([deep], [deep.period], 600);
+    expect(run.frozenS / 600).toBeLessThanOrEqual(DEEP_FREEZE.freezeS / deep.period + 0.005);
+  });
+
+  it('never lets a running freeze be cut short by a diminished repeat', () => {
+    // Two hits a moment apart: the second is halved, and the freeze keeps the longer.
+    let cc = NO_BOSS_CC;
+    let frost = NO_FROST;
+    const first = diminishFrost(cc, orb.hit, frost.frozenS, 0);
+    cc = first.state;
+    frost = applyFrost(frost, first.hit);
+    const second = diminishFrost(cc, deep.hit, frost.frozenS, 0.1);
+    frost = applyFrost(frost, second.hit);
+    expect(frost.frozenS).toBe(FROST_ORB.freezeS);
+  });
+});

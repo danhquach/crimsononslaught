@@ -16,13 +16,16 @@ import {
 const ENTRY = { 2: 'Adds a blade.', 3: 'Blades explode on impact.' };
 
 describe('SPELL_LEVELS (#326)', () => {
-  it('has an entry for exactly the five Fire spells (#327)', () => {
-    expect(Object.keys(SPELL_LEVELS).sort()).toEqual([...SPELLS_BY_ELEMENT.fire].sort());
+  it('has an entry for exactly the spells whose levels have landed: every Fire (#327) and Ice (#328) spell', () => {
+    expect(Object.keys(SPELL_LEVELS).sort()).toEqual(
+      [...SPELLS_BY_ELEMENT.fire, ...SPELLS_BY_ELEMENT.ice].sort(),
+    );
     expect(validateSpellLevels()).toEqual([]);
   });
 
-  it('has a stat add for each spell that has text, and the fields exist (#327)', () => {
-    expect(Object.keys(SPELL_LEVEL_STATS).sort()).toEqual(Object.keys(SPELL_LEVELS).sort());
+  it('adds stats only to spells that have text, and the fields exist (#327, #328)', () => {
+    // A spell whose levels are all behaviour (Ice Shield, Ice Storm) has text and no stat add.
+    for (const id of Object.keys(SPELL_LEVEL_STATS)) expect(SPELL_LEVELS, id).toHaveProperty(id);
     expect(validateSpellLevelStats(SPELL_LEVEL_STATS, rosterBaseStats)).toEqual([]);
   });
 

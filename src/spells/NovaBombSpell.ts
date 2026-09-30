@@ -1,4 +1,8 @@
 import Phaser from 'phaser';
+import { CLUSTER, MAX_LIVE_MINI_URCHINS } from '../config/iceLevels';
+import type { SpellLevel } from '../config/spellLevels';
+import { recordCapped } from '../core/fireLevels';
+import { clusterBurst, clusterHeadings, hasCluster } from '../core/iceLevels';
 import {
   BOMB_SPIN_DEG_PER_S,
   MAX_LIVE_BOMBS,
@@ -29,6 +33,13 @@ const BOMB_LOOK: ProjectileLook = { texture: 'proj_nova_bomb' };
 /** One icicle in flight: `ice.icicle` through its placeholder key, the diamond without the atlas. */
 const ICICLE_LOOK: ProjectileLook = { texture: 'proj_icicle' };
 
+/** A cluster urchin: the bomb's own sprite at half size, so it adds no art (#328). */
+const MINI_LOOK: ProjectileLook = {
+  texture: 'proj_nova_bomb',
+  clip: CLUSTER.clip,
+  scale: CLUSTER.drawScale,
+};
+
 const SPIN_RAD_PER_S = (BOMB_SPIN_DEG_PER_S * Math.PI) / 180;
 
 /**
@@ -39,12 +50,46 @@ const TURN_EPSILON_RAD = 1e-6;
 
 /** One rolling bomb's own clock, and the numbers it was thrown with (spec §6.2 snapshot). */
 interface Flight {
+  /** The level the bomb was thrown at (#328): Cluster is read here, not at the burst. */
+  readonly level: SpellLevel;
   readonly aimRad: number;
   readonly stats: Readonly<NovaBombStats>;
   elapsedS: number;
   thrown: number;
   /** Test hook (CO-185): a step of this flight turned the sprite. */
   turned: boolean;
+}
+
+/** One small urchin rolling out of a Cluster burst: what its own burst will be, and the level it came from. */
+interface Mini {
+  readonly level: SpellLevel;
+  readonly bombRadius: number;
+  readonly burst: ReturnType<typeof clusterBurst>;
+}
+
+/** Frost Nova Bomb's level record, what the test hook reads (#328): cause and effect in one entry. */
+export interface NovaLevelReport {
+  /** Each throw of the icicle spiral: the icicles that actually left the bomb. */
+  throws: { level: SpellLevel; icicles: number }[];
+  /** Each Cluster burst: the urchins that rolled out of it. */
+  clusters: { level: SpellLevel; urchins: number }[];
+  /** Each small urchin's burst: its radius against the bomb's, how far it had rolled from the burst, and the enemies it caught. */
+  miniBursts: {
+    level: SpellLevel;
+    radius: number;
+    bombRadius: number;
+    distance: number;
+    caught: number;
+  }[];
+  /** Cluster bursts that rolled out a full `CLUSTER.count` urchins, so far: a count the capped `clusters` log cannot lose. */
+  fullClusters: number;
+  /** Urchin bursts that caught at least one enemy, so far. */
+  minisCaught: number;
+  /** Urchin bursts that went off where the urchin's range ran out (within 20 past it), so far. */
+  minisAtRange: number;
+  liveMinis: number;
+  minisDropped: number;
+  miniViews: { clip: string | null; scale: number }[];
 }
 
 /**
@@ -73,11 +118,27 @@ interface Flight {
  * `radius` (`spikeRingScale`). Ice Shield keeps `ice.nova` for its shatter.
  * The frost on a slowed enemy and the block on a frozen one are the overlay
  * pool's, driven from its status.
+ *
+ * Levels (#328): level 2's four icicles a throw is a stat add (`icicles`).
+ * Level 3, Cluster: a bomb thrown at that level rolls `CLUSTER.count` small
+ * urchins out of its burst, each a half-radius burst of its own that slows and
+ * damages but never freezes, so it draws nothing from the RNG. The urchins
+ * roll in a pool of their own, pass through the crowd like the bomb and never
+ * cluster again.
  */
 export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
   private readonly bombs: Phaser.Physics.Arcade.Group;
   private readonly icicles: Phaser.Physics.Arcade.Group;
+  private readonly minis: Phaser.Physics.Arcade.Group;
   private readonly flights = new Map<Projectile, Flight>();
+  private readonly rolling = new Map<Projectile, Mini>();
+  private readonly throwLog: NovaLevelReport['throws'] = [];
+  private readonly clusterLog: NovaLevelReport['clusters'] = [];
+  private readonly miniBurstLog: NovaLevelReport['miniBursts'] = [];
+  private miniDropCount = 0;
+  private fullClusters = 0;
+  private minisCaught = 0;
+  private minisAtRange = 0;
   private readonly caster: Readonly<Vec2>;
   private readonly enemies: EnemyPool;
   private readonly damage: DamageSink;
@@ -125,6 +186,34 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
       runChildUpdate: false,
     });
     collisions.addSpellGroup(this.icicles, (enemy, hitbox) => this.onIcicleHit(enemy, hitbox));
+    // Urchins pass through the crowd like the bomb: not registered with
+    // CollisionSystem, they burst on the rule when their range runs out.
+    this.minis = scene.physics.add.group({
+      classType: Projectile,
+      maxSize: MAX_LIVE_MINI_URCHINS,
+      runChildUpdate: false,
+    });
+  }
+
+  /** Test hook (#328): the throws, Cluster bursts and urchin bursts this spell has made, and its urchins. */
+  get levelReport(): NovaLevelReport {
+    const live = this.minis
+      .getChildren()
+      .filter((child): child is Projectile => child instanceof Projectile && child.active);
+    return {
+      throws: [...this.throwLog],
+      clusters: [...this.clusterLog],
+      miniBursts: [...this.miniBurstLog],
+      fullClusters: this.fullClusters,
+      minisCaught: this.minisCaught,
+      minisAtRange: this.minisAtRange,
+      liveMinis: live.length,
+      minisDropped: this.miniDropCount,
+      miniViews: live.map((mini) => ({
+        clip: mini.anims.currentAnim?.key ?? null,
+        scale: mini.scaleX,
+      })),
+    };
   }
 
   /** Bombs and icicles in the air right now. */
@@ -168,6 +257,7 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
   protected override tick(deltaS: number): void {
     super.tick(deltaS);
     if (this.flights.size > 0) this.roll(deltaS);
+    if (this.rolling.size > 0) this.rollMinis(deltaS);
     for (const child of this.icicles.getChildren()) {
       if (child instanceof Projectile && child.active && child.spent) child.despawn();
     }
@@ -190,7 +280,7 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
       }
       if (shouldBurst(bomb, live, bomb.travelled, flight.stats.range, flight.stats.radius)) {
         if (flight.turned) this.spun += 1;
-        this.detonate(bomb, flight.stats);
+        this.detonate(bomb, flight);
         continue;
       }
       const owed = throwsDue(flight.elapsedS, flight.thrown, flight.stats.throwInterval);
@@ -215,6 +305,7 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
     const to = { x: x + aim.x * stats.range, y: y + aim.y * stats.range };
     bomb.fire(x, y, to, stats.speed, stats.range, BOMB_LOOK);
     this.flights.set(bomb, {
+      level: this.level,
       aimRad: Math.atan2(aim.y, aim.x),
       stats,
       elapsedS: 0,
@@ -226,6 +317,7 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
   /** One throw of the spiral: the whole set leaves the bomb's position. */
   private throwIcicles(bomb: Projectile, flight: Flight): void {
     const { icicles, icicleSpeed, icicleRange } = flight.stats;
+    let thrown = 0;
     for (const angle of throwAngles(flight.aimRad, flight.thrown, icicles)) {
       const icicle = this.icicles.get(bomb.x, bomb.y) as Projectile | null;
       // Pool exhausted: the rest of the throw is dropped, never queued.
@@ -235,8 +327,10 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
         y: bomb.y + Math.sin(angle) * icicleRange,
       };
       icicle.fire(bomb.x, bomb.y, to, icicleSpeed, icicleRange, ICICLE_LOOK);
+      thrown += 1;
     }
     flight.thrown += 1;
+    recordCapped(this.throwLog, { level: flight.level, icicles: thrown });
   }
 
   /**
@@ -258,7 +352,8 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
   }
 
   /** The burst, resolved at the bomb's position: chill first, then damage, the way every Ice hit lands. */
-  private detonate(bomb: Projectile, stats: Readonly<NovaBombStats>): void {
+  private detonate(bomb: Projectile, flight: Flight): void {
+    const { stats } = flight;
     const origin = { x: bomb.x, y: bomb.y };
     bomb.despawn();
     this.flights.delete(bomb);
@@ -273,5 +368,67 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
     this.landed += caught;
     this.caught.push(caught);
     this.fx.burst('ice.spikeRing', origin.x, origin.y, { scale: spikeRingScale(stats.radius) });
+    if (hasCluster(flight.level)) this.rollOutMinis(origin, flight);
+  }
+
+  /** Cluster (level 3): `CLUSTER.count` urchins leave the burst, dropped when the pool is out. */
+  private rollOutMinis(origin: Readonly<Vec2>, flight: Flight): void {
+    const burst = clusterBurst(flight.stats);
+    let launched = 0;
+    for (const angle of clusterHeadings(flight.aimRad)) {
+      const mini = this.minis.get(origin.x, origin.y) as Projectile | null;
+      // Pool exhausted: the urchin is dropped, never queued.
+      if (!mini) {
+        this.miniDropCount += 1;
+        continue;
+      }
+      const to = {
+        x: origin.x + Math.cos(angle) * CLUSTER.range,
+        y: origin.y + Math.sin(angle) * CLUSTER.range,
+      };
+      mini.fire(origin.x, origin.y, to, CLUSTER.speed, CLUSTER.range, MINI_LOOK);
+      this.rolling.set(mini, { level: flight.level, bombRadius: flight.stats.radius, burst });
+      launched += 1;
+    }
+    if (launched === CLUSTER.count) this.fullClusters += 1;
+    recordCapped(this.clusterLog, { level: flight.level, urchins: launched });
+  }
+
+  /** Every rolling urchin's step: spin it, and burst it once its range has run out. */
+  private rollMinis(deltaS: number): void {
+    // Deleting a Map entry while iterating it is safe: it just stops being visited.
+    for (const [mini, state] of this.rolling) {
+      if (!mini.active) {
+        this.rolling.delete(mini);
+        continue;
+      }
+      mini.setRotation(mini.rotation + SPIN_RAD_PER_S * deltaS);
+      if (mini.spent) this.burstMini(mini, state);
+    }
+  }
+
+  /** An urchin's burst: slow first, then damage, never a freeze. */
+  private burstMini(mini: Projectile, { level, bombRadius, burst }: Mini): void {
+    const origin = { x: mini.x, y: mini.y };
+    const distance = mini.travelled;
+    mini.despawn();
+    this.rolling.delete(mini);
+    let caught = 0;
+    for (const enemy of pulseTargets(origin, this.enemies.live, burst.radius)) {
+      if (!enemy.active) continue;
+      caught += 1;
+      enemy.applyFrost(icicleFrost(burst));
+      this.damage(enemy, burst.damage, 'hit', origin);
+    }
+    if (caught > 0) this.minisCaught += 1;
+    if (distance >= CLUSTER.range && distance < CLUSTER.range + 20) this.minisAtRange += 1;
+    recordCapped(this.miniBurstLog, {
+      level,
+      radius: burst.radius,
+      bombRadius,
+      distance,
+      caught,
+    });
+    this.fx.burst('ice.spikeRing', origin.x, origin.y, { scale: spikeRingScale(burst.radius) });
   }
 }

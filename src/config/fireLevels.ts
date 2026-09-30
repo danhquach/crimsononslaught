@@ -54,9 +54,12 @@ export const COMPANION_FIREBALL = {
   pond: { radius: 36, durationS: 2, tickEveryS: 0.5, tickDamage: 3 },
 } as const;
 
-/** Which ranged companion's every-Nth attack is empowered, and how. Ice adds `'frostOrb'` in #328. */
-export const COMPANION_EMPOWERED: Readonly<Partial<Record<CompanionSpellId, 'fireball'>>> = {
+/** Which ranged companion's every-Nth attack is empowered, and how (Ice's `frostOrb` is `config/iceLevels.ts`'s, #328). */
+export const COMPANION_EMPOWERED: Readonly<
+  Partial<Record<CompanionSpellId, 'fireball' | 'frostOrb'>>
+> = {
   fire_companion: 'fireball',
+  ice_companion: 'frostOrb',
 };
 
 /** Fire Dragon level 3, Dragon swarm: a dragon strikes this many different enemies before it is spent (levels 1 and 2: one). */

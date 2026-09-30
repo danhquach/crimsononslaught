@@ -41,10 +41,10 @@ export type SpellLevelEntry = Readonly<{ 2: string; 3: string }>;
 export type SpellLevelTable = Readonly<Partial<Record<RosterSpellId, SpellLevelEntry>>>;
 
 /**
- * What each spell's levels 2 and 3 add. Fire's are here (#327); each other
- * element's lands with its own ticket (#328-#330). The stat adds that back the
- * first line of each are `SPELL_LEVEL_STATS`, and the level 3 rules are
- * `config/fireLevels.ts`'s. Written as ASCII, so "degrees" stands for the sign.
+ * What each spell's levels 2 and 3 add. Fire's are here (#327) and Ice's
+ * (#328); each other element's lands with its own ticket (#329-#330). The stat
+ * adds that back the first line of each are `SPELL_LEVEL_STATS`, and the level
+ * 3 rules are `config/fireLevels.ts`'s and `config/iceLevels.ts`'s. Written as ASCII, so "degrees" stands for the sign.
  */
 export const SPELL_LEVELS: SpellLevelTable = {
   fire: {
@@ -67,6 +67,26 @@ export const SPELL_LEVELS: SpellLevelTable = {
     2: 'Sends 2 dragons per cast, at different targets.',
     3: 'Dragon swarm: 3 dragons, each hits 2 enemies.',
   },
+  ice: {
+    2: 'Fires 2 arrows in a fan.',
+    3: 'Shatter: hits on slowed enemies throw 3 shards.',
+  },
+  ice_nova_bomb: {
+    2: 'Sprays 4 icicles per throw instead of 2.',
+    3: 'Cluster: the burst rolls out 3 small urchins.',
+  },
+  ice_shield: {
+    2: 'Frost aura: enemies touching it are slowed.',
+    3: 'Shatter ring: a break fires 8 icicles, freezes.',
+  },
+  ice_companion: {
+    2: 'Fires 2 projectiles per attack.',
+    3: 'Frost orb: every 4th attack freezes its target.',
+  },
+  ice_blizzard: {
+    2: 'Hail: every second a hailstone hits one inside.',
+    3: 'Deep freeze: the last tick freezes all inside.',
+  },
 };
 
 /** Stat adds a level brings, cumulative: level 3 has level 2's adds too (#327). */
@@ -88,6 +108,9 @@ export const SPELL_LEVEL_STATS: SpellLevelStatTable = {
   fire_column: { 2: { arc: 55 } }, // 95 -> 150
   fire_companion: { 2: { projectiles: 1 } },
   fire_dragon: { 2: { projectiles: 1 }, 3: { projectiles: 1 } },
+  ice: { 2: { projectiles: 1 } },
+  ice_nova_bomb: { 2: { icicles: 2 } }, // 2 -> 4
+  ice_companion: { 2: { projectiles: 1 } },
 };
 
 /** The text for `level` of `id`, or `undefined` when the spell has no entry or the level is 1. */

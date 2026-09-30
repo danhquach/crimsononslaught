@@ -11,10 +11,16 @@ import {
   MAGNET_DURATION_MS,
   RELIC_COUNT,
 } from '../config/pickups';
-import { ROSTER_SPELL_IDS, SPELLS_BY_ELEMENT } from '../config/loadout';
+import { ROSTER_SPELL_IDS, SPELLS_BY_ELEMENT, elementOf } from '../config/loadout';
 import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVEL_TEXT_MAX, SPELL_LEVELS, type SpellLevelTable } from '../config/spellLevels';
-import { MAX_SPELL_HELP_ROWS, pickupHelpRows, spellHelpRows } from './helpModel';
+import {
+  MAX_SPELL_HELP_ROWS,
+  clampSpellPage,
+  pickupHelpRows,
+  spellHelpPages,
+  spellHelpRows,
+} from './helpModel';
 import { MAX_OFFER_SIZE } from './levelUp';
 
 const row = (name: string) => {
@@ -75,12 +81,17 @@ describe('pickupHelpRows', () => {
 });
 
 describe('spellHelpRows', () => {
-  it('lists exactly the five Fire spells, in roster order', () => {
-    expect(spellHelpRows().map((r) => r.id)).toEqual(SPELLS_BY_ELEMENT.fire);
+  it('lists exactly the spells whose levels have landed, in roster order: Fire, then Ice', () => {
+    expect(spellHelpRows().map((r) => r.id)).toEqual([
+      ...SPELLS_BY_ELEMENT.fire,
+      ...SPELLS_BY_ELEMENT.ice,
+    ]);
   });
 
-  it('fits the panel: no more rows than it has room for without a pager', () => {
-    expect(spellHelpRows().length).toBeLessThanOrEqual(MAX_SPELL_HELP_ROWS);
+  it('fits the panel: no page holds more rows than it has room for', () => {
+    for (const page of spellHelpPages()) {
+      expect(page.rows.length).toBeLessThanOrEqual(MAX_SPELL_HELP_ROWS);
+    }
   });
 
   it('reads name, colour and description from the same card the level-up uses', () => {
@@ -120,5 +131,67 @@ describe('spellHelpRows', () => {
     const table = { __proto__: null, water: { 2: 'x', 3: 'y' } } as unknown as SpellLevelTable;
     expect(spellHelpRows(table)).toEqual([]);
     expect(ROSTER_SPELL_IDS).not.toContain('water');
+  });
+});
+
+describe('spellHelpPages', () => {
+  const both: SpellLevelTable = {
+    fire: { 2: 'Fire two.', 3: 'Fire three.' },
+    ice: { 2: 'Ice two.', 3: 'Ice three.' },
+  };
+
+  it('is a Fire page then an Ice page while those are the elements with text', () => {
+    const pages = spellHelpPages();
+    expect(pages.map((p) => [p.element, p.title])).toEqual([
+      ['fire', 'Fire'],
+      ['ice', 'Ice'],
+    ]);
+    expect(pages[0]?.rows.map((r) => r.id)).toEqual(SPELLS_BY_ELEMENT.fire);
+    expect(pages[1]?.rows.map((r) => r.id)).toEqual(SPELLS_BY_ELEMENT.ice);
+  });
+
+  it('gives each element its own page, in element order, titled by the element', () => {
+    const pages = spellHelpPages(both);
+    expect(pages.map((p) => [p.element, p.title])).toEqual([
+      ['fire', 'Fire'],
+      ['ice', 'Ice'],
+    ]);
+    for (const page of pages) {
+      expect(page.rows.length).toBeGreaterThan(0);
+      expect(page.rows.length).toBeLessThanOrEqual(MAX_SPELL_HELP_ROWS);
+      for (const r of page.rows) expect(elementOf(r.id), r.id).toBe(page.element);
+    }
+  });
+
+  it('lists every row once, in spellHelpRows order', () => {
+    const table: SpellLevelTable = { ...both, earth: { 2: 'E two.', 3: 'E three.' } };
+    const paged = spellHelpPages(table).flatMap((p) => p.rows.map((r) => r.id));
+    expect(paged).toEqual(spellHelpRows(table).map((r) => r.id));
+    expect(new Set(paged).size).toBe(paged.length);
+  });
+
+  it('has no page for an empty table', () => {
+    expect(spellHelpPages({})).toEqual([]);
+  });
+});
+
+describe('clampSpellPage', () => {
+  it('keeps a page that exists', () => {
+    expect(clampSpellPage(0, 2)).toBe(0);
+    expect(clampSpellPage(1, 2)).toBe(1);
+  });
+
+  it('clamps out-of-range pages to the nearest end', () => {
+    expect(clampSpellPage(2, 2)).toBe(1);
+    expect(clampSpellPage(Number.MAX_SAFE_INTEGER, 2)).toBe(1);
+    expect(clampSpellPage(-1, 2)).toBe(0);
+    expect(clampSpellPage(Number.NEGATIVE_INFINITY, 2)).toBe(0);
+  });
+
+  it('sends NaN, infinity and no pages to the first page, and truncates fractions', () => {
+    expect(clampSpellPage(Number.NaN, 2)).toBe(0);
+    expect(clampSpellPage(Number.POSITIVE_INFINITY, 2)).toBe(0);
+    expect(clampSpellPage(1, 0)).toBe(0);
+    expect(clampSpellPage(1.9, 3)).toBe(1);
   });
 });

@@ -9,7 +9,7 @@ import {
   feedbackPayload,
   validateFeedback,
 } from '../core/feedback';
-import { pickupHelpRows, spellHelpRows } from '../core/helpModel';
+import { clampSpellPage, pickupHelpRows, spellHelpPages } from '../core/helpModel';
 import { SCENE, isHelpPayload, type HelpView } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
@@ -39,11 +39,17 @@ const ICON_BOX = 32;
 const NAME_X = 92;
 const TEXT_X = 196;
 
-/** Spells tab (#327): a 64 px row per spell, five Fire spells filling the panel down to Back. */
+/** Spells tab (#327): a 64 px row per spell, five to a page, filling the panel down to Back. */
 const SPELL_ROW_PITCH = 64;
 const SPELL_ROW_TOP = PANEL_TOP + PANEL_PADDING + SPELL_ROW_PITCH / 2;
 /** Room for the longest card name ("Fire Companion") at 19px, with slack for a wider font. */
 const SPELL_TEXT_X = 260;
+/**
+ * The pager (#328) shares Back's row: Back spans 220 px and each pager button
+ * 160, so buttons centred 206 px either side leave 16 px between them.
+ */
+const PAGER_WIDTH = 160;
+const PAGER_OFFSET = 206;
 
 /** The feedback form's fields, in game pixels. */
 const FORM_WIDTH = 600;
@@ -72,6 +78,8 @@ const FEEDBACK_KEY = import.meta.env.VITE_FEEDBACK_ACCESS_KEY;
  */
 export class HelpScene extends Phaser.Scene {
   private current: HelpView = 'pickups';
+  /** The Spells page on screen (0-based), already clamped to the pages there are. */
+  private spellPage = 0;
   private leaving = false;
   /** Bumped on every create, so a send that resolves after the form closed changes nothing. */
   private generation = 0;
@@ -89,6 +97,8 @@ export class HelpScene extends Phaser.Scene {
 
   init(data: unknown): void {
     this.current = isHelpPayload(data) ? data.view : 'pickups';
+    // Clamped against the pages again in `drawSpells`, once the table is read.
+    this.spellPage = isHelpPayload(data) ? (data.spellPage ?? 0) : 0;
     // Phaser replays the last start payload on a payload-less start; clear it.
     this.scene.settings.data = {};
   }
@@ -110,7 +120,7 @@ export class HelpScene extends Phaser.Scene {
     } else {
       const items: MenuItem[] = this.drawTabs();
       if (this.current === 'pickups') this.drawPickups();
-      else if (this.current === 'spells') this.drawSpells();
+      else if (this.current === 'spells') items.push(...this.drawSpells());
       else items.push(...this.drawAbout());
       items.push(
         addMenuRow(this, {
@@ -193,8 +203,11 @@ export class HelpScene extends Phaser.Scene {
     });
   }
 
-  private drawSpells(): void {
-    const rows = spellHelpRows();
+  private drawSpells(): MenuItem[] {
+    const { width } = this.scale;
+    const pages = spellHelpPages();
+    this.spellPage = clampSpellPage(this.spellPage, pages.length);
+    const rows = pages[this.spellPage]?.rows ?? [];
     drawPanel(this, 30, PANEL_TOP, 900, rows.length * SPELL_ROW_PITCH + PANEL_PADDING * 2);
     rows.forEach((row, i) => {
       const y = SPELL_ROW_TOP + i * SPELL_ROW_PITCH;
@@ -218,6 +231,36 @@ export class HelpScene extends Phaser.Scene {
         })
         .setOrigin(0, 0.5);
     });
+
+    // A button only where that neighbour page exists; each names the element it goes to.
+    const pager: MenuItem[] = [];
+    const prev = pages[this.spellPage - 1];
+    const next = pages[this.spellPage + 1];
+    if (prev) {
+      pager.push(
+        addMenuRow(this, {
+          kind: 'bar',
+          label: `< ${prev.title}`,
+          x: width / 2 - PAGER_OFFSET,
+          y: BACK_Y,
+          width: PAGER_WIDTH,
+          onConfirm: () => this.showSpellPage(this.spellPage - 1),
+        }),
+      );
+    }
+    if (next) {
+      pager.push(
+        addMenuRow(this, {
+          kind: 'bar',
+          label: `${next.title} >`,
+          x: width / 2 + PAGER_OFFSET,
+          y: BACK_Y,
+          width: PAGER_WIDTH,
+          onConfirm: () => this.showSpellPage(this.spellPage + 1),
+        }),
+      );
+    }
+    return pager;
   }
 
   private drawAbout(): MenuItem[] {
@@ -400,6 +443,14 @@ export class HelpScene extends Phaser.Scene {
     this.leaving = true;
     audioOf(this).play('ui.confirm');
     this.scene.restart({ view });
+  }
+
+  /** Same guard as `show`: a click and a key in one frame turn the page once. */
+  private showSpellPage(spellPage: number): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    audioOf(this).play('ui.confirm');
+    this.scene.restart({ view: 'spells', spellPage });
   }
 
   private back(): void {

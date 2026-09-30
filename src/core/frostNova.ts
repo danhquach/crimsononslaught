@@ -46,9 +46,9 @@ export const BURST_ARM_DISTANCE = 120;
  * Icicles in the air the pool may ever hold (CO-182). An icicle lives about
  * 0.34 s (110 px at 320 px/s) and a bomb throws 2 every 0.25 s, so one bomb
  * keeps about 3 up; the cap leaves room for a hasted, long-range build with
- * several bombs rolling at once.
+ * several bombs rolling at once, each throwing the 4 icicles of level 2 (#328).
  */
-export const MAX_LIVE_ICICLES = 32;
+export const MAX_LIVE_ICICLES = 64;
 
 /** The cold on one enemy; `NO_FROST` when there is none. */
 export interface FrostState {

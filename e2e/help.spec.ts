@@ -3,7 +3,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import { E2E_FEEDBACK_KEY } from '../playwright.config';
 import { CHANGELOG } from '../src/config/changelog';
 import { FEEDBACK_URL } from '../src/core/feedback';
-import { pickupHelpRows, spellHelpRows } from '../src/core/helpModel';
+import { pickupHelpRows, spellHelpPages } from '../src/core/helpModel';
 import { AUDIO_REGISTRY_KEY, SCENE, type HelpView } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import { clickRow, collectErrors, menuRows, sceneTexts, waitForScene } from './game';
@@ -135,26 +135,17 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
   expect(errors).toEqual([]);
 });
 
-test('the Spells tab lists every Fire spell with its two upgrades, inside the panel', async ({
-  page,
-}) => {
-  const errors = collectErrors(page);
-  await page.goto('/?seed=1');
-  await waitForScene(page, SCENE.intro);
-  await clickRow(page, SCENE.intro, 'Help');
-  await waitForView(page, 'pickups');
-  await clickRow(page, SCENE.help, 'Spells');
-  await waitForView(page, 'spells');
-
-  const rows = spellHelpRows();
-  expect(rows.map((row) => row.id)).toEqual([
-    'fire',
-    'fire_meteor',
-    'fire_column',
-    'fire_companion',
-    'fire_dragon',
-  ]);
-  // The screen is still, so texts, boxes and rows read one after another agree.
+/**
+ * The Spells page on screen: every row of `page` drawn inside the panel, clear
+ * of the tabs above and the Back row below, and each pager button that exists
+ * (`< Prev` / `Next >`) clear of Back and the side edges. The screen is still,
+ * so texts, boxes and rows read one after another agree.
+ */
+async function expectSpellsPageFits(
+  page: Page,
+  spellsPage: ReturnType<typeof spellHelpPages>[number],
+  neighbours: { prev?: string; next?: string },
+): Promise<void> {
   const boxes = await drawnBounds(page);
   const boxOf = (label: string): (typeof boxes)[number] => {
     const box = boxes.find((b) => b.label === label);
@@ -171,7 +162,7 @@ test('the Spells tab lists every Fire spell with its two upgrades, inside the pa
   const SLACK = 8;
   const tabsBottom = Math.max(...tabs.map((row) => row.bounds.y + row.bounds.height));
   let previousBottom = tabsBottom;
-  for (const row of rows) {
+  for (const row of spellsPage.rows) {
     const name = boxOf(row.name);
     const lv2 = boxOf(row.lv2);
     const lv3 = boxOf(row.lv3);
@@ -186,12 +177,95 @@ test('the Spells tab lists every Fire spell with its two upgrades, inside the pa
     previousBottom = lv3.b;
   }
   expect(previousBottom).toBeLessThanOrEqual(back.bounds.y - SLACK);
+
+  // A pager button only where that neighbour page exists, labelled with its element.
+  const pager = menu.filter((row) => row.label.startsWith('< ') || row.label.endsWith(' >'));
+  expect(pager.map((row) => row.label)).toEqual(
+    [neighbours.prev && `< ${neighbours.prev}`, neighbours.next && `${neighbours.next} >`].filter(
+      (label): label is string => label !== undefined,
+    ),
+  );
+  for (const button of pager) {
+    const { x, y, width, height } = button.bounds;
+    const label = boxOf(button.label);
+    // On Back's row, centred label, and 8 px clear of Back and of the panel's side edges.
+    expect(y + height / 2, button.label).toBeCloseTo(back.bounds.y + back.bounds.height / 2, 0);
+    expect((label.l + label.r) / 2, button.label).toBeCloseTo(x + width / 2, 0);
+    expect(label.l, button.label).toBeGreaterThanOrEqual(x + SLACK);
+    expect(label.r, button.label).toBeLessThanOrEqual(x + width - SLACK);
+    expect(x, button.label).toBeGreaterThanOrEqual(30 + SLACK);
+    expect(x + width, button.label).toBeLessThanOrEqual(930 - SLACK);
+    const clear =
+      x + width <= back.bounds.x - SLACK || x >= back.bounds.x + back.bounds.width + SLACK;
+    expect(clear, `${button.label} clear of Back`).toBe(true);
+  }
   await expectOnScreen(page);
-  await page.screenshot({ path: test.info().outputPath('help-spells.png') });
+}
+
+test('the Spells tab lists every spell of each element with its two upgrades, inside the panel', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Help');
+  await waitForView(page, 'pickups');
+  await clickRow(page, SCENE.help, 'Spells');
+  await waitForView(page, 'spells');
+
+  const pages = spellHelpPages();
+  expect(pages[0]?.rows.map((row) => row.id)).toEqual([
+    'fire',
+    'fire_meteor',
+    'fire_column',
+    'fire_companion',
+    'fire_dragon',
+  ]);
+  // Walk the pages with the pager: each fits, a `Next >` click turns forward, `< Prev` turns back.
+  for (const [i, spellsPage] of pages.entries()) {
+    await expectSpellsPageFits(page, spellsPage, {
+      prev: pages[i - 1]?.title,
+      next: pages[i + 1]?.title,
+    });
+    await page.screenshot({
+      path: test.info().outputPath(`help-spells-${spellsPage.element}.png`),
+    });
+    const next = pages[i + 1];
+    if (next) {
+      await clickRow(page, SCENE.help, `${next.title} >`);
+      await expect.poll(async () => sceneTexts(page, SCENE.help)).toContain(next.rows[0]!.lv2);
+    }
+  }
+  for (let i = pages.length - 1; i > 0; i--) {
+    await clickRow(page, SCENE.help, `< ${pages[i - 1]!.title}`);
+    await expect
+      .poll(async () => sceneTexts(page, SCENE.help))
+      .toContain(pages[i - 1]!.rows[0]!.lv2);
+  }
 
   await clickRow(page, SCENE.help, 'Back  (Esc)');
   await waitForScene(page, SCENE.intro);
   expect(errors).toEqual([]);
+});
+
+test('the Spells pager is reached by keyboard and turns the page', async ({ page }) => {
+  // Only with a second element's text in the table does a pager exist to reach.
+  const pages = spellHelpPages();
+  test.skip(pages.length < 2, 'one Spells page: no pager buttons');
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Help');
+  await waitForView(page, 'pickups');
+  await clickRow(page, SCENE.help, 'Spells');
+  await waitForView(page, 'spells');
+
+  // Menu order: tabs, `Next >` (page 0 has no `< Prev`), Back. Arrows reveal the first entry.
+  await page.keyboard.press('ArrowRight'); // reveals the Pickups tab
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight'); // Spells, About, Next >
+  const lit = (await menuRows(page, SCENE.help)).filter((row) => row.selected);
+  expect(lit.map((row) => row.label)).toEqual([`${pages[1]!.title} >`]);
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => sceneTexts(page, SCENE.help)).toContain(pages[1]!.rows[0]!.lv2);
 });
 
 test('the keyboard opens Help, switches to About, and Esc returns', async ({ page }) => {
@@ -207,7 +281,7 @@ test('the keyboard opens Help, switches to About, and Esc returns', async ({ pag
   await page.keyboard.press('ArrowRight'); // Spells
   await page.keyboard.press('Enter');
   await waitForView(page, 'spells');
-  expect(await sceneTexts(page, SCENE.help)).toContain(spellHelpRows()[0]!.lv2);
+  expect(await sceneTexts(page, SCENE.help)).toContain(spellHelpPages()[0]!.rows[0]!.lv2);
 
   await page.keyboard.press('ArrowRight'); // reveals the Pickups tab
   await page.keyboard.press('ArrowRight'); // Spells
@@ -406,4 +480,43 @@ test('a failed send says so and keeps what was typed; Esc in a field closes the 
   await page.keyboard.press('Escape');
   await waitForView(page, 'about');
   await expect(page.locator('textarea[name="message"]')).toHaveCount(0);
+});
+
+test('a hostile spellPage is refused whole: Help falls back to Pickups and draws without an error', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Help');
+  await waitForView(page, 'pickups');
+
+  const restartHelp = (payload: object) =>
+    page.evaluate(
+      async ([key, data]) => {
+        const { game } = await import('/src/main.ts');
+        game.scene.getScene(key as string).scene.restart(data as object);
+      },
+      [SCENE.help, payload] as const,
+    );
+
+  // A page the scene accepts shows the Spells tab; the same view with any of
+  // these is not a HelpPayload, so the scene shows its default view instead.
+  await restartHelp({ view: 'spells', spellPage: 1 });
+  await waitForView(page, 'spells');
+  for (const spellPage of [999, -1, '1', Number.NaN, 1.5, { page: 1 }, [1]]) {
+    await restartHelp({ view: 'spells', spellPage });
+    await expect
+      .poll(() => helpView(page), { message: `Help falls back for ${String(spellPage)}` })
+      .toBe('pickups');
+    await waitForScene(page, SCENE.help);
+    expect(await sceneTexts(page, SCENE.help), String(spellPage)).toEqual(
+      expect.arrayContaining(['Help', 'Pickups', 'About', ...NAMES]),
+    );
+    await expectOnScreen(page);
+    // Back to the accepted case, so the fallback is seen to be a change and not a stale view.
+    await restartHelp({ view: 'spells', spellPage: 1 });
+    await waitForView(page, 'spells');
+  }
+  expect(errors).toEqual([]);
 });

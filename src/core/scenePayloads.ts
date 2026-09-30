@@ -129,7 +129,12 @@ export type HelpView = (typeof HELP_VIEWS)[number];
 /** `Intro -> Help`, and Help restarting itself on another view. Left out, Help opens on Pickups. */
 export interface HelpPayload {
   view: HelpView;
+  /** Which Spells page (#328), 0-based; left out, the first. The scene clamps it to the pages there are. */
+  spellPage?: number;
 }
+
+/** No table has anywhere near this many Spells pages; a larger `spellPage` is not one the scene sent. */
+export const MAX_SPELL_PAGE = 64;
 
 /** `ended`: the player ended the run from the pause screen (#252), keeping what it earned. */
 export type Outcome = 'win' | 'lose' | 'ended';
@@ -220,7 +225,14 @@ export function isSettingsPayload(data: unknown): data is SettingsPayload {
 }
 
 export function isHelpPayload(data: unknown): data is HelpPayload {
-  return isRecord(data) && (HELP_VIEWS as readonly unknown[]).includes(data.view);
+  return (
+    isRecord(data) &&
+    (HELP_VIEWS as readonly unknown[]).includes(data.view) &&
+    (data.spellPage === undefined ||
+      (Number.isInteger(data.spellPage) &&
+        (data.spellPage as number) >= 0 &&
+        (data.spellPage as number) <= MAX_SPELL_PAGE))
+  );
 }
 
 export function isRunStats(data: unknown): data is RunStats {

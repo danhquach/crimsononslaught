@@ -1,5 +1,10 @@
+import { COMPANION_EMPOWERED, COMPANION_FIREBALL } from '../config/fireLevels';
+import { FROST_ORB } from '../config/iceLevels';
+import type { SpellLevel } from '../config/spellLevels';
+import type { CompanionSpellId } from '../config/companions';
 import type { Vec2 } from './input';
 import { chaseVelocity } from './enemy';
+import { isEmpoweredAttack } from './fireLevels';
 import { nearestEnemies } from './spell';
 
 /**
@@ -191,4 +196,21 @@ export function volleyLanes(
       to: { x: target.x + ox, y: target.y + oy },
     };
   });
+}
+
+/**
+ * What a ranged companion's attack number `attackNumber` (1-based) is at
+ * `level`: the empowered shot its spell names in `COMPANION_EMPOWERED`, on that
+ * kind's every-Nth attack from level 3, or `null` for an ordinary volley (also
+ * for a companion with no empowered shot).
+ */
+export function companionEmpowerment(
+  id: CompanionSpellId,
+  attackNumber: number,
+  level: SpellLevel,
+): 'fireball' | 'frostOrb' | null {
+  const kind = Object.hasOwn(COMPANION_EMPOWERED, id) ? COMPANION_EMPOWERED[id] : undefined;
+  if (kind === undefined) return null;
+  const every = kind === 'fireball' ? COMPANION_FIREBALL.every : FROST_ORB.every;
+  return isEmpoweredAttack(attackNumber, level, every) ? kind : null;
 }
