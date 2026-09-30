@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
 import { FREEZE_DURATION } from '../config/spells';
+import { SPELL_LEVEL_STATS } from '../config/spellLevels';
 import {
   BURST_TRIGGER_COUNT,
   ICICLE_SPIRAL_STEP_DEG,
@@ -189,6 +190,16 @@ describe('MAX_LIVE_ICICLES (CO-182)', () => {
     const lifeS = (base.icicleRange * 1.5) / base.icicleSpeed;
     const perBomb = Math.ceil(lifeS / interval) * base.icicles;
     expect(MAX_LIVE_ICICLES).toBeGreaterThanOrEqual(bombs * perBomb);
+  });
+
+  it('still holds them once level 2 has doubled the spray (#328)', () => {
+    const cooldown = base.cooldown * 0.5;
+    const interval = base.throwInterval * 0.5;
+    const bombs = Math.ceil((base.range * 1.5) / base.speed / cooldown);
+    const lifeS = (base.icicleRange * 1.5) / base.icicleSpeed;
+    const icicles = base.icicles + (SPELL_LEVEL_STATS.ice_nova_bomb?.[2]?.icicles ?? 0);
+    expect(icicles).toBe(4);
+    expect(MAX_LIVE_ICICLES).toBeGreaterThanOrEqual(bombs * Math.ceil(lifeS / interval) * icicles);
   });
 });
 

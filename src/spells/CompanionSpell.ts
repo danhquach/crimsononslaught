@@ -6,15 +6,13 @@ import {
   MAX_COMPANION_SHOTS,
   type CompanionSpellId,
 } from '../config/companions';
-import {
-  COMPANION_EMPOWERED,
-  COMPANION_FIREBALL,
-  COMPANION_SHOT_GAP_PX,
-} from '../config/fireLevels';
+import { COMPANION_FIREBALL, COMPANION_SHOT_GAP_PX } from '../config/fireLevels';
+import { FROST_ORB } from '../config/iceLevels';
 import { METEOR_POND_LOOK } from '../config/strikes';
 import type { SpellLevel } from '../config/spellLevels';
 import {
   chooseTarget,
+  companionEmpowerment,
   followVelocity,
   inReach,
   lungeVelocity,
@@ -30,14 +28,17 @@ import {
   companionFacing,
   type Facing,
 } from '../core/animation';
-import { isEmpoweredAttack, recordCapped } from '../core/fireLevels';
+import { recordCapped } from '../core/fireLevels';
 import { splashTargets } from '../core/fireball';
-import { dustFlip, explosionScale } from '../core/fx';
+import { pulseTargets } from '../core/frostNova';
+import { dustFlip, explosionScale, novaScale } from '../core/fx';
+import { frostOrbHit } from '../core/iceLevels';
 import { createArea, membersOf } from '../core/groundArea';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
 import { Spell } from '../core/spell';
 import type { CompanionStats } from '../core/spellStats';
+import { Boss } from '../entities/Boss';
 import { Companion } from '../entities/Companion';
 import type { Enemy } from '../entities/Enemy';
 import { Projectile, type ProjectileLook } from '../entities/Projectile';
@@ -71,11 +72,15 @@ import type { DamageSink } from './DamageSink';
  * `runChildUpdate` is what keeps a paused Game — a level-up overlay — from
  * letting the ally wander.
  *
- * Levels (#327): level 2 adds a shot (`projectiles`), and a ranged companion
- * flies a volley's shots side by side, `COMPANION_SHOT_GAP_PX` apart, so they
- * read as two and each still connects with a small enemy. Level 3, for the companions in `COMPANION_EMPOWERED`: every
- * 4th attack's first shot is a fireball, which on hit also blasts what stands
- * near it and leaves a burning patch. The level is taken when the shot leaves.
+ * Levels (#327, #328): level 2 adds a shot (`projectiles`), and a ranged
+ * companion flies a volley's shots side by side, `COMPANION_SHOT_GAP_PX` apart,
+ * so they read as two and each still connects with a small enemy. Level 3, for
+ * the companions in `COMPANION_EMPOWERED`: every 4th attack's first shot is
+ * empowered. Fire's is a fireball, which on hit also blasts what stands near it
+ * and leaves a burning patch; Ice's is a frost orb, which freezes the enemy it
+ * lands on (`FROST_ORB.freezeS`, through `applyFrost`, so a boss's diminishing
+ * returns cap it) and slows what stands near it. The level is taken when the
+ * shot leaves.
  *
  * The companion itself carries no body (see `entities/Companion.ts`), so it is
  * not damageable, does not block movement and cannot collide with an enemy. Its
@@ -89,9 +94,28 @@ const FIREBALL_LOOK: ProjectileLook = {
   scale: COMPANION_FIREBALL.drawScale,
 };
 
+/** The frost orb wears the Ice Bomb's clip at half size, so it reads apart from the usual shard and adds no art (#328). */
+const FROST_ORB_LOOK: ProjectileLook = {
+  texture: 'proj_ice',
+  clip: FROST_ORB.clip,
+  scale: FROST_ORB.drawScale,
+};
+
+/** An empowered shot in the air: which kind it is and the level it left at. */
+interface Empowered {
+  readonly kind: 'fireball' | 'frostOrb';
+  readonly level: SpellLevel;
+}
+
 /** A ranged companion's level record, what the test hook reads (#327): cause and effect in one entry. */
 export interface CompanionLevelReport {
-  volleys: { level: SpellLevel; attackNumber: number; shots: number; fireball: boolean }[];
+  volleys: {
+    level: SpellLevel;
+    attackNumber: number;
+    shots: number;
+    fireball: boolean;
+    frostOrb: boolean;
+  }[];
   fireballs: {
     level: SpellLevel;
     caught: number;
@@ -99,6 +123,22 @@ export interface CompanionLevelReport {
     x: number;
     y: number;
   }[];
+  /**
+   * Each frost orb that landed: whether its target was a boss, the seconds the
+   * target was frozen for right after the orb's own freeze (read before the hit's
+   * damage), and the neighbours it chilled against the neighbours it reached.
+   */
+  frostOrbs: {
+    level: SpellLevel;
+    boss: boolean;
+    targetFrozenS: number;
+    around: number;
+    slowedAround: number;
+    x: number;
+    y: number;
+  }[];
+  /** Shots in the air right now, for the pool-cap check. */
+  liveShots: number;
 }
 
 export class CompanionSpell extends Spell<CompanionSpellId> {
@@ -127,10 +167,11 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   private attacksStarted = 0;
   /** Volleys that fired: the count level 3's empowered attack is every Nth of. */
   private attackNumber = 0;
-  /** Fireballs in the air, with the level each left at. Cleared on every despawn path. */
-  private readonly fireballs = new Map<Projectile, SpellLevel>();
+  /** Empowered shots in the air, with the kind and level each left at. Cleared on every despawn path. */
+  private readonly empowered = new Map<Projectile, Empowered>();
   private readonly volleyLog: CompanionLevelReport['volleys'] = [];
   private readonly fireballLog: CompanionLevelReport['fireballs'] = [];
+  private readonly frostOrbLog: CompanionLevelReport['frostOrbs'] = [];
   private readonly areas: AreaPool | undefined;
 
   constructor(
@@ -194,9 +235,14 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     return { current: this.companion.clip, shown: [...this.companion.clipsShown] };
   }
 
-  /** Test hook (#327): the volleys this ally has shot and the fireballs that landed. */
+  /** Test hook (#327, #328): the volleys this ally has shot and the fireballs and frost orbs that landed. */
   get levelReport(): CompanionLevelReport {
-    return { volleys: [...this.volleyLog], fireballs: [...this.fireballLog] };
+    return {
+      volleys: [...this.volleyLog],
+      fireballs: [...this.fireballLog],
+      frostOrbs: [...this.frostOrbLog],
+      liveShots: this.liveCount,
+    };
   }
 
   /** The live block, as the companion stats every one of these ids resolves to. */
@@ -299,16 +345,15 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
 
   /**
    * Ranged: `projectiles` shots leave the ally, side by side along the line to
-   * the target it picked. On level 3's empowered attack the first is a fireball.
+   * the target it picked. On level 3's empowered attack the first is the
+   * companion's empowered shot: a fireball, or Ice's frost orb.
    */
   private shoot(target: Readonly<Vec2>): void {
     const { projectiles = 1, speed = 0, targetRange } = this.companionStats;
     const { x, y } = this.position;
     const level = this.level;
     const number = this.attackNumber + 1;
-    const empowered =
-      COMPANION_EMPOWERED[this.id] === 'fireball' &&
-      isEmpoweredAttack(number, level, COMPANION_FIREBALL.every);
+    const kind = companionEmpowerment(this.id, number, level);
     const lanes = volleyLanes(
       this.position,
       target,
@@ -317,11 +362,12 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     );
     let fired = 0;
     let fireball = false;
+    let frostOrb = false;
     for (const [i, lane] of lanes.entries()) {
       const shot = this.shots?.get(lane.from.x, lane.from.y) as Projectile | null;
       // Pool exhausted: the rest of the volley is dropped, never queued.
       if (!shot) break;
-      const isFireball = empowered && i === 0;
+      const kindOfShot = i === 0 ? kind : null;
       // A shot expires at the range the ally could see its target from, so it
       // never outlives the reach the stat block promises.
       shot.fire(
@@ -330,17 +376,28 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
         lane.to,
         speed,
         targetRange,
-        isFireball ? FIREBALL_LOOK : COMPANION_FX[this.id].shot,
+        kindOfShot === 'fireball'
+          ? FIREBALL_LOOK
+          : kindOfShot === 'frostOrb'
+            ? FROST_ORB_LOOK
+            : COMPANION_FX[this.id].shot,
       );
-      if (isFireball) this.fireballs.set(shot, level);
-      else this.fireballs.delete(shot);
-      fireball ||= isFireball;
+      if (kindOfShot) this.empowered.set(shot, { kind: kindOfShot, level });
+      else this.empowered.delete(shot);
+      fireball ||= kindOfShot === 'fireball';
+      frostOrb ||= kindOfShot === 'frostOrb';
       fired += 1;
     }
     if (fired > 0) {
       this.attackNumber = number;
       this.startAttack(target);
-      recordCapped(this.volleyLog, { level, attackNumber: number, shots: fired, fireball });
+      recordCapped(this.volleyLog, {
+        level,
+        attackNumber: number,
+        shots: fired,
+        fireball,
+        frostOrb,
+      });
     }
     const muzzle = COMPANION_FX[this.id].muzzle;
     if (fired > 0 && muzzle) this.fx.burst(muzzle, x, y);
@@ -361,17 +418,57 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     // A shot is spent on its first hit; a later overlap the same frame, or one
     // with an enemy something else already killed, flies on.
     if (!(hitbox instanceof Projectile) || !hitbox.active || !enemy.active) return;
-    const fireballLevel = this.fireballs.get(hitbox);
+    const special = this.empowered.get(hitbox);
     this.retire(hitbox);
+    if (special?.kind === 'frostOrb') {
+      this.landFrostOrb(enemy, hitbox, special.level);
+      return;
+    }
     // The blast is resolved against the crowd as it stands before the hit lands.
-    const burst = fireballLevel === undefined ? undefined : this.fireballBlast(enemy);
+    const burst = special?.kind === 'fireball' ? this.fireballBlast(enemy) : undefined;
     this.onCompanionHit(enemy, hitbox);
-    if (fireballLevel !== undefined && burst) this.finishFireball(burst, fireballLevel);
+    if (special?.kind === 'fireball' && burst) this.finishFireball(burst, special.level);
   }
 
   private retire(shot: Projectile): void {
-    this.fireballs.delete(shot);
+    this.empowered.delete(shot);
     shot.despawn();
+  }
+
+  /**
+   * A frost orb landing on `enemy` (level 3), in the order that keeps a killing
+   * blow from skipping its frost: who stands near is resolved before the hit,
+   * the freeze goes on, the normal hit lands, then the neighbours are slowed.
+   * The frozen time is read right after the freeze, before the hit can remove
+   * the enemy, and it is whatever `applyFrost` left: a boss's is capped by its
+   * diminishing returns, never stretched.
+   */
+  private landFrostOrb(enemy: Enemy, from: Readonly<Vec2>, level: SpellLevel): void {
+    const { slowRadius, slowPct, slowDurationS } = FROST_ORB;
+    const at = { x: enemy.x, y: enemy.y };
+    const around = pulseTargets(at, this.enemies.live, slowRadius).filter(
+      (other) => other !== enemy,
+    );
+    enemy.applyFrost(frostOrbHit(this.companionStats));
+    const targetFrozenS = enemy.crowdControlRemainingS.frozenS;
+    const boss = enemy instanceof Boss;
+    this.onCompanionHit(enemy, from);
+    this.fx.burst('ice.nova', at.x, at.y, { scale: novaScale(slowRadius) });
+    let slowedAround = 0;
+    for (const other of around) {
+      if (!other.active) continue;
+      other.applyFrost({ slowPct, slowDuration: slowDurationS, freeze: false });
+      if (other.slowed) slowedAround += 1;
+    }
+    recordCapped(this.frostOrbLog, {
+      level,
+      boss,
+      targetFrozenS,
+      around: around.length,
+      slowedAround,
+      x: at.x,
+      y: at.y,
+    });
   }
 
   /** Who a fireball bursting on `enemy` will catch, before the direct hit lands. */

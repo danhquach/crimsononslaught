@@ -8,11 +8,12 @@ import {
 } from '../config/companions';
 import { ENEMY_ARCHETYPES } from '../config/enemies';
 import { COMPANION_SHOT_GAP_PX } from '../config/fireLevels';
-import { SPELL_LEVEL_STATS } from '../config/spellLevels';
+import { SPELL_LEVEL_STATS, type SpellLevel } from '../config/spellLevels';
 import type { Vec2 } from './input';
 import { levelStatAdds } from './spellLevelStats';
 import {
   chooseTarget,
+  companionEmpowerment,
   followVelocity,
   inReach,
   lungeVelocity,
@@ -266,5 +267,60 @@ describe('volleyLanes (#327)', () => {
         }
       }
     }
+  });
+});
+
+describe('companionEmpowerment (#328)', () => {
+  const LEVELS: readonly SpellLevel[] = [1, 2, 3];
+  const attacks = [1, 2, 3, 4, 5, 6, 7, 8];
+  const at = (id: (typeof COMPANION_SPELL_IDS)[number], level: SpellLevel): (string | null)[] =>
+    attacks.map((n) => companionEmpowerment(id, n, level));
+
+  it('empowers nothing below level 3', () => {
+    for (const id of ['fire_companion', 'ice_companion'] as const) {
+      for (const level of [1, 2] as const)
+        expect(at(id, level), `${id} ${level}`).toEqual(attacks.map(() => null));
+    }
+  });
+
+  it('makes every 4th attack of the Fire companion a fireball and of the Ice companion a frost orb at level 3', () => {
+    const none = null;
+    expect(at('fire_companion', 3)).toEqual([
+      none,
+      none,
+      none,
+      'fireball',
+      none,
+      none,
+      none,
+      'fireball',
+    ]);
+    expect(at('ice_companion', 3)).toEqual([
+      none,
+      none,
+      none,
+      'frostOrb',
+      none,
+      none,
+      none,
+      'frostOrb',
+    ]);
+  });
+
+  it('empowers no attack of a companion with no empowered shot, at any level', () => {
+    for (const id of ['lightning_companion', 'earth_companion'] as const) {
+      for (const level of LEVELS)
+        expect(at(id, level), `${id} ${level}`).toEqual(attacks.map(() => null));
+    }
+  });
+
+  it('never counts attack 0 or a negative one', () => {
+    expect(companionEmpowerment('ice_companion', 0, 3)).toBeNull();
+    expect(companionEmpowerment('ice_companion', -4, 3)).toBeNull();
+  });
+
+  it('does not read an empowerment off the prototype chain', () => {
+    expect(companionEmpowerment('toString' as never, 4, 3)).toBeNull();
+    expect(companionEmpowerment('__proto__' as never, 4, 3)).toBeNull();
   });
 });

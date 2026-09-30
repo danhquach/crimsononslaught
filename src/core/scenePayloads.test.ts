@@ -14,6 +14,7 @@ import { STRIKE_CARDS } from '../config/strikes';
 import {
   HELP_VIEWS,
   MAX_BUILD_COUNT,
+  MAX_SPELL_PAGE,
   isGamePayload,
   isHelpPayload,
   isLevelUpPayload,
@@ -114,6 +115,59 @@ describe('isHelpPayload', () => {
 
   it('accepts the Spells view', () => {
     expect(isHelpPayload({ view: 'spells' })).toBe(true);
+  });
+
+  it('accepts a spellPage only as a small non-negative integer, or left out', () => {
+    expect(isHelpPayload({ view: 'spells' })).toBe(true);
+    expect(isHelpPayload({ view: 'spells', spellPage: undefined })).toBe(true);
+    for (const spellPage of [0, 1, 3, MAX_SPELL_PAGE]) {
+      expect(isHelpPayload({ view: 'spells', spellPage }), String(spellPage)).toBe(true);
+    }
+  });
+
+  it('rejects a hostile spellPage', () => {
+    const hostile: unknown[] = [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      -1,
+      -0.5,
+      1.5,
+      MAX_SPELL_PAGE + 1,
+      Number.MAX_SAFE_INTEGER,
+      1e21,
+      '1',
+      '',
+      null,
+      true,
+      [],
+      [1],
+      {},
+      { valueOf: () => 1 },
+      BigInt(1),
+    ];
+    for (const spellPage of hostile) {
+      expect(isHelpPayload({ view: 'spells', spellPage }), String(spellPage)).toBe(false);
+    }
+    // JSON.parse makes `__proto__` an ordinary own key: the first payload has a hostile
+    // spellPage of its own and is rejected; in the second `__proto__` is just an extra
+    // key, the prototype is untouched, spellPage is absent and the payload is accepted.
+    expect(isHelpPayload(JSON.parse('{"view":"spells","spellPage":{"__proto__":{"x":1}}}'))).toBe(
+      false,
+    );
+    expect(isHelpPayload(JSON.parse('{"view":"spells","__proto__":{"spellPage":"x"}}'))).toBe(true);
+  });
+
+  it('reads spellPage as the scene does, so an inherited value is checked like an own one', () => {
+    // The validator and HelpScene both read `data.spellPage` along the prototype chain.
+    expect(isHelpPayload(Object.create({ view: 'spells', spellPage: 3 }))).toBe(true);
+    expect(isHelpPayload(Object.create({ view: 'spells', spellPage: '3' }))).toBe(false);
+    expect(isHelpPayload(Object.assign(Object.create({ spellPage: 3 }), { view: 'spells' }))).toBe(
+      true,
+    );
+    expect(
+      isHelpPayload(Object.assign(Object.create({ spellPage: 999 }), { view: 'spells' })),
+    ).toBe(false);
   });
 });
 

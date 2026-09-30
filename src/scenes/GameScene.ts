@@ -183,14 +183,14 @@ import {
   type DragonShot,
   FireDragonSpell,
 } from '../spells/FireDragonSpell';
-import { IceArrowSpell } from '../spells/IceArrowSpell';
-import { NovaBombSpell } from '../spells/NovaBombSpell';
+import { IceArrowSpell, type IceArrowLevelReport } from '../spells/IceArrowSpell';
+import { NovaBombSpell, type NovaLevelReport } from '../spells/NovaBombSpell';
 import { CompanionSpell, type CompanionLevelReport } from '../spells/CompanionSpell';
-import { GroundAreaSpell } from '../spells/GroundAreaSpell';
+import { GroundAreaSpell, type IceStormLevelReport } from '../spells/GroundAreaSpell';
 import { MeteorSpell, type BlastSpread, type MeteorLevelReport } from '../spells/MeteorSpell';
 import { EarthShieldSpell } from '../spells/EarthShieldSpell';
 import { EarthSpikeSpell } from '../spells/EarthSpikeSpell';
-import { IceShieldSpell } from '../spells/IceShieldSpell';
+import { IceShieldSpell, type IceShieldLevelReport } from '../spells/IceShieldSpell';
 import { LightningSwordSpell } from '../spells/LightningSwordSpell';
 import { OrbitingBodySpell } from '../spells/OrbitingBodySpell';
 import { RollingBoulderSpell } from '../spells/RollingBoulderSpell';
@@ -208,6 +208,18 @@ import { PickupPool } from '../systems/PickupPool';
 import { OverlayPool } from '../systems/OverlayPool';
 import { EliteMarkPool } from '../systems/EliteMarkPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
+
+/** One Ice spell's line in `iceLevelReport` (#328). */
+interface IceLevelEntry {
+  id: RosterSpellId;
+  level: SpellLevel;
+  report:
+    | IceArrowLevelReport
+    | NovaLevelReport
+    | IceShieldLevelReport
+    | CompanionLevelReport
+    | IceStormLevelReport;
+}
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
 const WORLD_WIDTH = 3000;
@@ -275,6 +287,13 @@ const ELITE_STREAM = 'elites';
  * its own: how the ground looks must never move a seed's spawns, offers or drops.
  */
 const FIRE_TRAIL_STREAM = 'fireTrail';
+
+/**
+ * Which enemy a level 2 Ice Storm's hailstone picks (#328) draws from a stream
+ * of its own, so the hail never moves a seed's spawns, offers, drops or the
+ * storms' own placement.
+ */
+const ICE_HAIL_STREAM = 'iceHail';
 
 /**
  * Where a death's Ember and consumable land, from the death spot, so neither
@@ -355,6 +374,8 @@ export class GameScene extends Phaser.Scene {
   private relicRng!: Rng;
   /** Fire Wave's burnt ground only (#327); see `FIRE_TRAIL_STREAM`. */
   private trailRng!: Rng;
+  /** Ice Storm's hail only (#328); see `ICE_HAIL_STREAM`. */
+  private hailRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -771,6 +792,32 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Test hook (#328): each Ice spell casting, its level and its level records
+   * (cause and effect in one entry), mirroring `fireLevelReport`. Every record
+   * carries the level it was cast at. Earthquake shares Ice Storm's class but
+   * has no levels, so it is left out.
+   */
+  get iceLevelReport(): IceLevelEntry[] {
+    return this.spells.spells.flatMap((spell): IceLevelEntry[] => {
+      const level = this.spells.spellLevel(spell.id);
+      if (spell instanceof IceArrowSpell || spell instanceof NovaBombSpell) {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      if (spell instanceof IceShieldSpell) {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      // Fire's companion has its own report in `fireLevelReport`.
+      if (spell instanceof CompanionSpell && spell.id === 'ice_companion') {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      if (spell instanceof GroundAreaSpell && spell.id === 'ice_blizzard') {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      return [];
+    });
+  }
+
+  /**
    * Test hook (#141): Ice Arrow and Frost Nova Bomb, whichever is equipped —
    * hits each has landed and shots each has in the air right now. The browser
    * suite watches a run land hits with both and hold their pool caps.
@@ -1025,6 +1072,7 @@ export class GameScene extends Phaser.Scene {
     this.pickupRng = createRng(deriveSeed(seed, PICKUP_STREAM));
     this.relicRng = createRng(deriveSeed(seed, RELIC_OFFER_STREAM));
     this.trailRng = createRng(deriveSeed(seed, FIRE_TRAIL_STREAM));
+    this.hailRng = createRng(deriveSeed(seed, ICE_HAIL_STREAM));
     this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -1470,6 +1518,7 @@ export class GameScene extends Phaser.Scene {
           this,
           this.player,
           this.enemies,
+          this.collisions,
           stats as Readonly<IceShieldStats>,
           damage,
           this.fx,
@@ -1484,6 +1533,8 @@ export class GameScene extends Phaser.Scene {
           damage,
           this.areas,
           this.rng,
+          // Only Ice Storm has levels (#328); Earthquake is built without the kit.
+          spellId === 'ice_blizzard' ? { fx: this.fx, hailRng: this.hailRng } : undefined,
         );
       case 'fire_column':
         return new FireWaveSpell(

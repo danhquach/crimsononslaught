@@ -14,7 +14,13 @@ import {
   PICKUP_TEXTURES,
   RELIC_COUNT,
 } from '../config/pickups';
-import { ROSTER_SPELL_IDS, type RosterSpellId } from '../config/loadout';
+import {
+  ELEMENTS,
+  ROSTER_SPELL_IDS,
+  elementOf,
+  type ElementId,
+  type RosterSpellId,
+} from '../config/loadout';
 import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVELS, spellLevelText, type SpellLevelTable } from '../config/spellLevels';
 import { MAX_OFFER_SIZE } from './levelUp';
@@ -153,4 +159,37 @@ export function spellHelpRows(table: SpellLevelTable = SPELL_LEVELS): SpellHelpR
       },
     ];
   });
+}
+
+/** One page of the Spells tab: an element's spells, at most `MAX_SPELL_HELP_ROWS` of them. */
+export interface SpellHelpPage {
+  element: ElementId;
+  /** The element's name, capitalised: the pager buttons' label. */
+  title: string;
+  rows: SpellHelpRow[];
+}
+
+/**
+ * The Spells tab split into pages, one element per page in `ELEMENTS` order
+ * (#328): a full element never shares a page, and an element with more than
+ * `MAX_SPELL_HELP_ROWS` spells would continue on a page of the same element.
+ * Elements with no level entries have no page.
+ */
+export function spellHelpPages(table: SpellLevelTable = SPELL_LEVELS): SpellHelpPage[] {
+  const rows = spellHelpRows(table);
+  return ELEMENTS.flatMap((element) => {
+    const own = rows.filter((row) => elementOf(row.id) === element);
+    const title = element.charAt(0).toUpperCase() + element.slice(1);
+    const pages: SpellHelpPage[] = [];
+    for (let i = 0; i < own.length; i += MAX_SPELL_HELP_ROWS) {
+      pages.push({ element, title, rows: own.slice(i, i + MAX_SPELL_HELP_ROWS) });
+    }
+    return pages;
+  });
+}
+
+/** `page` held to a page that exists: NaN or a fraction is the first page, out of range the nearest end. */
+export function clampSpellPage(page: number, count: number): number {
+  if (count <= 0 || !Number.isFinite(page)) return 0;
+  return Math.min(Math.max(Math.trunc(page), 0), count - 1);
 }

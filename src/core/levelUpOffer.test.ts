@@ -749,15 +749,21 @@ describe('levelUpOffer — seeds stay stable without spell levels (#326)', () =>
     ]);
   });
 
-  it('pools no upgrade for a spell of another element (#327)', () => {
-    const ice: ActiveCard[] = [
-      { id: 'ice', name: 'Ice Arrow', description: 'Fires an arrow.', color: 0x40c4ff },
+  it('pools no upgrade for a spell of an element whose levels have not landed (#327, #329)', () => {
+    // Lightning's levels are #329's; Ice's landed in #328, so it is the unfilled element here.
+    const lightning: ActiveCard[] = [
+      {
+        id: 'lightning',
+        name: 'Lightning Bolt',
+        description: 'Strikes an enemy.',
+        color: 0xffee58,
+      },
     ];
     const input: OfferInput = {
-      loadout: buildLoadout('ice'),
+      loadout: buildLoadout('lightning'),
       level: PASSIVE_LEVEL,
       actives: [],
-      casting: ice,
+      casting: lightning,
     };
     expect(offerPool(input).some((card) => card.kind === 'upgrade')).toBe(false);
   });
