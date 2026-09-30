@@ -267,7 +267,7 @@ export class HelpScene extends Phaser.Scene {
     const { width } = this.scale;
     drawPanel(this, 130, PANEL_TOP, 700, 262);
     this.add
-      .text(width / 2, 146, `Crimson Onslaught  v${__APP_VERSION__}`, {
+      .text(width / 2, 146, `Crimson Onslaught  v${__APP_VERSION__}  Pre-alpha`, {
         fontFamily: SERIF,
         fontSize: '24px',
         color: '#eeeeee',
