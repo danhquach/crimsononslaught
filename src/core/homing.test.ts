@@ -113,6 +113,22 @@ describe('retarget', () => {
     expect(retarget(from, [enemy(400, 100), enemy(105, 100, false)], 200)).toBeNull();
     expect(retarget(from, [], 200)).toBeNull();
   });
+
+  it('skips an enemy in the exclude set, even a nearer one', () => {
+    const struck = enemy(110, 100);
+    const other = enemy(180, 100);
+    expect(retarget(from, [struck, other], 200, new Set([struck]))).toBe(other);
+  });
+
+  it('is null when the only enemies in range are excluded', () => {
+    const struck = enemy(110, 100);
+    expect(retarget(from, [struck, enemy(400, 100)], 200, new Set([struck]))).toBeNull();
+  });
+
+  it('is unchanged by an empty exclude set', () => {
+    const near = enemy(130, 100);
+    expect(retarget(from, [enemy(300, 100), near], 200, new Set())).toBe(near);
+  });
 });
 
 describe('tickLifetime', () => {

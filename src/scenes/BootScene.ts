@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { rosterBaseStats } from '../config/rosterBaseStats';
+import { SPELL_LEVEL_STATS } from '../config/spellLevels';
 import { ensurePlayerName, PLAYER_NAME_STREAM } from '../core/playerName';
 import { createRng, deriveSeed, resolveSeed } from '../core/rng';
 import {
@@ -23,6 +25,7 @@ import {
   TIME_SCALE_REGISTRY_KEY,
 } from '../core/scenePayloads';
 import { validateLoadoutConfig } from '../core/loadout';
+import { validateSpellLevelStats } from '../core/spellLevelStats';
 import { isSave, parseSave, serializeSave } from '../core/save';
 import { validateMeta } from '../core/upgrades';
 import { loadSaveJson, storeSaveJson } from '../storage/localSave';
@@ -63,6 +66,8 @@ export class BootScene extends Phaser.Scene {
     // Spec §7: config is checked once at boot and complains loudly, but a bad
     // roster or passive list never stops the run — everything sound still works.
     for (const problem of validateLoadoutConfig()) console.error(`[config] ${problem}`);
+    for (const problem of validateSpellLevelStats(SPELL_LEVEL_STATS, rosterBaseStats))
+      console.error(`[config] ${problem}`);
     for (const problem of validateMeta()) console.error(`[config] ${problem}`);
 
     // Saved progress (CO-101): parsed once here, then lives in the registry.

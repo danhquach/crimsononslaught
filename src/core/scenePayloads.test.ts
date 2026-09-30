@@ -103,7 +103,17 @@ describe('isHelpPayload', () => {
   it('rejects a missing or unknown view', () => {
     expect(isHelpPayload(undefined)).toBe(false);
     expect(isHelpPayload({})).toBe(false);
-    expect(isHelpPayload({ view: 'spells' })).toBe(false);
+    // 'spells' is a view since #327; the allow-list is exact, so near misses and hostile shapes stay out.
+    for (const view of ['Spells', 'spells ', ' spells', '__proto__', 'constructor', '']) {
+      expect(isHelpPayload({ view }), JSON.stringify(view)).toBe(false);
+    }
+    expect(isHelpPayload({ view: ['spells'] })).toBe(false);
+    expect(isHelpPayload({ view: { toString: () => 'spells' } })).toBe(false);
+    expect(isHelpPayload(JSON.parse('{"__proto__":{"view":"spells"}}'))).toBe(false);
+  });
+
+  it('accepts the Spells view', () => {
+    expect(isHelpPayload({ view: 'spells' })).toBe(true);
   });
 });
 

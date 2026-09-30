@@ -155,3 +155,40 @@ export function spawnPosition(player: Readonly<Vec2>, leashRadius: number): Vec2
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/** One shot of a volley: where it leaves and the point it flies at. */
+export interface VolleyLane {
+  from: Vec2;
+  to: Vec2;
+}
+
+/**
+ * The `count` shots of one ranged companion volley (#327), as parallel lanes:
+ * each starts `gapPx` further along the perpendicular to the line from `from`
+ * to `target`, symmetric about it, and aims at the target shifted the same way.
+ * Every lane so passes within its own offset of the target's centre at any
+ * range, where an angular fan drifts off a small enemy. One shot is the line
+ * itself, unchanged.
+ */
+export function volleyLanes(
+  from: Readonly<Vec2>,
+  target: Readonly<Vec2>,
+  count: number,
+  gapPx: number,
+): VolleyLane[] {
+  if (count <= 1) return [{ from: { x: from.x, y: from.y }, to: { x: target.x, y: target.y } }];
+  const dx = target.x - from.x;
+  const dy = target.y - from.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const px = -dy / length;
+  const py = dx / length;
+  return Array.from({ length: count }, (_, i) => {
+    const offset = (i - (count - 1) / 2) * gapPx;
+    const ox = px * offset;
+    const oy = py * offset;
+    return {
+      from: { x: from.x + ox, y: from.y + oy },
+      to: { x: target.x + ox, y: target.y + oy },
+    };
+  });
+}

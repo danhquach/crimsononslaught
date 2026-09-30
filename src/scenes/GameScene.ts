@@ -108,7 +108,7 @@ import { buildLoadout, canUpgradeSpell, spellLevel } from '../core/loadout';
 import { emptySave, isSave, recordRun, serializeSave, type Save } from '../core/save';
 import { upgradeRanks } from '../core/upgrades';
 import { storeSaveJson } from '../storage/localSave';
-import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
+import { isRosterSpellId, type RosterSpellId } from '../config/loadout';
 import {
   SPELL_LEVELS,
   isSpellLevel,
@@ -124,14 +124,7 @@ import {
 } from '../config/passives';
 import { chargeById } from '../config/offerActions';
 import { isRelicBuffId } from '../config/relics';
-import { AREA_CARDS, AREA_SPELL_IDS, BASE_AREA_STATS, isAreaSpellId } from '../config/areas';
-import {
-  BASE_STRIKE_STATS,
-  METEOR_POND_LOOK,
-  STRIKE_CARDS,
-  STRIKE_SPELL_IDS,
-  isStrikeSpellId,
-} from '../config/strikes';
+import { METEOR_POND_LOOK } from '../config/strikes';
 import {
   ARENA_EDGE_BAND,
   ARENA_EDGE_FRAME,
@@ -171,45 +164,10 @@ import {
   type HitKind,
   type ShakeState,
 } from '../core/hitFeedback';
+import { rosterBaseStats } from '../config/rosterBaseStats';
+import { rosterCards } from '../config/rosterCards';
+import type { ShieldSpellId } from '../config/shields';
 import type { SpellStatBlock } from '../config/spellFields';
-import { BASE_SPELL_STATS, SPELL_CARDS, isSpellId } from '../config/spells';
-import {
-  BASE_FIRE_ROSTER_STATS,
-  FIRE_ROSTER_CARDS,
-  FIRE_ROSTER_SPELL_IDS,
-  isFireRosterSpellId,
-} from '../config/fireRoster';
-import {
-  BASE_ICE_ROSTER_STATS,
-  ICE_ROSTER_CARDS,
-  ICE_ROSTER_SPELL_IDS,
-  isIceRosterSpellId,
-} from '../config/iceRoster';
-import {
-  BASE_LIGHTNING_ROSTER_STATS,
-  LIGHTNING_ROSTER_CARDS,
-  LIGHTNING_ROSTER_SPELL_IDS,
-  isLightningRosterSpellId,
-} from '../config/lightningRoster';
-import {
-  BASE_COMPANION_STATS,
-  COMPANION_CARDS,
-  COMPANION_SPELL_IDS,
-  isCompanionSpellId,
-} from '../config/companions';
-import {
-  BASE_EARTH_ROSTER_STATS,
-  EARTH_ROSTER_CARDS,
-  EARTH_ROSTER_SPELL_IDS,
-  isEarthRosterSpellId,
-} from '../config/earthRoster';
-import {
-  BASE_SHIELD_STATS,
-  SHIELD_CARDS,
-  SHIELD_SPELL_IDS,
-  isShieldSpellId,
-  type ShieldSpellId,
-} from '../config/shields';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 import type { EnemyShot } from '../entities/EnemyShot';
@@ -218,14 +176,18 @@ import type { Pickup } from '../entities/Pickup';
 import { XpGem } from '../entities/XpGem';
 import { ChainLightningSpell } from '../spells/ChainLightningSpell';
 import { LightningBoltSpell } from '../spells/LightningBoltSpell';
-import { FireballSpell } from '../spells/FireballSpell';
-import { FireWaveSpell } from '../spells/FireWaveSpell';
-import { type DragonShot, FireDragonSpell } from '../spells/FireDragonSpell';
+import { FireballSpell, type FireBoltLevelReport } from '../spells/FireballSpell';
+import { FireWaveSpell, type FireWaveLevelReport } from '../spells/FireWaveSpell';
+import {
+  type DragonLevelReport,
+  type DragonShot,
+  FireDragonSpell,
+} from '../spells/FireDragonSpell';
 import { IceArrowSpell } from '../spells/IceArrowSpell';
 import { NovaBombSpell } from '../spells/NovaBombSpell';
-import { CompanionSpell } from '../spells/CompanionSpell';
+import { CompanionSpell, type CompanionLevelReport } from '../spells/CompanionSpell';
 import { GroundAreaSpell } from '../spells/GroundAreaSpell';
-import { MeteorSpell, type BlastSpread } from '../spells/MeteorSpell';
+import { MeteorSpell, type BlastSpread, type MeteorLevelReport } from '../spells/MeteorSpell';
 import { EarthShieldSpell } from '../spells/EarthShieldSpell';
 import { EarthSpikeSpell } from '../spells/EarthSpikeSpell';
 import { IceShieldSpell } from '../spells/IceShieldSpell';
@@ -309,6 +271,12 @@ const RELIC_OFFER_STREAM = 'relicOffers';
 const ELITE_STREAM = 'elites';
 
 /**
+ * Where a level 3 Fire Wave's burnt ground lies (#327) draws from a stream of
+ * its own: how the ground looks must never move a seed's spawns, offers or drops.
+ */
+const FIRE_TRAIL_STREAM = 'fireTrail';
+
+/**
  * Where a death's Ember and consumable land, from the death spot, so neither
  * hides under the gem that lands on the spot itself. Well inside the pickup
  * radius, so walking over the gem takes them too.
@@ -385,6 +353,8 @@ export class GameScene extends Phaser.Scene {
   private pickupRng!: Rng;
   /** Relic offers only (#227); see `RELIC_OFFER_STREAM`. */
   private relicRng!: Rng;
+  /** Fire Wave's burnt ground only (#327); see `FIRE_TRAIL_STREAM`. */
+  private trailRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -770,6 +740,37 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Test hook (#327): each Fire spell casting, its level and its level records
+   * (cause and effect in one entry). Every record carries the level it was cast
+   * at, so a level-up pick taken mid-test can never be mistaken for the level
+   * under test.
+   */
+  get fireLevelReport(): {
+    id: RosterSpellId;
+    level: SpellLevel;
+    report:
+      | FireBoltLevelReport
+      | MeteorLevelReport
+      | FireWaveLevelReport
+      | CompanionLevelReport
+      | DragonLevelReport;
+  }[] {
+    return this.spells.spells.flatMap((spell) => {
+      const level = this.spells.spellLevel(spell.id);
+      if (
+        spell instanceof FireballSpell ||
+        spell instanceof MeteorSpell ||
+        spell instanceof FireWaveSpell ||
+        spell instanceof FireDragonSpell ||
+        (spell instanceof CompanionSpell && spell.id === 'fire_companion')
+      ) {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      return [];
+    });
+  }
+
+  /**
    * Test hook (#141): Ice Arrow and Frost Nova Bomb, whichever is equipped —
    * hits each has landed and shots each has in the air right now. The browser
    * suite watches a run land hits with both and hold their pool caps.
@@ -1023,6 +1024,7 @@ export class GameScene extends Phaser.Scene {
     this.critRng = createRng(seed ^ CRIT_STREAM);
     this.pickupRng = createRng(deriveSeed(seed, PICKUP_STREAM));
     this.relicRng = createRng(deriveSeed(seed, RELIC_OFFER_STREAM));
+    this.trailRng = createRng(deriveSeed(seed, FIRE_TRAIL_STREAM));
     this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -1107,9 +1109,9 @@ export class GameScene extends Phaser.Scene {
     this.spells = new Spellbook(
       buildLoadout(spellId, upgradeRanks(this.save())),
       (id, stats) => this.createSpell(id, stats),
-      (id) => this.baseStatsFor(id),
+      rosterBaseStats,
     );
-    this.cards = new Map(this.rosterCards().map((card) => [card.id, card]));
+    this.cards = new Map(rosterCards().map((card) => [card.id, card]));
     this.syncPlayerStats(BASE_PLAYER_PROFILE);
     this.equipSpell(spellId);
     for (const extra of this.extraActives()) this.equipSpell(extra);
@@ -1461,6 +1463,7 @@ export class GameScene extends Phaser.Scene {
           stats as Readonly<CompanionStats>,
           damage,
           this.fx,
+          this.areas,
         );
       case 'ice_shield':
         return new IceShieldSpell(
@@ -1490,6 +1493,7 @@ export class GameScene extends Phaser.Scene {
           stats as Readonly<FireWaveStats>,
           damage,
           this.fx,
+          this.trailRng,
         );
       case 'fire_dragon':
         return new FireDragonSpell(
@@ -1529,25 +1533,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The block a spell's stats are resolved from, before the loadout's passives
-   * scale it (spec §6.2). Every roster spell has a block since #143;
-   * `undefined` is left for an id added to the roster without one, which
-   * `activeCatalog` then keeps out of the offers.
-   */
-  private baseStatsFor(spellId: RosterSpellId): SpellStatBlock | undefined {
-    if (isSpellId(spellId)) return BASE_SPELL_STATS[spellId];
-    if (isCompanionSpellId(spellId)) return BASE_COMPANION_STATS[spellId];
-    if (isShieldSpellId(spellId)) return BASE_SHIELD_STATS[spellId];
-    if (isAreaSpellId(spellId)) return BASE_AREA_STATS[spellId];
-    if (isStrikeSpellId(spellId)) return BASE_STRIKE_STATS[spellId];
-    if (isFireRosterSpellId(spellId)) return BASE_FIRE_ROSTER_STATS[spellId];
-    if (isIceRosterSpellId(spellId)) return BASE_ICE_ROSTER_STATS[spellId];
-    if (isLightningRosterSpellId(spellId)) return BASE_LIGHTNING_ROSTER_STATS[spellId];
-    if (isEarthRosterSpellId(spellId)) return BASE_EARTH_ROSTER_STATS[spellId];
-    return undefined;
-  }
-
-  /**
    * Every active this build can actually cast and is not already casting, as a
    * level-up card reads it: the whole Phase 2 roster, twenty spells over four
    * elements, complete since #143. `canEquip` is what keeps an offer to the
@@ -1560,72 +1545,9 @@ export class GameScene extends Phaser.Scene {
    */
   private activeCatalog(): ActiveCard[] {
     const casting = new Set<string>(this.equippedSpellIds);
-    return this.rosterCards()
+    return rosterCards()
       .filter((card) => !casting.has(card.id))
       .map(({ id, name, description, color }) => ({ id, name, description, color }));
-  }
-
-  /**
-   * Every roster spell's card: its name and line for a level-up, its colour for
-   * the HUD (#144) and for its level-up card (CO-155).
-   */
-  private rosterCards(): (ActiveCard & { color: number })[] {
-    return [
-      ...ROSTER_SPELL_IDS.filter(isSpellId).map((id) => ({
-        id,
-        name: SPELL_CARDS[id].name,
-        description: SPELL_CARDS[id].description,
-        color: SPELL_CARDS[id].color,
-      })),
-      ...COMPANION_SPELL_IDS.map((id) => ({
-        id,
-        name: COMPANION_CARDS[id].name,
-        description: COMPANION_CARDS[id].description,
-        color: COMPANION_CARDS[id].color,
-      })),
-      ...SHIELD_SPELL_IDS.map((id) => ({
-        id,
-        name: SHIELD_CARDS[id].name,
-        description: SHIELD_CARDS[id].description,
-        color: SHIELD_CARDS[id].color,
-      })),
-      ...AREA_SPELL_IDS.map((id) => ({
-        id,
-        name: AREA_CARDS[id].name,
-        description: AREA_CARDS[id].description,
-        color: AREA_CARDS[id].color,
-      })),
-      ...STRIKE_SPELL_IDS.map((id) => ({
-        id,
-        name: STRIKE_CARDS[id].name,
-        description: STRIKE_CARDS[id].description,
-        color: STRIKE_CARDS[id].color,
-      })),
-      ...FIRE_ROSTER_SPELL_IDS.map((id) => ({
-        id,
-        name: FIRE_ROSTER_CARDS[id].name,
-        description: FIRE_ROSTER_CARDS[id].description,
-        color: FIRE_ROSTER_CARDS[id].color,
-      })),
-      ...ICE_ROSTER_SPELL_IDS.map((id) => ({
-        id,
-        name: ICE_ROSTER_CARDS[id].name,
-        description: ICE_ROSTER_CARDS[id].description,
-        color: ICE_ROSTER_CARDS[id].color,
-      })),
-      ...LIGHTNING_ROSTER_SPELL_IDS.map((id) => ({
-        id,
-        name: LIGHTNING_ROSTER_CARDS[id].name,
-        description: LIGHTNING_ROSTER_CARDS[id].description,
-        color: LIGHTNING_ROSTER_CARDS[id].color,
-      })),
-      ...EARTH_ROSTER_SPELL_IDS.map((id) => ({
-        id,
-        name: EARTH_ROSTER_CARDS[id].name,
-        description: EARTH_ROSTER_CARDS[id].description,
-        color: EARTH_ROSTER_CARDS[id].color,
-      })),
-    ];
   }
 
   /** The save Boot parsed into the registry; an empty one if something else got there first. */

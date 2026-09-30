@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { validateSpellLevelStats } from '../core/spellLevelStats';
+import { SPELLS_BY_ELEMENT } from './loadout';
+import { rosterBaseStats } from './rosterBaseStats';
 import {
   MAX_SPELL_LEVEL,
   SPELL_LEVELS,
+  SPELL_LEVEL_STATS,
   SPELL_LEVEL_TEXT_MAX,
   isSpellLevel,
   spellLevelText,
@@ -12,9 +16,14 @@ import {
 const ENTRY = { 2: 'Adds a blade.', 3: 'Blades explode on impact.' };
 
 describe('SPELL_LEVELS (#326)', () => {
-  it('ships empty, so no spell is offered an upgrade until its ticket lands', () => {
-    expect(Object.keys(SPELL_LEVELS)).toEqual([]);
+  it('has an entry for exactly the five Fire spells (#327)', () => {
+    expect(Object.keys(SPELL_LEVELS).sort()).toEqual([...SPELLS_BY_ELEMENT.fire].sort());
     expect(validateSpellLevels()).toEqual([]);
+  });
+
+  it('has a stat add for each spell that has text, and the fields exist (#327)', () => {
+    expect(Object.keys(SPELL_LEVEL_STATS).sort()).toEqual(Object.keys(SPELL_LEVELS).sort());
+    expect(validateSpellLevelStats(SPELL_LEVEL_STATS, rosterBaseStats)).toEqual([]);
   });
 
   it('caps a spell at level 3', () => {

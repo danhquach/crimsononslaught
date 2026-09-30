@@ -720,14 +720,45 @@ describe('levelUpOffer — seeds stay stable without spell levels (#326)', () =>
     expect(replayGolden()).toEqual(OFFER_GOLDEN);
   });
 
-  it('adds nothing with the shipped, empty level table, whatever is casting', () => {
+  it('adds nothing when nothing is casting, whatever the shipped table holds', () => {
+    const input: OfferInput = {
+      loadout: fullLoadout(),
+      level: PASSIVE_LEVEL,
+      actives: FIRE_CATALOG,
+    };
+    expect(offerPool(input).some((card) => card.kind === 'upgrade')).toBe(false);
+  });
+
+  it('pools an upgrade for each Fire spell from the shipped table, once the slots are full (#327)', () => {
     const input: OfferInput = {
       loadout: fullLoadout(),
       level: PASSIVE_LEVEL,
       actives: FIRE_CATALOG,
       casting: FIRE_CASTING,
     };
-    expect(offerPool(input)).toEqual(offerPool({ ...input, casting: undefined }));
+    expect(
+      offerPool(input)
+        .filter((card) => card.kind === 'upgrade')
+        .map((card) => card.id),
+    ).toEqual([
+      'spell_level_fire',
+      'spell_level_fire_meteor',
+      'spell_level_fire_column',
+      'spell_level_fire_companion',
+      'spell_level_fire_dragon',
+    ]);
+  });
+
+  it('pools no upgrade for a spell of another element (#327)', () => {
+    const ice: ActiveCard[] = [
+      { id: 'ice', name: 'Ice Arrow', description: 'Fires an arrow.', color: 0x40c4ff },
+    ];
+    const input: OfferInput = {
+      loadout: buildLoadout('ice'),
+      level: PASSIVE_LEVEL,
+      actives: [],
+      casting: ice,
+    };
     expect(offerPool(input).some((card) => card.kind === 'upgrade')).toBe(false);
   });
 });

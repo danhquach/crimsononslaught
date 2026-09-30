@@ -4,6 +4,9 @@ import { isLiveTarget, retarget, steerToward, tickLifetime } from '../core/homin
 import type { Enemy } from './Enemy';
 import { type ProjectileLook, Projectile } from './Projectile';
 
+/** Nothing excluded: the shared empty set for a shot that never re-homes off a struck enemy. */
+const NONE: ReadonlySet<Enemy> = new Set();
+
 /**
  * A shot that bends toward its target every frame (#137, spec §9.2 "Fire
  * Dragon"). Launched like any `Projectile`, then `steer`ed by its spell's
@@ -49,11 +52,14 @@ export class HomingProjectile extends Projectile {
 
   /**
    * One frame of flight. Called by the owning spell's `tick`, never by Phaser,
-   * so a paused scene holds the shot where it is.
+   * so a paused scene holds the shot where it is. A target in `exclude` (one it
+   * already struck) is dropped for the nearest enemy that is not.
    */
-  steer(deltaS: number, enemies: readonly Enemy[]): void {
+  steer(deltaS: number, enemies: readonly Enemy[], exclude: ReadonlySet<Enemy> = NONE): void {
     this.lifeS = tickLifetime(this.lifeS, deltaS);
-    if (!isLiveTarget(this.target)) this.target = retarget(this, enemies, this.targetRange);
+    if (!isLiveTarget(this.target) || (this.target !== null && exclude.has(this.target))) {
+      this.target = retarget(this, enemies, this.targetRange, exclude);
+    }
     if (!this.target) return;
     const body = this.body as Phaser.Physics.Arcade.Body;
     const next = steerToward(body.velocity, this, this.target, this.turnRate * deltaS, this.speed);

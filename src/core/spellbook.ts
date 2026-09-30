@@ -2,7 +2,11 @@ import type { RosterSpellId } from '../config/loadout';
 import type { PassiveId, PlayerProfile } from '../config/passives';
 import type { RelicBuffId } from '../config/relics';
 import type { SpellStatBlock, SpellStatField } from '../config/spellFields';
-import type { SpellLevel } from '../config/spellLevels';
+import {
+  SPELL_LEVEL_STATS,
+  type SpellLevel,
+  type SpellLevelStatTable,
+} from '../config/spellLevels';
 import {
   equip as equipInLoadout,
   profileOf,
@@ -15,6 +19,7 @@ import {
 } from './loadout';
 import { resolveSpellStats } from './playerProfile';
 import type { Spell } from './spell';
+import { applyLevelStats, levelStatAdds } from './spellLevelStats';
 import type { SpellStats } from './spellStats';
 
 /**
@@ -49,11 +54,18 @@ export class Spellbook {
   private current: Loadout;
   private readonly create: SpellFactory;
   private readonly baseStats: BaseStatsFor;
+  private readonly levelStats: SpellLevelStatTable;
 
-  constructor(loadout: Loadout, create: SpellFactory, baseStats: BaseStatsFor) {
+  constructor(
+    loadout: Loadout,
+    create: SpellFactory,
+    baseStats: BaseStatsFor,
+    levelStats: SpellLevelStatTable = SPELL_LEVEL_STATS,
+  ) {
     this.current = loadout;
     this.create = create;
     this.baseStats = baseStats;
+    this.levelStats = levelStats;
   }
 
   /** The spells casting right now, in equip order. */
@@ -96,7 +108,10 @@ export class Spellbook {
     const stats = this.statsFor(spellId);
     if (!stats) return undefined;
     const spell = this.create(spellId, stats);
-    if (spell) this.live.push(spell);
+    if (spell) {
+      spell.setLevel(this.spellLevel(spellId));
+      this.live.push(spell);
+    }
     return spell;
   }
 
@@ -173,6 +188,7 @@ export class Spellbook {
       // The block came from this spell's own base block, so its fields are that
       // spell's; the resolver widens the type, it never changes which keys exist.
       if (stats) spell.setStats(stats as SpellStats);
+      spell.setLevel(this.spellLevel(spell.id));
     }
   }
 
@@ -183,6 +199,12 @@ export class Spellbook {
 
   private statsFor(spellId: RosterSpellId): SpellStatBlock | undefined {
     const base = this.baseStats(spellId);
-    return base && resolveSpellStats(base, this.profile);
+    if (!base) return undefined;
+    // The level's stat adds go on the base block, before the profile scales it.
+    const leveled = applyLevelStats(
+      base,
+      levelStatAdds(this.levelStats, spellId, this.spellLevel(spellId)),
+    );
+    return resolveSpellStats(leveled, this.profile);
   }
 }

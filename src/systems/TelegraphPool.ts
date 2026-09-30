@@ -27,6 +27,10 @@ export interface MeteorView {
   readonly drawnX: number;
   readonly drawnY: number;
   readonly visible: boolean;
+  /** The scale the meteor sprite is drawn at (#327: a giant one is drawn larger). */
+  readonly scale: number;
+  /** The sprite's drawn width in px right now. */
+  readonly displayWidth: number;
   /** The clip it plays, or null when the atlas did not supply it and the placeholder stands in. */
   readonly clip: string | null;
   readonly rotation: number;
@@ -91,6 +95,8 @@ export class TelegraphPool {
       drawnX: sprite.x,
       drawnY: sprite.y,
       visible: sprite.visible,
+      scale: sprite.scaleX,
+      displayWidth: sprite.displayWidth,
       clip: animated ? METEOR_CLIP : null,
       rotation: sprite.rotation,
     }));
@@ -98,23 +104,26 @@ export class TelegraphPool {
 
   /**
    * Launch `telegraph`'s meteor and call `onLand` when its delay is up.
-   * Returns whether it was placed: a pool at its cap drops the strike outright,
-   * the way a burst past `MAX_LIVE_FX` is dropped.
+   * `drawScale` sizes the animated meteor (#327: a giant one is 2x); the
+   * placeholder is sized by the blast's radius already.
+   * Returns the meteor's drawn width in px, or `null` when it was not placed: a
+   * pool at its cap drops the strike outright, the way a burst past
+   * `MAX_LIVE_FX` is dropped.
    */
-  place(telegraph: Telegraph, onLand: Landing): boolean {
+  place(telegraph: Telegraph, onLand: Landing, drawScale = 1): number | null {
     const start = fallPosition(telegraph, fallProgress(telegraph));
     const sprite = this.group.get(
       start.x,
       start.y,
       TELEGRAPH_TEXTURE,
     ) as Phaser.GameObjects.Sprite | null;
-    if (!sprite) return false;
+    if (!sprite) return null;
     sprite.setActive(true).setVisible(true).setPosition(start.x, start.y);
     // A recycled sprite may still hold its last clip; `showEffect` restarts it.
     sprite.anims.stop();
     const animated = showEffect(sprite, METEOR_CLIP);
     if (animated) {
-      sprite.setScale(1).setRotation(fallRotation());
+      sprite.setScale(drawScale).setRotation(fallRotation());
     } else {
       sprite
         .setTexture(TELEGRAPH_TEXTURE)
@@ -123,7 +132,7 @@ export class TelegraphPool {
         .setScale(telegraphScale(telegraph.radius));
     }
     this.live.push({ telegraph, sprite, onLand, animated });
-    return true;
+    return sprite.displayWidth;
   }
 
   /**

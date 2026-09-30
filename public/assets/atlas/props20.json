@@ -1,0 +1,93 @@
+{
+  "frames": {
+    "fire.scorch.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 70,
+        "h": 66
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 70,
+        "h": 66
+      },
+      "sourceSize": {
+        "w": 70,
+        "h": 66
+      }
+    },
+    "fire.scorch.1": {
+      "frame": {
+        "x": 72,
+        "y": 1,
+        "w": 70,
+        "h": 66
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 70,
+        "h": 66
+      },
+      "sourceSize": {
+        "w": 70,
+        "h": 66
+      }
+    },
+    "fire.scorch.2": {
+      "frame": {
+        "x": 143,
+        "y": 1,
+        "w": 70,
+        "h": 66
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 70,
+        "h": 66
+      },
+      "sourceSize": {
+        "w": 70,
+        "h": 66
+      }
+    },
+    "fire.scorch.3": {
+      "frame": {
+        "x": 214,
+        "y": 1,
+        "w": 70,
+        "h": 66
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 70,
+        "h": 66
+      },
+      "sourceSize": {
+        "w": 70,
+        "h": 66
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 512,
+      "h": 128
+    },
+    "scale": "1"
+  }
+}

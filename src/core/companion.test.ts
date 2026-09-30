@@ -1,4 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { PLACEHOLDERS } from '../config/colors';
+import {
+  BASE_COMPANION_STATS,
+  COMPANION_FX,
+  COMPANION_KINDS,
+  COMPANION_SPELL_IDS,
+} from '../config/companions';
+import { ENEMY_ARCHETYPES } from '../config/enemies';
+import { COMPANION_SHOT_GAP_PX } from '../config/fireLevels';
+import { SPELL_LEVEL_STATS } from '../config/spellLevels';
+import type { Vec2 } from './input';
+import { levelStatAdds } from './spellLevelStats';
 import {
   chooseTarget,
   followVelocity,
@@ -7,7 +19,9 @@ import {
   meleeTarget,
   spawnPosition,
   stepPosition,
+  volleyLanes,
   type Bounds,
+  type VolleyLane,
 } from './companion';
 
 /**
@@ -187,5 +201,70 @@ describe('spawnPosition', () => {
   it('puts the ally inside its own leash from the first frame', () => {
     const pos = spawnPosition(PLAYER, 60);
     expect(followVelocity(pos, PLAYER, 60, 220)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('volleyLanes (#327)', () => {
+  const from = { x: 100, y: 100 };
+  const target = { x: 400, y: 100 };
+
+  /** Distance of `p` from the infinite line through `a` and `b`. */
+  const lineDistance = (p: Vec2, a: Vec2, b: Vec2): number =>
+    Math.abs((b.x - a.x) * (a.y - p.y) - (a.x - p.x) * (b.y - a.y)) /
+    Math.hypot(b.x - a.x, b.y - a.y);
+
+  it('is exactly the from and target it was given for one shot', () => {
+    expect(volleyLanes(from, target, 1, 10)).toEqual([{ from, to: target }]);
+  });
+
+  it('runs two shots parallel to the line and symmetric about it', () => {
+    const [a, b] = volleyLanes(from, target, 2, 10) as [VolleyLane, VolleyLane];
+    for (const lane of [a, b]) {
+      expect(lane.to.x - lane.from.x).toBeCloseTo(target.x - from.x, 9);
+      expect(lane.to.y - lane.from.y).toBeCloseTo(target.y - from.y, 9);
+      expect(lineDistance(lane.from, from, target)).toBeCloseTo(5, 9);
+      expect(lineDistance(lane.to, from, target)).toBeCloseTo(5, 9);
+    }
+    expect(a.from.y - from.y).toBeCloseTo(-(b.from.y - from.y), 9);
+    expect(a.from.y).not.toBeCloseTo(b.from.y, 3);
+    expect(a.from.x).toBeCloseTo(b.from.x, 9);
+  });
+
+  it('puts the middle lane of three on the line', () => {
+    const [, middle] = volleyLanes(from, target, 3, 10) as [VolleyLane, VolleyLane, VolleyLane];
+    expect(middle.from.x).toBeCloseTo(from.x, 9);
+    expect(middle.from.y).toBeCloseTo(from.y, 9);
+    expect(middle.to.x).toBeCloseTo(target.x, 9);
+    expect(middle.to.y).toBeCloseTo(target.y, 9);
+  });
+
+  it('keeps every configured lane within reach of a lone smallest enemy, at any range and heading', () => {
+    // A lane hits when its offset from the target's centre is under the enemy's
+    // radius plus the shot's own body radius; half that keeps the margin real.
+    const smallestEnemy = Math.min(...Object.values(ENEMY_ARCHETYPES).map((e) => e.radius));
+    const shots = Object.values(COMPANION_FX).flatMap((fx) => (fx.shot ? [fx.shot.texture] : []));
+    const smallestShot = Math.min(...shots.map((texture) => PLACEHOLDERS[texture].width / 2));
+    const bound = (smallestEnemy + smallestShot) / 2;
+    const counts = COMPANION_SPELL_IDS.flatMap((id) => {
+      if (COMPANION_KINDS[id] !== 'ranged') return [];
+      const base = BASE_COMPANION_STATS[id].projectiles ?? 1;
+      const add = levelStatAdds(SPELL_LEVEL_STATS, id, 3).projectiles ?? 0;
+      return [Math.floor(base + add)];
+    });
+    expect(counts.length).toBeGreaterThan(0);
+    for (const count of counts) {
+      for (const [dx, dy] of [
+        [300, 0],
+        [0, -180],
+        [-120, 90],
+        [1, 1],
+      ] as const) {
+        const aim = { x: from.x + dx, y: from.y + dy };
+        for (const lane of volleyLanes(from, aim, count, COMPANION_SHOT_GAP_PX)) {
+          expect(lineDistance(lane.from, from, aim)).toBeLessThanOrEqual(bound + 1e-9);
+          expect(lineDistance(lane.to, from, aim)).toBeLessThanOrEqual(bound + 1e-9);
+        }
+      }
+    }
   });
 });

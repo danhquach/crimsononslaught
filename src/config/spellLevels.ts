@@ -1,4 +1,5 @@
 import { isRosterSpellId, type RosterSpellId } from './loadout';
+import type { SpellStatField } from './spellFields';
 
 /**
  * Spell levels as data (#326): every equipped spell, the element's default
@@ -7,8 +8,9 @@ import { isRosterSpellId, type RosterSpellId } from './loadout';
  * ticket (#327-#330) fills its entry in when it builds the behaviour.
  *
  * A spell is offered an upgrade only while it has an entry, the same way only a
- * castable spell is offered as an active, so the table ships EMPTY and the
- * system lands before any level does. Levels live in the run, never in a save.
+ * castable spell is offered as an active, so an element's levels switch on when
+ * its ticket fills its entries in, after the behaviour exists. Levels live in
+ * the run, never in a save.
  *
  * Pure data, no Phaser import.
  */
@@ -38,8 +40,55 @@ export type SpellLevelEntry = Readonly<{ 2: string; 3: string }>;
 /** A spell without an entry has no upgrade to offer yet. */
 export type SpellLevelTable = Readonly<Partial<Record<RosterSpellId, SpellLevelEntry>>>;
 
-/** What each spell's levels 2 and 3 add. Empty until the element tickets land. */
-export const SPELL_LEVELS: SpellLevelTable = {};
+/**
+ * What each spell's levels 2 and 3 add. Fire's are here (#327); each other
+ * element's lands with its own ticket (#328-#330). The stat adds that back the
+ * first line of each are `SPELL_LEVEL_STATS`, and the level 3 rules are
+ * `config/fireLevels.ts`'s. Written as ASCII, so "degrees" stands for the sign.
+ */
+export const SPELL_LEVELS: SpellLevelTable = {
+  fire: {
+    2: 'Fires 2 bolts, at the two nearest enemies.',
+    3: 'Ember split: each blast throws 3 small embers.',
+  },
+  fire_meteor: {
+    2: 'Drops 2 meteors per cast, on different targets.',
+    3: 'Cataclysm: every 3rd cast drops a giant meteor.',
+  },
+  fire_column: {
+    2: "The wave's arc widens from 95 to 150 degrees.",
+    3: 'Fire trail: the wave leaves burning ground.',
+  },
+  fire_companion: {
+    2: 'Fires 2 projectiles per attack.',
+    3: 'Fireball: every 4th attack explodes and burns.',
+  },
+  fire_dragon: {
+    2: 'Sends 2 dragons per cast, at different targets.',
+    3: 'Dragon swarm: 3 dragons, each hits 2 enemies.',
+  },
+};
+
+/** Stat adds a level brings, cumulative: level 3 has level 2's adds too (#327). */
+export type SpellLevelStatAdds = Readonly<Partial<Record<SpellStatField, number>>>;
+
+export type SpellLevelStatTable = Readonly<
+  Partial<Record<RosterSpellId, Readonly<{ 2?: SpellLevelStatAdds; 3?: SpellLevelStatAdds }>>>
+>;
+
+/**
+ * The stat adds each spell's levels bring (#327), read by the `Spellbook`
+ * before the profile scales a block. Every field named is `unscaled`, so a
+ * passive never multiplies an add. The row's spell must carry the field in its
+ * base block, which `validateSpellLevelStats` checks at boot.
+ */
+export const SPELL_LEVEL_STATS: SpellLevelStatTable = {
+  fire: { 2: { projectiles: 1 } },
+  fire_meteor: { 2: { projectiles: 1 } },
+  fire_column: { 2: { arc: 55 } }, // 95 -> 150
+  fire_companion: { 2: { projectiles: 1 } },
+  fire_dragon: { 2: { projectiles: 1 }, 3: { projectiles: 1 } },
+};
 
 /** The text for `level` of `id`, or `undefined` when the spell has no entry or the level is 1. */
 export function spellLevelText(

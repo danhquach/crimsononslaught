@@ -9,9 +9,10 @@ import {
   feedbackPayload,
   validateFeedback,
 } from '../core/feedback';
-import { pickupHelpRows } from '../core/helpModel';
+import { pickupHelpRows, spellHelpRows } from '../core/helpModel';
 import { SCENE, isHelpPayload, type HelpView } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
+import { addSpellIcon } from '../render/spellIcon';
 import { CRIMSON_CSS, SERIF } from './buildStrips';
 import { attachMenuInput, type MenuItem } from './input';
 import {
@@ -38,6 +39,12 @@ const ICON_BOX = 32;
 const NAME_X = 92;
 const TEXT_X = 196;
 
+/** Spells tab (#327): a 64 px row per spell, five Fire spells filling the panel down to Back. */
+const SPELL_ROW_PITCH = 64;
+const SPELL_ROW_TOP = PANEL_TOP + PANEL_PADDING + SPELL_ROW_PITCH / 2;
+/** Room for the longest card name ("Fire Companion") at 19px, with slack for a wider font. */
+const SPELL_TEXT_X = 260;
+
 /** The feedback form's fields, in game pixels. */
 const FORM_WIDTH = 600;
 const FORM_TOP = 90;
@@ -49,9 +56,10 @@ let lastSentAt: number | null = null;
 const FEEDBACK_KEY = import.meta.env.VITE_FEEDBACK_ACCESS_KEY;
 
 /**
- * Help screen (#226), reached from Intro and back to it. Two tabs: Pickups,
+ * Help screen (#226), reached from Intro and back to it. Three tabs: Pickups,
  * a row per thing on the floor with its art and what it does
- * (`core/helpModel.ts`), and About, the build's version, what's new
+ * (`core/helpModel.ts`); Spells (#327), a row per spell with its icon and what
+ * its two upgrades add, the level-up card's own text; and About, the build's version, what's new
  * (`config/changelog.ts`) and a feedback form. Like Pause, a tab switch or the
  * form restarts the scene on that view, so every view builds its own menu.
  *
@@ -102,6 +110,7 @@ export class HelpScene extends Phaser.Scene {
     } else {
       const items: MenuItem[] = this.drawTabs();
       if (this.current === 'pickups') this.drawPickups();
+      else if (this.current === 'spells') this.drawSpells();
       else items.push(...this.drawAbout());
       items.push(
         addMenuRow(this, {
@@ -144,6 +153,7 @@ export class HelpScene extends Phaser.Scene {
     const { width } = this.scale;
     const tabs: readonly (readonly [label: string, view: HelpView])[] = [
       ['Pickups', 'pickups'],
+      ['Spells', 'spells'],
       ['About', 'about'],
     ];
     return tabs.map(([label, view], i) => {
@@ -151,7 +161,7 @@ export class HelpScene extends Phaser.Scene {
       const tab = addMenuRow(this, {
         kind: 'bar',
         label,
-        x: width / 2 + (i - 0.5) * (TAB_WIDTH + 16),
+        x: width / 2 + (i - (tabs.length - 1) / 2) * (TAB_WIDTH + 16),
         y: TAB_Y,
         width: TAB_WIDTH,
         onConfirm: open,
@@ -179,6 +189,33 @@ export class HelpScene extends Phaser.Scene {
         .setOrigin(0, 0.5);
       this.add
         .text(TEXT_X, y + 10, row.effect, { fontFamily: SERIF, fontSize: '16px', color: '#dddddd' })
+        .setOrigin(0, 0.5);
+    });
+  }
+
+  private drawSpells(): void {
+    const rows = spellHelpRows();
+    drawPanel(this, 30, PANEL_TOP, 900, rows.length * SPELL_ROW_PITCH + PANEL_PADDING * 2);
+    rows.forEach((row, i) => {
+      const y = SPELL_ROW_TOP + i * SPELL_ROW_PITCH;
+      // The HUD slot's own art, or its colour and letters when the run has no atlas.
+      addSpellIcon(this, ICON_X, y, row, 1);
+      this.add
+        .text(NAME_X, y, row.name, { fontFamily: SERIF, fontSize: '19px', color: '#eeeeee' })
+        .setOrigin(0, 0.5);
+      this.add
+        .text(SPELL_TEXT_X, y - 11, row.lv2, {
+          fontFamily: SERIF,
+          fontSize: '15px',
+          color: '#dddddd',
+        })
+        .setOrigin(0, 0.5);
+      this.add
+        .text(SPELL_TEXT_X, y + 11, row.lv3, {
+          fontFamily: SERIF,
+          fontSize: '15px',
+          color: '#f0c674',
+        })
         .setOrigin(0, 0.5);
     });
   }
