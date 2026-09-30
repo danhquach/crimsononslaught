@@ -22,10 +22,11 @@ import { nearestEnemies } from './spell';
  * Boulders in the air the pool may ever hold. Base `cooldown` is 2 s against a
  * 207 px `range` at 280 px/s — under 0.8 s of flight, so at most one is
  * rolling — and a stacked Haste at the profile's 0.35 floor brings that to
- * one or two; the cap is several times either and exists to bound the pool
+ * one or two. From level 2 a throw sends 2 boulders (#330), about 2.1 rolling
+ * at the floor; the cap is several times that and exists to bound the pool
  * rather than to shape play.
  */
-export const MAX_LIVE_BOULDERS = 8;
+export const MAX_LIVE_BOULDERS = 12;
 
 /**
  * The line a throw takes: the nearest enemy within `range` of the caster, or

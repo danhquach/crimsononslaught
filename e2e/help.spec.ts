@@ -214,7 +214,7 @@ test('the Spells tab lists every spell of each element with its two upgrades, in
   await waitForView(page, 'spells');
 
   const pages = spellHelpPages();
-  expect(pages.map((p) => p.title)).toEqual(['Fire', 'Ice', 'Lightning']);
+  expect(pages.map((p) => p.title)).toEqual(['Fire', 'Ice', 'Lightning', 'Earth']);
   expect(pages[0]?.rows.map((row) => row.id)).toEqual([
     'fire',
     'fire_meteor',

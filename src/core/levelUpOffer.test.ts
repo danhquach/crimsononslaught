@@ -784,8 +784,44 @@ describe('levelUpOffer — seeds stay stable without spell levels (#326)', () =>
     ]);
   });
 
-  it('pools no upgrade for a spell of an element whose levels have not landed (#327, #330)', () => {
-    // Earth's levels are #330's; Fire's, Ice's and Lightning's have landed, so it is the unfilled element here.
+  it('pools an upgrade for each Earth spell from the shipped table, once the slots are full (#330)', () => {
+    const casting: ActiveCard[] = [
+      'earth',
+      'earth_boulder',
+      'earth_shield',
+      'earth_quake',
+      'earth_companion',
+    ].map((id) => ({
+      id: id as RosterSpellId,
+      name: `Spell ${id}`,
+      description: 'Casts a thing.',
+    }));
+    const input: OfferInput = {
+      loadout: equipOrThrow(
+        equipOrThrow(buildLoadout('earth'), 'earth_boulder', SLOT_2_LEVEL),
+        'earth_shield',
+        SLOT_3_LEVEL,
+      ),
+      level: PASSIVE_LEVEL,
+      actives: [],
+      casting,
+    };
+    expect(
+      offerPool(input)
+        .filter((card) => card.kind === 'upgrade')
+        .map((card) => card.id),
+    ).toEqual([
+      'spell_level_earth',
+      'spell_level_earth_boulder',
+      'spell_level_earth_shield',
+      'spell_level_earth_quake',
+      'spell_level_earth_companion',
+    ]);
+  });
+
+  it('pools no upgrade for a spell whose element has no entry in the table it is given (#327)', () => {
+    // Every shipped element has landed, so the unfilled case is a table without Earth's entries.
+    const withoutEarth: SpellLevelTable = { fire: { 2: 'Fire two.', 3: 'Fire three.' } };
     const earth: ActiveCard[] = [
       { id: 'earth', name: 'Earth Spike', description: 'Raises a spike.', color: 0x8d6e63 },
     ];
@@ -794,6 +830,7 @@ describe('levelUpOffer — seeds stay stable without spell levels (#326)', () =>
       level: PASSIVE_LEVEL,
       actives: [],
       casting: earth,
+      spellLevels: withoutEarth,
     };
     expect(offerPool(input).some((card) => card.kind === 'upgrade')).toBe(false);
   });

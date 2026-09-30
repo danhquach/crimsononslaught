@@ -219,8 +219,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('lightning.tornado', 4, 10, LOOP),
   spec('lightning.sword', 4, 12, LOOP),
 
-  // Earth Spike's eruption (CO-123). No spell draws it since the spike became
-  // a flying shot (#205, `earth.fly`); it is kept for later.
+  // Earth Spike's eruption (CO-123). The spike became a flying shot (#205,
+  // `earth.fly`); Earthquake's level 3 Aftershock draws this burst (#330).
   spec('earth.spike', 5, 15, ONCE),
   spec('earth.shield', 4, 6, LOOP),
   spec('earth.shieldBreak', 4, 15, ONCE),
@@ -229,6 +229,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // rock ring, is no longer drawn by the spell and is kept for later.
   spec('earth.quake', 4, 8, LOOP),
   spec('earth.quakeRift', 4, 8, LOOP),
+  // The Boulder's Landslide rut (CO-203): four static variants of one band of broken ground, never played; a tile picks one frame.
+  spec('earth.rut', 4, 1, ONCE),
 
   // Cross-element status overlays (#139): bleed and stagger are applied by
   // spells of any element, so they hang off `status` rather than off the

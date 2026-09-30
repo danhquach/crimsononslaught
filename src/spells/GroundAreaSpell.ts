@@ -1,6 +1,14 @@
 import { AREA_LOOKS, type AreaSpellId } from '../config/areas';
+import { AFTERSHOCK } from '../config/earthLevels';
 import { HAIL } from '../config/iceLevels';
 import type { SpellLevel } from '../config/spellLevels';
+import {
+  aftershockDamage,
+  aftershockThrow,
+  hasAftershock,
+  quakeSpots,
+  quakesPerCast,
+} from '../core/earthLevels';
 import { recordCapped } from '../core/fireLevels';
 import { novaScale } from '../core/fx';
 import {
@@ -30,6 +38,49 @@ import type { DamageSink } from './DamageSink';
 export interface StormLevelKit {
   readonly fx: FxPool;
   readonly hailRng: Rng;
+}
+
+/**
+ * What only the Earthquake's levels need (#330): the effects pool for the
+ * aftershock, and the stream its second quake's centre is drawn on when the
+ * densest groups tie, so a second quake never shifts any other draw of the
+ * run. Handed to `earth_quake` alone; Ice Storm never gets it.
+ */
+export interface QuakeLevelKit {
+  readonly fx: FxPool;
+  readonly levelRng: Rng;
+}
+
+/** One quake's own record, closed over at the cast (#330): the level it opened at, its number and a count of the ticks it has paid. */
+interface QuakePatch {
+  readonly kit: QuakeLevelKit;
+  readonly level: SpellLevel;
+  readonly patch: number;
+  readonly tickDamage: number;
+  readonly paid: { patch: number; ticks: number };
+}
+
+/** The Earthquake's level record, what the test hook reads (#330): cause and effect in one entry. */
+export interface QuakeLevelReport {
+  /** Every cast that opened a quake, at the level it was cast at: quakes opened, and the distance between the first two centres (null with one). */
+  casts: { level: SpellLevel; patches: number; gapPx: number | null }[];
+  /** Each quake's paid ticks so far, in the order they opened; the ones still open are still counting. */
+  patchTicks: { patch: number; ticks: number }[];
+  /**
+   * Each aftershock: the quake's level and number, who stood inside as it ended,
+   * how many were hit, how many still stood inside after the throw (a wall or a
+   * boss can hold one) and the boss's throw in px if it was inside.
+   */
+  aftershocks: {
+    level: SpellLevel;
+    patch: number;
+    inside: number;
+    hit: number;
+    insideAfter: number;
+    bossThrowPx: number | null;
+  }[];
+  /** Aftershocks so far: a count the capped log cannot lose. */
+  aftershockCount: number;
 }
 
 /** One patch's own count of its ticks and what it needs to run a level (#328), closed over at the cast. */
@@ -88,6 +139,13 @@ export interface IceStormLevelReport {
  * a tick costs the enemies inside. Nothing here touches the physics world: a
  * patch has no body, so `CollisionSystem` never learns it exists.
  *
+ * Levels (#328, #330): Ice Storm's come through a `StormLevelKit`, the
+ * Earthquake's through a `QuakeLevelKit`; each spell is handed its own and the
+ * other never sees it. Earthquake level 2 opens `QUAKE_SPLIT.count` quakes a
+ * cast, the second on the densest group clear of the first, each its own
+ * area with its own clock and its own closure. Level 3, Aftershock: a quake
+ * erupts as it ends, damaging and throwing out what still stands inside.
+ *
  * Spec §6.2: a patch has a finite lifetime, so every number it will ever use is
  * read once at the cast and closed over — a Haste or an Expanse taken while an
  * Ice Storm lies on the ground grows the next one, never the one the player is
@@ -100,6 +158,11 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
   private readonly areas: AreaPool;
   private readonly rng: Rng;
   private readonly kit: StormLevelKit | undefined;
+  private readonly quakeKit: QuakeLevelKit | undefined;
+  private readonly quakeCastLog: QuakeLevelReport['casts'] = [];
+  private readonly quakeTickLog: QuakeLevelReport['patchTicks'] = [];
+  private readonly aftershockLog: QuakeLevelReport['aftershocks'] = [];
+  private aftershocks = 0;
   private readonly hailLog: IceStormLevelReport['hail'] = [];
   private readonly deepFreezeLog: IceStormLevelReport['deepFreezes'] = [];
   private hailHits = 0;
@@ -120,6 +183,7 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     areas: AreaPool,
     rng: Rng,
     kit?: StormLevelKit,
+    quakeKit?: QuakeLevelKit,
   ) {
     super(id, { ...stats });
     this.caster = caster;
@@ -127,8 +191,9 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     this.damage = damage;
     this.areas = areas;
     this.rng = rng;
-    // Only Ice Storm has levels; Earthquake ignores a kit it was handed.
+    // Each element's kit reaches its own spell only: the other ignores one it was handed.
     this.kit = id === 'ice_blizzard' ? kit : undefined;
+    this.quakeKit = id === 'earth_quake' ? quakeKit : undefined;
   }
 
   /** Test hook (#328): the hail and deep freezes this spell's storms have made. */
@@ -139,6 +204,16 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
       patches: this.patches,
       hailHits: this.hailHits,
       hailPerPatch: [...this.hailByPatch.values()],
+    };
+  }
+
+  /** Test hook (#330): the quakes and aftershocks this spell's Earthquake has made. */
+  get quakeLevelReport(): QuakeLevelReport {
+    return {
+      casts: [...this.quakeCastLog],
+      patchTicks: this.quakeTickLog.map(({ patch, ticks }) => ({ patch, ticks })),
+      aftershocks: [...this.aftershockLog],
+      aftershockCount: this.aftershocks,
     };
   }
 
@@ -175,6 +250,10 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
    * (`densestSpot`). With nothing in range the cast never comes here: it waits
    * (#212), so a patch is never dropped on the player's feet.
    *
+   * An Earthquake with its kit (#330) asks `quakeSpots`, whose first centre is
+   * that same `densestSpot` call and whose second, from level 2, is the densest
+   * group clear of the first. Each quake is its own area with its own closure.
+   *
    * A pool at its cap drops the patch, so the cast is spent — a backlog of
    * areas waiting for room would land them all at once, long after the moment
    * that asked for them.
@@ -184,28 +263,62 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     const slowPct = this.areaStats.slowPct ?? 0;
     const slowDuration = this.areaStats.slowDuration ?? 0;
     const staggerS = areaStaggerS(this.areaStats.staggerDuration ?? 0, tickRate);
-    const at = densestSpot(this.caster, this.enemies.live, radius, targetRange, this.rng);
-    const area = createArea(at, { radius, durationS: duration, tickEveryS: tickRate });
-    const storm: StormPatch | null = this.kit
-      ? {
-          kit: this.kit,
-          level: this.level,
-          patch: this.patches + 1,
-          count: stormTickCount(duration, tickRate),
-          tickEveryS: tickRate,
-          tickNumber: 0,
-        }
-      : null;
-    const placed = this.areas.place(
-      area,
-      (live) => {
-        this.applyTick(live, tickDamage, slowPct, slowDuration, staggerS);
-        if (storm) this.stormLevels(live, storm, tickDamage, slowPct, slowDuration);
-      },
-      {},
-      AREA_LOOKS[this.id],
-    );
-    if (placed) this.patches += 1;
+    const level = this.level;
+    const spots = this.quakeKit
+      ? quakeSpots(
+          this.caster,
+          this.enemies.live,
+          radius,
+          targetRange,
+          quakesPerCast(level),
+          this.rng,
+          this.quakeKit.levelRng,
+        )
+      : [densestSpot(this.caster, this.enemies.live, radius, targetRange, this.rng)];
+    const opened: Vec2[] = [];
+    for (const at of spots) {
+      const area = createArea(at, { radius, durationS: duration, tickEveryS: tickRate });
+      const storm: StormPatch | null = this.kit
+        ? {
+            kit: this.kit,
+            level,
+            patch: this.patches + 1,
+            count: stormTickCount(duration, tickRate),
+            tickEveryS: tickRate,
+            tickNumber: 0,
+          }
+        : null;
+      const quake: QuakePatch | null = this.quakeKit
+        ? {
+            kit: this.quakeKit,
+            level,
+            patch: this.patches + 1,
+            tickDamage,
+            paid: { patch: this.patches + 1, ticks: 0 },
+          }
+        : null;
+      const placed = this.areas.place(
+        area,
+        (live) => {
+          this.applyTick(live, tickDamage, slowPct, slowDuration, staggerS);
+          if (storm) this.stormLevels(live, storm, tickDamage, slowPct, slowDuration);
+          if (quake) quake.paid.ticks += 1;
+        },
+        quake && hasAftershock(level) ? { onExpire: () => this.aftershock(area, quake) } : {},
+        AREA_LOOKS[this.id],
+      );
+      if (!placed) continue;
+      this.patches += 1;
+      opened.push(at);
+      if (quake) recordCapped(this.quakeTickLog, quake.paid);
+    }
+    const [first, second] = opened;
+    if (!this.quakeKit || !first) return;
+    recordCapped(this.quakeCastLog, {
+      level,
+      patches: opened.length,
+      gapPx: second ? Math.hypot(second.x - first.x, second.y - first.y) : null,
+    });
   }
 
   /**
@@ -307,5 +420,44 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     this.damage(target, damage, 'tick', area);
     this.hailHits += 1;
     recordCapped(this.hailLog, { level, patch, tickNumber, inside: inside.length, hit: true });
+  }
+
+  /**
+   * Level 3, Aftershock: the quake erupts as it ends. Whoever is inside, read
+   * fresh, takes `AFTERSHOCK.damageFactor` x the quake's tick damage and is
+   * thrown out past the rim, in the order they were found (a dead-centre enemy
+   * takes its heading from that index). A boss's throw is clamped. No stagger
+   * and no roll: the throw is the effect.
+   */
+  private aftershock(area: Readonly<GroundArea>, quake: QuakePatch): void {
+    const { kit, level, patch } = quake;
+    const inside = membersOf(area, this.enemies.live).filter((enemy) => enemy.active);
+    kit.fx.burst(AFTERSHOCK.clip, area.x, area.y, {
+      scale: (2 * area.radius) / AFTERSHOCK.artPx,
+    });
+    const damage = aftershockDamage(quake.tickDamage);
+    let hit = 0;
+    let bossThrowPx: number | null = null;
+    for (const [index, enemy] of inside.entries()) {
+      if (!enemy.active) continue;
+      const boss = enemy instanceof Boss;
+      const thrown = aftershockThrow(area, enemy, area.radius, index, boss);
+      hit += 1;
+      this.damage(enemy, damage, 'tick', area);
+      // A killing blow drops its gems where the enemy stood; only a survivor is thrown.
+      if (!enemy.active) continue;
+      enemy.knockBack(thrown);
+      if (boss) bossThrowPx = Math.max(bossThrowPx ?? 0, Math.hypot(thrown.x, thrown.y));
+    }
+    const insideAfter = membersOf(area, this.enemies.live).filter((enemy) => enemy.active).length;
+    this.aftershocks += 1;
+    recordCapped(this.aftershockLog, {
+      level,
+      patch,
+      inside: inside.length,
+      hit,
+      insideAfter,
+      bossThrowPx,
+    });
   }
 }

@@ -25,10 +25,11 @@ import type { EarthStats } from './spellStats';
  * Spikes in the air the pool may ever hold. Base flight is a 144 px `range` at
  * 260 px/s — about 0.55 s against a 1.1 s `cooldown`, so at most one is flying
  * — and a stacked Haste at the profile's 0.35 floor (0.385 s) brings that to
- * two; the cap is several times either and exists to bound the pool rather
- * than to shape play.
+ * two casts in the air. From level 2 a cast flings 2 spikes (#330), so that is
+ * four; the cap is four times that and exists to bound the pool rather than to
+ * shape play.
  */
-export const MAX_LIVE_SPIKES = 8;
+export const MAX_LIVE_SPIKES = 16;
 
 /**
  * The line a cast takes: the nearest enemy within `range` of the caster, or

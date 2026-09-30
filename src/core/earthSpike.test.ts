@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SPIKES_PER_CAST } from '../config/earthLevels';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { MAX_LIVE_SPIKES, rollBleed, spikeHit, spikeTarget } from './earthSpike';
 import { createRng } from './rng';
@@ -50,7 +51,8 @@ describe('the flight (#205)', () => {
     // Flight time against the Haste floor's cooldown (0.35 × 1.1 s).
     const inAir = Math.ceil(base.range / base.speed / (base.cooldown * 0.35));
     expect(inAir).toBeLessThanOrEqual(2);
-    expect(MAX_LIVE_SPIKES).toBeGreaterThanOrEqual(inAir * 4);
+    // Level 2 and 3 fling two spikes a cast (#330).
+    expect(MAX_LIVE_SPIKES).toBeGreaterThanOrEqual(inAir * SPIKES_PER_CAST[3] * 4);
   });
 });
 

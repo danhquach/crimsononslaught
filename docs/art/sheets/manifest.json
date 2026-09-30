@@ -2161,6 +2161,20 @@
         [{ "anim": "scorch", "cols": [1, 2], "centred": true }],
         [{ "anim": "scorch", "cols": [1, 2], "centred": true }]
       ]
+    },
+    {
+      "key": "earth",
+      "ticket": "CO-203",
+      "file": "CO-203/earth_boulder_rut.png",
+      "page": 21,
+      "cols": 2,
+      "rows": 2,
+      "sheetCell": 512,
+      "maxMagenta": 20,
+      "rowSpecs": [
+        [{ "anim": "rut", "cols": [1, 2] }],
+        [{ "anim": "rut", "cols": [1, 2] }]
+      ]
     }
   ]
 }

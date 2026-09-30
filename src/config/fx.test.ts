@@ -48,7 +48,9 @@ describe('fx config (CO-082)', () => {
   it('caps ground areas well above what a run can hold', () => {
     // Two area spells (only `?loadout=` equips both), two patches each at a
     // fully hasted cooldown: the cap is four times the reachable peak (#135).
-    expect(MAX_LIVE_AREAS).toBeGreaterThanOrEqual(16);
+    // Earthquake's level 2 doubles a cast and the seismic patches share the
+    // pool (#330), which `config/earthLevels.test.ts` sizes exactly.
+    expect(MAX_LIVE_AREAS).toBeGreaterThanOrEqual(24);
   });
 
   it('scales a ground area against the placeholder it is drawn with', () => {

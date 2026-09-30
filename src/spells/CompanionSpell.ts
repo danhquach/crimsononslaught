@@ -6,6 +6,12 @@ import {
   MAX_COMPANION_SHOTS,
   type CompanionSpellId,
 } from '../config/companions';
+import { AREA_LOOKS } from '../config/areas';
+import {
+  EARTH_COMPANION_SWEEP,
+  MAX_LIVE_SEISMIC_PATCHES,
+  SEISMIC_SLAM,
+} from '../config/earthLevels';
 import { COMPANION_FIREBALL, COMPANION_SHOT_GAP_PX } from '../config/fireLevels';
 import { FROST_ORB } from '../config/iceLevels';
 import { COMPANION_SWEEP, MAX_LIVE_COMPANION_STRIPS, THUNDERCLAP } from '../config/lightningLevels';
@@ -29,6 +35,16 @@ import {
   companionFacing,
   type Facing,
 } from '../core/animation';
+import {
+  earthCompanionAttackCooldown,
+  earthSweepPush,
+  earthSweepTargets,
+  hasEarthSweep,
+  hasSeismicSlam,
+  patchAllowed,
+  seismicPatchRule,
+  seismicStaggerS,
+} from '../core/earthLevels';
 import { recordCapped } from '../core/fireLevels';
 import { splashTargets } from '../core/fireball';
 import { pulseTargets } from '../core/frostNova';
@@ -102,6 +118,16 @@ import type { DamageSink } from './DamageSink';
  * cap it; none stuns and none rolls, so nothing draws from the RNG. The strips
  * are a pool of their own, capped at `MAX_LIVE_COMPANION_STRIPS`. The level is
  * taken when the swing lands.
+ *
+ * Levels (#330), the Earth Companion (melee): from level 2 it attacks twice as
+ * fast (`earthCompanionAttackCooldown`), and a swing that lands also sweeps the
+ * arc in front of it (`EARTH_COMPANION_SWEEP`), hitting and shoving up to four
+ * other enemies for half its damage. Level 3, Seismic slam: the swing also
+ * leaves a quake patch on its target (`SEISMIC_SLAM`) that staggers and hurts
+ * whatever stands in it; at most `MAX_LIVE_SEISMIC_PATCHES` at once and never on
+ * top of another, so a swing that would is skipped. Every stagger is the
+ * patch's own, so a boss's diminishing returns cap it; none stuns and none
+ * rolls. The level is taken when the swing lands.
  *
  * The companion itself carries no body (see `entities/Companion.ts`), so it is
  * not damageable, does not block movement and cannot collide with an enemy. Its
@@ -178,6 +204,24 @@ export interface CompanionLevelReport {
   }[];
   /** Strips up right now, for the pool-cap check; 0 for every other companion. */
   liveStrips: number;
+  /**
+   * The Earth Companion's landed swings from level 2 (#330), at the level each
+   * landed at: the cadence its attacks run on now against its base
+   * `attackCooldown`, the enemies its arc caught and how many were hit, and
+   * whether the slam's patch was placed or skipped (at level 3, for the cap or
+   * for lying on another patch). Empty for every other companion.
+   */
+  slams: {
+    level: SpellLevel;
+    cadenceS: number;
+    attackCooldownS: number;
+    swept: number;
+    sweptHit: number;
+    patchPlaced: boolean;
+    patchSkipped: boolean;
+  }[];
+  /** Seismic patches on the ground right now, for the cap check; 0 for every other companion. */
+  liveSeismicPatches: number;
 }
 
 export class CompanionSpell extends Spell<CompanionSpellId> {
@@ -215,6 +259,9 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   /** The Lightning Companion's arc and Thunderclap strips (#329); no other companion draws any. */
   private readonly strips: ChainStripPool | undefined;
   private readonly swingLog: CompanionLevelReport['swings'] = [];
+  private readonly slamLog: CompanionLevelReport['slams'] = [];
+  /** Centres of the Earth Companion's seismic patches on the ground; a patch leaves when it expires. */
+  private readonly seismicCentres: Vec2[] = [];
 
   constructor(
     scene: Phaser.Scene,
@@ -289,6 +336,8 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
       liveShots: this.liveCount,
       swings: [...this.swingLog],
       liveStrips: this.strips?.liveCount ?? 0,
+      slams: [...this.slamLog],
+      liveSeismicPatches: this.seismicCentres.length,
     };
   }
 
@@ -314,10 +363,15 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   /**
    * The attack cadence. A companion has no `cooldown` of its own — it is always
    * out — so the scheduler runs on `attackCooldown` instead; the Lightning
-   * Companion's is halved from level 2 (#329).
+   * Companion's is halved from level 2 (#329), and so is the Earth Companion's
+   * (#330); the two compose, each touching its own companion only.
    */
   protected override get cooldown(): number {
-    return companionAttackCooldown(this.id, this.companionStats.attackCooldown, this.level);
+    return earthCompanionAttackCooldown(
+      this.id,
+      companionAttackCooldown(this.id, this.companionStats.attackCooldown, this.level),
+      this.level,
+    );
   }
 
   /** No target this frame → the attack waits rather than being spent (#212). */
@@ -461,8 +515,92 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     if (!inReach(this.position, target, target.bodyRadius, COMPANION_REACH)) return;
     this.startAttack(target);
     const arc = this.strips ? this.resolveArc(target) : undefined;
+    const sweep = this.id === 'earth_companion' ? this.resolveSweep(target) : undefined;
+    // Where the target stands before the blow, so a kill still leaves the slam where it fell.
+    const slamAt = { x: target.x, y: target.y };
     this.onCompanionHit(target, this.position);
     if (arc) this.landArc(target, arc.swept, arc.aimRad);
+    if (sweep) this.landSlam(slamAt, sweep);
+  }
+
+  /**
+   * The Earth Companion's front arc for a swing on `target` (levels 2 and 3):
+   * who it catches, resolved before any damage lands so a kill cannot change the
+   * crowd it reads.
+   */
+  private resolveSweep(target: Enemy): Enemy[] | undefined {
+    if (!hasEarthSweep(this.level)) return undefined;
+    const aimRad = Math.atan2(target.y - this.position.y, target.x - this.position.x);
+    return earthSweepTargets(this.position, aimRad, this.enemies.live, [target]);
+  }
+
+  /**
+   * The rest of a landed swing at level 2 and 3, after the direct hit: an
+   * impact, a shove and half the companion's damage on each enemy of the arc;
+   * from level 3 a seismic patch where the target stood. `swept` was resolved
+   * before the direct hit.
+   */
+  private landSlam(at: Readonly<Vec2>, swept: readonly Enemy[]): void {
+    const { damage, knockback = 0 } = this.companionStats;
+    const level = this.level;
+    let sweptHit = 0;
+    for (const enemy of swept) {
+      if (!enemy.active) continue;
+      sweptHit += 1;
+      this.fx.burst('earth.impact', enemy.x, enemy.y, { scale: EARTH_COMPANION_SWEEP.impactScale });
+      // The shove is measured before the blow, so a killing hit drops its gems where the enemy stood.
+      const push = earthSweepPush(this.position, enemy, knockback, this.caster);
+      this.damage(enemy, damage * EARTH_COMPANION_SWEEP.damageFactor, 'hit', this.position);
+      if (!enemy.active) continue;
+      enemy.knockBack(push);
+      this.fx.burst('earth.dust', enemy.x, enemy.y + enemy.bodyRadius, { flipX: dustFlip(push) });
+    }
+    const slams = hasSeismicSlam(level);
+    const patchPlaced = slams && this.placeSeismicPatch(at, damage);
+    recordCapped(this.slamLog, {
+      level,
+      cadenceS: this.cooldown,
+      attackCooldownS: this.companionStats.attackCooldown,
+      swept: swept.length,
+      sweptHit,
+      patchPlaced,
+      patchSkipped: slams && !patchPlaced,
+    });
+  }
+
+  /**
+   * Level 3: a seismic patch at `at`, staggering and hurting whatever stands in
+   * it for its short life. Refused at the cap and on top of a live patch, so
+   * no enemy is ever in two of them; false too when the shared pool is full.
+   * Its damage is read now, so a passive taken later grows the next slam only.
+   */
+  private placeSeismicPatch(at: Readonly<Vec2>, companionDamage: number): boolean {
+    if (!this.areas) return false;
+    if (!patchAllowed(at, this.seismicCentres, MAX_LIVE_SEISMIC_PATCHES, SEISMIC_SLAM.radius)) {
+      return false;
+    }
+    const centre = { x: at.x, y: at.y };
+    const staggerS = seismicStaggerS();
+    const tickDamage = companionDamage * SEISMIC_SLAM.tickDamageFactor;
+    const placed = this.areas.place(
+      createArea(centre, seismicPatchRule()),
+      (live) => {
+        for (const member of membersOf(live, this.enemies.live)) {
+          if (!member.active) continue;
+          if (staggerS > 0) member.applyStagger(staggerS);
+          this.damage(member, tickDamage, 'tick', live);
+        }
+      },
+      {
+        onExpire: () => {
+          const i = this.seismicCentres.indexOf(centre);
+          if (i >= 0) this.seismicCentres.splice(i, 1);
+        },
+      },
+      AREA_LOOKS.earth_quake,
+    );
+    if (placed) this.seismicCentres.push(centre);
+    return placed;
   }
 
   /**
