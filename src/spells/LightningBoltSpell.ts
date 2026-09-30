@@ -1,11 +1,22 @@
 import Phaser from 'phaser';
 import { FX_DEPTH } from '../config/fx';
+import { THUNDERBOLT } from '../config/lightningLevels';
+import type { SpellLevel } from '../config/spellLevels';
 import { resolveCast, rollStun, type BoltStats } from '../core/chainLightning';
+import { recordCapped } from '../core/fireLevels';
 import { flightRotation } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { BOLT_SPEED, MAX_LIVE_BOLTS, boltStep } from '../core/lightningBolt';
+import {
+  isThunderboltCast,
+  nextThunderboltCount,
+  skyStrikeTargets,
+  stunStream,
+  thunderboltDamage,
+} from '../core/lightningLevels';
 import type { Rng } from '../core/rng';
 import { Spell, anyWithin } from '../core/spell';
+import { Boss } from '../entities/Boss';
 import type { Enemy } from '../entities/Enemy';
 import { showEffect } from '../render/animate';
 import type { EnemyPool } from '../systems/EnemyPool';
@@ -23,6 +34,27 @@ interface Flight {
   readonly aim: Vec2;
   /** False once the target died or left the pool mid-flight; it is never re-read after that. */
   live: boolean;
+  /** The level the bolt left at (#329): which stream its stun roll is made on. */
+  readonly level: SpellLevel;
+}
+
+/** Lightning Bolt's level record, what the test hook reads (#329): cause and effect in one entry. */
+export interface LightningBoltLevelReport {
+  /** Each cast that sent a bolt: its number, the bolts it sent, whether it called a Thunderbolt. */
+  casts: { level: SpellLevel; castNumber: number; bolts: number; thunderbolt: boolean }[];
+  /**
+   * Each Thunderbolt: the cast that called it, the enemies it caught, how many
+   * of them were stunned right after it, and the boss's stun if it was caught.
+   */
+  thunderbolts: {
+    level: SpellLevel;
+    castNumber: number;
+    caught: number;
+    stunnedAfter: number;
+    bossStunS: number | null;
+  }[];
+  /** Thunderbolts called, all run: a count the capped log cannot lose. */
+  thunderboltCount: number;
 }
 
 /**
@@ -43,6 +75,14 @@ interface Flight {
  * `lightning.strike` and `lightning.impact` burst on the target when it lands.
  * With no atlas it flies as the `proj_bolt` placeholder. Chain Lightning's
  * tiled strip is `ChainLightningSpell`'s alone.
+ *
+ * Levels (#329): level 2's second bolt is a stat add (`strikes`). Level 3,
+ * Thunderbolt: every `THUNDERBOLT.every`th cast that sent a bolt also calls a
+ * sky strike on its first target, at the cast: everything within
+ * `THUNDERBOLT.radius` takes a multiple of the bolt's damage and a fixed stun,
+ * through `applyStun`, so a boss's diminishing returns cap it. From level 2 a
+ * bolt's stun roll is made on the levels' own stream (`stunStream`, taken at
+ * the launch); level 1 rolls on the run's RNG exactly as it always has.
  */
 export class LightningBoltSpell extends Spell<'lightning'> {
   private readonly scene: Phaser.Scene;
@@ -51,10 +91,16 @@ export class LightningBoltSpell extends Spell<'lightning'> {
   private readonly damage: DamageSink;
   private readonly fx: FxPool;
   private readonly rng: Rng;
+  private readonly levelRng: Rng;
   private readonly flights: Flight[] = [];
   private readonly spare: Phaser.GameObjects.Sprite[] = [];
   /** Test hook: enemies this spell has struck. */
   private landed = 0;
+  /** Casts that sent a bolt at level 3, from the pick: the count a Thunderbolt is every Nth of. */
+  private castNumber = 0;
+  private readonly castLog: LightningBoltLevelReport['casts'] = [];
+  private readonly thunderboltLog: LightningBoltLevelReport['thunderbolts'] = [];
+  private thunderbolts = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -64,6 +110,7 @@ export class LightningBoltSpell extends Spell<'lightning'> {
     damage: DamageSink,
     rng: Rng,
     fx: FxPool,
+    levelRng: Rng = rng,
   ) {
     super('lightning', stats);
     this.scene = scene;
@@ -71,7 +118,17 @@ export class LightningBoltSpell extends Spell<'lightning'> {
     this.enemies = enemies;
     this.damage = damage;
     this.rng = rng;
+    this.levelRng = levelRng;
     this.fx = fx;
+  }
+
+  /** Test hook (#329): the casts this spell has made and the Thunderbolts they called. */
+  get levelReport(): LightningBoltLevelReport {
+    return {
+      casts: [...this.castLog],
+      thunderbolts: [...this.thunderboltLog],
+      thunderboltCount: this.thunderbolts,
+    };
   }
 
   /** Bolts in the air right now. */
@@ -107,7 +164,7 @@ export class LightningBoltSpell extends Spell<'lightning'> {
       sprite.setVisible(false);
       sprite.anims.stop();
       this.spare.push(sprite);
-      if (flight.live) this.strike(flight.target, from);
+      if (flight.live) this.strike(flight.target, from, flight.level);
     }
   }
 
@@ -118,35 +175,75 @@ export class LightningBoltSpell extends Spell<'lightning'> {
 
   /** One cast: a bolt leaves the caster for each target, aimed where it stands now. */
   protected cast(): void {
+    const level = this.level;
+    let sent = 0;
+    let lead: Enemy | undefined;
     for (const bolt of resolveCast(this.caster, this.enemies.live, this.stats)) {
       const [first] = bolt;
       if (!first) continue;
       // Pool exhausted: the rest of the cast is dropped, never queued.
       if (this.flights.length >= MAX_LIVE_BOLTS) break;
-      this.launch(first.target);
+      this.launch(first.target, level);
+      lead ??= first.target;
+      sent += 1;
     }
+    if (sent === 0 || !lead) return;
+    this.castNumber = nextThunderboltCount(this.castNumber, level);
+    const thunderbolt = isThunderboltCast(this.castNumber, level);
+    recordCapped(this.castLog, { level, castNumber: this.castNumber, bolts: sent, thunderbolt });
+    if (thunderbolt) this.skyStrike(lead, level);
   }
 
-  private launch(target: Enemy): void {
+  /**
+   * Thunderbolt (level 3): a strike from the sky on `centre`, where it stands
+   * at the cast. Who it catches is read before any damage lands; stun before
+   * damage, as every Lightning hit does, so a killing strike has still stunned.
+   */
+  private skyStrike(centre: Enemy, level: SpellLevel): void {
+    const { x, y } = centre;
+    const caught = skyStrikeTargets({ x, y }, this.enemies.live);
+    this.thunderbolts += 1;
+    this.fx.burst(THUNDERBOLT.clip, x, y, { scale: THUNDERBOLT.drawScale });
+    this.fx.burst('lightning.impact', x, y, { scale: THUNDERBOLT.drawScale });
+    const damage = thunderboltDamage(this.stats.damage);
+    let stunnedAfter = 0;
+    let bossStunS: number | null = null;
+    for (const enemy of caught) {
+      enemy.applyStun(THUNDERBOLT.stunS);
+      if (enemy.isStunned) stunnedAfter += 1;
+      if (enemy instanceof Boss) bossStunS = enemy.crowdControlRemainingS.stunS;
+      this.damage(enemy, damage, 'hit', { x, y });
+    }
+    recordCapped(this.thunderboltLog, {
+      level,
+      castNumber: this.castNumber,
+      caught: caught.length,
+      stunnedAfter,
+      bossStunS,
+    });
+  }
+
+  private launch(target: Enemy, level: SpellLevel): void {
     const { x, y } = this.caster;
     const sprite = this.spare.pop() ?? this.makeSprite();
     const heading = { x: target.x - x, y: target.y - y };
     sprite.setPosition(x, y).setRotation(flightRotation(heading, 0)).setVisible(true);
     if (!showEffect(sprite, BOLT_CLIP)) sprite.setOrigin(0.5, 0.5);
-    this.flights.push({ sprite, target, aim: { x: target.x, y: target.y }, live: true });
+    this.flights.push({ sprite, target, aim: { x: target.x, y: target.y }, live: true, level });
   }
 
   /**
    * The bolt lands: bursts on the enemy, then status before damage, as every
    * Lightning hit does. `from` is the last point of its flight.
    */
-  private strike(target: Enemy, from: Readonly<Vec2>): void {
+  private strike(target: Enemy, from: Readonly<Vec2>, level: SpellLevel): void {
     const stats: BoltStats = this.stats;
+    const rng = stunStream(level, this.rng, this.levelRng);
     this.landed += 1;
     this.fx.burst('lightning.strike', target.x, target.y);
     this.fx.burst('lightning.impact', target.x, target.y);
     target.applyStagger(stats.staggerDuration);
-    if (rollStun(this.rng, stats.stunChance)) target.applyStun(stats.stunDuration);
+    if (rollStun(rng, stats.stunChance)) target.applyStun(stats.stunDuration);
     this.damage(target, stats.damage, 'hit', from);
   }
 

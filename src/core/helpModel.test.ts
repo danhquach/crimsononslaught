@@ -81,10 +81,11 @@ describe('pickupHelpRows', () => {
 });
 
 describe('spellHelpRows', () => {
-  it('lists exactly the spells whose levels have landed, in roster order: Fire, then Ice', () => {
+  it('lists exactly the spells whose levels have landed, in roster order: Fire, Ice, then Lightning', () => {
     expect(spellHelpRows().map((r) => r.id)).toEqual([
       ...SPELLS_BY_ELEMENT.fire,
       ...SPELLS_BY_ELEMENT.ice,
+      ...SPELLS_BY_ELEMENT.lightning,
     ]);
   });
 
@@ -140,14 +141,16 @@ describe('spellHelpPages', () => {
     ice: { 2: 'Ice two.', 3: 'Ice three.' },
   };
 
-  it('is a Fire page then an Ice page while those are the elements with text', () => {
+  it('is a Fire, an Ice and a Lightning page while those are the elements with text', () => {
     const pages = spellHelpPages();
     expect(pages.map((p) => [p.element, p.title])).toEqual([
       ['fire', 'Fire'],
       ['ice', 'Ice'],
+      ['lightning', 'Lightning'],
     ]);
     expect(pages[0]?.rows.map((r) => r.id)).toEqual(SPELLS_BY_ELEMENT.fire);
     expect(pages[1]?.rows.map((r) => r.id)).toEqual(SPELLS_BY_ELEMENT.ice);
+    expect(pages[2]?.rows.map((r) => r.id)).toEqual(SPELLS_BY_ELEMENT.lightning);
   });
 
   it('gives each element its own page, in element order, titled by the element', () => {

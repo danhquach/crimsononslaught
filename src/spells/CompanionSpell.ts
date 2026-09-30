@@ -8,6 +8,7 @@ import {
 } from '../config/companions';
 import { COMPANION_FIREBALL, COMPANION_SHOT_GAP_PX } from '../config/fireLevels';
 import { FROST_ORB } from '../config/iceLevels';
+import { COMPANION_ARC, MAX_THUNDERCLAP_ARC_SPRITES, THUNDERCLAP } from '../config/lightningLevels';
 import { METEOR_POND_LOOK } from '../config/strikes';
 import type { SpellLevel } from '../config/spellLevels';
 import {
@@ -33,6 +34,13 @@ import { splashTargets } from '../core/fireball';
 import { pulseTargets } from '../core/frostNova';
 import { dustFlip, explosionScale, novaScale } from '../core/fx';
 import { frostOrbHit } from '../core/iceLevels';
+import {
+  arcTargets,
+  frenzyCooldown,
+  hasCompanionArc,
+  hasThunderclap,
+  thunderclapPath,
+} from '../core/lightningLevels';
 import { createArea, membersOf } from '../core/groundArea';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
@@ -43,6 +51,7 @@ import { Companion } from '../entities/Companion';
 import type { Enemy } from '../entities/Enemy';
 import { Projectile, type ProjectileLook } from '../entities/Projectile';
 import type { AreaPool } from '../systems/AreaPool';
+import { ArcFlashPool } from '../systems/ArcFlashPool';
 import type { CollisionSystem, SpellHitbox } from '../systems/CollisionSystem';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
@@ -81,6 +90,16 @@ import type { DamageSink } from './DamageSink';
  * lands on (`FROST_ORB.freezeS`, through `applyFrost`, so a boss's diminishing
  * returns cap it) and slows what stands near it. The level is taken when the
  * shot leaves.
+ *
+ * Lightning's levels (#329) are the melee swing's: from level 2 the Lightning
+ * Companion attacks twice as fast (`frenzyCooldown`) and each landed swing also
+ * strikes the enemies in an arc in front of it (`arcTargets`); from level 3 each
+ * swing, the end of its charge, chains on from its target to up to
+ * `THUNDERCLAP.chains` nearby enemies (`thunderclapPath`), drawn as
+ * `lightning.chain` arcs (`ArcFlashPool`). Both stagger through
+ * `applyStagger` and roll nothing; neither has a per-enemy cooldown of its
+ * own (deliberate: they ride the swing's cadence). The level is taken when
+ * the swing lands.
  *
  * The companion itself carries no body (see `entities/Companion.ts`), so it is
  * not damageable, does not block movement and cannot collide with an enemy. Its
@@ -139,6 +158,26 @@ export interface CompanionLevelReport {
   }[];
   /** Shots in the air right now, for the pool-cap check. */
   liveShots: number;
+  /**
+   * Each landed melee swing (#329): its number, the wait between attacks it was
+   * made on against the block's `attackCooldown`, the run time since the swing
+   * before it, the enemies its arc struck and those its Thunderclap chained to.
+   */
+  swings: {
+    level: SpellLevel;
+    attackNumber: number;
+    cadenceS: number;
+    attackCooldownS: number;
+    sinceLastS: number | null;
+    arcHits: number;
+    chainHits: number;
+  }[];
+  /** Running counts the capped log cannot lose: arc hits, chain hits, and swings whose chain reached `THUNDERCLAP.chains`. */
+  arcHits: number;
+  chainHits: number;
+  fullThunderclaps: number;
+  /** Sprites the Thunderclap arcs on screen are drawn with. */
+  liveArcSprites: number;
 }
 
 export class CompanionSpell extends Spell<CompanionSpellId> {
@@ -173,6 +212,15 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   private readonly fireballLog: CompanionLevelReport['fireballs'] = [];
   private readonly frostOrbLog: CompanionLevelReport['frostOrbs'] = [];
   private readonly areas: AreaPool | undefined;
+  private readonly swingLog: CompanionLevelReport['swings'] = [];
+  private arcHitCount = 0;
+  private chainHitCount = 0;
+  private fullThunderclaps = 0;
+  /** Run clock, seconds, and when the last melee swing landed (#329). */
+  private clockS = 0;
+  private lastSwingS: number | null = null;
+  /** The Lightning Companion's Thunderclap arcs (#329); no other companion has any. */
+  private readonly arcs: ArcFlashPool | undefined;
 
   constructor(
     scene: Phaser.Scene,
@@ -194,6 +242,10 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     this.fx = fx;
     this.position = spawnPosition(caster, stats.leashRadius);
     this.companion = new Companion(scene, this.position.x, this.position.y);
+    this.arcs =
+      id === 'lightning_companion'
+        ? new ArcFlashPool(scene, MAX_THUNDERCLAP_ARC_SPRITES)
+        : undefined;
     if (COMPANION_KINDS[id] !== 'ranged') return;
     this.shots = scene.physics.add.group({
       classType: Projectile,
@@ -242,6 +294,11 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
       fireballs: [...this.fireballLog],
       frostOrbs: [...this.frostOrbLog],
       liveShots: this.liveCount,
+      swings: [...this.swingLog],
+      arcHits: this.arcHitCount,
+      chainHits: this.chainHitCount,
+      fullThunderclaps: this.fullThunderclaps,
+      liveArcSprites: this.arcs?.spriteCount ?? 0,
     };
   }
 
@@ -251,6 +308,8 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   }
 
   protected override tick(deltaS: number): void {
+    if (deltaS > 0 && Number.isFinite(deltaS)) this.clockS += deltaS;
+    this.arcs?.step(deltaS);
     this.attackMs = Math.max(0, this.attackMs - deltaS * 1000);
     this.target = this.pickTarget();
     this.walk(deltaS);
@@ -265,10 +324,14 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
 
   /**
    * The attack cadence. A companion has no `cooldown` of its own — it is always
-   * out — so the scheduler runs on `attackCooldown` instead.
+   * out — so the scheduler runs on `attackCooldown` instead; a Lightning
+   * Companion from level 2 on half of it (#329).
    */
   protected override get cooldown(): number {
-    return this.companionStats.attackCooldown;
+    const { attackCooldown } = this.companionStats;
+    return this.id === 'lightning_companion'
+      ? frenzyCooldown(attackCooldown, this.level)
+      : attackCooldown;
   }
 
   /** No target this frame → the attack waits rather than being spent (#212). */
@@ -411,7 +474,67 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
   private strike(target: Enemy): void {
     if (!inReach(this.position, target, target.bodyRadius, COMPANION_REACH)) return;
     this.startAttack(target);
-    this.onCompanionHit(target, this.position);
+    if (this.id !== 'lightning_companion') {
+      this.onCompanionHit(target, this.position);
+      return;
+    }
+    this.lightningSwing(target);
+  }
+
+  /**
+   * A Lightning Companion's swing (#329): at level 1 exactly the swing every
+   * melee ally makes. From level 2 the arc in front, and from level 3 the
+   * Thunderclap's chain, are resolved against the crowd as it stands before the
+   * swing lands, so a killing blow still carries on; each extra hit is
+   * staggered before it is damaged, the order every Lightning hit keeps.
+   */
+  private lightningSwing(target: Enemy): void {
+    const level = this.level;
+    const from = { x: this.position.x, y: this.position.y };
+    const live = this.enemies.live;
+    const arc = hasCompanionArc(level) ? arcTargets(from, target, live, COMPANION_ARC) : [];
+    // The arc's victims are struck already: the chain goes on past them, never back into one.
+    const chain = hasThunderclap(level)
+      ? thunderclapPath(target, live, THUNDERCLAP, new Set(arc))
+      : [];
+    const hops: { from: Vec2; to: Enemy }[] = [];
+    let hopFrom: Vec2 = { x: target.x, y: target.y };
+    for (const next of chain) {
+      hops.push({ from: hopFrom, to: next });
+      hopFrom = { x: next.x, y: next.y };
+    }
+    this.onCompanionHit(target, from);
+    const { damage, staggerDuration = 0 } = this.companionStats;
+    let arcHits = 0;
+    for (const enemy of arc) {
+      if (!enemy.active || enemy.isDying) continue;
+      arcHits += 1;
+      this.fx.burst('lightning.impact', enemy.x, enemy.y);
+      if (staggerDuration > 0) enemy.applyStagger(staggerDuration);
+      this.damage(enemy, damage * COMPANION_ARC.damageFactor, 'hit', from);
+    }
+    let chainHits = 0;
+    for (const hop of hops) this.arcs?.lay(hop.from, hop.to);
+    for (const { from: link, to } of hops) {
+      if (!to.active || to.isDying) continue;
+      chainHits += 1;
+      if (staggerDuration > 0) to.applyStagger(staggerDuration);
+      this.damage(to, damage * THUNDERCLAP.damageFactor, 'hit', link);
+    }
+    this.attackNumber += 1;
+    this.arcHitCount += arcHits;
+    this.chainHitCount += chainHits;
+    if (chainHits >= THUNDERCLAP.chains) this.fullThunderclaps += 1;
+    recordCapped(this.swingLog, {
+      level,
+      attackNumber: this.attackNumber,
+      cadenceS: this.cooldown,
+      attackCooldownS: this.companionStats.attackCooldown,
+      sinceLastS: this.lastSwingS === null ? null : this.clockS - this.lastSwingS,
+      arcHits,
+      chainHits,
+    });
+    this.lastSwingS = this.clockS;
   }
 
   private onShotHit(enemy: Enemy, hitbox: SpellHitbox): void {

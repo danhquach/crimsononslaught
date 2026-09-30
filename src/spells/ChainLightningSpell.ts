@@ -1,30 +1,44 @@
-import Phaser from 'phaser';
-import { PLACEHOLDERS } from '../config/colors';
-import { CHAIN_CLIP, FX_DEPTH } from '../config/fx';
-import { ART_BOXES, FRAMES } from '../config/frames';
-import { artFrame } from '../core/animation';
+import type Phaser from 'phaser';
+import { FORK } from '../config/lightningLevels';
+import type { SpellLevel } from '../config/spellLevels';
 import { resolveCast, rollStun } from '../core/chainLightning';
-import { chainFrame, chainSegmentPose } from '../core/fx';
+import { recordCapped } from '../core/fireLevels';
 import type { Vec2 } from '../core/input';
+import { forkCast, hasFork, stunStream, type ForkHit } from '../core/lightningLevels';
 import type { Rng } from '../core/rng';
 import { Spell, anyWithin } from '../core/spell';
 import type { ChainLightningStats } from '../core/spellStats';
+import type { Enemy } from '../entities/Enemy';
+import { ChainStripPool } from '../systems/ChainStripPool';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
 
 /**
  * Chain segments that may be up at once. A cast draws `strikes * (chains + 1)`
- * at most — a maxed build is a handful — and each lives one clip cycle, far
+ * at most, or `strikes * FORK.maxHits` forked at level 3 (#329) — a maxed
+ * build is a handful — and each lives one clip cycle, far
  * shorter than any cooldown a perk can reach; the headroom covers a stalled
  * frame paying out several casts. Past it a segment is dropped, never queued.
  */
 export const MAX_SEGMENTS = 32;
 
-/** One chain jump on screen: a tiled strip between two enemies, stepped on the run clock. */
-interface Segment {
-  readonly strip: Phaser.GameObjects.TileSprite;
-  elapsedMs: number;
+/** Chain Lightning's level record, what the test hook reads (#329): cause and effect in one entry. */
+export interface ChainLevelReport {
+  /**
+   * Each cast: the level it went out at, the enemies each bolt struck (its
+   * first target included), whether it forked, and for a fork the jumps each
+   * branch made.
+   */
+  casts: {
+    level: SpellLevel;
+    hits: number[];
+    forked: boolean;
+    branches: [number, number][];
+  }[];
+  /** Casts that forked with both branches striking: a count the capped log cannot lose. */
+  fullForks: number;
+  liveStrips: number;
 }
 
 /**
@@ -49,19 +63,28 @@ interface Segment {
  * on the run clock so a paused run holds it. `lightning.strike` and
  * `lightning.impact` play on each bolt's first target. With no atlas the strip
  * is the `fx_bolt` placeholder. The sparks on a stunned or staggered enemy are
- * the overlay pool's, driven from its status.
+ * the overlay pool's, driven from its status. The strips are a
+ * `ChainStripPool`'s, capped at `MAX_SEGMENTS`.
+ *
+ * Levels (#329): level 2's two extra jumps are a stat add (`chains`). Level 3,
+ * Fork: at each bolt's first target the chain splits in two branches that take
+ * turns jumping (`forkPaths`), the bolt striking at most `FORK.maxHits` enemies
+ * in all. From level 2 the stun rolls are made on the levels' own stream
+ * (`stunStream`), so the hits a level adds never move the run's own draws;
+ * level 1 rolls on the run's RNG exactly as it always has.
  */
 export class ChainLightningSpell extends Spell<'lightning_chain'> {
-  private readonly scene: Phaser.Scene;
   private readonly caster: Readonly<Vec2>;
   private readonly enemies: EnemyPool;
   private readonly damage: DamageSink;
   private readonly fx: FxPool;
   private readonly rng: Rng;
-  private readonly live: Segment[] = [];
-  private readonly spare: Phaser.GameObjects.TileSprite[] = [];
+  private readonly levelRng: Rng;
+  private readonly strips: ChainStripPool;
   /** Test hook (#142): enemies this spell has struck, across every bolt. */
   private landed = 0;
+  private readonly castLog: ChainLevelReport['casts'] = [];
+  private fullForks = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -71,19 +94,26 @@ export class ChainLightningSpell extends Spell<'lightning_chain'> {
     damage: DamageSink,
     rng: Rng,
     fx: FxPool,
+    levelRng: Rng = rng,
   ) {
     super('lightning_chain', stats);
-    this.scene = scene;
     this.caster = caster;
     this.enemies = enemies;
     this.damage = damage;
     this.rng = rng;
+    this.levelRng = levelRng;
     this.fx = fx;
+    this.strips = new ChainStripPool(scene, MAX_SEGMENTS);
   }
 
   /** Bolt strips on screen right now. */
   get liveCount(): number {
-    return this.live.length;
+    return this.strips.count;
+  }
+
+  /** Test hook (#329): the casts this spell has made and how each chain ran. */
+  get levelReport(): ChainLevelReport {
+    return { casts: [...this.castLog], fullForks: this.fullForks, liveStrips: this.strips.count };
   }
 
   /** Enemies struck so far — what the browser suite watches. */
@@ -93,19 +123,7 @@ export class ChainLightningSpell extends Spell<'lightning_chain'> {
 
   protected override tick(deltaS: number): void {
     super.tick(deltaS);
-    const deltaMs = deltaS * 1000;
-    for (let i = this.live.length - 1; i >= 0; i -= 1) {
-      const segment = this.live[i] as Segment;
-      segment.elapsedMs += deltaMs;
-      const frame = chainFrame(segment.elapsedMs);
-      if (frame === null) {
-        this.live.splice(i, 1);
-        segment.strip.setVisible(false);
-        this.spare.push(segment.strip);
-      } else if (this.hasAtlas) {
-        segment.strip.setFrame(artFrame(`${CHAIN_CLIP}.${frame}`));
-      }
-    }
+    this.strips.step(deltaS);
   }
 
   /** Nothing within targetRange → the cast waits rather than being spent (#212). */
@@ -119,9 +137,21 @@ export class ChainLightningSpell extends Spell<'lightning_chain'> {
    * the caster stands this frame.
    */
   protected cast(): void {
+    const level = this.level;
+    if (hasFork(level)) {
+      this.castForked(level);
+      return;
+    }
     const { stats } = this;
+    const rng = stunStream(level, this.rng, this.levelRng);
     const bolts = resolveCast(this.caster, this.enemies.live, stats);
     if (bolts.length === 0) return;
+    recordCapped(this.castLog, {
+      level,
+      hits: bolts.map((bolt) => bolt.length),
+      forked: false,
+      branches: [],
+    });
 
     for (const bolt of bolts) {
       const [first] = bolt;
@@ -144,46 +174,55 @@ export class ChainLightningSpell extends Spell<'lightning_chain'> {
         // Status before damage, so a killing bolt has still marked the enemy
         // while it was there; the stun roll draws once per enemy struck.
         target.applyStagger(stats.staggerDuration);
-        if (rollStun(this.rng, stats.stunChance)) target.applyStun(stats.stunDuration);
+        if (rollStun(rng, stats.stunChance)) target.applyStun(stats.stunDuration);
         this.damage(target, damage, 'hit', from);
         from = at;
       }
     }
   }
 
-  private get hasAtlas(): boolean {
-    return this.scene.anims.exists(CHAIN_CLIP);
-  }
-
-  /** Put one strip between two points — the caster and a target, or two enemies — fresh at the clip's first frame. */
-  private lay(from: Readonly<Vec2>, to: Readonly<Vec2>): void {
-    if (this.live.length >= MAX_SEGMENTS) return;
-    const pose = chainSegmentPose(from, to);
-    const strip = this.spare.pop() ?? this.makeStrip();
-    strip.setPosition(pose.x, pose.y).setRotation(pose.rotation).setVisible(true);
-    strip.setSize(pose.length, strip.height);
-    if (this.hasAtlas) strip.setFrame(artFrame(`${CHAIN_CLIP}.0`));
-    this.live.push({ strip, elapsedMs: 0 });
-  }
-
   /**
-   * A strip anchored at its left-middle, so `setPosition` puts that end on the
-   * start point and the rotation swings the rest onto the target. The atlas
-   * strip tiles the chain's art alone, never its frame's margin (CO-126); the
-   * placeholder tiles the `fx_bolt` bar.
+   * One level 3 cast (#329): the same order as a plain one, over forked bolts.
+   * Every strip and every position is laid before any damage lands; each hit
+   * strikes from the enemy it jumped from, the first from the caster.
    */
-  private makeStrip(): Phaser.GameObjects.TileSprite {
-    const first = FRAMES[`${CHAIN_CLIP}.0`];
-    const art = ART_BOXES[CHAIN_CLIP];
-    const strip = this.hasAtlas
-      ? this.scene.add.tileSprite(0, 0, art.w, art.h, first.page, artFrame(`${CHAIN_CLIP}.0`))
-      : this.scene.add.tileSprite(
-          0,
-          0,
-          PLACEHOLDERS.fx_bolt.width,
-          PLACEHOLDERS.fx_bolt.height,
-          'fx_bolt',
-        );
-    return strip.setOrigin(0, 0.5).setDepth(FX_DEPTH).setVisible(false);
+  private castForked(level: SpellLevel): void {
+    const { stats } = this;
+    const bolts: ForkHit<Enemy>[][] = forkCast(this.caster, this.enemies.live, stats, FORK.maxHits);
+    if (bolts.length === 0) return;
+    const branches = bolts.map((bolt): [number, number] => [
+      bolt.filter((hit) => hit.branch === 0).length,
+      bolt.filter((hit) => hit.branch === 1).length,
+    ]);
+    if (branches.some(([a, b]) => a > 0 && b > 0)) this.fullForks += 1;
+    recordCapped(this.castLog, {
+      level,
+      hits: bolts.map((bolt) => bolt.length),
+      forked: true,
+      branches,
+    });
+    const origins = bolts.map((bolt) =>
+      bolt.map(({ from }): Vec2 => ({ x: (from ?? this.caster).x, y: (from ?? this.caster).y })),
+    );
+    for (const bolt of bolts) {
+      const [first] = bolt;
+      if (!first) continue;
+      this.fx.burst('lightning.strike', first.target.x, first.target.y);
+      this.fx.burst('lightning.impact', first.target.x, first.target.y);
+      for (const { target, from } of bolt) this.lay(from ?? this.caster, target);
+    }
+    bolts.forEach((bolt, i) => {
+      bolt.forEach(({ target, damage }, j) => {
+        this.landed += 1;
+        target.applyStagger(stats.staggerDuration);
+        if (rollStun(this.levelRng, stats.stunChance)) target.applyStun(stats.stunDuration);
+        this.damage(target, damage, 'hit', origins[i]?.[j] ?? this.caster);
+      });
+    });
+  }
+
+  /** Put one strip between two points — the caster and a target, or two enemies. */
+  private lay(from: Readonly<Vec2>, to: Readonly<Vec2>): void {
+    this.strips.lay(from, to);
   }
 }

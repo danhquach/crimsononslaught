@@ -42,8 +42,12 @@ const TEXT_X = 196;
 /** Spells tab (#327): a 64 px row per spell, five to a page, filling the panel down to Back. */
 const SPELL_ROW_PITCH = 64;
 const SPELL_ROW_TOP = PANEL_TOP + PANEL_PADDING + SPELL_ROW_PITCH / 2;
-/** Room for the longest card name ("Fire Companion") at 19px, with slack for a wider font. */
-const SPELL_TEXT_X = 260;
+/**
+ * Room for the longest card name ("Lightning Companion", 169 px from `NAME_X`
+ * at 19px, #329) plus the 8 px the layout check keeps, with slack for a wider
+ * font. The longest level line (48 characters) still ends well inside the panel.
+ */
+const SPELL_TEXT_X = 300;
 /**
  * The pager (#328) shares Back's row: Back spans 220 px and each pager button
  * 160, so buttons centred 206 px either side leave 16 px between them.

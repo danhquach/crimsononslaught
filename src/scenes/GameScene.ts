@@ -174,8 +174,8 @@ import type { EnemyShot } from '../entities/EnemyShot';
 import { Player } from '../entities/Player';
 import type { Pickup } from '../entities/Pickup';
 import { XpGem } from '../entities/XpGem';
-import { ChainLightningSpell } from '../spells/ChainLightningSpell';
-import { LightningBoltSpell } from '../spells/LightningBoltSpell';
+import { ChainLightningSpell, type ChainLevelReport } from '../spells/ChainLightningSpell';
+import { LightningBoltSpell, type LightningBoltLevelReport } from '../spells/LightningBoltSpell';
 import { FireballSpell, type FireBoltLevelReport } from '../spells/FireballSpell';
 import { FireWaveSpell, type FireWaveLevelReport } from '../spells/FireWaveSpell';
 import {
@@ -191,10 +191,10 @@ import { MeteorSpell, type BlastSpread, type MeteorLevelReport } from '../spells
 import { EarthShieldSpell } from '../spells/EarthShieldSpell';
 import { EarthSpikeSpell } from '../spells/EarthSpikeSpell';
 import { IceShieldSpell, type IceShieldLevelReport } from '../spells/IceShieldSpell';
-import { LightningSwordSpell } from '../spells/LightningSwordSpell';
+import { LightningSwordSpell, type SwordLevelReport } from '../spells/LightningSwordSpell';
 import { OrbitingBodySpell } from '../spells/OrbitingBodySpell';
 import { RollingBoulderSpell } from '../spells/RollingBoulderSpell';
-import { TornadoSpell } from '../spells/TornadoSpell';
+import { TornadoSpell, type TornadoLevelReport } from '../spells/TornadoSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
 import { AreaPool, type AreaView } from '../systems/AreaPool';
 import { TelegraphPool, type MeteorView } from '../systems/TelegraphPool';
@@ -219,6 +219,18 @@ interface IceLevelEntry {
     | IceShieldLevelReport
     | CompanionLevelReport
     | IceStormLevelReport;
+}
+
+/** One Lightning spell's line in `lightningLevelReport` (#329). */
+interface LightningLevelEntry {
+  id: RosterSpellId;
+  level: SpellLevel;
+  report:
+    | LightningBoltLevelReport
+    | ChainLevelReport
+    | TornadoLevelReport
+    | CompanionLevelReport
+    | SwordLevelReport;
 }
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
@@ -294,6 +306,14 @@ const FIRE_TRAIL_STREAM = 'fireTrail';
  * storms' own placement.
  */
 const ICE_HAIL_STREAM = 'iceHail';
+
+/**
+ * The stun rolls a levelled Lightning Bolt or Chain Lightning makes (#329)
+ * draw from a stream of their own, so the strikes and chains a level adds never
+ * move a seed's spawns, offers or drops. Level 1 rolls on the run's RNG as it
+ * always has.
+ */
+const LIGHTNING_LEVEL_STREAM = 'lightningLevels';
 
 /**
  * Where a death's Ember and consumable land, from the death spot, so neither
@@ -376,6 +396,8 @@ export class GameScene extends Phaser.Scene {
   private trailRng!: Rng;
   /** Ice Storm's hail only (#328); see `ICE_HAIL_STREAM`. */
   private hailRng!: Rng;
+  /** Levelled Lightning stun rolls only (#329); see `LIGHTNING_LEVEL_STREAM`. */
+  private lightningRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -818,6 +840,29 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Test hook (#329): each Lightning spell casting, its level and its level
+   * records (cause and effect in one entry), mirroring `iceLevelReport`. Every
+   * record carries the level it was cast at.
+   */
+  get lightningLevelReport(): LightningLevelEntry[] {
+    return this.spells.spells.flatMap((spell): LightningLevelEntry[] => {
+      const level = this.spells.spellLevel(spell.id);
+      if (
+        spell instanceof LightningBoltSpell ||
+        spell instanceof ChainLightningSpell ||
+        spell instanceof TornadoSpell ||
+        spell instanceof LightningSwordSpell
+      ) {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      if (spell instanceof CompanionSpell && spell.id === 'lightning_companion') {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      return [];
+    });
+  }
+
+  /**
    * Test hook (#141): Ice Arrow and Frost Nova Bomb, whichever is equipped —
    * hits each has landed and shots each has in the air right now. The browser
    * suite watches a run land hits with both and hold their pool caps.
@@ -1073,6 +1118,7 @@ export class GameScene extends Phaser.Scene {
     this.relicRng = createRng(deriveSeed(seed, RELIC_OFFER_STREAM));
     this.trailRng = createRng(deriveSeed(seed, FIRE_TRAIL_STREAM));
     this.hailRng = createRng(deriveSeed(seed, ICE_HAIL_STREAM));
+    this.lightningRng = createRng(deriveSeed(seed, LIGHTNING_LEVEL_STREAM));
     this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -1449,6 +1495,7 @@ export class GameScene extends Phaser.Scene {
           damage,
           this.rng,
           this.fx,
+          this.lightningRng,
         );
       case 'lightning_chain':
         return new ChainLightningSpell(
@@ -1459,6 +1506,7 @@ export class GameScene extends Phaser.Scene {
           damage,
           this.rng,
           this.fx,
+          this.lightningRng,
         );
       case 'lightning_tornado':
         return new TornadoSpell(
@@ -1467,6 +1515,7 @@ export class GameScene extends Phaser.Scene {
           stats as Readonly<TornadoStats>,
           damage,
           this.areas,
+          { scene: this, fx: this.fx },
         );
       case 'lightning_sword':
         return new LightningSwordSpell(
@@ -1476,6 +1525,7 @@ export class GameScene extends Phaser.Scene {
           stats as Readonly<SwordStats>,
           damage,
           this.fx,
+          this.enemies,
         );
       case 'earth':
         return new EarthSpikeSpell(

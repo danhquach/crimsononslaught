@@ -749,21 +749,21 @@ describe('levelUpOffer — seeds stay stable without spell levels (#326)', () =>
     ]);
   });
 
-  it('pools no upgrade for a spell of an element whose levels have not landed (#327, #329)', () => {
-    // Lightning's levels are #329's; Ice's landed in #328, so it is the unfilled element here.
-    const lightning: ActiveCard[] = [
+  it('pools no upgrade for a spell of an element whose levels have not landed (#327, #330)', () => {
+    // Earth's levels are #330's; Ice's (#328) and Lightning's (#329) have landed, so it is the unfilled element here.
+    const earth: ActiveCard[] = [
       {
-        id: 'lightning',
-        name: 'Lightning Bolt',
-        description: 'Strikes an enemy.',
-        color: 0xffee58,
+        id: 'earth',
+        name: 'Earth Spike',
+        description: 'Flings a spike.',
+        color: 0x8d6e63,
       },
     ];
     const input: OfferInput = {
-      loadout: buildLoadout('lightning'),
+      loadout: buildLoadout('earth'),
       level: PASSIVE_LEVEL,
       actives: [],
-      casting: lightning,
+      casting: earth,
     };
     expect(offerPool(input).some((card) => card.kind === 'upgrade')).toBe(false);
   });
