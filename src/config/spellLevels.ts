@@ -41,10 +41,11 @@ export type SpellLevelEntry = Readonly<{ 2: string; 3: string }>;
 export type SpellLevelTable = Readonly<Partial<Record<RosterSpellId, SpellLevelEntry>>>;
 
 /**
- * What each spell's levels 2 and 3 add. Fire's are here (#327) and Ice's
- * (#328); each other element's lands with its own ticket (#329-#330). The stat
- * adds that back the first line of each are `SPELL_LEVEL_STATS`, and the level
- * 3 rules are `config/fireLevels.ts`'s and `config/iceLevels.ts`'s. Written as ASCII, so "degrees" stands for the sign.
+ * What each spell's levels 2 and 3 add. Fire's are here (#327), Ice's (#328)
+ * and Lightning's (#329); Earth's lands with its own ticket (#330). The stat
+ * adds that back the first line of each are `SPELL_LEVEL_STATS`, and the
+ * behaviour rules are `config/fireLevels.ts`'s, `config/iceLevels.ts`'s and
+ * `config/lightningLevels.ts`'s. Written as ASCII, so "degrees" stands for the sign.
  */
 export const SPELL_LEVELS: SpellLevelTable = {
   fire: {
@@ -87,6 +88,26 @@ export const SPELL_LEVELS: SpellLevelTable = {
     2: 'Hail: every second a hailstone hits one inside.',
     3: 'Deep freeze: the last tick freezes all inside.',
   },
+  lightning: {
+    2: 'Strikes 2 targets per cast.',
+    3: 'Thunderbolt: every 5th cast stuns a small area.',
+  },
+  lightning_chain: {
+    2: 'Chains to 4 enemies instead of 2.',
+    3: 'Fork: the chain splits in two at the first hit.',
+  },
+  lightning_tornado: {
+    2: 'Sends 2 tornadoes per cast.',
+    3: 'Storm cell: funnels throw a bolt every 0.5 s.',
+  },
+  lightning_companion: {
+    2: 'Attacks twice as fast; hits arc in front of it.',
+    3: 'Thunderclap: each strike chains to 3 enemies.',
+  },
+  lightning_sword: {
+    2: 'Adds a 4th blade to the ring.',
+    3: '5 blades; each cut arcs to 1-2 enemies nearby.',
+  },
 };
 
 /** Stat adds a level brings, cumulative: level 3 has level 2's adds too (#327). */
@@ -111,6 +132,9 @@ export const SPELL_LEVEL_STATS: SpellLevelStatTable = {
   ice: { 2: { projectiles: 1 } },
   ice_nova_bomb: { 2: { icicles: 2 } }, // 2 -> 4
   ice_companion: { 2: { projectiles: 1 } },
+  lightning: { 2: { strikes: 1 } },
+  lightning_chain: { 2: { chains: 2 } }, // 2 -> 4
+  lightning_sword: { 2: { count: 1 }, 3: { count: 1 } }, // 3 -> 4 -> 5
 };
 
 /** The text for `level` of `id`, or `undefined` when the spell has no entry or the level is 1. */
