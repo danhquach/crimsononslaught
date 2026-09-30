@@ -1,4 +1,8 @@
 import Phaser from 'phaser';
+import { TREMOR } from '../config/earthLevels';
+import type { SpellLevel } from '../config/spellLevels';
+import { hasTremor, tremorPush, tremorReach, tremorTargets, tremorsDue } from '../core/earthLevels';
+import { recordCapped } from '../core/fireLevels';
 import { dustFlip } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import {
@@ -9,12 +13,34 @@ import {
   knockbackVector,
 } from '../core/orbitingBoulders';
 import type { EarthShieldStats } from '../core/spellStats';
+import { Boss } from '../entities/Boss';
 import { Boulder } from '../entities/Boulder';
 import type { Enemy } from '../entities/Enemy';
 import type { CollisionSystem, SpellHitbox } from '../systems/CollisionSystem';
+import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
 import { ShieldSpell } from './ShieldSpell';
+
+/** Earth Shield's level record, what the test hook reads (#330): cause and effect in one entry. */
+export interface EarthShieldLevelReport {
+  /**
+   * Every tremor: the level the ring held, when it struck on the spell's own
+   * clock, the enemies it reached, how many of them stood staggered right after,
+   * and the boss's stagger if it was among them.
+   */
+  tremors: {
+    level: SpellLevel;
+    atS: number;
+    caught: number;
+    staggered: number;
+    bossStaggerS: number | null;
+  }[];
+  /** Tremors so far: a count the capped log cannot lose. */
+  tremorCount: number;
+  /** Stones on the ring right now. */
+  stones: number;
+}
 
 /**
  * Earth Shield (#134, Phase 2 spec §9.5): `count` stones circle the player,
@@ -30,18 +56,33 @@ import { ShieldSpell } from './ShieldSpell';
  * same `core/orbitingBoulders.ts` Phase 1's Earth turns on. This class owns the
  * stone pool, registers it with `CollisionSystem` (the one place overlaps are
  * wired, CO-032) and turns an overlap into damage.
+ *
+ * Levels (#330): level 2's fourth stone is a stat add (`count`), so the ring
+ * simply places one more. Level 3, Tremor: while the ring is up, every
+ * `TREMOR.everyS` of its life every stone strikes the ground, and each enemy
+ * within reach of the ring is shoved and staggered (`TREMOR`). The cadence is
+ * fixed, and its clock restarts when the ring comes back. Stagger only, so a
+ * boss's diminishing returns cap it.
  */
 export class EarthShieldSpell extends ShieldSpell<'earth_shield'> {
   private readonly group: Phaser.Physics.Arcade.Group;
   private readonly caster: Readonly<Vec2>;
   private readonly damage: DamageSink;
   private readonly fx: FxPool;
+  private readonly enemies: EnemyPool;
+  /** The ring's own clock (#330), on the run clock: what a tremor's time is read from. */
+  private clockS = 0;
+  /** Seconds the ring has been up at level 3 since it last formed; a tremor falls due every `TREMOR.everyS` of it. */
+  private tremorElapsedS = 0;
+  private readonly tremorLog: EarthShieldLevelReport['tremors'] = [];
+  private tremors = 0;
   /** Where stone 0 is on the ring, in radians; the rest are spaced from it. */
   private angle = 0;
 
   constructor(
     scene: Phaser.Scene,
     caster: Readonly<Vec2>,
+    enemies: EnemyPool,
     collisions: CollisionSystem,
     stats: Readonly<EarthShieldStats>,
     damage: DamageSink,
@@ -49,6 +90,7 @@ export class EarthShieldSpell extends ShieldSpell<'earth_shield'> {
   ) {
     super('earth_shield', stats);
     this.caster = caster;
+    this.enemies = enemies;
     this.damage = damage;
     this.fx = fx;
     this.group = scene.physics.add.group({
@@ -68,10 +110,63 @@ export class EarthShieldSpell extends ShieldSpell<'earth_shield'> {
     return this.group.countActive(true);
   }
 
+  /** Test hook (#330): the tremors this ring has struck. */
+  get levelReport(): EarthShieldLevelReport {
+    return { tremors: [...this.tremorLog], tremorCount: this.tremors, stones: this.liveCount };
+  }
+
   protected override tick(deltaS: number): void {
     super.tick(deltaS);
     this.angle = advanceOrbit(this.angle, this.stats.orbitSpeed, deltaS);
     this.place();
+    this.clockS += deltaS;
+    this.tremble(deltaS);
+  }
+
+  /**
+   * Level 3: the tremor this frame owes, from the ring's own life clock. A ring
+   * that is down, or a level below 3, holds the clock at 0, so the first tremor
+   * of a new ring is `everyS` after it forms. At most one a frame.
+   */
+  private tremble(deltaS: number): void {
+    const level = this.level;
+    if (!this.up || !hasTremor(level)) {
+      this.tremorElapsedS = 0;
+      return;
+    }
+    const due = tremorsDue(this.tremorElapsedS, deltaS);
+    this.tremorElapsedS += deltaS;
+    if (due > 0) this.tremor(level);
+  }
+
+  /** Every stone strikes the ground, and everything within the ring's reach is shoved out and staggered. */
+  private tremor(level: SpellLevel): void {
+    for (const stone of this.liveStones()) {
+      this.fx.burst('earth.impact', stone.x, stone.y, { scale: TREMOR.impactScale });
+    }
+    const { orbitRadius, size } = this.stats;
+    const caught = tremorTargets(this.caster, this.enemies.live, tremorReach(orbitRadius, size));
+    let staggered = 0;
+    let bossStaggerS: number | null = null;
+    for (const enemy of caught) {
+      if (!enemy.active) continue;
+      const push = tremorPush(this.caster, enemy);
+      enemy.applyStagger(TREMOR.staggerS);
+      if (enemy.isStaggered) staggered += 1;
+      if (enemy instanceof Boss) {
+        bossStaggerS = Math.max(bossStaggerS ?? 0, enemy.crowdControlRemainingS.staggerS);
+      }
+      enemy.knockBack(push);
+      this.fx.burst('earth.dust', enemy.x, enemy.y + enemy.bodyRadius, { flipX: dustFlip(push) });
+    }
+    this.tremors += 1;
+    recordCapped(this.tremorLog, {
+      level,
+      atS: this.clockS,
+      caught: caught.length,
+      staggered,
+      bossStaggerS,
+    });
   }
 
   /** The stones fall in: nothing is left on screen until the pool comes back. */

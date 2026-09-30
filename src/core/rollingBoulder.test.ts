@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BOULDER_SPLIT } from '../config/earthLevels';
 import { BASE_BOULDER_STATS } from '../config/earthRoster';
 import { MAX_LIVE_BOULDERS, rollSpent, rollTarget } from './rollingBoulder';
 
@@ -57,5 +58,7 @@ describe('the pool cap', () => {
     // Flight is `range / speed`; the profile floors `cooldownMul` at 0.35.
     const inAir = base.range / base.speed / (base.cooldown * 0.35);
     expect(inAir).toBeLessThan(MAX_LIVE_BOULDERS);
+    // Level 2 and 3 throw two boulders a cast (#330); the cap keeps a margin of four.
+    expect(MAX_LIVE_BOULDERS).toBeGreaterThanOrEqual(inAir * BOULDER_SPLIT.count * 4);
   });
 });

@@ -41,11 +41,11 @@ export type SpellLevelEntry = Readonly<{ 2: string; 3: string }>;
 export type SpellLevelTable = Readonly<Partial<Record<RosterSpellId, SpellLevelEntry>>>;
 
 /**
- * What each spell's levels 2 and 3 add. Fire's are here (#327), Ice's (#328)
- * and Lightning's (#329); Earth's lands with its own ticket (#330). The stat
- * adds that back the first line of each are `SPELL_LEVEL_STATS`, and the
- * behaviour rules are `config/fireLevels.ts`'s, `config/iceLevels.ts`'s and
- * `config/lightningLevels.ts`'s. Written as ASCII, so "degrees" stands for the sign.
+ * What each spell's levels 2 and 3 add. Fire's are here (#327), Ice's (#328),
+ * Lightning's (#329) and Earth's (#330). The stat adds that back the first
+ * line of each are `SPELL_LEVEL_STATS`, and the behaviour rules are
+ * `config/fireLevels.ts`'s, `config/iceLevels.ts`'s, `config/lightningLevels.ts`'s
+ * and `config/earthLevels.ts`'s. Written as ASCII, so "degrees" stands for the sign.
  */
 export const SPELL_LEVELS: SpellLevelTable = {
   fire: {
@@ -108,6 +108,26 @@ export const SPELL_LEVELS: SpellLevelTable = {
     2: 'Adds a 4th blade to the ring.',
     3: '5 blades; each cut arcs to 1-2 enemies nearby.',
   },
+  earth: {
+    2: 'Flings 2 spikes in a fan.',
+    3: 'Splinter: a hit shatters the spike over an area.',
+  },
+  earth_boulder: {
+    2: 'Throws 2 boulders per cast.',
+    3: 'Landslide: boulders leave a staggering trail.',
+  },
+  earth_shield: {
+    2: 'Adds a 4th stone to the ring.',
+    3: 'Tremor: every 2 s the ring shoves and staggers.',
+  },
+  earth_quake: {
+    2: 'Opens 2 quakes, on the two densest groups.',
+    3: 'Aftershock: quakes end in a blast, hurling foes.',
+  },
+  earth_companion: {
+    2: 'Attacks twice as fast; each hit sweeps an arc.',
+    3: 'Seismic slam: a slam leaves a staggering quake.',
+  },
 };
 
 /** Stat adds a level brings, cumulative: level 3 has level 2's adds too (#327). */
@@ -135,6 +155,7 @@ export const SPELL_LEVEL_STATS: SpellLevelStatTable = {
   lightning: { 2: { strikes: 1 } },
   lightning_chain: { 2: { chains: 2 } }, // 2 -> 4
   lightning_sword: { 2: { count: 1 }, 3: { count: 1 } }, // 3 -> 4 -> 5
+  earth_shield: { 2: { count: 1 } }, // 3 -> 4 stones
 };
 
 /** The text for `level` of `id`, or `undefined` when the spell has no entry or the level is 1. */

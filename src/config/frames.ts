@@ -34,6 +34,7 @@ export const ATLAS_PAGES = [
   { key: 'props18', texture: 'assets/atlas/props18.png', data: 'assets/atlas/props18.json' },
   { key: 'props19', texture: 'assets/atlas/props19.png', data: 'assets/atlas/props19.json' },
   { key: 'props20', texture: 'assets/atlas/props20.png', data: 'assets/atlas/props20.json' },
+  { key: 'props21', texture: 'assets/atlas/props21.png', data: 'assets/atlas/props21.json' },
 ] as const satisfies readonly AtlasPage[];
 
 /** Texture key of an atlas page. */
@@ -289,6 +290,10 @@ export const FRAMES = {
   'earth.quakeRift.1': { w: 166, h: 150, anchorX: 83, anchorY: 75, page: 'props9' },
   'earth.quakeRift.2': { w: 166, h: 150, anchorX: 83, anchorY: 75, page: 'props9' },
   'earth.quakeRift.3': { w: 166, h: 150, anchorX: 83, anchorY: 75, page: 'props9' },
+  'earth.rut.0': { w: 122, h: 41, anchorX: 61, anchorY: 21, page: 'props21' },
+  'earth.rut.1': { w: 122, h: 41, anchorX: 61, anchorY: 21, page: 'props21' },
+  'earth.rut.2': { w: 122, h: 41, anchorX: 61, anchorY: 21, page: 'props21' },
+  'earth.rut.3': { w: 122, h: 41, anchorX: 61, anchorY: 21, page: 'props21' },
   'earth.shield.0': { w: 57, h: 56, anchorX: 29, anchorY: 28, page: 'props4' },
   'earth.shield.1': { w: 57, h: 56, anchorX: 29, anchorY: 28, page: 'props4' },
   'earth.shield.2': { w: 57, h: 56, anchorX: 29, anchorY: 28, page: 'props4' },
@@ -843,6 +848,7 @@ export const ART_BOXES = {
   'earth.impact': { x: 1, y: 1, w: 32, h: 32 },
   'earth.quake': { x: 3, y: 2, w: 153, h: 144 },
   'earth.quakeRift': { x: 2, y: 2, w: 157, h: 145 },
+  'earth.rut': { x: 1, y: 1, w: 120, h: 39 },
   'earth.shield': { x: 1, y: 1, w: 55, h: 54 },
   'earth.shieldBreak': { x: 2, y: 2, w: 67, h: 55 },
   'earth.spike': { x: 1, y: 1, w: 106, h: 108 },

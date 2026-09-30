@@ -186,14 +186,18 @@ import {
 import { IceArrowSpell, type IceArrowLevelReport } from '../spells/IceArrowSpell';
 import { NovaBombSpell, type NovaLevelReport } from '../spells/NovaBombSpell';
 import { CompanionSpell, type CompanionLevelReport } from '../spells/CompanionSpell';
-import { GroundAreaSpell, type IceStormLevelReport } from '../spells/GroundAreaSpell';
+import {
+  GroundAreaSpell,
+  type IceStormLevelReport,
+  type QuakeLevelReport,
+} from '../spells/GroundAreaSpell';
 import { MeteorSpell, type BlastSpread, type MeteorLevelReport } from '../spells/MeteorSpell';
-import { EarthShieldSpell } from '../spells/EarthShieldSpell';
-import { EarthSpikeSpell } from '../spells/EarthSpikeSpell';
+import { EarthShieldSpell, type EarthShieldLevelReport } from '../spells/EarthShieldSpell';
+import { EarthSpikeSpell, type SpikeLevelReport } from '../spells/EarthSpikeSpell';
 import { IceShieldSpell, type IceShieldLevelReport } from '../spells/IceShieldSpell';
 import { LightningSwordSpell, type SwordLevelReport } from '../spells/LightningSwordSpell';
 import { OrbitingBodySpell } from '../spells/OrbitingBodySpell';
-import { RollingBoulderSpell } from '../spells/RollingBoulderSpell';
+import { RollingBoulderSpell, type BoulderLevelReport } from '../spells/RollingBoulderSpell';
 import { TornadoSpell, type TornadoLevelReport } from '../spells/TornadoSpell';
 import { ShieldSpell } from '../spells/ShieldSpell';
 import { AreaPool, type AreaView } from '../systems/AreaPool';
@@ -231,6 +235,18 @@ interface LightningLevelEntry {
     | TornadoLevelReport
     | CompanionLevelReport
     | SwordLevelReport;
+}
+
+/** One Earth spell's line in `earthLevelReport` (#330). */
+interface EarthLevelEntry {
+  id: RosterSpellId;
+  level: SpellLevel;
+  report:
+    | SpikeLevelReport
+    | BoulderLevelReport
+    | EarthShieldLevelReport
+    | QuakeLevelReport
+    | CompanionLevelReport;
 }
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
@@ -317,6 +333,15 @@ const BOLT_LEVEL_STREAM = 'boltLevelStuns';
 const CHAIN_LEVEL_STREAM = 'chainLevelStuns';
 
 /**
+ * The rolls a level adds to Earth (#330) draw from streams of their own too: the
+ * bleed rolls of the spikes a fan adds, which must not shift the run's stream
+ * the level-1 spike keeps drawing from, and the tie-break that picks the second
+ * quake's centre, which must not shift the first quake's.
+ */
+const SPIKE_LEVEL_STREAM = 'spikeLevelBleeds';
+const QUAKE_LEVEL_STREAM = 'quakeLevelPicks';
+
+/**
  * Where a death's Ember and consumable land, from the death spot, so neither
  * hides under the gem that lands on the spot itself. Well inside the pickup
  * radius, so walking over the gem takes them too.
@@ -401,6 +426,10 @@ export class GameScene extends Phaser.Scene {
   private boltLevelRng!: Rng;
   /** Chain Lightning's level-added stun rolls only (#329); see `CHAIN_LEVEL_STREAM`. */
   private chainLevelRng!: Rng;
+  /** Earth Spike's level-added bleed rolls only (#330); see `SPIKE_LEVEL_STREAM`. */
+  private spikeLevelRng!: Rng;
+  /** The Earthquake's second-centre tie-break only (#330); see `QUAKE_LEVEL_STREAM`. */
+  private quakeLevelRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -820,7 +849,7 @@ export class GameScene extends Phaser.Scene {
    * Test hook (#328): each Ice spell casting, its level and its level records
    * (cause and effect in one entry), mirroring `fireLevelReport`. Every record
    * carries the level it was cast at. Earthquake shares Ice Storm's class but
-   * has no levels, so it is left out.
+   * its levels are Earth's (#330), so it is in `earthLevelReport`.
    */
   get iceLevelReport(): IceLevelEntry[] {
     return this.spells.spells.flatMap((spell): IceLevelEntry[] => {
@@ -859,6 +888,32 @@ export class GameScene extends Phaser.Scene {
       }
       // Fire's and Ice's companions have their own reports; this is the Lightning one.
       if (spell instanceof CompanionSpell && spell.id === 'lightning_companion') {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      return [];
+    });
+  }
+
+  /**
+   * Test hook (#330): each Earth spell casting, its level and its level records
+   * (cause and effect in one entry), mirroring `lightningLevelReport`. Every
+   * record carries the level it was cast at. The Earthquake's is its
+   * `quakeLevelReport`; Ice Storm, its class-mate, is in `iceLevelReport`.
+   */
+  get earthLevelReport(): EarthLevelEntry[] {
+    return this.spells.spells.flatMap((spell): EarthLevelEntry[] => {
+      const level = this.spells.spellLevel(spell.id);
+      if (
+        spell instanceof EarthSpikeSpell ||
+        spell instanceof RollingBoulderSpell ||
+        spell instanceof EarthShieldSpell
+      ) {
+        return [{ id: spell.id, level, report: spell.levelReport }];
+      }
+      if (spell instanceof GroundAreaSpell && spell.id === 'earth_quake') {
+        return [{ id: spell.id, level, report: spell.quakeLevelReport }];
+      }
+      if (spell instanceof CompanionSpell && spell.id === 'earth_companion') {
         return [{ id: spell.id, level, report: spell.levelReport }];
       }
       return [];
@@ -1123,6 +1178,8 @@ export class GameScene extends Phaser.Scene {
     this.hailRng = createRng(deriveSeed(seed, ICE_HAIL_STREAM));
     this.boltLevelRng = createRng(deriveSeed(seed, BOLT_LEVEL_STREAM));
     this.chainLevelRng = createRng(deriveSeed(seed, CHAIN_LEVEL_STREAM));
+    this.spikeLevelRng = createRng(deriveSeed(seed, SPIKE_LEVEL_STREAM));
+    this.quakeLevelRng = createRng(deriveSeed(seed, QUAKE_LEVEL_STREAM));
     this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -1542,6 +1599,7 @@ export class GameScene extends Phaser.Scene {
           damage,
           this.rng,
           this.fx,
+          this.spikeLevelRng,
         );
       case 'earth_boulder':
         return new RollingBoulderSpell(
@@ -1588,8 +1646,9 @@ export class GameScene extends Phaser.Scene {
           damage,
           this.areas,
           this.rng,
-          // Only Ice Storm has levels (#328); Earthquake is built without the kit.
+          // Each element's levels get their own kit (#328, #330); the other spell is built without it.
           spellId === 'ice_blizzard' ? { fx: this.fx, hailRng: this.hailRng } : undefined,
+          spellId === 'earth_quake' ? { fx: this.fx, levelRng: this.quakeLevelRng } : undefined,
         );
       case 'fire_column':
         return new FireWaveSpell(
@@ -1627,6 +1686,7 @@ export class GameScene extends Phaser.Scene {
         return new EarthShieldSpell(
           this,
           this.player,
+          this.enemies,
           this.collisions,
           stats as Readonly<EarthShieldStats>,
           damage,

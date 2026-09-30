@@ -77,13 +77,16 @@ export const MAX_LIVE_OVERLAYS = MAX_LIVE_ENEMIES + 1;
 
 /**
  * Persistent ground areas (#135) that may be on the ground at once, across
- * every spell casting them. One area spell holds at most two — its 6-8 s patch
- * against a 12-14 s cooldown, halved at most by a stacked Haste — and only the
- * `?loadout=` hook can equip both, so the cap is several times what a real run
- * reaches and exists to bound the pool rather than to shape play. Past it a
- * cast places nothing, the rule every pool follows.
+ * every spell casting them. One area spell holds at most two casts' patches —
+ * its 4-8 s patch against a 9-14 s cooldown, cut to 0.35 x by a stacked Haste —
+ * and from level 2 an Earthquake cast opens 2 (#330), about 3.3 alive at the
+ * floor, 13 with the margin of four; the Earth Companion's seismic patches
+ * (`MAX_LIVE_SEISMIC_PATCHES`, 6) share the pool: 13 + 6 = 19 of 24. Only the
+ * `?loadout=` hook can equip more than one area spell, so the cap is several
+ * times what a real run reaches and exists to bound the pool rather than to
+ * shape play. Past it a cast places nothing, the rule every pool follows.
  */
-export const MAX_LIVE_AREAS = 16;
+export const MAX_LIVE_AREAS = 24;
 
 /**
  * A ground area is drawn at `radius / AREA_SCALE_RADIUS`, so the ring covers
