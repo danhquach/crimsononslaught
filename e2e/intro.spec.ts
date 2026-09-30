@@ -13,6 +13,7 @@ import {
   clickRow,
   collectErrors,
   frames,
+  isSceneActive,
   menuRows,
   padPress,
   sceneTexts,
@@ -284,4 +285,38 @@ test('a gamepad drives Intro into Settings and back', async ({ page }) => {
   await press(UP); // wraps to Back
   await press(A);
   await waitForScene(page, SCENE.intro);
+});
+
+test('pad B goes back one screen at a time from Settings, Profile, SpellSelect and Upgrades (#377)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await addFakePad(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await frames(page, 4); // the first poll after a connect only takes a baseline
+  // The mouse opens each screen; the pad only backs out. A fresh scene baselines
+  // its pad first, so give it a few frames before pressing.
+  const back = async (from: string, to: string): Promise<void> => {
+    await waitForScene(page, from);
+    await frames(page, 4);
+    await padPress(page, PAD.B);
+    await waitForScene(page, to);
+    await frames(page, 4);
+  };
+
+  await clickRow(page, SCENE.intro, 'Settings');
+  await back(SCENE.settings, SCENE.intro);
+
+  await clickRow(page, SCENE.intro, 'Profile');
+  await back(SCENE.profile, SCENE.intro);
+
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  await clickRow(page, SCENE.spellSelect, 'Upgrades  (U)');
+  // Upgrades -> SpellSelect, one screen, not straight to Intro.
+  await back(SCENE.upgrades, SCENE.spellSelect);
+  expect(await isSceneActive(page, SCENE.intro)).toBe(false);
+  await back(SCENE.spellSelect, SCENE.intro);
+  expect(errors).toEqual([]);
 });

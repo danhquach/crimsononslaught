@@ -9,12 +9,18 @@ import {
   feedbackPayload,
   validateFeedback,
 } from '../core/feedback';
-import { clampSpellPage, pickupHelpRows, spellHelpPages } from '../core/helpModel';
+import {
+  clampSpellPage,
+  groupChangelog,
+  helpShoulderStep,
+  pickupHelpRows,
+  spellHelpPages,
+} from '../core/helpModel';
 import { SCENE, isHelpPayload, type HelpView } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
 import { CRIMSON_CSS, SERIF } from './buildStrips';
-import { attachMenuInput, type MenuItem } from './input';
+import { attachMenuInput, attachPadButtons, type MenuItem } from './input';
 import {
   addHintLine,
   addMenuRow,
@@ -50,6 +56,10 @@ const SPELL_TEXT_X = 300;
  */
 const PAGER_WIDTH = 160;
 const PAGER_OFFSET = 206;
+
+/** About tab's changelog rows (#377): a heading per version, then its lines. */
+const ABOUT_ROW_TOP = 214;
+const ABOUT_ROW_PITCH = 22;
 
 /** The feedback form's fields, in game pixels. */
 const FORM_WIDTH = 600;
@@ -133,7 +143,7 @@ export class HelpScene extends Phaser.Scene {
         }),
       );
       attachMenuInput(this, items, { keyboard: true });
-      addHintLine(this);
+      addHintLine(this, 'click, arrows + Enter, or a gamepad (A select, B back, LB/RB tabs)');
     }
 
     // Phaser applies a restart or a start on its next step and empties the key
@@ -144,6 +154,18 @@ export class HelpScene extends Phaser.Scene {
       if (this.current === 'feedback') this.show('about');
       else this.back();
     });
+    // Pad (#377): B is Esc; LB and RB walk the tabs, turning Spells pages first.
+    attachPadButtons(this, {
+      B: () => (this.current === 'feedback' ? this.show('about') : this.back()),
+      LB: () => this.shoulder(-1),
+      RB: () => this.shoulder(1),
+    });
+  }
+
+  private shoulder(dir: -1 | 1): void {
+    const step = helpShoulderStep(this.current, this.spellPage, spellHelpPages().length, dir);
+    if (!step) return;
+    this.show(step.view, step.spellPage);
   }
 
   /** Redraws Send's label as a send or its cooldown ends; unchanged text is a no-op. */
@@ -280,15 +302,21 @@ export class HelpScene extends Phaser.Scene {
         color: CRIMSON_CSS,
       })
       .setOrigin(0.5);
-    CHANGELOG.forEach(({ version, line }, i) => {
-      this.add
-        .text(width / 2, 222 + i * 26, `v${version}  ${line}`, {
-          fontFamily: SERIF,
-          fontSize: '17px',
-          color: '#cccccc',
-        })
-        .setOrigin(0.5);
-    });
+    // One heading per version, its lines under it (#377); `MAX_ABOUT_ROWS` rows fit the panel.
+    let row = 0;
+    for (const { version, lines } of groupChangelog(CHANGELOG)) {
+      const rows = [`v${version}`, ...lines.map((line) => `• ${line}`)];
+      rows.forEach((text, i) => {
+        this.add
+          .text(width / 2, ABOUT_ROW_TOP + row * ABOUT_ROW_PITCH, text, {
+            fontFamily: SERIF,
+            fontSize: '17px',
+            color: i === 0 ? '#eeeeee' : '#cccccc',
+          })
+          .setOrigin(0.5);
+        row += 1;
+      });
+    }
 
     const y = 410;
     if (!feedbackAvailable(FEEDBACK_KEY)) {
@@ -438,11 +466,11 @@ export class HelpScene extends Phaser.Scene {
   }
 
   /** Idempotent, like `back`: a click and a key in the same frame switch once. */
-  private show(view: HelpView): void {
+  private show(view: HelpView, spellPage?: number): void {
     if (this.leaving) return;
     this.leaving = true;
     audioOf(this).play('ui.confirm');
-    this.scene.restart({ view });
+    this.scene.restart({ view, spellPage });
   }
 
   /** Same guard as `show`: a click and a key in one frame turn the page once. */

@@ -2422,6 +2422,7 @@ export class GameScene extends Phaser.Scene {
     const cards = relicOffer(this.relicRng, {
       ranks: this.spells.loadout.relics,
       profile: this.spells.profile,
+      carried: this.spells.carriedStats,
     });
     if (cards.length === 0) return false;
     this.offer = cards;

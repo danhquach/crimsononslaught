@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
 import {
+  PAD_BUTTON,
+  buttonEdge,
   menuStep,
   pressedEdges,
   stickVector,
   wrapIndex,
   type DirectionState,
+  type PadButton,
   type MenuInputState,
 } from '../core/input';
 import { isConfirmKey } from '../core/resultModel';
@@ -179,12 +182,6 @@ export function attachMenuInput(
   );
 }
 
-/**
- * Start on a standard-mapping pad: the W3C Gamepad layout's button 9. Phaser
- * has no getter for it.
- */
-const START_BUTTON = 9;
-
 export interface StartButtonWatch {
   /** True on the poll where Start goes down; call once a frame. */
   pressed(): boolean;
@@ -205,26 +202,55 @@ export interface StartButtonWatch {
  * Esc read as a fresh press one frame later, and the pause opened again.
  */
 export function watchStartButton(scene: Phaser.Scene): StartButtonWatch {
-  let prev: boolean | null = null;
+  const edge = buttonEdge();
   let stale = false;
   return {
     pressed: () => {
       const pad = firstPad(scene);
       if (!pad || stale) {
-        prev = null;
+        edge.reset();
         stale = false;
         return false;
       }
-      const down = pad.buttons[START_BUTTON]?.pressed ?? false;
-      const edge = prev === false && down;
-      prev = down;
-      return edge;
+      return edge.step(pad.buttons[PAD_BUTTON.START]?.pressed ?? false);
     },
     reset: () => {
-      prev = null;
+      edge.reset();
       stale = true;
     },
   };
+}
+
+/**
+ * Pad face and shoulder buttons as press edges (#377): B goes back, LB and RB
+ * flip tabs, X and Y act on the level-up row. One tracker per bound button,
+ * polled on the scene's update event and unhooked on shutdown. A fresh scene
+ * baselines on its first poll, so a B still held from the screen before does
+ * not fire again here. `reset` re-baselines, for a scene that resumes.
+ */
+export function attachPadButtons(
+  scene: Phaser.Scene,
+  handlers: Partial<Record<PadButton, () => void>>,
+): { reset(): void } {
+  const bound = (Object.keys(handlers) as PadButton[]).map((name) => ({
+    index: PAD_BUTTON[name],
+    handler: handlers[name],
+    edge: buttonEdge(),
+  }));
+
+  const poll = (): void => {
+    const pad = firstPad(scene);
+    for (const { index, handler, edge } of bound) {
+      const down = pad ? (pad.buttons[index]?.pressed ?? false) : undefined;
+      if (edge.step(down)) handler?.();
+    }
+  };
+
+  scene.events.on(Phaser.Scenes.Events.UPDATE, poll);
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    scene.events.off(Phaser.Scenes.Events.UPDATE, poll);
+  });
+  return { reset: () => bound.forEach(({ edge }) => edge.reset()) };
 }
 
 function readMenuState(pad: Phaser.Input.Gamepad.Gamepad): MenuInputState {

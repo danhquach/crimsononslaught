@@ -1230,3 +1230,61 @@ test('the focus ring follows the arrows over the menu rows, the strips and Yes /
   expect(overlaps(ring.outer!, rows[0]!.bounds)).toBe(false);
   expect(errors).toEqual([]);
 });
+
+const B = 1;
+
+test('pad B resumes the run, and backs out of a Yes / No to the menu first (#377)', async ({
+  page,
+}) => {
+  await installPad(page);
+  const errors = collectErrors(page);
+  await startRun(page);
+  await frames(page, 4); // the first poll after a connect only takes a baseline
+
+  await pressPad(page, START);
+  await waitForPause(page, undefined);
+  await frames(page, 4);
+  await pressPad(page, B);
+  await expect.poll(async () => (await snapshot(page)).gamePaused).toBe(false);
+  await frames(page, 4);
+  expect((await snapshot(page)).pause).toBeNull();
+
+  await pressPad(page, START);
+  await waitForPause(page, undefined);
+  await frames(page, 4);
+  for (let i = 0; i < 3; i += 1) await pressPad(page, DOWN); // wakes Resume, then Settings, Restart
+  await pressPad(page, A);
+  await waitForPause(page, 'restart');
+  await frames(page, 4);
+  await pressPad(page, B);
+  await waitForPause(page, 'menu');
+  await frames(page, 10);
+  // The B that closed the Yes / No did not also resume the run.
+  expect((await snapshot(page)).gamePaused).toBe(true);
+  await pressPad(page, B);
+  await expect.poll(async () => (await snapshot(page)).gamePaused).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('pad B leaves Settings for the pause screen, not for the run (#377)', async ({ page }) => {
+  await installPad(page);
+  const errors = collectErrors(page);
+  await startRun(page);
+  await frames(page, 4);
+
+  await pressPad(page, START);
+  await waitForPause(page, undefined);
+  await frames(page, 4);
+  await pressPad(page, DOWN); // wakes Resume
+  await pressPad(page, DOWN); // Settings
+  await pressPad(page, A);
+  await waitForScene(page, SCENE.settings);
+  await frames(page, 4);
+
+  await pressPad(page, B);
+  await waitForPause(page, undefined);
+  await waitForScene(page, SCENE.pause);
+  await frames(page, 10);
+  expect((await snapshot(page)).gamePaused).toBe(true);
+  expect(errors).toEqual([]);
+});

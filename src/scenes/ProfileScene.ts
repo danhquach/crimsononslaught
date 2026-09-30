@@ -5,7 +5,7 @@ import { SAVE_REGISTRY_KEY, SCENE } from '../core/scenePayloads';
 import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { audioOf } from '../render/audio';
 import { storeSaveJson } from '../storage/localSave';
-import { attachMenuInput } from './input';
+import { attachMenuInput, attachPadButtons } from './input';
 import {
   addHintLine,
   addMenuRow,
@@ -155,6 +155,7 @@ export class ProfileScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape') this.onBack();
     });
+    attachPadButtons(this, { B: () => this.onBack() });
   }
 
   /** The widest valid name (16 W) is wider than its slot, so it shrinks to fit rather than run into Rename. */

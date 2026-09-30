@@ -6,7 +6,17 @@ import { FEEDBACK_URL } from '../src/core/feedback';
 import { pickupHelpRows, spellHelpPages } from '../src/core/helpModel';
 import { AUDIO_REGISTRY_KEY, SCENE, type HelpView } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
-import { clickRow, collectErrors, menuRows, sceneTexts, waitForScene } from './game';
+import {
+  PAD,
+  addFakePad,
+  clickRow,
+  collectErrors,
+  frames,
+  menuRows,
+  padPress,
+  sceneTexts,
+  waitForScene,
+} from './game';
 import type { MenuRowReport } from '../src/scenes/menuUi';
 
 /**
@@ -96,6 +106,7 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
 
   const texts = await sceneTexts(page, SCENE.help);
   expect(texts).toEqual(expect.arrayContaining(['Help', 'Pickups', 'About', ...NAMES]));
+  expect(texts).toContain('several placed round the map at run start, more on bigger maps');
   for (const row of pickupHelpRows()) {
     expect(texts).toEqual(expect.arrayContaining([row.source, row.effect]));
   }
@@ -291,7 +302,9 @@ test('the keyboard opens Help, switches to About, and Esc returns', async ({ pag
   await waitForView(page, 'about');
   const texts = await sceneTexts(page, SCENE.help);
   expect(texts).toContain(`Crimson Onslaught  v${VERSION}  Pre-alpha`);
-  for (const { version, line } of CHANGELOG) expect(texts).toContain(`v${version}  ${line}`);
+  // One heading for the version, its lines as bullets under it (#377).
+  expect(texts.filter((text) => text === `v${CHANGELOG[0]!.version}`)).toHaveLength(1);
+  for (const { line } of CHANGELOG) expect(texts).toContain(`• ${line}`);
   expect(texts).toContain('Send feedback');
   await expectOnScreen(page);
   await page.screenshot({ path: test.info().outputPath('help-about.png') });
@@ -368,6 +381,69 @@ test('a gamepad opens Help, reaches About, and backs out', async ({ page }) => {
   await press(DOWN); // reveals the Pickups tab
   await press(UP); // wraps to Back
   await press(A);
+  await waitForScene(page, SCENE.intro);
+});
+
+test('a gamepad walks the Help tabs with LB/RB and backs out with B (#377)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await addFakePad(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Help');
+  await waitForView(page, 'pickups');
+  await frames(page, 4); // a fresh scene baselines its pad first
+
+  const pages = spellHelpPages().length;
+  const spellPage = (): Promise<number> =>
+    page.evaluate(async (key) => {
+      const { game } = await import('/src/main.ts');
+      return (game.scene.getScene(key) as unknown as { spellPage: number }).spellPage;
+    }, SCENE.help);
+  const step = async (button: number, view: HelpView, expectedPage?: number): Promise<void> => {
+    await padPress(page, button);
+    await waitForView(page, view);
+    if (expectedPage !== undefined) expect(await spellPage()).toBe(expectedPage);
+    await frames(page, 4);
+  };
+
+  await padPress(page, PAD.LB); // nowhere left of Pickups
+  await frames(page, 4);
+  expect(await helpView(page)).toBe('pickups');
+
+  await step(PAD.RB, 'spells', 0);
+  for (let p = 1; p < pages; p += 1) await step(PAD.RB, 'spells', p);
+  await step(PAD.RB, 'about');
+  await padPress(page, PAD.RB); // nowhere right of About
+  await frames(page, 4);
+  expect(await helpView(page)).toBe('about');
+
+  await step(PAD.LB, 'spells', pages - 1);
+  for (let p = pages - 2; p >= 0; p -= 1) await step(PAD.LB, 'spells', p);
+  await step(PAD.LB, 'pickups');
+
+  await step(PAD.RB, 'spells', 0);
+  await step(PAD.LB, 'pickups');
+  await padPress(page, PAD.B);
+  await waitForScene(page, SCENE.intro);
+  expect(errors).toEqual([]);
+});
+
+test('pad B closes the feedback form to About, then About to Intro (#377)', async ({ page }) => {
+  await addFakePad(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Help');
+  await waitForView(page, 'pickups');
+  await clickRow(page, SCENE.help, 'About');
+  await waitForView(page, 'about');
+  await clickRow(page, SCENE.help, 'Send feedback');
+  await waitForView(page, 'feedback');
+  await frames(page, 4);
+
+  await padPress(page, PAD.B);
+  await waitForView(page, 'about');
+  await frames(page, 4);
+  await padPress(page, PAD.B);
   await waitForScene(page, SCENE.intro);
 });
 

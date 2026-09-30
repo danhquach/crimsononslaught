@@ -9,14 +9,16 @@ import {
   EMBER_DROPS,
   HEAL_AMOUNT,
   MAGNET_DURATION_MS,
-  RELIC_COUNT,
 } from '../config/pickups';
 import { ROSTER_SPELL_IDS, SPELLS_BY_ELEMENT, elementOf } from '../config/loadout';
 import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVEL_TEXT_MAX, SPELL_LEVELS, type SpellLevelTable } from '../config/spellLevels';
 import {
   MAX_SPELL_HELP_ROWS,
+  aboutRowCount,
   clampSpellPage,
+  groupChangelog,
+  helpShoulderStep,
   pickupHelpRows,
   spellHelpPages,
   spellHelpRows,
@@ -58,7 +60,10 @@ describe('pickupHelpRows', () => {
     expect(row('Magnet').effect).toContain(`${MAGNET_DURATION_MS / 1000} s`);
     expect(row('Bomb').effect).toContain(`${BOMB_DAMAGE} damage`);
     expect(row('Chest').effect).toContain(`${CHEST_EMBERS} Embers`);
-    expect(row('Relic').source).toContain(`${RELIC_COUNT} placed`);
+    expect(row('Relic').source).toBe(
+      'several placed round the map at run start, more on bigger maps',
+    );
+    expect(row('Relic').source).not.toMatch(/\d/);
     expect(row('Relic').effect).toContain(`1 of ${MAX_OFFER_SIZE}`);
   });
 
@@ -199,5 +204,68 @@ describe('clampSpellPage', () => {
     expect(clampSpellPage(Number.POSITIVE_INFINITY, 2)).toBe(0);
     expect(clampSpellPage(1, 0)).toBe(0);
     expect(clampSpellPage(1.9, 3)).toBe(1);
+  });
+});
+
+describe('groupChangelog (#377)', () => {
+  const e = (version: string, line = 'x') => ({ version, line });
+
+  it('puts entries of one version under a single heading', () => {
+    const groups = groupChangelog([
+      e('0.1.0', 'a'),
+      e('0.1.0', 'b'),
+      e('0.1.0', 'c'),
+      e('0.1.0', 'd'),
+      e('0.1.0', 'e'),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.lines).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('starts a group at each change of version', () => {
+    expect(groupChangelog([e('a'), e('a'), e('b')]).map((g) => g.lines.length)).toEqual([2, 1]);
+  });
+
+  it('merges only neighbours', () => {
+    expect(groupChangelog([e('a'), e('b'), e('a')]).map((g) => g.version)).toEqual(['a', 'b', 'a']);
+  });
+
+  it('is empty for no entries', () => {
+    expect(groupChangelog([])).toEqual([]);
+  });
+
+  it('counts a heading and every line as rows', () => {
+    expect(aboutRowCount(groupChangelog([e('a'), e('a'), e('b')]))).toBe(5);
+    expect(aboutRowCount([])).toBe(0);
+  });
+});
+
+describe('helpShoulderStep (#377)', () => {
+  it('walks Pickups -> Spells pages -> About with RB', () => {
+    expect(helpShoulderStep('pickups', 0, 3, 1)).toEqual({ view: 'spells', spellPage: 0 });
+    expect(helpShoulderStep('spells', 0, 3, 1)).toEqual({ view: 'spells', spellPage: 1 });
+    expect(helpShoulderStep('spells', 1, 3, 1)).toEqual({ view: 'spells', spellPage: 2 });
+    expect(helpShoulderStep('spells', 2, 3, 1)).toEqual({ view: 'about' });
+  });
+
+  it('walks back with LB', () => {
+    expect(helpShoulderStep('about', 0, 3, -1)).toEqual({ view: 'spells', spellPage: 2 });
+    expect(helpShoulderStep('spells', 2, 3, -1)).toEqual({ view: 'spells', spellPage: 1 });
+    expect(helpShoulderStep('spells', 0, 3, -1)).toEqual({ view: 'pickups' });
+  });
+
+  it('does not wrap at either end', () => {
+    expect(helpShoulderStep('pickups', 0, 3, -1)).toBeNull();
+    expect(helpShoulderStep('about', 0, 3, 1)).toBeNull();
+  });
+
+  it('does nothing on the feedback form', () => {
+    expect(helpShoulderStep('feedback', 0, 3, 1)).toBeNull();
+    expect(helpShoulderStep('feedback', 0, 3, -1)).toBeNull();
+  });
+
+  it('copes with a single page', () => {
+    expect(helpShoulderStep('spells', 0, 1, 1)).toEqual({ view: 'about' });
+    expect(helpShoulderStep('about', 0, 1, -1)).toEqual({ view: 'spells', spellPage: 0 });
   });
 });

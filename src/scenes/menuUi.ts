@@ -17,7 +17,7 @@ import type { MenuItem } from './input';
 /** The title face for the front door, with the serif behind it while the font loads. */
 export const TITLE_FONT = `${MENU_ART.font.family}, ${SERIF}`;
 
-const HINT = 'click, arrows + Enter, or a gamepad';
+const HINT = 'click, arrows + Enter, or a gamepad (A select, B back)';
 /** How dark the quiet backdrop lays over the painting. */
 const QUIET_ALPHA = 0.6;
 const HINT_HEIGHT = 30;

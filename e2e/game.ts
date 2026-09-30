@@ -164,7 +164,7 @@ export async function frames(page: Page, n: number): Promise<void> {
 }
 
 /** Standard-mapping button indexes of the fake pad. */
-export const PAD = { A: 0, UP: 12, DOWN: 13 } as const;
+export const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, UP: 12, DOWN: 13 } as const;
 
 /**
  * Plug in a fake standard-mapping pad Phaser finds by polling

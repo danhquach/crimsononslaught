@@ -13,7 +13,7 @@ import {
 import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { audioOf } from '../render/audio';
 import { storeSaveJson } from '../storage/localSave';
-import { attachMenuInput, watchStartButton, type MenuItem } from './input';
+import { attachMenuInput, attachPadButtons, watchStartButton, type MenuItem } from './input';
 import { addSwitchIcon } from './minimapHud';
 import {
   addHintLine,
@@ -124,7 +124,8 @@ export class SettingsScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.repeat) this.back();
     });
-    // Start goes back as well; the scene's own emitter keeps its listeners across a restart.
+    // Pad B and Start go back as well (#377); the scene's own emitter keeps its listeners across a restart.
+    attachPadButtons(this, { B: () => this.back() });
     const start = watchStartButton(this);
     const pollStart = (): void => {
       if (start.pressed()) this.back();

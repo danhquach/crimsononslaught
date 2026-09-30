@@ -15,7 +15,7 @@ import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
 import { focusable, frameBox } from './focusRing';
-import { attachMenuInput, type MenuItem } from './input';
+import { attachMenuInput, attachPadButtons, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
 const CARD_HEIGHT = 260;
@@ -123,7 +123,8 @@ export class LevelUpScene extends Phaser.Scene {
       .setOrigin(0.5);
     const keys = this.cards.length === 1 ? '1' : `1–${this.cards.length}`;
     const choose = relic ? 'Choose a buff for the rest of the run' : 'Choose an upgrade';
-    const hint = `${choose}  ·  click a card, press ${keys}, or use a gamepad`;
+    const pad = this.actions ? 'use a gamepad (X reroll, Y ban)' : 'use a gamepad';
+    const hint = `${choose}  ·  click a card, press ${keys}, or ${pad}`;
     const subtitle = this.add
       .text(width / 2, 118, hint, {
         fontFamily: 'Georgia, serif',
@@ -152,6 +153,16 @@ export class LevelUpScene extends Phaser.Scene {
       if (card) this.choose(card);
       else if (this.actions && !event.repeat) this.onActionKey(event.key);
     });
+    // Pad (#377): X rerolls, Y toggles ban mode, B only leaves it, like R, B and Esc.
+    if (this.actions) {
+      attachPadButtons(this, {
+        X: () => this.reroll(),
+        Y: () => this.toggleBan(),
+        B: () => {
+          if (this.banning) this.setBanning(false);
+        },
+      });
+    }
   }
 
   /** R, S and B press their buttons; Esc leaves ban mode. */
@@ -191,7 +202,7 @@ export class LevelUpScene extends Phaser.Scene {
       ban.setBanning(on);
       subtitle
         .setText(
-          on ? 'Choose a card to ban for the rest of the run  ·  Esc or Ban to cancel' : hint,
+          on ? 'Choose a card to ban for the rest of the run  ·  Esc, B or Ban to cancel' : hint,
         )
         .setColor(on ? cssColor(BAN_COLOR) : '#cccccc');
     };

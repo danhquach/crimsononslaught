@@ -10,6 +10,7 @@
  * climbs out of drawn in the last cell.
  */
 
+import { buildIconFrame } from './buildIcons';
 import type { TextureKey } from './colors';
 import type { FrameName } from './frames';
 import { ROSTER_SPELL_IDS } from './loadout';
@@ -302,8 +303,14 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...ROSTER_SPELL_IDS.map((id) => spec(`icon.${id}`, 1, 1, ONCE)),
 
   // Pause screen build icons (CO-179): one still per passive and relic buff,
-  // drawn by PauseScene straight from the atlas, never played.
-  ...[...PASSIVES, ...RELIC_BUFFS].map(({ id }) => spec(`icon.${id}`, 1, 1, ONCE)),
+  // drawn by PauseScene straight from the atlas, never played. A buff with no
+  // icon art yet (Impaler, #377) has no clip; its tile keeps its two letters.
+  // Colossus's art is no longer drawn (#377) but stays on its page, so dropping
+  // it would re-quantise the page's palette.
+  ...[...PASSIVES, ...RELIC_BUFFS]
+    .filter(({ id }) => buildIconFrame(id) !== undefined)
+    .map(({ id }) => spec(`icon.${id}`, 1, 1, ONCE)),
+  spec('icon.relic_colossus', 1, 1, ONCE),
 
   // HUD bar frames and their end marks (CO-156): stills, never played; each
   // frame is cut into caps and a middle by `render/barFrame.ts`. The shield

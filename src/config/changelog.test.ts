@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_ABOUT_ROWS, aboutRowCount, groupChangelog } from '../core/helpModel';
 import { CHANGELOG, MAX_CHANGELOG_ENTRIES, MAX_CHANGELOG_LINE } from './changelog';
 
 describe('CHANGELOG', () => {
@@ -16,5 +17,9 @@ describe('CHANGELOG', () => {
 
   it('starts with the build version, so a bump needs a new line', () => {
     expect(CHANGELOG[0]?.version).toBe(__APP_VERSION__);
+  });
+
+  it('fits the About panel once grouped by version (#377)', () => {
+    expect(aboutRowCount(groupChangelog(CHANGELOG))).toBeLessThanOrEqual(MAX_ABOUT_ROWS);
   });
 });

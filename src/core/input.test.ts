@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { PLAYER_SPEED } from '../config/player';
 import {
+  PAD_BUTTON,
   STICK_DEADZONE,
+  buttonEdge,
   clampMoveSpeed,
   directionVector,
   menuStep,
@@ -154,5 +156,54 @@ describe('clampMoveSpeed', () => {
 
   it('takes the fallback the caller gives', () => {
     expect(clampMoveSpeed(-1, 200)).toBe(200);
+  });
+});
+
+describe('buttonEdge (#377)', () => {
+  it('reads the first poll as a baseline, never an edge', () => {
+    expect(buttonEdge().step(true)).toBe(false);
+  });
+
+  it('fires once on release then press', () => {
+    const b = buttonEdge();
+    b.step(false);
+    expect(b.step(true)).toBe(true);
+  });
+
+  it('does not fire while held, and fires again after a release', () => {
+    const b = buttonEdge();
+    b.step(false);
+    b.step(true);
+    expect(b.step(true)).toBe(false);
+    b.step(false);
+    expect(b.step(true)).toBe(true);
+  });
+
+  it('drops the baseline when the pad disconnects', () => {
+    const b = buttonEdge();
+    b.step(false);
+    expect(b.step(undefined)).toBe(false);
+    expect(b.step(true)).toBe(false);
+  });
+
+  it('treats a stale down after reset as a baseline, not an edge', () => {
+    const b = buttonEdge();
+    b.step(false);
+    b.reset();
+    expect(b.step(true)).toBe(false);
+    expect(b.step(true)).toBe(false);
+  });
+
+  it('keeps two trackers independent', () => {
+    const a = buttonEdge();
+    const b = buttonEdge();
+    a.step(false);
+    b.step(false);
+    expect(a.step(true)).toBe(true);
+    expect(b.step(false)).toBe(false);
+  });
+
+  it('names the standard-mapping indices', () => {
+    expect(PAD_BUTTON).toEqual({ A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, START: 9 });
   });
 });
