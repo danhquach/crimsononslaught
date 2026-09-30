@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
-import { PASSIVE_COLOR, RELIC_COLOR } from '../core/offerColors';
+import { PASSIVE_COLOR, RELIC_COLOR, offerColor } from '../core/offerColors';
 import {
   CONFIRM_PROMPTS,
   EMPTY_STRIP_TEXT,
+  INFO_HINT,
   PAUSE_ACTIONS,
   PAUSE_EVENT,
   PAUSE_LABELS,
@@ -24,6 +25,7 @@ import {
   type SettingsPayload,
 } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
+import { addInspectable, infoLook, type BuildSlot } from './buildInspect';
 import {
   CRIMSON_CSS,
   SERIF,
@@ -37,7 +39,6 @@ import {
   drawHeroStand,
   drawStrip,
 } from './buildStrips';
-import { focusable, frameBox } from './focusRing';
 import { attachMenuInput, attachNavInput, watchStartButton, type MenuItem } from './input';
 import { addMenuRow } from './menuUi';
 
@@ -62,19 +63,7 @@ const SPELL_PITCH = 120;
 const SPELL_STRIP_HEIGHT = 96;
 /** A spell name's font sizes, tried in order until it fits. */
 const NAME_SIZES = [12, 11, 10] as const;
-const INFO_HINT = 'Point at a spell, passive or relic, or reach it with the arrows or a pad';
 const NAV_DIRECTIONS: readonly NavDirection[] = ['up', 'down', 'left', 'right'];
-
-/** One readable item in a strip, for the pointer and the pad alike. */
-interface BuildSlot {
-  x: number;
-  y: number;
-  /** Its face's size, for the focus ring's box. */
-  size: number;
-  /** What the info line reads for it. */
-  info: string;
-  setLit(on: boolean): void;
-}
 
 /**
  * Pause screen (#252): launched by Game over its own paused scene with the
@@ -251,8 +240,8 @@ export class PauseScene extends Phaser.Scene {
 
   /** The info line: the pointed-at slot, else the pad's, else the hint. */
   private showInfo(pointed: BuildSlot | null): void {
-    const slot = pointed ?? this.padSlot;
-    this.info?.setText(slot ? slot.info : INFO_HINT).setColor(slot ? '#eeeeee' : '#888888');
+    const { text, color } = infoLook(pointed ?? this.padSlot);
+    this.info?.setText(text).setColor(color);
   }
 
   /** The hero idling on its pedestal, the "Paused" title over it and the level badge under it. */
@@ -273,10 +262,19 @@ export class PauseScene extends Phaser.Scene {
     const pitch = Math.min(SPELL_PITCH, room / Math.max(1, spells.length));
     return spells.map((spell, i) => {
       const x = STRIP_CONTENT_X + pitch / 2 + i * pitch;
-      const slot = this.badgesAboveRing(() => {
-        const rim = addSpellDisc(this, x, cy, spell);
-        return this.slot(rim, x, cy, SPELL_ICON_SIZE + 6, itemInfo(spell), rim.strokeColor, 2);
-      });
+      const slot = addInspectable(
+        this,
+        () => addSpellDisc(this, x, cy, spell),
+        {
+          x,
+          y: cy,
+          size: SPELL_ICON_SIZE + 6,
+          info: itemInfo(spell),
+          rim: offerColor('active', spell.id),
+          restWidth: 2,
+        },
+        (s) => this.showInfo(s),
+      );
       this.addFittedName(x, cy + SPELL_ICON_SIZE / 2 + 12, spell.name, pitch - 8);
       return slot;
     });
@@ -331,65 +329,22 @@ export class PauseScene extends Phaser.Scene {
 
   /** A passive: its icon (CO-179) in a mint rim, or its lettered tile with no icon art. */
   private addTile(x: number, y: number, tile: PauseItem): BuildSlot {
-    return this.badgesAboveRing(() => {
-      const face =
-        addBuildIcon(this, x, y, tile, PASSIVE_COLOR) ?? addPassiveTile(this, x, y, tile);
-      return this.slot(face, x, y, TILE + 4, itemInfo(tile), PASSIVE_COLOR);
-    });
+    return addInspectable(
+      this,
+      () => addBuildIcon(this, x, y, tile, PASSIVE_COLOR) ?? addPassiveTile(this, x, y, tile),
+      { x, y, size: TILE + 4, info: itemInfo(tile), rim: PASSIVE_COLOR },
+      (s) => this.showInfo(s),
+    );
   }
 
   /** A relic buff: its icon (CO-179) in a violet rim, or its lettered gem with no icon art. */
   private addGem(x: number, y: number, tile: PauseItem): BuildSlot {
-    return this.badgesAboveRing(() => {
-      const face = addBuildIcon(this, x, y, tile, RELIC_COLOR) ?? addRelicGem(this, x, y, tile);
-      return this.slot(face, x, y, TILE + 4, itemInfo(tile), RELIC_COLOR);
-    });
-  }
-
-  /**
-   * Draws one tile with `draw`, then lifts its count badge (a pill and its text,
-   * and any letters), or a spell's level pill (#326), over the focus ring, which sits at depth 0, so the ring
-   * never clips the count or a MAX pill.
-   */
-  private badgesAboveRing(draw: () => BuildSlot): BuildSlot {
-    const before = this.children.list.length;
-    const slot = draw();
-    for (const o of this.children.list.slice(before)) {
-      if (o.type === 'Text' || o.type === 'Graphics') {
-        (o as Phaser.GameObjects.Text | Phaser.GameObjects.Graphics).setDepth(1);
-      }
-    }
-    return slot;
-  }
-
-  /**
-   * One readable item in a strip. Pointing at it, or the pad selecting it,
-   * thickens its rim in its kind's colour and reads it on the info line; the
-   * pad's focus also draws the shared ring round it (CO-196).
-   */
-  private slot(
-    face: Phaser.GameObjects.Shape,
-    x: number,
-    y: number,
-    size: number,
-    info: string,
-    rim: number,
-    restWidth = 1,
-  ): BuildSlot {
-    const focus = focusable(this, frameBox(x, y, size, size), ({ raised }) => {
-      face.setStrokeStyle(raised ? restWidth + 1 : restWidth, rim);
-    });
-    const slot: BuildSlot = { x, y, size, info, setLit: focus.setFocused };
-    face.setInteractive();
-    face.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      focus.setHovered(true);
-      this.showInfo(slot);
-    });
-    face.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      focus.setHovered(false);
-      this.showInfo(null);
-    });
-    return slot;
+    return addInspectable(
+      this,
+      () => addBuildIcon(this, x, y, tile, RELIC_COLOR) ?? addRelicGem(this, x, y, tile),
+      { x, y, size: TILE + 4, info: itemInfo(tile), rim: RELIC_COLOR },
+      (s) => this.showInfo(s),
+    );
   }
 
   private drawConfirm(view: PauseView, action: ConfirmAction): void {

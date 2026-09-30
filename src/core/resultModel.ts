@@ -1,4 +1,5 @@
 import { CURRENCY_NAME } from '../config/meta';
+import { ROSTER_SPELL_CARDS } from '../config/rosterCards';
 import { SPELL_CARDS, SPELL_IDS, type SpellId } from '../config/spells';
 import { formatTimer } from './hudModel';
 import type { SaveProfile } from './save';
@@ -76,7 +77,12 @@ export function resultView(payload: Readonly<ResultPayload>): ResultView {
   // The pause screen's tiles, so both screens name and letter them alike.
   const tiles = pauseView({
     level: stats.level,
-    spells: build.spells,
+    // The payload carries no descriptions; the info line reads them from the
+    // roster by id, which `isRunBuild` has already allow-listed (CO-198).
+    spells: build.spells.map((spell) => ({
+      ...spell,
+      description: ROSTER_SPELL_CARDS[spell.id]?.description ?? '',
+    })),
     passives: new Map(build.passives),
     relics: new Map(build.relics),
     kills: stats.kills,
@@ -112,17 +118,23 @@ export interface Box {
  * a long run can never push the button off the screen.
  */
 export const RESULT_LAYOUT = {
-  headlineY: 46,
-  subtitleY: 88,
-  card: { x: 36, y: 116, width: 252, height: 316 },
-  pedestalY: 226,
+  headlineY: 42,
+  subtitleY: 84,
+  card: { x: 36, y: 108, width: 252, height: 280 },
+  pedestalY: 220,
   /** The stats card's rows: labels from `x`, values right-aligned to `valueX`. */
-  rows: { x: 54, valueX: 272, y: 300, pitch: 30 },
-  spells: { x: 308, y: 116, width: 616, height: 76 },
-  passives: { x: 308, y: 204, width: 616, height: 104 },
-  relics: { x: 308, y: 320, width: 616, height: 112 },
+  rows: { x: 54, valueX: 272, y: 282, pitch: 28 },
+  spells: { x: 308, y: 108, width: 616, height: 64 },
+  passives: { x: 308, y: 184, width: 616, height: 96 },
+  relics: { x: 308, y: 292, width: 616, height: 96 },
   /** Where a strip's contents start, right of its label. */
   contentInset: 104,
+  /**
+   * The info line for the pointed-at or selected item (CO-198): up to two
+   * lines, centred in the box. Two CI-height lines (about 21 px each) still
+   * fit; anything taller hangs from the top, clear of the strips.
+   */
+  info: { x: 36, y: 392, width: 888, height: 44 },
   button: { x: 370, y: 444, width: 220, height: 34 },
   hintY: 500,
   /** The save-failed line (#316), under the hint; 24 px clears two CI-height 14 px lines. */
@@ -131,12 +143,12 @@ export const RESULT_LAYOUT = {
 
 /** A strip's tiles: `TILE_PITCH` apart in rows `TILE_ROW_PITCH` apart, `TILE_ROWS` rows at most. */
 const TILE_PITCH = 48;
-const TILE_ROW_PITCH = 48;
+const TILE_ROW_PITCH = 44;
 export const TILE_ROWS = 2;
 /** A tile's half height, its disc and the badge under it: what must stay inside its strip. */
 export const TILE_REACH = 22;
 /** The first row's centre, under the strip's top edge. */
-const TILE_TOP = 28;
+const TILE_TOP = 26;
 /** A spell's slot: an icon with its name to the right, or the icon alone when squeezed. */
 export const SPELL_PITCH = 150;
 const SPELL_ICON = 32;

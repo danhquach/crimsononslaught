@@ -57,7 +57,7 @@ export interface PauseSpell {
 
 export interface PauseBuild {
   level: number;
-  /** The result screen's build (#290) carries no descriptions; it has no info line. */
+  /** The result screen's build (#290) carries no descriptions; `resultView` looks them up (CO-198). */
   spells: readonly (Pick<PauseSpell, 'id' | 'name' | 'color' | 'level'> & {
     description?: string;
   })[];
@@ -121,6 +121,9 @@ export function pauseView(build: PauseBuild): PauseView {
     stats: { kills: build.kills, embers: build.embers, elapsedMs: build.elapsedMs },
   };
 }
+
+/** The info line while nothing is pointed at or selected; the result screen reads it too (CO-198). */
+export const INFO_HINT = 'Point at a spell, passive or relic, or reach it with the arrows or a pad';
 
 /** Placeholder for a strip with nothing in it yet. */
 export const EMPTY_STRIP_TEXT = 'None yet';

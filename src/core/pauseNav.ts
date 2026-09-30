@@ -57,7 +57,7 @@ export function stepPauseFocus(
 }
 
 /** Index of the value in `xs` closest to `x`; the first on a tie. */
-function nearest(xs: readonly number[], x: number): number {
+export function nearest(xs: readonly number[], x: number): number {
   let best = 0;
   xs.forEach((value, i) => {
     if (Math.abs(value - x) < Math.abs((xs[best] ?? 0) - x)) best = i;
