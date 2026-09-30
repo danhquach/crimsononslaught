@@ -290,7 +290,7 @@ test('the keyboard opens Help, switches to About, and Esc returns', async ({ pag
   await page.keyboard.press('Enter');
   await waitForView(page, 'about');
   const texts = await sceneTexts(page, SCENE.help);
-  expect(texts).toContain(`Crimson Onslaught  v${VERSION}`);
+  expect(texts).toContain(`Crimson Onslaught  v${VERSION}  Pre-alpha`);
   for (const { version, line } of CHANGELOG) expect(texts).toContain(`v${version}  ${line}`);
   expect(texts).toContain('Send feedback');
   await expectOnScreen(page);

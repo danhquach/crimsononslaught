@@ -17,9 +17,9 @@ export const MAX_CHANGELOG_ENTRIES = 5;
 export const MAX_CHANGELOG_LINE = 60;
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
-  { version: '0.1.0', line: 'Help screen: every pickup explained, plus feedback' },
-  { version: '0.1.0', line: 'Ranged enemies keep their distance and shoot' },
-  { version: '0.1.0', line: 'The page asks before you leave during a run' },
-  { version: '0.1.0', line: 'Reroll, Skip and Ban on level-up offers' },
-  { version: '0.1.0', line: 'Pause the run with Esc or Start' },
+  { version: '0.1.0', line: 'Spell levels 2 and 3 for Fire, Ice, Lightning and Earth' },
+  { version: '0.1.0', line: 'New foes: ranged, exploder, splitter, shielded, elites' },
+  { version: '0.1.0', line: 'Music, and a cast sound for every spell' },
+  { version: '0.1.0', line: '20-minute runs that end in a boss fight' },
+  { version: '0.1.0', line: 'Progress saves, with permanent upgrades between runs' },
 ];
