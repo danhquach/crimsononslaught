@@ -4,7 +4,7 @@ import { PASSIVES } from '../src/config/passives';
 import { RELIC_BUFFS } from '../src/config/relics';
 import { PASSIVE_COLOR, RELIC_COLOR } from '../src/core/offerColors';
 import { abbreviate } from '../src/core/pauseModel';
-import { RESULT_HEADLINES } from '../src/core/resultModel';
+import { RESULT_HEADLINES, RESULT_LAYOUT } from '../src/core/resultModel';
 import {
   MAX_BUILD_COUNT,
   SCENE,
@@ -12,7 +12,8 @@ import {
   type ResultPayload,
 } from '../src/core/scenePayloads';
 import type { ResultControls, ResultScene } from '../src/scenes/ResultScene';
-import { collectErrors, isSceneActive, waitForScene } from './game';
+import { collectErrors, focusRing, isSceneActive, waitForScene } from './game';
+import { expectRingReadable } from './ringProbe';
 
 /**
  * #290 in the browser: the result screen holds the largest build the game
@@ -27,7 +28,7 @@ const HEIGHT = 540;
 /** CI's fonts render taller than a Mac's; keep this much clear of every edge. */
 const SLACK = 8;
 
-/** Every passive at its top rank, every relic stacked to the cap, and all three spell slots. */
+/** Every passive at its top rank, every relic stacked to the cap, and all three spell slots at level 3. */
 function maxedPayload(outcome: Outcome): ResultPayload {
   return {
     outcome,
@@ -42,9 +43,9 @@ function maxedPayload(outcome: Outcome): ResultPayload {
     },
     build: {
       spells: [
-        { id: 'lightning', name: 'Lightning Bolt', color: 0xffee55 },
-        { id: 'lightning_companion', name: 'Lightning Companion', color: 0x88ccff },
-        { id: 'lightning_tornado', name: 'Tornado', color: 0x88ccff },
+        { id: 'lightning', name: 'Lightning Bolt', color: 0xffee55, level: 3 },
+        { id: 'lightning_companion', name: 'Lightning Companion', color: 0x88ccff, level: 3 },
+        { id: 'lightning_tornado', name: 'Tornado', color: 0x88ccff, level: 3 },
       ],
       passives: PASSIVES.map((passive) => [
         passive.id as ResultPayload['build']['passives'][number][0],
@@ -180,8 +181,13 @@ const within = (b: Box, slack: number): boolean =>
 function expectBuildAboveButton(s: Sample, passives: Box[], relics: Box[]): void {
   expect(passives).toHaveLength(PASSIVES.length);
   expect(relics).toHaveLength(RELIC_BUFFS.length);
-  expect(s.badges).toBe(PASSIVES.length + RELIC_BUFFS.length);
-  expect(s.maxBadges).toBe(PASSIVES.filter((p) => p.maxRank !== undefined).length);
+  // Each spell wears a level badge too (#326), gold MAX at level 3.
+  const spells = s.summary?.build.spells ?? [];
+  expect(s.badges).toBe(PASSIVES.length + RELIC_BUFFS.length + spells.length);
+  expect(s.maxBadges).toBe(
+    PASSIVES.filter((p) => p.maxRank !== undefined).length +
+      spells.filter((spell) => spell.level === 3).length,
+  );
   const buttonTop = s.controls?.button.y ?? 0;
   for (const face of [...passives, ...relics]) {
     expect(within(face, SLACK), JSON.stringify(face)).toBe(true);
@@ -328,8 +334,20 @@ test('pad A lights Play again, then starts exactly one SpellSelect', async ({ pa
   await waitForScene(page, SCENE.result);
   await frames(page, 4); // the first poll after a connect only takes a baseline
 
+  expect((await focusRing(page, SCENE.result)).visible, 'no ring before the pad wakes').toBe(false);
   await pressA(); // reveals the highlight
   expect(await isSceneActive(page, SCENE.result)).toBe(true);
+  // The shared focus ring (CO-196) is round the button, and the press did not confirm.
+  const ring = await focusRing(page, SCENE.result);
+  expect(ring.visible).toBe(true);
+  expect(ring.box).toEqual(RESULT_LAYOUT.button);
+  await expectRingReadable(page, SCENE.result, 'Play again');
+  // The ring's outer edge stays clear of the hint under it, with room for CI's taller fonts.
+  const controls = await page.evaluate(async (key) => {
+    const { game } = await import('/src/main.ts');
+    return (game.scene.getScene(key) as unknown as { controls: ResultControls }).controls;
+  }, SCENE.result);
+  expect(ring.outer!.y + ring.outer!.height).toBeLessThanOrEqual(controls.hint.y);
   await pressA();
   await waitForScene(page, SCENE.spellSelect);
   await frames(page, 10);
@@ -341,8 +359,9 @@ test('pad A lights Play again, then starts exactly one SpellSelect', async ({ pa
 const HOSTILE_BUILDS: readonly [string, Record<string, unknown>][] = [
   [
     'a markup spell name',
-    { spells: [{ id: 'fire', name: '<img src=x onerror=alert(1)>', color: 0 }] },
+    { spells: [{ id: 'fire', name: '<img src=x onerror=alert(1)>', color: 0, level: 1 }] },
   ],
+  ['a spell level of 4', { spells: [{ id: 'fire', name: 'Fire Bolt', color: 0, level: 4 }] }],
   ['a __proto__ passive id', { passives: [['__proto__', 1]] }],
   ['a rank of 0', { passives: [['passive_power', 0]] }],
   ['an unknown relic id', { relics: [['relic_nope', 1]] }],

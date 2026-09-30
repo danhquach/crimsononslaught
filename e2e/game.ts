@@ -5,6 +5,7 @@ import type { HudModel } from '../src/core/hudModel';
 import { AUDIO_REGISTRY_KEY, SCENE } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import type { HudScene } from '../src/scenes/HudScene';
+import type { FocusRingReport } from '../src/scenes/focusRing';
 import type { MenuRowReport } from '../src/scenes/menuUi';
 
 /**
@@ -117,6 +118,15 @@ export function menuRows(page: Page, key: string): Promise<MenuRowReport[]> {
     const { game } = await import('/src/main.ts');
     const { menuRowsOf } = await import('/src/scenes/menuUi.ts');
     return menuRowsOf(game.scene.getScene(sceneKey));
+  }, key);
+}
+
+/** The shared focus ring a scene is drawing (CO-196): where it is, and whether it shows. */
+export function focusRing(page: Page, key: string): Promise<FocusRingReport> {
+  return page.evaluate(async (sceneKey) => {
+    const { game } = await import('/src/main.ts');
+    const { focusRingOf } = await import('/src/scenes/focusRing.ts');
+    return focusRingOf(game.scene.getScene(sceneKey));
   }, key);
 }
 

@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { MAX_LIVE_AREAS } from '../src/config/fx';
-import { BASE_SWORD_STATS, LIGHTNING_ROSTER_SPELL_IDS } from '../src/config/lightningRoster';
+import {
+  BASE_SWORD_STATS,
+  LIGHTNING_ROSTER_SPELL_IDS,
+  TORNADO_LOOK,
+} from '../src/config/lightningRoster';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import { MAX_BOULDERS } from '../src/core/orbitingBoulders';
 import { SCENE } from '../src/core/scenePayloads';
@@ -165,6 +169,8 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
     expect(Math.abs((area.artRadius ?? 0) - area.radius), `tornado art size ${i}`).toBeLessThan(1);
     expect(area.artOffset, `tornado art on its ring ${i}`).toBeLessThan(1);
     expect(area.ringShown, `tornado hides the ring ${i}`).toBe(false);
+    // CO-194: the funnel is drawn at its look's alpha. It has no fade-out, so exactly that while it lives.
+    expect(area.artAlpha, `tornado art alpha ${i}`).toBeCloseTo(TORNADO_LOOK.alpha ?? 1, 5);
   }
 
   // The sword is always out: three blades on the ring from the first frame (spec §9.4 `count` 3, #305).

@@ -1,4 +1,6 @@
 import { SLOT_UNLOCK_LEVELS } from '../config/loadout';
+import { MAX_SPELL_LEVEL } from '../config/spellLevels';
+import { badgeText } from './maxRank';
 import type { LoadoutPassiveView, LoadoutSpellView, RunEvent, RunPhase } from './runEvents';
 
 /**
@@ -48,6 +50,10 @@ export type SlotRow =
       ready: boolean;
       waiting: number;
       badge: string | null;
+      /** #326: the spell's level, whether it is at the top one, and the text its pill reads (`1`, `2`, `MAX`). */
+      level: number;
+      maxed: boolean;
+      levelBadge: string;
     }
   | { kind: 'open' }
   | { kind: 'locked'; unlockLevel: number };
@@ -110,8 +116,9 @@ export function applyRunEvent(model: Readonly<HudModel>, event: RunEvent): HudMo
  * gets an icon for each.
  */
 export function slotRows(model: Readonly<HudModel>): SlotRow[] {
-  const rows: SlotRow[] = model.spells.map(({ id, name, color, progress, secondsLeft }) => {
+  const rows: SlotRow[] = model.spells.map(({ id, name, color, progress, secondsLeft, level }) => {
     const waiting = progress === null ? 0 : 1 - fraction(progress, 1);
+    const maxed = level >= MAX_SPELL_LEVEL;
     return {
       kind: 'spell',
       id,
@@ -122,6 +129,9 @@ export function slotRows(model: Readonly<HudModel>): SlotRow[] {
       ready: waiting === 0,
       waiting,
       badge: waiting > 0 ? cooldownBadge(secondsLeft) : null,
+      level,
+      maxed,
+      levelBadge: badgeText(level, maxed),
     };
   });
   // Row 0 is the default spell's, which is always equipped; it is only empty
@@ -169,9 +179,42 @@ export function cooldownBadge(secondsLeft: number | null): string | null {
   return String(Math.floor(secondsLeft));
 }
 
-/** The shield bar exists only while the run has a shield equipped (#134). */
-export function shieldBarVisible(model: Readonly<HudModel>): boolean {
-  return model.shieldMax > 0;
+/**
+ * CO-195: the HP bar with the shield drawn on it. The red fill is HP and the
+ * ice segment right after it is the shield, both as shares of the bar. While a
+ * shield is up the bar stands for whichever is more, max HP or HP plus the
+ * shield, so a shield on full HP shrinks the red a little rather than running
+ * off the end; as the shield drains the bar eases back to max HP, with no jump
+ * when it breaks. With no shield up the bar is HP alone.
+ */
+export interface HpBarView {
+  hp: number;
+  shield: number;
+  /** `HP 70 / 100`, or `HP 70` while a shield is up. */
+  hpText: string;
+  /** `+20` while a shield is up, drawn in the shield's colour after `hpText`; '' otherwise. */
+  shieldText: string;
+}
+
+export function hpBarView(model: Readonly<HudModel>): HpBarView {
+  const hp = Math.ceil(model.hp);
+  const up = model.shieldMax > 0 && model.shield > 0;
+  if (!up) {
+    return {
+      hp: fraction(model.hp, model.maxHp),
+      shield: 0,
+      hpText: `HP ${hp} / ${model.maxHp}`,
+      shieldText: '',
+    };
+  }
+  const span = Math.max(model.maxHp, Math.max(0, model.hp) + model.shield);
+  const hpShare = fraction(model.hp, span);
+  return {
+    hp: hpShare,
+    shield: Math.min(1 - hpShare, fraction(model.shield, span)),
+    hpText: `HP ${hp}`,
+    shieldText: `+${Math.ceil(model.shield)}`,
+  };
 }
 
 /** The boss bar exists only during the boss phase (ticket CO-012). */

@@ -141,6 +141,13 @@ export interface AreaLook {
    * Meteor pond); absent, the art is drawn whole until the patch expires.
    */
   readonly fadeOutS?: number;
+  /**
+   * How opaque the art is drawn while whole, in (0, 1]; absent, fully. It
+   * multiplies the `fadeOutS` fade, so a fading patch still ends at 0. A flat
+   * runtime alpha: baking it into the atlas page would cost every alpha level
+   * the page already holds.
+   */
+  readonly alpha?: number;
 }
 
 /**

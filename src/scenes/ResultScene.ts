@@ -29,11 +29,14 @@ import {
   drawStrip,
 } from './buildStrips';
 import { saveStoreFailed } from '../storage/localSave';
+import { focusable } from './focusRing';
 import { attachMenuInput } from './input';
 
 const HINT = 'click, press Enter, or gamepad A';
 const BUTTON_REST_ALPHA = 0.6;
 const BUTTON_REST_TEXT = '#dddddd';
+/** A spell's name starts this far right of its icon's centre: clear of the icon and its level badge. */
+const NAME_INSET = SPELL_ICON_SIZE / 2 + 12;
 
 /** On-screen bounds of the button and its hint, for the browser suite. */
 export interface ResultControls {
@@ -177,11 +180,11 @@ export class ResultScene extends Phaser.Scene {
       addSpellDisc(this, x, y, spell);
       if (!named) return;
       this.add
-        .text(x + SPELL_ICON_SIZE / 2 + 8, y, spell.name, {
+        .text(x + NAME_INSET, y, spell.name, {
           fontFamily: SERIF,
           fontSize: '14px',
           color: '#dddddd',
-          wordWrap: { width: SPELL_PITCH - SPELL_ICON_SIZE - 20 },
+          wordWrap: { width: SPELL_PITCH - NAME_INSET - SPELL_ICON_SIZE / 2 - 12 },
         })
         .setOrigin(0, 0.5);
     });
@@ -250,37 +253,23 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    let selected = false;
-    let hovered = false;
-    const paint = (): void => {
-      const lit = selected || hovered;
-      bar.setFillStyle(WINE, lit ? 1 : BUTTON_REST_ALPHA);
-      edge.setAlpha(lit ? 1 : 0);
-      marker.setAlpha(lit ? 1 : 0);
-      label.setColor(lit ? '#ffffff' : BUTTON_REST_TEXT);
-    };
+    // The pointer lights the bar; a pad's focus also draws the shared ring (CO-196).
+    const focus = focusable(this, box, ({ raised }) => {
+      bar.setFillStyle(WINE, raised ? 1 : BUTTON_REST_ALPHA);
+      edge.setAlpha(raised ? 1 : 0);
+      marker.setAlpha(raised ? 1 : 0);
+      label.setColor(raised ? '#ffffff' : BUTTON_REST_TEXT);
+    });
     bar.setInteractive({ useHandCursor: true });
     bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      hovered = true;
-      paint();
+      focus.setHovered(true);
       audioOf(this).play('ui.move');
     });
-    bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      hovered = false;
-      paint();
-    });
+    bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => focus.setHovered(false));
     bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.playAgain());
     // Pad A: the first press lights the button, the next one confirms it.
     // Enter is handled in `create`, so the keyboard stays off here.
-    attachMenuInput(this, [
-      {
-        setSelected: (on) => {
-          selected = on;
-          paint();
-        },
-        confirm: () => this.playAgain(),
-      },
-    ]);
+    attachMenuInput(this, [{ setSelected: focus.setFocused, confirm: () => this.playAgain() }]);
 
     const bounds = (o: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Text): Box => {
       const b = o.getBounds();

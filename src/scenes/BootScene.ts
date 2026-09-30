@@ -6,12 +6,14 @@ import {
   resolveEnemyFilter,
   resolveInvulnerable,
   resolveLoadout,
+  resolveLoadoutLevels,
   resolveStartAt,
   resolveTimeScale,
 } from '../core/runState';
 import {
   ENEMIES_REGISTRY_KEY,
   INVULNERABLE_REGISTRY_KEY,
+  LOADOUT_LEVELS_REGISTRY_KEY,
   LOADOUT_REGISTRY_KEY,
   SAVE_REGISTRY_KEY,
   SAVE_RESET_REGISTRY_KEY,
@@ -128,6 +130,12 @@ export class BootScene extends Phaser.Scene {
     const loadout = resolveLoadout(search);
     this.registry.set(LOADOUT_REGISTRY_KEY, loadout);
     if (loadout.length > 0) console.info(`[run] loadout=${loadout.join(',')}`);
+    // `?loadout=fire:3,fire_meteor:2` also sets spell levels (#326).
+    const levels = resolveLoadoutLevels(search);
+    this.registry.set(LOADOUT_LEVELS_REGISTRY_KEY, levels);
+    if (levels.length > 0) {
+      console.info(`[run] levels=${levels.map(([id, level]) => `${id}:${level}`).join(',')}`);
+    }
 
     // `?enemies=ranged` lets only those types spawn (#126), so a browser check
     // can watch one type without the crowd around it.

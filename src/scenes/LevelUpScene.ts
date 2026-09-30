@@ -1,28 +1,33 @@
 import Phaser from 'phaser';
 import {
   LEVEL_UP_EVENT,
+  cardSpellId,
   offerIndexForKey,
   type LevelUpPickPayload,
   type OfferCard,
 } from '../core/levelUp';
 import { SKIP_REROLL_BONUS } from '../config/offerActions';
+import type { ItemLook } from '../core/focusStyle';
 import type { OfferActionCounts } from '../core/offerActions';
-import { MAX_RANK_CSS, grantsMaxRank, rankLabel } from '../core/maxRank';
+import { MAX_RANK_CSS, grantsMaxRank, offerRankLabel } from '../core/maxRank';
 import { CARD_FILL, CARD_FILL_HOVER, cssColor, offerColor } from '../core/offerColors';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
+import { focusable, frameBox } from './focusRing';
 import { attachMenuInput, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
 const CARD_HEIGHT = 260;
 /**
  * CO-155: a spell card's icon band above its name — a 2x (64 px) icon and its
- * margins. An offer of spells grows every card by it; passive and relic cards
- * keep their height and layout.
+ * margins. An offer with a spell in it, a new one or an upgrade (#326), grows
+ * every card by it; a row of passive and relic cards keeps its height and layout.
  */
 const ICON_BAND = 50;
 const ICON_SCALE = 2;
+/** #326: an upgrade card's icon centre, from the card's left padding edge; clears the hotkey and the rank line. */
+const UPGRADE_ICON_INSET = 50;
 const CARD_GAP = 28;
 const CARD_PADDING = 14;
 const BACKDROP_ALPHA = 0.65;
@@ -45,8 +50,8 @@ const BAN_COLOR = 0xdc143c;
 
 /**
  * Level-up overlay: launched by Game over its own paused scene with 1–3 offer
- * cards — a new spell for an open slot, or a rank of a passive (Phase 2 spec
- * §7.1). Click a card or press its number key (1–3) to pick; the pick is
+ * cards — a new spell for an open slot, or a rank of a passive or a level of a
+ * spell you cast (Phase 2 spec §7.1, #326). Click a card or press its number key (1–3) to pick; the pick is
  * emitted as `LEVEL_UP_EVENT.pick` on the Game scene's emitter, then Game is
  * resumed and this scene stops. The HUD is a
  * separate parallel scene and stays visible throughout. A gamepad moves the
@@ -130,9 +135,10 @@ export class LevelUpScene extends Phaser.Scene {
     const n = this.cards.length;
     const rowWidth = n * CARD_WIDTH + (n - 1) * CARD_GAP;
     const firstX = (width - rowWidth) / 2 + CARD_WIDTH / 2;
-    // One offer never mixes spells and passives (spec §7.1), so the row shares one height.
+    // A new spell's offer is all spells (spec §7.1), but an upgrade (#326) can sit
+    // beside passives, so the row shares one height: the taller if any card has an icon.
     const cardHeight =
-      CARD_HEIGHT + (this.cards.some((card) => card.kind === 'active') ? ICON_BAND : 0);
+      CARD_HEIGHT + (this.cards.some((card) => cardSpellId(card) !== undefined) ? ICON_BAND : 0);
     const cardY = 160 + cardHeight / 2;
     const items = this.cards.map((card, i) =>
       this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, cardHeight, card, i + 1),
@@ -220,32 +226,29 @@ export class LevelUpScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    let selected = false;
+    // Ban mode keeps its rim while the pointer and the pad come and go.
+    let look: ItemLook = { raised: false, ring: false };
     let banning = false;
     const draw = (): void => {
-      const rim = banning ? BAN_COLOR : stroke;
       frame
-        .setFillStyle(selected && enabled ? CARD_FILL_HOVER : CARD_FILL)
-        .setStrokeStyle(selected || banning ? 4 : 2, rim);
+        .setFillStyle(look.raised && enabled ? CARD_FILL_HOVER : CARD_FILL)
+        .setStrokeStyle(look.raised || banning ? 4 : 2, banning ? BAN_COLOR : stroke);
     };
+    const focus = focusable(this, frameBox(x, BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT), (next) => {
+      look = next;
+      draw();
+    });
     if (enabled) {
       frame.setInteractive({ useHandCursor: true });
       frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-        selected = true;
-        draw();
+        focus.setHovered(true);
         audioOf(this).play('ui.move');
       });
-      frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-        selected = false;
-        draw();
-      });
+      frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => focus.setHovered(false));
       frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, confirm);
     }
     return {
-      setSelected: (on) => {
-        selected = on;
-        draw();
-      },
+      setSelected: focus.setFocused,
       // A greyed-out button does nothing, however it is reached.
       confirm: () => {
         if (enabled) confirm();
@@ -264,14 +267,19 @@ export class LevelUpScene extends Phaser.Scene {
     // CO-164: the kind's colour (a spell's element, a passive's, a relic's) on
     // the border and the kind label, at rest and under hover alike.
     const stroke = offerColor(card.kind, card.id);
-    // A spell shows its icon (CO-155) between the hotkey and its name.
+    // A spell, or an upgrade of one (#326), shows its icon (CO-155) between the
+    // hotkey and its name.
+    const spellId = cardSpellId(card);
+    // An upgrade's rank line, `Lv 3/3 · MAX`, is wide enough to run under a
+    // centred icon, so its icon sits left of it instead.
+    const iconX = card.kind === 'upgrade' ? left + UPGRADE_ICON_INSET : 0;
     const icon =
-      card.kind === 'active'
+      spellId !== undefined
         ? addSpellIcon(
             this,
-            0,
+            iconX,
             top + 40,
-            { id: card.id, name: card.name, color: card.color ?? stroke },
+            { id: spellId, name: card.name, color: card.color ?? stroke },
             ICON_SCALE,
           )
         : [];
@@ -284,7 +292,7 @@ export class LevelUpScene extends Phaser.Scene {
       color: '#888888',
     });
     const rank = this.add
-      .text(left + innerWidth, top, rankLabel(card), {
+      .text(left + innerWidth, top, offerRankLabel(card), {
         fontFamily: 'monospace',
         fontSize: '14px',
         color: grantsMaxRank(card) ? MAX_RANK_CSS : '#aaaaaa',
@@ -311,21 +319,23 @@ export class LevelUpScene extends Phaser.Scene {
 
     this.add.container(x, y, [frame, ...icon, key, rank, name, kind, description]);
 
-    // Gamepad selection reuses the hover look, so a card reads the same however
-    // it was reached.
-    const highlight = (on: boolean): void => {
-      frame.setFillStyle(on ? CARD_FILL_HOVER : CARD_FILL).setStrokeStyle(on ? 4 : 2, stroke);
-    };
+    // The pointer and the pad raise the card the same way; the pad's focus also
+    // draws the shared ring round it (CO-196).
+    const focus = focusable(this, frameBox(x, y, CARD_WIDTH, height), ({ raised }) => {
+      frame
+        .setFillStyle(raised ? CARD_FILL_HOVER : CARD_FILL)
+        .setStrokeStyle(raised ? 4 : 2, stroke);
+    });
 
     frame.setInteractive({ useHandCursor: true });
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      highlight(true);
+      focus.setHovered(true);
       audioOf(this).play('ui.move');
     });
-    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => highlight(false));
+    frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => focus.setHovered(false));
     frame.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.choose(card));
 
-    return { setSelected: highlight, confirm: () => this.choose(card) };
+    return { setSelected: focus.setFocused, confirm: () => this.choose(card) };
   }
 
   /** A card chosen: banned in ban mode, else picked. */
@@ -371,4 +381,5 @@ const KIND_LABEL: Readonly<Record<OfferCard['kind'], string>> = {
   passive: 'Passive',
   relic: 'Relic',
   charge: 'Charge',
+  upgrade: 'Spell upgrade',
 };

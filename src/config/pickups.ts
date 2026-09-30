@@ -124,6 +124,24 @@ export const RELIC_PLACEMENT = {
   maxAttempts: 1000,
 } as const;
 
+/**
+ * CO-194: a consumable that blinks a flat tint while it lies on the floor, so
+ * it stands out from the ground under it: every `periodMs` of run time it shows
+ * `color` for the first `onMs`. Only the kinds named here blink. A tint, never a
+ * scale or an alpha pulse: Arcade resizes a body with its scale, and a dimmer
+ * pickup is the opposite of the goal.
+ */
+export interface FlashRule {
+  readonly periodMs: number;
+  readonly onMs: number;
+  readonly color: number;
+}
+
+/** The bomb blinks white, the way an enemy does when hit (`HIT_FLASH_TINT`); the rest do not. */
+export const PICKUP_FLASH: Readonly<Partial<Record<ConsumableKind, FlashRule>>> = {
+  bomb: { periodMs: 900, onMs: 140, color: 0xffffff },
+};
+
 /** Each kind's placeholder look (`config/colors.ts`); real art comes later. */
 export const PICKUP_TEXTURES: Readonly<Record<Exclude<PickupKind, 'consumable'>, TextureKey>> = {
   ember: 'pickup_ember',

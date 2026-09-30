@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { MENU_ART } from '../config/menuArt';
 import { rowLook, type RowLook, type RowText } from '../core/menuStyle';
 import { audioOf } from '../render/audio';
+import { focusRing } from './focusRing';
 import { CRIMSON, CRIMSON_CSS, SERIF, WINE, drawStrip } from './buildStrips';
 import type { MenuItem } from './input';
 
@@ -9,8 +10,8 @@ import type { MenuItem } from './input';
  * The menu screens' shared look (CO-191): the painted backdrop, the crimson
  * title, the rows, the framed panels and the hint line. Intro, Settings,
  * Profile, Help, Upgrades and SpellSelect draw with these, so a tweak lands on
- * every one of them. A row is drawn like Pause's rows (`PauseScene.addRow`
- * keeps its own copy of the bar look until it moves here, #323).
+ * every one of them, Pause's rows and buttons included. A focused row also wears
+ * the shared focus ring (CO-196, `focusRing.ts`).
  */
 
 /** The title face for the front door, with the serif behind it while the font loads. */
@@ -112,6 +113,8 @@ export interface MenuRowSpec {
   onConfirm: () => void;
   /** A bar's label stays left with a ▶ before it, as Pause's menu does; the default is centred. */
   align?: 'left' | 'center';
+  /** A bar's fill with nothing going on: `BUTTON_REST_ALPHA` by default, 0 for a list row. */
+  restAlpha?: number;
 }
 
 export interface MenuRow extends MenuItem {
@@ -130,6 +133,8 @@ export interface MenuRowReport {
   /** In game pixels. */
   bounds: { x: number; y: number; width: number; height: number };
   selected: boolean;
+  /** The pointer is over it. */
+  hovered: boolean;
   enabled: boolean;
   active: boolean;
   dim: boolean;
@@ -171,7 +176,7 @@ export function addMenuRow(scene: Phaser.Scene, spec: MenuRowSpec): MenuRow {
   const height = plated ? MENU_ART.plate.height : ROW_HEIGHT;
   const left = x - width / 2;
   const listed = !plated && spec.align === 'left';
-  const restAlpha = plated ? 0 : BUTTON_REST_ALPHA;
+  const restAlpha = plated ? 0 : (spec.restAlpha ?? BUTTON_REST_ALPHA);
 
   // Drawn back to front; the zone on top takes the pointer for all of it.
   let paintBody: (look: RowLook) => void;
@@ -213,10 +218,14 @@ export function addMenuRow(scene: Phaser.Scene, spec: MenuRowSpec): MenuRow {
   const showsMarker = plated || width >= MARKER_MIN_WIDTH;
 
   const state = { selected: false, hovered: false, enabled: true, active: false, dim: false };
+  const owner = {};
+  const rowBox = { x: left, y: y - height / 2, width, height };
   let shown: RowText | null = null;
   const paint = (): void => {
     const look = rowLook(state, restAlpha);
     paintBody(look);
+    if (look.focused) focusRing(scene).show(owner, rowBox);
+    else focusRing(scene).hide(owner);
     marker.setAlpha(look.lit && showsMarker ? 1 : 0);
     // Setting a colour redraws the text, so only when it changes.
     if (look.text !== shown) text.setColor(TEXT_COLOR[look.text]);
@@ -243,9 +252,10 @@ export function addMenuRow(scene: Phaser.Scene, spec: MenuRowSpec): MenuRow {
     const box = text.getBounds();
     return {
       label: text.text,
-      bounds: { x: left, y: y - height / 2, width, height },
+      bounds: { ...rowBox },
       labelBounds: { x: box.x, y: box.y, width: box.width, height: box.height },
       selected: state.selected,
+      hovered: state.hovered,
       enabled: state.enabled,
       active: state.active,
       dim: state.dim,

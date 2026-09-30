@@ -8,7 +8,8 @@ import type { Pickup } from '../src/entities/Pickup';
 import type { Player } from '../src/entities/Player';
 import type { PauseScene } from '../src/scenes/PauseScene';
 import type { PickupPool } from '../src/systems/PickupPool';
-import { collectErrors, startFromIntro, waitForScene } from './game';
+import { collectErrors, focusRing, startFromIntro, waitForScene } from './game';
+import { expectRingReadable } from './ringProbe';
 
 /**
  * CO-164 (#253) in the browser: each kind of level-up card wears its own
@@ -200,5 +201,45 @@ test('spell, passive and relic cards each wear their own border, hovered or not'
   expect(rims.filter((c) => c === SPELL_CARDS.fire.color)).toHaveLength(counts.spells);
   expect(rims.filter((c) => c === PASSIVE_COLOR)).toHaveLength(counts.passives);
   expect(rims.filter((c) => c === RELIC_COLOR)).toHaveLength(counts.relics);
+  expect(errors).toEqual([]);
+});
+
+test('the arrows put the focus ring on a card, and the pointer passing over another does not take it', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/?seed=1&timeScale=10&invulnerable=1');
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  await page.keyboard.press('1');
+  await waitForScene(page, SCENE.game);
+  const open = await waitForOverlay(page);
+  const [first, second] = open.frames;
+  if (!first || !second) throw new Error('fewer than two cards');
+  await page.mouse.move(5, 5);
+  expect((await focusRing(page, SCENE.levelUp)).visible, 'nothing focused yet').toBe(false);
+
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(async () => (await focusRing(page, SCENE.levelUp)).visible).toBe(true);
+  const ring = await focusRing(page, SCENE.levelUp);
+  expect(ring.box!.x + ring.box!.width / 2, 'ring is centred on card 0').toBe(first.x);
+  expect(ring.box!.y + ring.box!.height / 2).toBe(first.y);
+  await expectRingReadable(page, SCENE.levelUp, 'level-up card');
+  // The cards keep their kind colours; the focused one is raised like a hover.
+  await expect
+    .poll(async () => (await sample(page))?.frames.map((f) => [f.color, f.width]))
+    .toEqual(open.frames.map((_, i) => [SPELL_CARDS.fire.color, i === 0 ? 4 : 2]));
+
+  // The pointer over card 1 raises it, then leaves: card 0 keeps the ring and its raise.
+  await page.mouse.move(second.x, second.y);
+  await expect
+    .poll(async () => (await sample(page))?.frames.map((f) => f.width))
+    .toEqual(open.frames.map((_, i) => (i <= 1 ? 4 : 2)));
+  expect((await focusRing(page, SCENE.levelUp)).box).toEqual(ring.box);
+  await page.mouse.move(5, 5);
+  await expect
+    .poll(async () => (await sample(page))?.frames.map((f) => f.width))
+    .toEqual(open.frames.map((_, i) => (i === 0 ? 4 : 2)));
+  expect((await focusRing(page, SCENE.levelUp)).box).toEqual(ring.box);
   expect(errors).toEqual([]);
 });

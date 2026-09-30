@@ -25,7 +25,6 @@ import {
 } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import {
-  CRIMSON,
   CRIMSON_CSS,
   SERIF,
   SPELL_ICON_SIZE,
@@ -38,7 +37,9 @@ import {
   drawHeroStand,
   drawStrip,
 } from './buildStrips';
+import { focusable, frameBox } from './focusRing';
 import { attachMenuInput, attachNavInput, watchStartButton, type MenuItem } from './input';
+import { addMenuRow } from './menuUi';
 
 const BACKDROP_ALPHA = 0.8;
 
@@ -48,7 +49,6 @@ const PEDESTAL_Y = 180;
 const MENU_TOP = 250;
 const MENU_PITCH = 42;
 const ROW_WIDTH = 220;
-const ROW_HEIGHT = 34;
 
 /** The right column: three framed strips, the run's stats and an info line. */
 const STRIP_X = 330;
@@ -63,15 +63,13 @@ const SPELL_STRIP_HEIGHT = 96;
 /** A spell name's font sizes, tried in order until it fits. */
 const NAME_SIZES = [12, 11, 10] as const;
 const INFO_HINT = 'Point at a spell, passive or relic, or reach it with the arrows or a pad';
-/** The pad's highlight round the selected strip item. */
-const CURSOR_COLOR = 0xffffff;
 const NAV_DIRECTIONS: readonly NavDirection[] = ['up', 'down', 'left', 'right'];
 
 /** One readable item in a strip, for the pointer and the pad alike. */
 interface BuildSlot {
   x: number;
   y: number;
-  /** Its face's size, for the pad's highlight. */
+  /** Its face's size, for the focus ring's box. */
   size: number;
   /** What the info line reads for it. */
   info: string;
@@ -102,7 +100,6 @@ export class PauseScene extends Phaser.Scene {
   /** The strip item the pad has lit, if the focus is in the strips. */
   private padSlot: BuildSlot | null = null;
   private info: Phaser.GameObjects.Text | null = null;
-  private cursor: Phaser.GameObjects.Rectangle | null = null;
 
   constructor() {
     super(SCENE.pause);
@@ -117,11 +114,15 @@ export class PauseScene extends Phaser.Scene {
   get nav(): {
     focus: PauseFocus | null;
     info: string;
-    /** The pad's highlight, where it sits over a strip item; `null` while hidden. */
+    /** The centre of the strip item the pad has lit; `null` while the focus is on a menu row. */
     cursor: { x: number; y: number } | null;
   } {
-    const cursor = this.cursor?.visible ? { x: this.cursor.x, y: this.cursor.y } : null;
-    return { focus: this.focus, info: this.info?.text ?? '', cursor };
+    const slot = this.padSlot;
+    return {
+      focus: this.focus,
+      info: this.info?.text ?? '',
+      cursor: slot ? { x: slot.x, y: slot.y } : null,
+    };
   }
 
   init(data: unknown): void {
@@ -135,7 +136,6 @@ export class PauseScene extends Phaser.Scene {
     this.focus = null;
     this.padSlot = null;
     this.info = null;
-    this.cursor = null;
     if (!this.payload) {
       console.warn('[Pause] launched without a valid payload; resuming Game');
       this.resume();
@@ -177,9 +177,16 @@ export class PauseScene extends Phaser.Scene {
   private drawMenu(view: PauseView): void {
     this.drawStand(view.level);
     const items = PAUSE_ACTIONS.map((action, i) =>
-      this.addRow(STAND_X, MENU_TOP + i * MENU_PITCH, ROW_WIDTH, PAUSE_LABELS[action], () =>
-        this.choose(action, view),
-      ),
+      addMenuRow(this, {
+        kind: 'bar',
+        label: PAUSE_LABELS[action],
+        x: STAND_X,
+        y: MENU_TOP + i * MENU_PITCH,
+        width: ROW_WIDTH,
+        align: 'left',
+        restAlpha: 0,
+        onConfirm: () => this.choose(action, view),
+      }),
     );
     const hintY = MENU_TOP + PAUSE_ACTIONS.length * MENU_PITCH + 12;
     this.addHint(STAND_X, hintY, 'Esc or Start to resume');
@@ -191,17 +198,12 @@ export class PauseScene extends Phaser.Scene {
       color: '#888888',
       wordWrap: { width: STRIP_WIDTH },
     });
-    this.cursor = this.add
-      .rectangle(0, 0, TILE, TILE)
-      .setStrokeStyle(2, CURSOR_COLOR)
-      .setVisible(false);
 
     const rows = [
       this.drawSpells(view.spells, 28),
       ...this.drawTiles('Passives', view.passives, 136, (x, y, tile) => this.addTile(x, y, tile)),
       ...this.drawTiles('Relics', view.relics, 268, (x, y, tile) => this.addGem(x, y, tile)),
     ].filter((row) => row.length > 0);
-    this.children.bringToTop(this.cursor);
     this.add.text(STRIP_X, 408, statsLine(view), {
       fontFamily: 'monospace',
       fontSize: '14px',
@@ -227,9 +229,6 @@ export class PauseScene extends Phaser.Scene {
       this.padSlot?.setLit(false);
       this.padSlot = next.zone === 'build' ? (rows[next.row]?.[next.col] ?? null) : null;
       this.padSlot?.setLit(true);
-      const slot = this.padSlot;
-      this.cursor?.setVisible(slot !== null);
-      if (slot) this.cursor?.setPosition(slot.x, slot.y).setSize(slot.size + 8, slot.size + 8);
       this.showInfo(null);
     };
     attachNavInput(
@@ -274,9 +273,12 @@ export class PauseScene extends Phaser.Scene {
     const pitch = Math.min(SPELL_PITCH, room / Math.max(1, spells.length));
     return spells.map((spell, i) => {
       const x = STRIP_CONTENT_X + pitch / 2 + i * pitch;
-      const rim = addSpellDisc(this, x, cy, spell);
+      const slot = this.badgesAboveRing(() => {
+        const rim = addSpellDisc(this, x, cy, spell);
+        return this.slot(rim, x, cy, SPELL_ICON_SIZE + 6, itemInfo(spell), rim.strokeColor, 2);
+      });
       this.addFittedName(x, cy + SPELL_ICON_SIZE / 2 + 12, spell.name, pitch - 8);
-      return this.slot(rim, x, cy, SPELL_ICON_SIZE + 6, itemInfo(spell), rim.strokeColor, 2);
+      return slot;
     });
   }
 
@@ -329,19 +331,41 @@ export class PauseScene extends Phaser.Scene {
 
   /** A passive: its icon (CO-179) in a mint rim, or its lettered tile with no icon art. */
   private addTile(x: number, y: number, tile: PauseItem): BuildSlot {
-    const face = addBuildIcon(this, x, y, tile, PASSIVE_COLOR) ?? addPassiveTile(this, x, y, tile);
-    return this.slot(face, x, y, TILE + 4, itemInfo(tile), PASSIVE_COLOR);
+    return this.badgesAboveRing(() => {
+      const face =
+        addBuildIcon(this, x, y, tile, PASSIVE_COLOR) ?? addPassiveTile(this, x, y, tile);
+      return this.slot(face, x, y, TILE + 4, itemInfo(tile), PASSIVE_COLOR);
+    });
   }
 
   /** A relic buff: its icon (CO-179) in a violet rim, or its lettered gem with no icon art. */
   private addGem(x: number, y: number, tile: PauseItem): BuildSlot {
-    const face = addBuildIcon(this, x, y, tile, RELIC_COLOR) ?? addRelicGem(this, x, y, tile);
-    return this.slot(face, x, y, TILE + 4, itemInfo(tile), RELIC_COLOR);
+    return this.badgesAboveRing(() => {
+      const face = addBuildIcon(this, x, y, tile, RELIC_COLOR) ?? addRelicGem(this, x, y, tile);
+      return this.slot(face, x, y, TILE + 4, itemInfo(tile), RELIC_COLOR);
+    });
+  }
+
+  /**
+   * Draws one tile with `draw`, then lifts its count badge (a pill and its text,
+   * and any letters), or a spell's level pill (#326), over the focus ring, which sits at depth 0, so the ring
+   * never clips the count or a MAX pill.
+   */
+  private badgesAboveRing(draw: () => BuildSlot): BuildSlot {
+    const before = this.children.list.length;
+    const slot = draw();
+    for (const o of this.children.list.slice(before)) {
+      if (o.type === 'Text' || o.type === 'Graphics') {
+        (o as Phaser.GameObjects.Text | Phaser.GameObjects.Graphics).setDepth(1);
+      }
+    }
+    return slot;
   }
 
   /**
    * One readable item in a strip. Pointing at it, or the pad selecting it,
-   * thickens its rim in its kind's colour and reads it on the info line.
+   * thickens its rim in its kind's colour and reads it on the info line; the
+   * pad's focus also draws the shared ring round it (CO-196).
    */
   private slot(
     face: Phaser.GameObjects.Shape,
@@ -352,30 +376,17 @@ export class PauseScene extends Phaser.Scene {
     rim: number,
     restWidth = 1,
   ): BuildSlot {
-    let hovered = false;
-    let lit = false;
-    const paint = (): void => {
-      face.setStrokeStyle(hovered || lit ? restWidth + 1 : restWidth, rim);
-    };
-    const slot: BuildSlot = {
-      x,
-      y,
-      size,
-      info,
-      setLit: (on) => {
-        lit = on;
-        paint();
-      },
-    };
+    const focus = focusable(this, frameBox(x, y, size, size), ({ raised }) => {
+      face.setStrokeStyle(raised ? restWidth + 1 : restWidth, rim);
+    });
+    const slot: BuildSlot = { x, y, size, info, setLit: focus.setFocused };
     face.setInteractive();
     face.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      hovered = true;
-      paint();
+      focus.setHovered(true);
       this.showInfo(slot);
     });
     face.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      hovered = false;
-      paint();
+      focus.setHovered(false);
       this.showInfo(null);
     });
     return slot;
@@ -396,74 +407,25 @@ export class PauseScene extends Phaser.Scene {
       .text(width / 2, 262, detail, { fontFamily: SERIF, fontSize: '17px', color: '#cccccc' })
       .setOrigin(0.5);
     const items = [
-      this.addRow(width / 2 - 80, 330, 140, 'Yes', () => this.confirmChoice(action), true),
-      this.addRow(width / 2 + 80, 330, 140, 'No', () => this.backToMenu(view), true),
+      addMenuRow(this, {
+        kind: 'bar',
+        label: 'Yes',
+        x: width / 2 - 80,
+        y: 330,
+        width: 140,
+        onConfirm: () => this.confirmChoice(action),
+      }),
+      addMenuRow(this, {
+        kind: 'bar',
+        label: 'No',
+        x: width / 2 + 80,
+        y: 330,
+        width: 140,
+        onConfirm: () => this.backToMenu(view),
+      }),
     ];
     attachMenuInput(this, items, { keyboard: true, enterDefault: 1 });
     this.addHint(width / 2, 410, 'Esc or Start to go back');
-  }
-
-  /**
-   * One menu row: a ▶ marker, its label and, when selected, a wine bar with a
-   * crimson edge. A pointer lights it too, as a pad or the arrows do. A
-   * `button` row (Yes / No) centres its label and shows its bar faintly at
-   * rest, so it reads as a button.
-   */
-  private addRow(
-    x: number,
-    y: number,
-    rowWidth: number,
-    label: string,
-    act: () => void,
-    button = false,
-  ): MenuItem {
-    const left = x - rowWidth / 2;
-    const restAlpha = button ? 0.35 : 0;
-    // The bar is the click target, so it fades by its fill: Phaser never
-    // hit-tests an object at alpha 0.
-    const bar = this.add.rectangle(x, y, rowWidth, ROW_HEIGHT, WINE, restAlpha);
-    const edge = this.add.rectangle(left + 1.5, y, 3, ROW_HEIGHT, CRIMSON).setAlpha(0);
-    const text = this.add
-      .text(button ? x : left + 32, y, label, {
-        fontFamily: SERIF,
-        fontSize: '20px',
-        color: '#bdb3a8',
-      })
-      .setOrigin(button ? 0.5 : 0, 0.5);
-    // Just left of a centred label; at the row's left for a menu row.
-    const markerX = button ? x - text.width / 2 - 20 : left + 12;
-    const marker = this.add
-      .text(markerX, y, '▶', { fontFamily: SERIF, fontSize: '14px', color: CRIMSON_CSS })
-      .setOrigin(0, 0.5)
-      .setAlpha(0);
-
-    let selected = false;
-    let hovered = false;
-    const paint = (): void => {
-      const lit = selected || hovered;
-      bar.setFillStyle(WINE, selected ? 1 : hovered ? 0.6 : restAlpha);
-      edge.setAlpha(lit ? 1 : 0);
-      marker.setAlpha(lit ? 1 : 0);
-      text.setColor(lit ? '#ffffff' : '#bdb3a8');
-    };
-    bar.setInteractive({ useHandCursor: true });
-    bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => {
-      hovered = true;
-      paint();
-      audioOf(this).play('ui.move');
-    });
-    bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => {
-      hovered = false;
-      paint();
-    });
-    bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, act);
-    return {
-      setSelected: (on) => {
-        selected = on;
-        paint();
-      },
-      confirm: act,
-    };
   }
 
   private addHint(x: number, y: number, text: string): void {

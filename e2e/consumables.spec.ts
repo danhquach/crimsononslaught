@@ -3,15 +3,19 @@ import {
   CHEST_EMBERS,
   HEAL_AMOUNT,
   MAGNET_DURATION_MS,
+  PICKUP_FLASH,
   type ConsumableKind,
 } from '../src/config/pickups';
 import { PLAYER_MAX_HP } from '../src/config/player';
 import { SOUNDS } from '../src/config/sounds';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
+import { flashOn } from '../src/core/pickups';
 import { SCENE } from '../src/core/scenePayloads';
+import type { Pickup } from '../src/entities/Pickup';
 import type { Player } from '../src/entities/Player';
 import type { EnemyPool } from '../src/systems/EnemyPool';
 import type { GemPool } from '../src/systems/GemPool';
+import type { PickupPool } from '../src/systems/PickupPool';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
 import {
@@ -44,6 +48,7 @@ const PICKED: SpellId = 'fire';
 const SAMPLE_MS = 100;
 
 type Report = GameScene['pickupReport'];
+type FlashSample = GameScene['bombFlashReport'][number];
 
 interface Sample {
   report: Report;
@@ -174,6 +179,171 @@ test('a health pickup heals, capped at the maximum, and a chest pays Embers', as
   // CO-159: each pickup asked for its own cue.
   const sounds = counts(await readSounds(page), ['pickup.health', 'pickup.chest']);
   expect(sounds).toEqual({ 'pickup.health': 2, 'pickup.chest': 1 });
+  expect(errors).toEqual([]);
+});
+
+test('a bomb on the floor blinks white and keeps its place and hitbox', async ({ page }) => {
+  const errors = collectErrors(page);
+  await startRun(page, 'timeScale=1');
+  const rule = PICKUP_FLASH.bomb;
+  if (!rule) throw new Error('the bomb has no flash rule');
+
+  // 250 px off is well outside the pickup radius, so it lies there for the whole window.
+  // A kill may drop a bomb of its own, so the test follows the one it placed: the
+  // bomb that was not on the floor before, found by where it lies.
+  const placed = await page.evaluate(
+    async ({ key }) => {
+      const { game } = await import('/src/main.ts');
+      const scene = game.scene.getScene(key) as GameScene;
+      const before = scene.bombFlashReport;
+      if (!scene.dropConsumable('bomb', 250)) return null;
+      return (
+        scene.bombFlashReport.find((b) => !before.some((o) => o.x === b.x && o.y === b.y)) ?? null
+      );
+    },
+    { key: SCENE.game },
+  );
+  if (!placed) throw new Error('the bomb was not placed');
+  const ours = (bombs: FlashSample[]) => bombs.find((b) => b.x === placed.x && b.y === placed.y);
+
+  // One evaluate per sample, so age, flag, tint and position are the same instant.
+  // Sampling goes on past the minimum until both states have been seen.
+  const trace: FlashSample[] = [];
+  const until = Date.now() + 15_000;
+  const seen = () => ({
+    on: trace.filter((s) => s.flashing).length,
+    off: trace.filter((s) => !s.flashing).length,
+  });
+  while (Date.now() < until && (trace.length < 40 || seen().on === 0 || seen().off === 0)) {
+    await answerLevelUp(page);
+    const bombs = await page.evaluate(async (key) => {
+      const { game } = await import('/src/main.ts');
+      return (game.scene.getScene(key) as GameScene).bombFlashReport;
+    }, SCENE.game);
+    const bomb = ours(bombs);
+    expect(bomb, 'the placed bomb still lies where it landed').toBeDefined();
+    trace.push(bomb as FlashSample);
+    await page.waitForTimeout(SAMPLE_MS);
+  }
+  console.log(`bomb flash: ${trace.length} samples, ${seen().on} on, ${seen().off} off`);
+
+  expect(seen().on, 'samples while flashing').toBeGreaterThan(0);
+  expect(seen().off, 'samples while not flashing').toBeGreaterThan(0);
+  const first = trace[0] as FlashSample;
+  for (const [i, s] of trace.entries()) {
+    expect(s.flashing, `flashing follows the rule at ${s.ageMs} ms (sample ${i})`).toBe(
+      flashOn(s.ageMs, rule),
+    );
+    expect(s.tinted, `the sprite is tint-filled exactly while flashing (sample ${i})`).toBe(
+      s.flashing,
+    );
+    // No scale or alpha pulse: the hitbox and the place it lies stay put.
+    expect(s.bodyRadius, `hitbox radius ${i}`).toBe(first.bodyRadius);
+    expect([s.x, s.y], `position ${i}`).toEqual([first.x, first.y]);
+    // A level-up can pause the run between two samples, so the age may hold still once.
+    if (i > 0)
+      expect(s.ageMs, `age never falls ${i}`).toBeGreaterThanOrEqual(
+        (trace[i - 1] as FlashSample).ageMs,
+      );
+  }
+  expect((trace.at(-1) as FlashSample).ageMs, 'age rises over the window').toBeGreaterThan(
+    first.ageMs,
+  );
+
+  // Taken mid-blink, it bursts in its own colours, and nothing leaves the pool still white.
+  // The bomb's own `collect` is wrapped to record, at the moment it is taken, whether it
+  // was lit and whether the tint survived. The player is put on it at the start of a lit
+  // window, so it is still lit a frame or two later when the overlap takes it, and a
+  // level-up pausing the run in between only freezes that state.
+  let touched = false;
+  const touchUntil = Date.now() + 15_000;
+  while (!touched && Date.now() < touchUntil) {
+    await answerLevelUp(page);
+    touched = await page.evaluate(
+      async ({ key, at, periodMs }) => {
+        const { game } = await import('/src/main.ts');
+        const scene = game.scene.getScene(key) as GameScene;
+        const { player, pickups } = scene as unknown as { player: Player; pickups: PickupPool };
+        const bomb = (pickups.group.getChildren() as Pickup[]).find(
+          (p) => p.active && !p.isCollected && p.x === at.x && p.y === at.y,
+        );
+        if (!bomb) throw new Error('the placed bomb left the floor untouched');
+        const frame = () =>
+          new Promise<void>((done) => {
+            const finish = () => {
+              clearTimeout(timer);
+              done();
+            };
+            const timer = setTimeout(() => {
+              scene.events.off('postupdate', finish);
+              done();
+            }, 50);
+            scene.events.once('postupdate', finish);
+          });
+        const litEarly = () => bomb.flashState.flashing && bomb.flashState.ageMs % periodMs < 40;
+        for (let i = 0; i < 90 && !litEarly(); i++) await frame();
+        if (!litEarly()) return false;
+        const record = window as unknown as { bombTaken?: { lit: boolean; tinted: boolean } };
+        const collect = bomb.collect.bind(bomb);
+        bomb.collect = () => {
+          const lit = bomb.flashState.flashing;
+          collect();
+          record.bombTaken = { lit, tinted: bomb.flashState.tinted };
+          // Back to the class's own method before the pool hands the sprite out again.
+          delete (bomb as unknown as { collect?: unknown }).collect;
+        };
+        (player.body as unknown as { reset(x: number, y: number): void }).reset(at.x, at.y);
+        return true;
+      },
+      { key: SCENE.game, at: { x: placed.x, y: placed.y }, periodMs: rule.periodMs },
+    );
+  }
+  expect(touched, 'the player was put on the lit bomb').toBe(true);
+
+  let taken: { lit: boolean; tinted: boolean } | undefined;
+  const takeUntil = Date.now() + 15_000;
+  while (!taken && Date.now() < takeUntil) {
+    await answerLevelUp(page);
+    taken = await page.evaluate(
+      () => (window as unknown as { bombTaken?: { lit: boolean; tinted: boolean } }).bombTaken,
+    );
+    if (!taken) await page.waitForTimeout(SAMPLE_MS);
+  }
+  console.log(`bomb taken: ${JSON.stringify(taken)}`);
+  expect(taken, 'the player took the placed bomb').toBeDefined();
+  expect(taken?.lit, 'it was lit the moment it was taken').toBe(true);
+  expect(taken?.tinted, 'a taken bomb bursts untinted').toBe(false);
+
+  // Once the burst is over the pooled sprite is free; a pickup dropped after it is not white.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          async ({ key, at }) => {
+            const { game } = await import('/src/main.ts');
+            const { pickups } = game.scene.getScene(key) as unknown as { pickups: PickupPool };
+            return (pickups.group.getChildren() as Pickup[]).some(
+              (p) => p.active && p.x === at.x && p.y === at.y,
+            );
+          },
+          { key: SCENE.game, at: { x: placed.x, y: placed.y } },
+        ),
+      { message: 'the taken bomb went back to the pool', timeout: 5_000 },
+    )
+    .toBe(false);
+  const whiteAfter = await page.evaluate(
+    async ({ key }) => {
+      const { game } = await import('/src/main.ts');
+      const scene = game.scene.getScene(key) as GameScene;
+      if (!scene.dropConsumable('health', 250)) throw new Error('no room to drop health');
+      const { pickups } = scene as unknown as { pickups: PickupPool };
+      return (pickups.group.getChildren() as Pickup[])
+        .filter((p) => p.active && !(p.kind === 'consumable' && p.consumableKind === 'bomb'))
+        .filter((p) => p.flashState.tinted).length;
+    },
+    { key: SCENE.game },
+  );
+  expect(whiteAfter, 'pickups tinted white that have no blink').toBe(0);
   expect(errors).toEqual([]);
 });
 

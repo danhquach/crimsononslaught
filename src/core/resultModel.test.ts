@@ -60,8 +60,8 @@ const payload: ResultPayload = {
   stats,
   build: {
     spells: [
-      { id: 'fire', name: 'Fire Bolt', color: 0xff5500 },
-      { id: 'fire_meteor', name: 'Meteor', color: 0xff8800 },
+      { id: 'fire', name: 'Fire Bolt', color: 0xff5500, level: 3 },
+      { id: 'fire_meteor', name: 'Meteor', color: 0xff8800, level: 1 },
     ],
     passives: [
       ['passive_power', 2],
@@ -78,9 +78,9 @@ const maxed: ResultPayload = {
   ...payload,
   build: {
     spells: [
-      { id: 'lightning', name: 'Lightning Bolt', color: 0xffee55 },
-      { id: 'lightning_companion', name: 'Lightning Companion', color: 0x88ccff },
-      { id: 'lightning_tornado', name: 'Tornado', color: 0x88ccff },
+      { id: 'lightning', name: 'Lightning Bolt', color: 0xffee55, level: 3 },
+      { id: 'lightning_companion', name: 'Lightning Companion', color: 0x88ccff, level: 3 },
+      { id: 'lightning_tornado', name: 'Tornado', color: 0x88ccff, level: 3 },
     ],
     passives: PASSIVES.map((p) => [p.id as PassiveId, p.maxRank ?? MAX_BUILD_COUNT] as const),
     relics: RELIC_BUFFS.map((buff) => [buff.id as RelicBuffId, MAX_BUILD_COUNT] as const),
@@ -140,6 +140,14 @@ describe('resultView', () => {
       ['Haste', 'Ha', 1],
     ]);
     expect(view.relics.map(({ name, count }) => [name, count])).toEqual([['Hourglass', 3]]);
+  });
+
+  it("carries each spell's level to the view, and the top one as maxed (#326)", () => {
+    const view = resultView(payload);
+    expect(view.spells.map(({ level, maxLevel, maxed }) => [level, maxLevel, maxed])).toEqual([
+      [3, 3, true],
+      [1, 3, false],
+    ]);
   });
 
   it('gives a maxed build every passive and relic', () => {

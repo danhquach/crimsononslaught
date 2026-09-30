@@ -1,0 +1,613 @@
+{
+  "frames": {
+    "tank.death.0": {
+      "frame": {
+        "x": 713,
+        "y": 1,
+        "w": 45,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 45,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 45,
+        "h": 42
+      }
+    },
+    "tank.death.1": {
+      "frame": {
+        "x": 759,
+        "y": 1,
+        "w": 45,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 45,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 45,
+        "h": 42
+      }
+    },
+    "tank.death.2": {
+      "frame": {
+        "x": 805,
+        "y": 1,
+        "w": 45,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 45,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 45,
+        "h": 42
+      }
+    },
+    "tank.death.3": {
+      "frame": {
+        "x": 851,
+        "y": 1,
+        "w": 45,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 45,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 45,
+        "h": 42
+      }
+    },
+    "tank.death.4": {
+      "frame": {
+        "x": 897,
+        "y": 1,
+        "w": 45,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 45,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 45,
+        "h": 42
+      }
+    },
+    "tank.death.5": {
+      "frame": {
+        "x": 943,
+        "y": 1,
+        "w": 45,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 45,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 45,
+        "h": 42
+      }
+    },
+    "tank.hurt.down.0": {
+      "frame": {
+        "x": 989,
+        "y": 1,
+        "w": 42,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 42,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 42,
+        "h": 42
+      }
+    },
+    "tank.hurt.left.0": {
+      "frame": {
+        "x": 177,
+        "y": 1,
+        "w": 29,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 29,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 29,
+        "h": 44
+      }
+    },
+    "tank.hurt.right.0": {
+      "frame": {
+        "x": 207,
+        "y": 1,
+        "w": 30,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 30,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 30,
+        "h": 44
+      }
+    },
+    "tank.hurt.up.0": {
+      "frame": {
+        "x": 238,
+        "y": 1,
+        "w": 42,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 42,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 42,
+        "h": 44
+      }
+    },
+    "tank.spawn.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 43,
+        "h": 47
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 43,
+        "h": 47
+      },
+      "sourceSize": {
+        "w": 43,
+        "h": 47
+      }
+    },
+    "tank.spawn.1": {
+      "frame": {
+        "x": 45,
+        "y": 1,
+        "w": 43,
+        "h": 47
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 43,
+        "h": 47
+      },
+      "sourceSize": {
+        "w": 43,
+        "h": 47
+      }
+    },
+    "tank.spawn.2": {
+      "frame": {
+        "x": 89,
+        "y": 1,
+        "w": 43,
+        "h": 47
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 43,
+        "h": 47
+      },
+      "sourceSize": {
+        "w": 43,
+        "h": 47
+      }
+    },
+    "tank.spawn.3": {
+      "frame": {
+        "x": 133,
+        "y": 1,
+        "w": 43,
+        "h": 47
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 43,
+        "h": 47
+      },
+      "sourceSize": {
+        "w": 43,
+        "h": 47
+      }
+    },
+    "tank.walk.down.0": {
+      "frame": {
+        "x": 1032,
+        "y": 1,
+        "w": 41,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 42
+      }
+    },
+    "tank.walk.down.1": {
+      "frame": {
+        "x": 1074,
+        "y": 1,
+        "w": 41,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 42
+      }
+    },
+    "tank.walk.down.2": {
+      "frame": {
+        "x": 1116,
+        "y": 1,
+        "w": 41,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 42
+      }
+    },
+    "tank.walk.down.3": {
+      "frame": {
+        "x": 1158,
+        "y": 1,
+        "w": 41,
+        "h": 42
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 42
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 42
+      }
+    },
+    "tank.walk.left.0": {
+      "frame": {
+        "x": 449,
+        "y": 1,
+        "w": 32,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 43
+      }
+    },
+    "tank.walk.left.1": {
+      "frame": {
+        "x": 482,
+        "y": 1,
+        "w": 32,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 43
+      }
+    },
+    "tank.walk.left.2": {
+      "frame": {
+        "x": 515,
+        "y": 1,
+        "w": 32,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 43
+      }
+    },
+    "tank.walk.left.3": {
+      "frame": {
+        "x": 548,
+        "y": 1,
+        "w": 32,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 43
+      }
+    },
+    "tank.walk.right.0": {
+      "frame": {
+        "x": 581,
+        "y": 1,
+        "w": 32,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 43
+      }
+    },
+    "tank.walk.right.1": {
+      "frame": {
+        "x": 614,
+        "y": 1,
+        "w": 32,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 43
+      }
+    },
+    "tank.walk.right.2": {
+      "frame": {
+        "x": 647,
+        "y": 1,
+        "w": 32,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 43
+      }
+    },
+    "tank.walk.right.3": {
+      "frame": {
+        "x": 680,
+        "y": 1,
+        "w": 32,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 43
+      }
+    },
+    "tank.walk.up.0": {
+      "frame": {
+        "x": 281,
+        "y": 1,
+        "w": 41,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 44
+      }
+    },
+    "tank.walk.up.1": {
+      "frame": {
+        "x": 323,
+        "y": 1,
+        "w": 41,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 44
+      }
+    },
+    "tank.walk.up.2": {
+      "frame": {
+        "x": 365,
+        "y": 1,
+        "w": 41,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 44
+      }
+    },
+    "tank.walk.up.3": {
+      "frame": {
+        "x": 407,
+        "y": 1,
+        "w": 41,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 41,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 41,
+        "h": 44
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 64
+    },
+    "scale": "1"
+  }
+}

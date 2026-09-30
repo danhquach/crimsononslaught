@@ -137,7 +137,7 @@ describe('area looks (#179)', () => {
 
   // #220: Earthquake's fissures are its whole look; since CO-153 Tornado's funnel is too.
   it('draws Tornado as its funnel and Earthquake as its fissures, both without the ring', () => {
-    expect(TORNADO_LOOK).toEqual({ clip: 'lightning.tornado', ringless: true });
+    expect(TORNADO_LOOK).toEqual({ clip: 'lightning.tornado', ringless: true, alpha: 0.6 });
     expect(AREA_LOOKS.earth_quake).toEqual({ clip: 'earth.quakeRift', ringless: true });
   });
 });

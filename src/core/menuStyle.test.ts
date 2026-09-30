@@ -12,18 +12,23 @@ const idle: RowState = {
 
 describe('rowLook', () => {
   it('shows nothing lit at rest, and the button fill when given one', () => {
-    expect(rowLook(idle)).toEqual({ lit: false, fillAlpha: 0, text: 'rest' });
+    expect(rowLook(idle)).toEqual({ lit: false, fillAlpha: 0, text: 'rest', focused: false });
     expect(rowLook(idle, 0.35).fillAlpha).toBe(0.35);
   });
 
   it('lights a selected row over a hovered one', () => {
     const selected = rowLook({ ...idle, selected: true, hovered: true });
-    expect(selected).toEqual({ lit: true, fillAlpha: 1, text: 'lit' });
+    expect(selected).toEqual({ lit: true, fillAlpha: 1, text: 'lit', focused: true });
     expect(rowLook({ ...idle, hovered: true }).fillAlpha).toBeLessThan(selected.fillAlpha);
   });
 
   it('lights a hovered row', () => {
-    expect(rowLook({ ...idle, hovered: true })).toEqual({ lit: true, fillAlpha: 0.6, text: 'lit' });
+    expect(rowLook({ ...idle, hovered: true })).toEqual({
+      lit: true,
+      fillAlpha: 0.6,
+      text: 'lit',
+      focused: false,
+    });
   });
 
   it('never lights a disabled row by the pointer, and dims its label', () => {
@@ -31,6 +36,7 @@ describe('rowLook', () => {
       lit: false,
       fillAlpha: 0,
       text: 'off',
+      focused: false,
     });
   });
 
@@ -39,6 +45,7 @@ describe('rowLook', () => {
       lit: true,
       fillAlpha: 0.6,
       text: 'off',
+      focused: true,
     });
   });
 
@@ -47,6 +54,7 @@ describe('rowLook', () => {
       lit: false,
       fillAlpha: 0.35 * 0.4,
       text: 'dim',
+      focused: false,
     });
     expect(rowLook({ ...idle, dim: true }, 0.35)).not.toEqual(rowLook(idle, 0.35));
     expect(rowLook({ ...idle, dim: true, hovered: true })).toEqual(
@@ -59,11 +67,27 @@ describe('rowLook', () => {
 
   it('marks the active row apart from a selected one', () => {
     const active = rowLook({ ...idle, active: true });
-    expect(active).toEqual({ lit: false, fillAlpha: 0.5, text: 'active' });
+    expect(active).toEqual({ lit: false, fillAlpha: 0.5, text: 'active', focused: false });
     expect(rowLook({ ...idle, active: true, selected: true })).toEqual(
       rowLook({ ...idle, selected: true }),
     );
     expect(active).not.toEqual(rowLook({ ...idle, selected: true }));
+  });
+});
+
+describe('rowLook focus', () => {
+  it('is focused when the arrows have it, whatever else the row is', () => {
+    expect(rowLook({ ...idle, selected: true }).focused).toBe(true);
+    expect(rowLook({ ...idle, selected: true, hovered: true }).focused).toBe(true);
+    expect(rowLook({ ...idle, selected: true, enabled: false }).focused).toBe(true);
+    expect(rowLook({ ...idle, selected: true, active: true, dim: true }).focused).toBe(true);
+  });
+
+  it('is not focused by the pointer, the active mark or a dim', () => {
+    expect(rowLook({ ...idle, hovered: true }).focused).toBe(false);
+    expect(rowLook({ ...idle, active: true }).focused).toBe(false);
+    expect(rowLook({ ...idle, dim: true }, 0.35).focused).toBe(false);
+    expect(rowLook({ ...idle, enabled: false, hovered: true }).focused).toBe(false);
   });
 });
 

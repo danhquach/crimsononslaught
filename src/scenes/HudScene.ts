@@ -16,19 +16,20 @@ import {
   bossBarVisible,
   formatTimer,
   fraction,
-  shieldBarVisible,
+  hpBarView,
   slotLabel,
   slotRows,
   type HudModel,
   type SlotRow,
 } from '../core/hudModel';
+import { MAX_BADGE_TEXT_CSS, MAX_RANK_CSS } from '../core/maxRank';
 import { PASSIVE_COLOR } from '../core/offerColors';
 import { onRunEvents, type LoadoutPassiveView, type RunEvent } from '../core/runEvents';
 import { SCENE } from '../core/scenePayloads';
 import { hasFrameArt } from '../render/atlas';
 import { barSlices } from '../render/barFrame';
 import { SPELL_ICON_ART_SIZE, spellIconArt } from '../render/spellIcon';
-import { addBuildIcon, addPassiveTile } from './buildStrips';
+import { CRIMSON_CSS, addBuildIcon, addPassiveTile } from './buildStrips';
 
 const MARGIN = 16;
 const BAR_WIDTH = 240;
@@ -70,6 +71,20 @@ const SLOT_BADGE_RADIUS = 8;
  * its nearest point to the icon's centre stays clear of the glyph's box.
  */
 const SLOT_BADGE_OFFSET = 15;
+/**
+ * #326: the spell's level on a pill at the rim's top right, the mirror of the
+ * cooldown badge, so the two never meet. At the top level it reads MAX on the
+ * same gold as a maxed passive's badge (#324). A slot's pitch (72 across, 62
+ * up) leaves room for the ~26 px MAX pill beside the next icon and the row
+ * above's label.
+ */
+const SLOT_LEVEL_OFFSET = 15;
+const SLOT_LEVEL_STYLE = {
+  fontFamily: 'monospace',
+  fontSize: '10px',
+  fontStyle: 'bold',
+  padding: { x: 4, y: 1 },
+} as const;
 const SLOT_LABEL_STYLE = { ...LABEL_STYLE, fontSize: '11px', strokeThickness: 3 } as const;
 const SLOT_GLYPH_STYLE = { ...LABEL_STYLE, fontSize: '13px', strokeThickness: 2 } as const;
 const SLOT_BADGE_STYLE = { ...LABEL_STYLE, fontSize: '10px', strokeThickness: 0 } as const;
@@ -78,12 +93,12 @@ const SLOT_BADGE_STYLE = { ...LABEL_STYLE, fontSize: '10px', strokeThickness: 0 
  * widest mark, the heart, hangs off their left end inside the margin, and are
  * narrower than the flat bars by that indent so every label keeps its place.
  * Each row clears the marks above it. The boss bar sits under the whole stack,
- * so the shield and XP labels never run into it.
+ * so the XP label never runs into it. CO-195: the shield is drawn on the HP
+ * bar, so the stack is HP and XP, the XP bar's mark just under the heart.
  */
 const FRAMED_X = MARGIN + 24;
 const FRAMED_WIDTH = BAR_WIDTH - 24;
-const FRAMED_SHIELD_Y = MARGIN + 31;
-const FRAMED_XP_Y = MARGIN + 54;
+const FRAMED_XP_Y = MARGIN + 32;
 const FRAMED_BOSS_Y = 96;
 const BOSS_WIDTH = 400;
 /**
@@ -114,11 +129,88 @@ const TILE_FLASH_MS = 250;
 /** How far toward white the glint row along the top of a framed fill is, 0 to 1. */
 const FILL_GLINT = 0.4;
 
+/**
+ * CO-195: a second fill right after a bar's own, and a second label right
+ * after its own in that fill's colour: the shield on the HP bar. Its rectangles
+ * span the whole trough and are scaled and moved, like the main fill.
+ */
+class Segment {
+  private readonly rects: Phaser.GameObjects.Rectangle[];
+  private readonly left: number;
+  private readonly span: number;
+  readonly label: Phaser.GameObjects.Text;
+  /** What `set` last drew, for the browser suite. */
+  shown: SegmentShown = {
+    start: 0,
+    width: 0,
+    text: '',
+    afterText: '',
+    afterRight: 0,
+    left: 0,
+    y: 0,
+  };
+
+  constructor(
+    rects: Phaser.GameObjects.Rectangle[],
+    left: number,
+    span: number,
+    label: Phaser.GameObjects.Text,
+  ) {
+    this.rects = rects;
+    this.left = left;
+    this.span = span;
+    this.label = label;
+  }
+
+  /** From `start01` of the trough, `width01` of it long; `text` beside `after`, the bar's own label. */
+  set(start01: number, width01: number, text: string, after: Phaser.GameObjects.Text): void {
+    for (const rect of this.rects) {
+      rect.setVisible(width01 > 0);
+      rect.setX(this.left + start01 * this.span).setScale(width01, 1);
+    }
+    const afterRight = after.x + after.width;
+    this.label.setText(text).setPosition(afterRight + SEGMENT_LABEL_GAP, after.y);
+    this.shown = {
+      start: start01,
+      width: width01,
+      text,
+      afterText: after.text,
+      afterRight,
+      left: this.label.x,
+      y: this.label.y,
+    };
+  }
+}
+
+/**
+ * A segment as last drawn: where it starts and how long it is, as shares of
+ * the trough; its label's text, left edge and centre line; and the bar's own
+ * label beside it, with its right edge.
+ */
+export interface SegmentShown {
+  start: number;
+  width: number;
+  text: string;
+  afterText: string;
+  afterRight: number;
+  left: number;
+  y: number;
+}
+
+/** Room between a bar's label and its segment's, a little under the monospace space. */
+const SEGMENT_LABEL_GAP = 4;
+
+function segmentLabel(scene: Phaser.Scene, color: number): Phaser.GameObjects.Text {
+  const css = `#${color.toString(16).padStart(6, '0')}`;
+  return scene.add.text(0, 0, '', { ...LABEL_STYLE, color: css }).setOrigin(0, 0.5);
+}
+
 /** Background + fill + label; `set` drives the fill by fraction so callers never touch pixels. */
 class Bar {
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly label: Phaser.GameObjects.Text;
+  private readonly segment: Segment | null = null;
 
   constructor(
     scene: Phaser.Scene,
@@ -127,12 +219,17 @@ class Bar {
     width: number,
     height: number,
     color: number,
+    segmentColor?: number,
   ) {
     this.bg = scene.add
       .rectangle(x, y, width, height, BAR_BG)
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0x555555);
     this.fill = scene.add.rectangle(x, y, width, height, color).setOrigin(0, 0);
+    if (segmentColor !== undefined) {
+      const rect = scene.add.rectangle(x, y, width, height, segmentColor).setOrigin(0, 0);
+      this.segment = new Segment([rect], x, width, segmentLabel(scene, segmentColor));
+    }
     this.label = scene.add.text(x + width + 8, y + height / 2, '', LABEL_STYLE).setOrigin(0, 0.5);
   }
 
@@ -149,6 +246,19 @@ class Bar {
   set(fraction01: number, text: string): void {
     this.fill.setScale(fraction01, 1);
     this.label.setText(text);
+  }
+
+  /**
+   * The second fill after this bar's own and its label, placed from the fill
+   * `set` just drew; only on a bar made with a `segmentColor`, which is the HP
+   * bar, never hidden.
+   */
+  setSegment(width01: number, text: string): void {
+    this.segment?.set(this.fill.scaleX, width01, text, this.label);
+  }
+
+  get segmentShown(): SegmentShown | null {
+    return this.segment?.shown ?? null;
   }
 
   setVisible(visible: boolean): void {
@@ -174,6 +284,7 @@ class FramedBar {
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly glint: Phaser.GameObjects.Rectangle;
   private readonly label: Phaser.GameObjects.Text;
+  private readonly segment: Segment | null = null;
   /** The frame's pieces and its mark: what shows of the bar with an empty fill. */
   readonly solid: readonly Phaser.GameObjects.GameObject[];
 
@@ -184,6 +295,7 @@ class FramedBar {
     width: number,
     art: BarArt,
     color: number,
+    segmentColor?: number,
   ) {
     const box = artBox(art.frame);
     const { left, top, right, bottom } = art.trough;
@@ -197,6 +309,19 @@ class FramedBar {
     this.glint = scene.add
       .rectangle(troughX, troughY, troughW, 1, towardWhite(color, FILL_GLINT))
       .setOrigin(0, 0);
+    const segmentRects =
+      segmentColor === undefined
+        ? []
+        : [
+            scene.add.rectangle(troughX, troughY, troughW, troughH, segmentColor),
+            scene.add.rectangle(
+              troughX,
+              troughY,
+              troughW,
+              1,
+              towardWhite(segmentColor, FILL_GLINT),
+            ),
+          ].map((rect) => rect.setOrigin(0, 0));
 
     const slices = barSlices(scene, art);
     const middleW = width - art.capLeft - art.capRight;
@@ -219,12 +344,24 @@ class FramedBar {
     this.label = scene.add.text(x + width + 8, y + box.h / 2, '', LABEL_STYLE).setOrigin(0, 0.5);
     this.parts = [bg, this.fill, this.glint, ...frame, mark, this.label];
     this.solid = [...frame, mark];
+    if (segmentColor !== undefined) {
+      this.segment = new Segment(segmentRects, troughX, troughW, segmentLabel(scene, segmentColor));
+    }
   }
 
   set(fraction01: number, text: string): void {
     this.fill.setScale(fraction01, 1);
     this.glint.setScale(fraction01, 1);
     this.label.setText(text);
+  }
+
+  /** As `Bar.setSegment`: the HP bar's shield, never hidden. */
+  setSegment(width01: number, text: string): void {
+    this.segment?.set(this.fill.scaleX, width01, text, this.label);
+  }
+
+  get segmentShown(): SegmentShown | null {
+    return this.segment?.shown ?? null;
   }
 
   setVisible(visible: boolean): void {
@@ -296,7 +433,8 @@ function ensureSlotTextures(scene: Phaser.Scene): void {
  * One slot icon (#213): the spell's icon art in a circle (CO-154) — or, with no
  * art for it or no atlas, its colour and its initials — with the cooldown still
  * to run drawn as a dark wedge that shrinks clockwise from 12 o'clock, the whole
- * seconds left in a badge on the rim, and a short name underneath. Ready brightens the ring. An
+ * seconds left in a badge on the rim, the spell's level (#326) on a pill opposite it,
+ * and a short name underneath. Ready brightens the ring. An
  * open slot is an empty circle; a locked one is dashed, with a lock and the
  * level that opens it. Every part is a shape or an image whose properties
  * change; nothing is redrawn.
@@ -309,7 +447,13 @@ class SlotIcon {
   private readonly glyph: Phaser.GameObjects.Text;
   private readonly badgeDisc: Phaser.GameObjects.Arc;
   private readonly badge: Phaser.GameObjects.Text;
+  private readonly levelPill: Phaser.GameObjects.Graphics;
+  private readonly levelText: Phaser.GameObjects.Text;
   private readonly label: Phaser.GameObjects.Text;
+  private x = 0;
+  private y = 0;
+  /** What the level pill was last drawn for, so a redraw waits for a change. */
+  private pillKey = '';
 
   constructor(scene: Phaser.Scene) {
     ensureSlotTextures(scene);
@@ -324,11 +468,15 @@ class SlotIcon {
       .circle(0, 0, SLOT_BADGE_RADIUS, 0x111111)
       .setStrokeStyle(1, 0xaaaaaa);
     this.badge = scene.add.text(0, 0, '', SLOT_BADGE_STYLE).setOrigin(0.5);
+    this.levelPill = scene.add.graphics();
+    this.levelText = scene.add.text(0, 0, '', SLOT_LEVEL_STYLE).setOrigin(0.5).setVisible(false);
     this.label = scene.add.text(0, 0, '', SLOT_LABEL_STYLE).setOrigin(0.5, 0);
   }
 
   /** Centre of the circle. */
   setPosition(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
     this.disc.setPosition(x, y);
     this.icon.setPosition(x, y);
     this.wedge.setPosition(x, y);
@@ -337,6 +485,14 @@ class SlotIcon {
     this.badgeDisc.setPosition(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET);
     this.badge.setPosition(x + SLOT_BADGE_OFFSET, y + SLOT_BADGE_OFFSET);
     this.label.setPosition(x, y + SLOT_RADIUS + 3);
+    this.levelText.setPosition(x + SLOT_LEVEL_OFFSET, y - SLOT_LEVEL_OFFSET);
+    this.drawLevelPill();
+  }
+
+  /** The level pill as drawn now, or `null` on a slot with no spell: what the browser suite reads. */
+  get levelBadge(): { text: string; fill: string } | null {
+    if (!this.levelText.visible) return null;
+    return { text: this.levelText.text, fill: String(this.levelText.getData('badgeFill')) };
   }
 
   set(row: Readonly<SlotRow>): void {
@@ -348,6 +504,7 @@ class SlotIcon {
     this.badge.setText(spell?.badge ?? '');
     this.badgeDisc.setVisible(spell?.badge != null);
     this.locked.setVisible(row.kind === 'locked');
+    this.setLevel(spell);
 
     // Any time still to run shows at least one step, so a spell reads ready only when it is.
     const step = spell ? Math.ceil(spell.waiting * SLOT_WEDGE_STEPS) : 0;
@@ -366,6 +523,46 @@ class SlotIcon {
     }
   }
 
+  /** Show the spell's level on its pill, redrawing the pill only when the badge changes (#326). */
+  private setLevel(spell: Extract<SlotRow, { kind: 'spell' }> | null): void {
+    this.levelText.setVisible(spell !== null);
+    if (!spell) {
+      this.levelPill.clear();
+      this.pillKey = '';
+      return;
+    }
+    const fill = spell.maxed ? MAX_RANK_CSS : CRIMSON_CSS;
+    // `set` runs every frame and `setColor` re-renders the text's texture even
+    // when the colour is the same, so only a change reaches it.
+    if (this.levelText.getData('badgeFill') !== fill) {
+      this.levelText
+        .setColor(spell.maxed ? MAX_BADGE_TEXT_CSS : '#ffffff')
+        .setData('badgeFill', fill);
+    }
+    this.levelText.setText(spell.levelBadge);
+    this.drawLevelPill();
+  }
+
+  /** The pill under the level text, sized to its padded box; skipped while nothing about it changed. */
+  private drawLevelPill(): void {
+    if (!this.levelText.visible) return;
+    const fill = String(this.levelText.getData('badgeFill'));
+    const key = `${this.levelText.text}|${fill}|${this.x}|${this.y}`;
+    if (key === this.pillKey) return;
+    this.pillKey = key;
+    const { width, height } = this.levelText;
+    this.levelPill
+      .clear()
+      .fillStyle(Phaser.Display.Color.HexStringToColor(fill).color)
+      .fillRoundedRect(
+        this.x + SLOT_LEVEL_OFFSET - width / 2,
+        this.y - SLOT_LEVEL_OFFSET - height / 2,
+        width,
+        height,
+        height / 2,
+      );
+  }
+
   /** Point the icon at `frame`'s art box, or hide it; unchanged frames are left alone. */
   private showIcon(frame: FrameName | null): void {
     this.icon.setVisible(frame !== null);
@@ -376,11 +573,11 @@ class SlotIcon {
 }
 
 /**
- * HUD overlay: timer, HP bar, shield bar, XP bar + level, kill and Ember
- * counts, boss HP bar, the loadout's slot icons and the passives held.
+ * HUD overlay: timer, HP bar, XP bar + level, kill and Ember counts, boss HP
+ * bar, the loadout's slot icons and the passives held.
  *
- * The shield bar (#134) sits under HP and is drawn only while the run has a
- * shield equipped, so a run without one reads exactly as it did before. The
+ * The shield pool (#134) is drawn on the HP bar (CO-195): an ice segment after
+ * the red and its number after the HP label, while a shield is up. The
  * slot icons (#144, #213) run along the bottom-left corner, one per spell
  * casting and one per slot still empty. The top-right corner (CO-193) is a
  * plate with the Kills and Embers counts and, under it, one tile per passive
@@ -397,7 +594,6 @@ export class HudScene extends Phaser.Scene {
   private killsText!: Phaser.GameObjects.Text;
   private embersText!: Phaser.GameObjects.Text;
   private hpBar!: Bar | FramedBar;
-  private shieldBar!: Bar | FramedBar;
   private xpBar!: Bar | FramedBar;
   private bossBar!: Bar | FramedBar;
   private look: 'art' | 'flat' = 'flat';
@@ -426,6 +622,24 @@ export class HudScene extends Phaser.Scene {
    */
   get barLook(): 'art' | 'flat' {
     return this.look;
+  }
+
+  /**
+   * Test hook (#326): the level pill on every slot casting a spell, in slot
+   * order — the level, whether it is the top one, the text on the pill and the
+   * colour under it.
+   */
+  get slotLevels(): { id: string; level: number; maxed: boolean; text: string; fill: string }[] {
+    return slotRows(this.model).flatMap((row, index) => {
+      const pill = this.slotIcons[index]?.levelBadge;
+      if (row.kind !== 'spell' || !pill) return [];
+      return [{ id: row.id, level: row.level, maxed: row.maxed, ...pill }];
+    });
+  }
+
+  /** CO-195: the HP bar's red and shield segment, and both labels, as last drawn; the browser suite reads it. */
+  get hpBarShown(): SegmentShown | null {
+    return this.hpBar.segmentShown;
   }
 
   /** The passive tiles on screen, in the order taken; the browser suite reads them. */
@@ -465,13 +679,13 @@ export class HudScene extends Phaser.Scene {
     );
     this.look = art ? 'art' : 'flat';
     if (art) {
-      this.hpBar = new FramedBar(this, FRAMED_X, MARGIN, FRAMED_WIDTH, BAR_ART.hp, HP_COLOR);
-      this.shieldBar = new FramedBar(
+      this.hpBar = new FramedBar(
         this,
         FRAMED_X,
-        FRAMED_SHIELD_Y,
+        MARGIN,
         FRAMED_WIDTH,
-        BAR_ART.shield,
+        BAR_ART.hp,
+        HP_COLOR,
         SHIELD_COLOR,
       );
       this.xpBar = new FramedBar(this, FRAMED_X, FRAMED_XP_Y, FRAMED_WIDTH, BAR_ART.xp, XP_COLOR);
@@ -484,9 +698,8 @@ export class HudScene extends Phaser.Scene {
         BOSS_COLOR,
       );
     } else {
-      this.hpBar = new Bar(this, MARGIN, MARGIN, BAR_WIDTH, 18, HP_COLOR);
-      this.shieldBar = new Bar(this, MARGIN, MARGIN + 22, BAR_WIDTH, 8, SHIELD_COLOR);
-      this.xpBar = new Bar(this, MARGIN, MARGIN + 34, BAR_WIDTH, 10, XP_COLOR);
+      this.hpBar = new Bar(this, MARGIN, MARGIN, BAR_WIDTH, 18, HP_COLOR, SHIELD_COLOR);
+      this.xpBar = new Bar(this, MARGIN, MARGIN + 22, BAR_WIDTH, 10, XP_COLOR);
       this.bossBar = new Bar(this, width / 2 - 200, 56, 400, 14, BOSS_COLOR);
     }
     this.timerText = this.add
@@ -564,9 +777,9 @@ export class HudScene extends Phaser.Scene {
   private render(): void {
     const m = this.model;
     this.timerText.setText(formatTimer(m.elapsedMs));
-    this.hpBar.set(fraction(m.hp, m.maxHp), `HP ${Math.ceil(m.hp)} / ${m.maxHp}`);
-    this.shieldBar.setVisible(shieldBarVisible(m));
-    this.shieldBar.set(fraction(m.shield, m.shieldMax), `Shield ${Math.ceil(m.shield)}`);
+    const hp = hpBarView(m);
+    this.hpBar.set(hp.hp, hp.hpText);
+    this.hpBar.setSegment(hp.shield, hp.shieldText);
     this.xpBar.set(fraction(m.xp, m.xpToNext), `Lv ${m.level}`);
     const counts = cornerCounts(m, this.iconed);
     this.killsText.setText(counts.kills);

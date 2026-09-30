@@ -11,6 +11,12 @@ import {
 import { UPGRADES } from '../config/meta';
 import { PASSIVES, passiveById, type PassiveId, type PlayerProfile } from '../config/passives';
 import { RELIC_BUFFS, relicBuffById, type RelicBuffId } from '../config/relics';
+import {
+  MAX_SPELL_LEVEL,
+  isSpellLevel,
+  validateSpellLevels,
+  type SpellLevel,
+} from '../config/spellLevels';
 import { resolveProfile, validatePassives } from './playerProfile';
 
 /**
@@ -50,6 +56,12 @@ export interface Loadout {
    * upgrades and passives in `profileOf`.
    */
   readonly relics: ReadonlyMap<RelicBuffId, number>;
+  /**
+   * Spell id -> level this run has taken it to (#326). A spell with no entry is
+   * at level 1, which is what an equip gives; only upgrades and the test switch
+   * write here.
+   */
+  readonly spellLevels: ReadonlyMap<RosterSpellId, SpellLevel>;
 }
 
 /** Why an equip was refused (spec §3.1, §3.2). */
@@ -75,6 +87,7 @@ export function buildLoadout(
     passives: new Map(),
     upgrades,
     relics: new Map(),
+    spellLevels: new Map(),
   };
 }
 
@@ -180,6 +193,46 @@ export function takeRelic(loadout: Loadout, buffId: RelicBuffId): Loadout {
   return { ...loadout, relics };
 }
 
+/** The level a spell below the top one moves to. */
+const NEXT_LEVEL: Readonly<Record<1 | 2, SpellLevel>> = { 1: 2, 2: 3 };
+
+/** The level of `id` this run holds: 1 until it is upgraded (#326). */
+export function spellLevel(loadout: Loadout, id: RosterSpellId): SpellLevel {
+  return loadout.spellLevels.get(id) ?? 1;
+}
+
+/** False once a spell is at `MAX_SPELL_LEVEL`. */
+export function canUpgradeSpell(loadout: Loadout, id: RosterSpellId): boolean {
+  return spellLevel(loadout, id) < MAX_SPELL_LEVEL;
+}
+
+/**
+ * Take a spell up one level, returning a new loadout. Throws on an unknown id
+ * or a spell already at `MAX_SPELL_LEVEL`, like `takePassive`: the offer only
+ * draws spells below the cap, so reaching here is a caller bug.
+ */
+export function upgradeSpell(loadout: Loadout, id: RosterSpellId): Loadout {
+  if (!isRosterSpellId(id)) throw new Error(`unknown spell "${id}"`);
+  const level = spellLevel(loadout, id);
+  if (level === MAX_SPELL_LEVEL) {
+    throw new RangeError(`spell "${id}" is already at level ${MAX_SPELL_LEVEL}`);
+  }
+  const spellLevels = new Map(loadout.spellLevels);
+  spellLevels.set(id, NEXT_LEVEL[level]);
+  return { ...loadout, spellLevels };
+}
+
+/**
+ * Set a spell straight to `level`, returning a new loadout: the `?loadout=`
+ * test switch's way in (#326). Throws on a level outside 1 to `MAX_SPELL_LEVEL`.
+ */
+export function withSpellLevel(loadout: Loadout, id: RosterSpellId, level: SpellLevel): Loadout {
+  if (!isSpellLevel(level)) throw new RangeError(`spell level must be 1 to ${MAX_SPELL_LEVEL}`);
+  const spellLevels = new Map(loadout.spellLevels);
+  spellLevels.set(id, level);
+  return { ...loadout, spellLevels };
+}
+
 /** What `validateLoadoutConfig` checks; each part defaults to the shipped config. */
 export interface LoadoutConfig {
   rosters?: Readonly<Record<ElementId, readonly string[]>>;
@@ -207,7 +260,8 @@ export function profileOf(loadout: Loadout): PlayerProfile {
  * problem and never throws, so a bad config logs and the game still starts:
  * every element's roster is led by its default spell and holds no spell another
  * element also claims, the slot unlock levels ascend, and the passive and relic
- * buff lists pass `validatePassives`, each buff with a positive weight. Tests
+ * buff lists pass `validatePassives`, each buff with a positive weight, and the
+ * spell level table passes `validateSpellLevels` (#326). Tests
  * pass their own config in `config`.
  */
 export function validateLoadoutConfig(config: LoadoutConfig = {}): string[] {
@@ -218,6 +272,7 @@ export function validateLoadoutConfig(config: LoadoutConfig = {}): string[] {
   const problems: string[] = [
     ...validatePassives(),
     ...validatePassives(RELIC_BUFFS).map((p) => p.replace(/passive /, 'relic buff ')),
+    ...validateSpellLevels(),
   ];
   for (const buff of RELIC_BUFFS) {
     if (!Number.isFinite(buff.weight) || buff.weight <= 0) {

@@ -19,7 +19,9 @@ import {
   gateTestSwitches,
   resolveInvulnerable,
   resolveEnemyFilter,
+  parseLoadoutSwitch,
   resolveLoadout,
+  resolveLoadoutLevels,
   resolveStartAt,
   resolveTimeScale,
   simulationSteps,
@@ -552,6 +554,103 @@ describe('resolveLoadout hardening (#316)', () => {
   it('survives a 100 kB value and takes the first of a repeated param', () => {
     expect(resolveLoadout(`?loadout=${'a'.repeat(100_000)}`)).toEqual([]);
     expect(resolveLoadout('?loadout=fire&loadout=ice')).toEqual(['fire']);
+  });
+});
+
+describe('?loadout= spell levels (#326)', () => {
+  it('reads a level after a colon, and none when there is no suffix', () => {
+    expect(parseLoadoutSwitch('?loadout=fire:3,fire_meteor:2,ice')).toEqual([
+      { id: 'fire', level: 3 },
+      { id: 'fire_meteor', level: 2 },
+      { id: 'ice' },
+    ]);
+    expect(resolveLoadoutLevels('?loadout=fire:3,fire_meteor:2,ice')).toEqual([
+      ['fire', 3],
+      ['fire_meteor', 2],
+    ]);
+    expect(resolveLoadoutLevels('?loadout=fire,ice')).toEqual([]);
+    expect(resolveLoadoutLevels('')).toEqual([]);
+  });
+
+  it('keeps resolveLoadout to the ids, in order, with or without levels', () => {
+    expect(resolveLoadout('?loadout=fire:3,fire_meteor:2')).toEqual(['fire', 'fire_meteor']);
+    expect(resolveLoadout('?loadout=fire:1,%20ice:2%20')).toEqual(['fire', 'ice']);
+  });
+
+  it('accepts each level from 1 to 3', () => {
+    for (const level of [1, 2, 3]) {
+      expect(resolveLoadoutLevels(`?loadout=fire:${level}`)).toEqual([['fire', level]]);
+    }
+  });
+
+  it('drops the whole token for any suffix that is not one ASCII digit from 1 to 3', () => {
+    const bad = [
+      'fire:0',
+      'fire:4',
+      'fire:99999999999',
+      'fire:2.5',
+      'fire:-1',
+      'fire:1e3',
+      'fire:%EF%BC%92', // fullwidth 2
+      'fire:%D9%A2', // Arabic-Indic 2
+      'fire:%202',
+      'fire%20:2',
+      'fire:2:3',
+      'fire:',
+      ':2',
+      'fire:%E2%80%8B2', // zero-width space
+      'fire%E2%80%AE:2', // bidi override
+      '__proto__:2',
+      'constructor:2',
+      'water:2',
+      'FIRE:2',
+      'fire:2%00',
+      'fire:22',
+      'fire:%0A2',
+    ];
+    for (const token of bad) {
+      expect(parseLoadoutSwitch(`?loadout=${token}`), token).toEqual([]);
+      expect(resolveLoadout(`?loadout=${token},ice`), token).toEqual(['ice']);
+      expect(resolveLoadoutLevels(`?loadout=${token},ice:2`), token).toEqual([['ice', 2]]);
+    }
+  });
+
+  it('lets the first write of a spell win, with or without a level', () => {
+    expect(parseLoadoutSwitch('?loadout=fire,fire:3')).toEqual([{ id: 'fire' }]);
+    expect(parseLoadoutSwitch('?loadout=fire:2,fire:3,fire')).toEqual([{ id: 'fire', level: 2 }]);
+    // A refused repeat does not use up a place in the list.
+    expect(parseLoadoutSwitch('?loadout=fire:2,fire:9,ice:3')).toEqual([
+      { id: 'fire', level: 2 },
+      { id: 'ice', level: 3 },
+    ]);
+  });
+
+  it('caps the list and the pieces looked at, level suffixes included', () => {
+    const list = parseLoadoutSwitch(
+      `?loadout=${ROSTER_SPELL_IDS.map((id) => `${id}:3`).join(',')}`,
+    );
+    expect(list.map((entry) => entry.id)).toEqual(ROSTER_SPELL_IDS.slice(0, MAX_SWITCH_LIST));
+    expect(list.every((entry) => entry.level === 3)).toBe(true);
+    const t0 = performance.now();
+    expect(resolveLoadoutLevels(`?loadout=${'fire:3,'.repeat(400_000)}`)).toEqual([['fire', 3]]);
+    expect(performance.now() - t0).toBeLessThan(50);
+    expect(parseLoadoutSwitch(`?loadout=${'x,'.repeat(MAX_SWITCH_TOKENS)}ice:3`)).toEqual([]);
+  });
+
+  it('survives a 100 kB token, and a long digit run, in linear time', () => {
+    const t0 = performance.now();
+    expect(parseLoadoutSwitch(`?loadout=fire:${'3'.repeat(100_000)}`)).toEqual([]);
+    expect(parseLoadoutSwitch(`?loadout=${'a'.repeat(100_000)}:3`)).toEqual([]);
+    expect(parseLoadoutSwitch(`?loadout=fire${':'.repeat(100_000)}`)).toEqual([]);
+    expect(performance.now() - t0).toBeLessThan(50);
+  });
+
+  it('is stripped, levels and all, by the production gate', () => {
+    const gated = gateTestSwitches('?seed=7&loadout=fire:3,fire_meteor:2', false);
+    expect(gated).toBe('?seed=7');
+    expect(parseLoadoutSwitch(gated)).toEqual([]);
+    expect(resolveLoadoutLevels(gated)).toEqual([]);
+    expect(resolveLoadoutLevels(gateTestSwitches('?loadout=fire:3', true))).toEqual([['fire', 3]]);
   });
 });
 

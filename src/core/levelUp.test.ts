@@ -3,9 +3,13 @@ import { EMPTY_OFFER_MAX_HP_BONUS } from '../config/progression';
 import {
   LEVEL_UP_EVENT,
   MAX_OFFER_SIZE,
+  SPELL_LEVEL_CARD_PREFIX,
+  cardSpellId,
   isOfferCard,
   offerIndexForKey,
   resolveLevelUp,
+  spellIdOfLevelCard,
+  spellLevelCardId,
   type OfferCard,
 } from './levelUp';
 
@@ -145,6 +149,75 @@ describe('isOfferCard', () => {
     expect(isOfferCard({ ...valid, kind: 'perk' })).toBe(false);
     expect(isOfferCard(null)).toBe(false);
     expect(isOfferCard('passive_power')).toBe(false);
+  });
+});
+
+describe('upgrade cards (#326)', () => {
+  const upgrade = (id = 'spell_level_fire', rank = 2, maxRank = 3): OfferCard => ({
+    kind: 'upgrade',
+    id,
+    name: 'Fire Bolt',
+    description: 'Adds a bolt.',
+    rank,
+    maxRank,
+  });
+
+  it('names the card after the spell, the same for every level', () => {
+    expect(spellLevelCardId('fire_meteor')).toBe('spell_level_fire_meteor');
+    expect(spellIdOfLevelCard('spell_level_fire_meteor')).toBe('fire_meteor');
+    expect(spellIdOfLevelCard(spellLevelCardId('ice'))).toBe('ice');
+  });
+
+  it('parses only a prefix followed by a roster id', () => {
+    for (const id of [
+      'spell_level_',
+      'spell_level_water',
+      'spell_level___proto__',
+      'spell_level_constructor',
+      'spell_level_fire ',
+      'spell_level_Fire',
+      'fire',
+      'passive_power',
+      `${SPELL_LEVEL_CARD_PREFIX}${SPELL_LEVEL_CARD_PREFIX}fire`,
+    ]) {
+      expect(spellIdOfLevelCard(id), id).toBeUndefined();
+    }
+  });
+
+  it('reads the spell of an active or upgrade card, and of nothing else', () => {
+    expect(cardSpellId(active('fire_meteor'))).toBe('fire_meteor');
+    expect(cardSpellId(upgrade('spell_level_ice'))).toBe('ice');
+    expect(cardSpellId(upgrade('spell_level_water'))).toBeUndefined();
+    expect(cardSpellId(passive('passive_power'))).toBeUndefined();
+    expect(cardSpellId({ kind: 'active', id: 'not_a_spell' })).toBeUndefined();
+  });
+
+  it('accepts level 2 and level 3 upgrades, with or without a colour', () => {
+    expect(isOfferCard(upgrade())).toBe(true);
+    expect(isOfferCard(upgrade('spell_level_fire', 3, 3))).toBe(true);
+    expect(isOfferCard({ ...upgrade(), color: 0xff4500 })).toBe(true);
+  });
+
+  it('rejects an unknown or hostile spell id', () => {
+    expect(isOfferCard(upgrade('spell_level_water'))).toBe(false);
+    expect(isOfferCard(upgrade('spell_level___proto__'))).toBe(false);
+    expect(isOfferCard(upgrade('spell_fire'))).toBe(false);
+  });
+
+  it('rejects a rank outside 2 to 3, or a missing or wrong cap', () => {
+    for (const rank of [1, 0, 4, 2.5, -1, NaN, 99999999999]) {
+      expect(isOfferCard(upgrade('spell_level_fire', rank)), String(rank)).toBe(false);
+    }
+    expect(isOfferCard(upgrade('spell_level_fire', 2, 99))).toBe(false);
+    expect(isOfferCard(upgrade('spell_level_fire', 2, 2))).toBe(false);
+    expect(isOfferCard({ ...upgrade(), maxRank: undefined })).toBe(false);
+    expect(isOfferCard({ ...upgrade(), rank: undefined })).toBe(false);
+  });
+
+  it('rejects a bad colour', () => {
+    for (const color of [-1, 0x1000000, 1.5, '#ff4500', null]) {
+      expect(isOfferCard({ ...upgrade(), color }), String(color)).toBe(false);
+    }
   });
 });
 

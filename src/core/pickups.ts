@@ -8,6 +8,7 @@ import {
   MAX_LIVE_PICKUPS,
   RELIC_PLACEMENT,
   type ConsumableKind,
+  type FlashRule,
   type RegularConsumableKind,
 } from '../config/pickups';
 import type { Vec2 } from './input';
@@ -30,6 +31,16 @@ export const PICKUP_EVENT = {
   consumable: 'pickup:consumable',
   relic: 'pickup:relic',
 } as const;
+
+/**
+ * CO-194: whether a pickup that has lain `ageMs` of run time is in the "on"
+ * part of its blink: the first `onMs` of every `periodMs`, from the moment it
+ * landed. A bad rule (no period, or nothing on) never flashes.
+ */
+export function flashOn(ageMs: number, rule: FlashRule): boolean {
+  if (!(rule.periodMs > 0 && rule.onMs > 0 && ageMs >= 0)) return false;
+  return ageMs % rule.periodMs < rule.onMs;
+}
 
 /** What one regular death drops beside its gems. */
 export interface DropRoll {

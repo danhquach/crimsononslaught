@@ -37,8 +37,8 @@ const stats = {
 };
 const build: RunBuild = {
   spells: [
-    { id: 'fire', name: 'Fire Bolt', color: 0xff5500 },
-    { id: 'fire_meteor', name: 'Meteor', color: 0xff8800 },
+    { id: 'fire', name: 'Fire Bolt', color: 0xff5500, level: 3 },
+    { id: 'fire_meteor', name: 'Meteor', color: 0xff8800, level: 1 },
   ],
   passives: [
     ['passive_power', 3],
@@ -120,8 +120,24 @@ describe('isPausePayload', () => {
   const view = {
     level: 4,
     spells: [
-      { id: 'fire', name: 'Fire Bolt', color: 0xff4400, description: 'A bolt.' },
-      { id: 'ice', name: 'Ice Arrow', color: 0x66ccff, description: 'An arrow.' },
+      {
+        id: 'fire',
+        name: 'Fire Bolt',
+        color: 0xff4400,
+        description: 'A bolt.',
+        level: 3,
+        maxLevel: 3,
+        maxed: true,
+      },
+      {
+        id: 'ice',
+        name: 'Ice Arrow',
+        color: 0x66ccff,
+        description: 'An arrow.',
+        level: 1,
+        maxLevel: 3,
+        maxed: false,
+      },
     ],
     passives: [power],
     relics: [{ ...power, id: 'relic_hourglass', name: 'Hourglass', abbr: 'Ho', count: 1 }],
@@ -238,7 +254,7 @@ describe('isRunBuild', () => {
     const spells = ROSTER_SPELL_IDS.map((id) => {
       const card = ROSTER_CARDS[id];
       expect(card, id).toBeDefined();
-      return { id, name: card?.name, color: card?.color };
+      return { id, name: card?.name, color: card?.color, level: 1 };
     });
     expect(isRunBuild(withSpells(spells))).toBe(true);
   });
@@ -253,7 +269,9 @@ describe('isRunBuild', () => {
   });
 
   it('rejects ids outside the allow-lists, and repeats', () => {
-    expect(isRunBuild(withSpells([{ id: 'water', name: 'Water', color: 0 }]))).toBe(false);
+    expect(isRunBuild(withSpells([{ id: 'water', name: 'Water', color: 0, level: 1 }]))).toBe(
+      false,
+    );
     expect(isRunBuild(withSpells([build.spells[0], build.spells[0]]))).toBe(false);
     expect(isRunBuild(withPassives([['passive_nope', 1]]))).toBe(false);
     expect(isRunBuild(withPassives([['relic_hourglass', 1]]))).toBe(false);
@@ -280,7 +298,9 @@ describe('isRunBuild', () => {
     for (const id of ['__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty']) {
       expect(isRunBuild(withPassives([[id, 1]])), id).toBe(false);
       expect(isRunBuild(withRelics([[id, 1]])), id).toBe(false);
-      expect(isRunBuild(withSpells([{ id, name: 'Fire Bolt', color: 0 }])), id).toBe(false);
+      expect(isRunBuild(withSpells([{ id, name: 'Fire Bolt', color: 0, level: 1 }])), id).toBe(
+        false,
+      );
     }
     // A parsed `__proto__` key is an own property, not the prototype; the guard reads fields only.
     const parsed: unknown = JSON.parse(
@@ -289,7 +309,7 @@ describe('isRunBuild', () => {
     expect(isRunBuild(parsed)).toBe(true);
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     const parsedSpell: unknown = JSON.parse(
-      '{"spells":[{"__proto__":{"id":"fire","name":"Fire Bolt","color":0}}],"passives":[],"relics":[]}',
+      '{"spells":[{"__proto__":{"id":"fire","name":"Fire Bolt","color":0,"level":1}}],"passives":[],"relics":[]}',
     );
     expect(isRunBuild(parsedSpell)).toBe(false);
   });
@@ -317,6 +337,30 @@ describe('isRunBuild', () => {
     expect(isRunBuild('build')).toBe(false);
   });
 
+  it('accepts a spell level of 1, 2 or 3, and nothing else (#326)', () => {
+    const level = (value: unknown): unknown =>
+      withSpells([{ id: 'fire', name: 'Fire Bolt', color: 0xff5500, level: value }]);
+    for (const ok of [1, 2, 3]) expect(isRunBuild(level(ok)), String(ok)).toBe(true);
+    const hostile = [
+      0,
+      4,
+      99999999999,
+      2.5,
+      -1,
+      NaN,
+      Infinity,
+      '3',
+      null,
+      undefined,
+      { valueOf: () => 2 },
+      [2],
+    ];
+    for (const bad of hostile) expect(isRunBuild(level(bad)), String(bad)).toBe(false);
+    expect(isRunBuild(withSpells([{ id: 'fire', name: 'Fire Bolt', color: 0xff5500 }]))).toBe(
+      false,
+    );
+  });
+
   it('turns away a huge array before reading it', () => {
     const huge = Array.from({ length: 100_000 }, () => ['passive_power', 1]);
     expect(isRunBuild(withPassives(huge))).toBe(false);
@@ -327,7 +371,7 @@ describe('isRunBuild', () => {
 
   it('allows only plain ASCII spell names, and a colour in 24-bit RGB', () => {
     const spell = (name: unknown, color: unknown = 0xff5500): unknown =>
-      withSpells([{ id: 'fire', name, color }]);
+      withSpells([{ id: 'fire', name, color, level: 1 }]);
     expect(isRunBuild(spell("Sage's Fire-Bolt 2"))).toBe(true);
     expect(isRunBuild(spell('fire_meteor'))).toBe(true); // Game's fallback: the id
     for (const name of [
@@ -368,6 +412,20 @@ describe('isLevelUpPayload', () => {
     expect(isLevelUpPayload({ offer: [passive] })).toBe(true);
     expect(isLevelUpPayload({ offer: [passive, passive, passive] })).toBe(true);
     expect(isLevelUpPayload({ offer: [active, active] })).toBe(true);
+  });
+
+  it('accepts an upgrade card, and rejects one naming a spell outside the roster (#326)', () => {
+    const upgrade = {
+      kind: 'upgrade',
+      id: 'spell_level_fire',
+      name: 'Fire Bolt',
+      description: 'Adds a bolt.',
+      rank: 2,
+      maxRank: 3,
+    };
+    expect(isLevelUpPayload({ offer: [upgrade, passive] })).toBe(true);
+    expect(isLevelUpPayload({ offer: [{ ...upgrade, id: 'spell_level_water' }] })).toBe(false);
+    expect(isLevelUpPayload({ offer: [{ ...upgrade, rank: 1 }] })).toBe(false);
   });
 
   it('rejects an empty offer (Game handles that path without an overlay) and more than three', () => {

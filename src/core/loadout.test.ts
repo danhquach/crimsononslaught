@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { SLOT_UNLOCK_LEVELS, SPELLS_BY_ELEMENT, type RosterSpellId } from '../config/loadout';
 import { BASE_PLAYER_PROFILE, PROFILE_CLAMPS, type PassiveId } from '../config/passives';
 import type { RelicBuffId } from '../config/relics';
+import type { SpellLevel } from '../config/spellLevels';
 import {
   buildLoadout,
   canEquip,
   canTakePassive,
+  canUpgradeSpell,
   equip,
   equippableSpells,
   equipped,
@@ -13,10 +15,13 @@ import {
   openSlots,
   passiveRank,
   profileOf,
+  spellLevel,
   takePassive,
   takeRelic,
   unlockedSlots,
+  upgradeSpell,
   validateLoadoutConfig,
+  withSpellLevel,
   type Loadout,
 } from './loadout';
 
@@ -216,6 +221,56 @@ describe('relics (#227)', () => {
 
   it('refuses an unknown relic buff id', () => {
     expect(() => takeRelic(buildLoadout('fire'), 'nope' as RelicBuffId)).toThrow(/unknown relic/);
+  });
+});
+
+describe('spell levels (#326)', () => {
+  it('reads level 1 for every spell of a fresh loadout, and for a spell just equipped', () => {
+    const loadout = equipOrThrow(buildLoadout('fire'), 'fire_meteor', SLOT_2_LEVEL);
+    expect(loadout.spellLevels.size).toBe(0);
+    expect(spellLevel(loadout, 'fire')).toBe(1);
+    expect(spellLevel(loadout, 'fire_meteor')).toBe(1);
+    expect(canUpgradeSpell(loadout, 'fire')).toBe(true);
+  });
+
+  it('upgrades 1 -> 2 -> 3, then throws at the cap', () => {
+    let loadout = buildLoadout('fire');
+    loadout = upgradeSpell(loadout, 'fire');
+    expect(spellLevel(loadout, 'fire')).toBe(2);
+    expect(canUpgradeSpell(loadout, 'fire')).toBe(true);
+    loadout = upgradeSpell(loadout, 'fire');
+    expect(spellLevel(loadout, 'fire')).toBe(3);
+    expect(canUpgradeSpell(loadout, 'fire')).toBe(false);
+    expect(() => upgradeSpell(loadout, 'fire')).toThrow(RangeError);
+  });
+
+  it('returns a new loadout and leaves the old one at its level', () => {
+    const before = buildLoadout('fire');
+    const after = upgradeSpell(before, 'fire');
+    expect(after).not.toBe(before);
+    expect(spellLevel(before, 'fire')).toBe(1);
+    expect(before.spellLevels.size).toBe(0);
+  });
+
+  it('keeps each spell’s level to itself', () => {
+    const loadout = upgradeSpell(equipOrThrow(buildLoadout('fire'), 'fire_meteor', 2), 'fire');
+    expect(spellLevel(loadout, 'fire')).toBe(2);
+    expect(spellLevel(loadout, 'fire_meteor')).toBe(1);
+  });
+
+  it('refuses an unknown spell id', () => {
+    expect(() => upgradeSpell(buildLoadout('fire'), 'water' as RosterSpellId)).toThrow(/unknown/);
+  });
+
+  it('withSpellLevel sets a level straight, and refuses one outside 1 to 3', () => {
+    const loadout = withSpellLevel(buildLoadout('fire'), 'fire', 3);
+    expect(spellLevel(loadout, 'fire')).toBe(3);
+    for (const bad of [0, 4, 2.5, NaN, -1]) {
+      expect(
+        () => withSpellLevel(buildLoadout('fire'), 'fire', bad as SpellLevel),
+        String(bad),
+      ).toThrow(RangeError);
+    }
   });
 });
 

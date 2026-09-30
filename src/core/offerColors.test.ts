@@ -91,3 +91,19 @@ describe('cssColor', () => {
     expect(cssColor(0x00a0ff)).toBe('#00a0ff');
   });
 });
+
+describe('offerColor for a spell upgrade (#326)', () => {
+  it('wears the element colour of the spell it upgrades, never the fallback', () => {
+    expect(offerColor('upgrade', 'spell_level_ice')).toBe(SPELL_CARDS.ice.color);
+    for (const id of ROSTER_SPELL_IDS) {
+      const element = elementOf(id);
+      if (element === undefined) throw new Error(`no element for ${id}`);
+      expect(offerColor('upgrade', `spell_level_${id}`), id).toBe(SPELL_CARDS[element].color);
+      expect(offerColor('upgrade', `spell_level_${id}`)).toBe(offerColor('active', id));
+    }
+  });
+
+  it('falls back for an upgrade naming no roster spell', () => {
+    expect(offerColor('upgrade', 'spell_level_water')).toBe(FALLBACK_COLOR);
+  });
+});
