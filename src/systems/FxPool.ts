@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FX_DEPTH, MAX_LIVE_FX } from '../config/fx';
 import { ATLAS_PAGES } from '../config/frames';
+import { fxAlpha } from '../core/fx';
 import { showEffect } from '../render/animate';
 
 /** How a burst is placed: drawn at `scale`, turned by `rotation`, mirrored on `flipX`. */
@@ -61,7 +62,8 @@ export class FxPool {
       .setPosition(x, y)
       .setScale(options.scale ?? 1)
       .setRotation(options.rotation ?? 0)
-      .setFlipX(options.flipX ?? false);
+      .setFlipX(options.flipX ?? false)
+      .setAlpha(fxAlpha(clip));
     // A recycled sprite may still hold its last clip; `showEffect` restarts it.
     sprite.anims.stop();
     return showEffect(sprite, clip);
