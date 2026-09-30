@@ -25,7 +25,7 @@ import {
   type ScorchPiece,
   type TrailClock,
 } from '../core/fireTrail';
-import { explosionScale } from '../core/fx';
+import { explosionScale, fxAlpha } from '../core/fx';
 import type { Vec2 } from '../core/input';
 import { knockbackVector } from '../core/orbitingBoulders';
 import type { Rng } from '../core/rng';
@@ -52,6 +52,8 @@ const RIM_EDGE_COLOR = 0xd50000;
 const RIM_WIDTH = 12;
 /** The flame front's first frame: every frame of the clip shares its size and page. */
 const FRONT = FRAMES['fire.wave.0'];
+/** #347: the flame front's opacity at full fade, so the crowd reads through it. */
+const FRONT_ALPHA = fxAlpha('fire.wave');
 
 /** What one zone of burnt ground did (#327), updated in place while it lives. */
 export interface TrailZoneRecord {
@@ -446,7 +448,7 @@ export class FireWaveSpell extends Spell<'fire_column'> {
 
     for (const rim of rims) {
       if (rim instanceof Phaser.GameObjects.Sprite) {
-        rim.setScale(r / FIRE_WAVE_ART.radius).setAlpha(fade);
+        rim.setScale(r / FIRE_WAVE_ART.radius).setAlpha(fade * FRONT_ALPHA);
         continue;
       }
       this.strokeRim(rim, x, y, r, from, to, fade);

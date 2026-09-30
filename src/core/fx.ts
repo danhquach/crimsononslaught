@@ -4,6 +4,7 @@ import {
   CHAIN_FRAME_RATE,
   EXPLOSION_SCALE_RADIUS,
   FROST_TINT,
+  FX_ALPHA,
   LARGE_BURN_MIN_RADIUS,
   NOVA_SCALE_RADIUS,
   SPIKE_RING_SCALE_RADIUS,
@@ -36,6 +37,14 @@ export function novaScale(radius: number): number {
 /** CO-182: Frost Nova Bomb's burst is drawn at `radius / 61`, its ring's rim on the radius it reaches. */
 export function spikeRingScale(radius: number): number {
   return radius / SPIKE_RING_SCALE_RADIUS;
+}
+
+/**
+ * #347: how opaque `clip` is drawn, from `FX_ALPHA`; a clip not listed, or a
+ * name that only exists on `Object.prototype`, draws solid.
+ */
+export function fxAlpha(clip: string): number {
+  return (Object.hasOwn(FX_ALPHA, clip) ? FX_ALPHA[clip] : undefined) ?? 1;
 }
 
 /** #135: a ground area is drawn at `radius / 100`, so the ring is the patch that ticks. */

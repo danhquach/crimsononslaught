@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS, type TextureKey } from '../config/colors';
 import { ART_BOXES, type ArtBox } from '../config/frames';
-import { spinTimeScale } from '../core/fx';
+import { fxAlpha, spinTimeScale } from '../core/fx';
 import { clearClip, showClip } from '../render/animate';
 
 /** The clip a boulder plays on the ring (CO-082). */
@@ -66,6 +66,8 @@ export class Boulder extends Phaser.Physics.Arcade.Sprite {
       ? (ART_BOXES as Readonly<Record<string, ArtBox | undefined>>)[look.clip]
       : undefined;
     const shown = look.clip && art ? showClip(this, look.clip, art.w / 2) : false;
+    // #347: a listed clip (the sword) draws see-through; pooled bodies reset.
+    this.setAlpha(shown && look.clip ? fxAlpha(look.clip) : 1);
     this.drawnWidth = shown && art ? art.w : PLACEHOLDERS[look.texture].width;
     if (!shown) {
       const body = this.body as Phaser.Physics.Arcade.Body;

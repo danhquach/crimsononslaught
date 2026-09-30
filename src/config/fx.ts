@@ -117,6 +117,29 @@ export const TELEGRAPH_SCALE_RADIUS = 100;
 export const FX_DEPTH = 5;
 
 /**
+ * How opaque a clip is drawn, by clip name (#347). These clips play above the
+ * crowd (`FX_DEPTH`, or among it for the sword) with mostly solid art, so
+ * each is drawn at a flat runtime alpha and the enemies, shots and pickups
+ * under it read through: the biggest, most solid bursts go lowest. Nothing
+ * goes below 0.6, so the element colours hold, and the meteor keeps 0.75
+ * because it is the warning. A clip not listed draws solid. A flat runtime
+ * alpha, not baked into the atlas page, as `AreaLook.alpha` is; the flame
+ * front multiplies its own fade-out by it.
+ *
+ * Keyed by clip, so every caster of a clip shares it, the exploder enemy's
+ * blast (`fire.explode` in `GameScene.ts`) included.
+ */
+export const FX_ALPHA: Readonly<Record<string, number>> = {
+  'fire.explode': 0.6,
+  'ice.nova': 0.6,
+  'fire.wave': 0.6,
+  'ice.shatter': 0.75,
+  'ice.spikeRing': 0.75,
+  'fire.meteor': 0.75,
+  'lightning.sword': 0.75,
+};
+
+/**
  * Damage numbers (#125) sit above the effects and the shield aura (6), so a
  * blast never hides what it dealt.
  */

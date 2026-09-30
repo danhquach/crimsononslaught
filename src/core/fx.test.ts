@@ -8,7 +8,7 @@ import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
 import { ART_BOXES } from '../config/frames';
 import { BASE_TORNADO_STATS } from '../config/lightningRoster';
 import { BASE_METEOR_STATS } from '../config/strikes';
-import { FROST_TINT, SLOW_TINT, STUN_TINT } from '../config/fx';
+import { FROST_TINT, FX_ALPHA, SLOW_TINT, STUN_TINT } from '../config/fx';
 import {
   CHAIN_CYCLE_MS,
   areaArtScale,
@@ -20,6 +20,7 @@ import {
   fadeOutAlpha,
   flightFlipY,
   flightRotation,
+  fxAlpha,
   novaScale,
   spikeRingScale,
   spinTimeScale,
@@ -269,5 +270,24 @@ describe('chainFrame', () => {
     expect(chainFrame(CHAIN_CYCLE_MS * 3)).toBeNull();
     expect(chainFrame(-1)).toBeNull();
     expect(chainFrame(Number.NaN)).toBeNull();
+  });
+});
+
+describe('fxAlpha (#347)', () => {
+  it('reads a listed clip from the table', () => {
+    for (const [clip, alpha] of Object.entries(FX_ALPHA)) expect(fxAlpha(clip)).toBe(alpha);
+    expect(fxAlpha('fire.explode')).toBe(0.6);
+    expect(fxAlpha('lightning.sword')).toBe(0.75);
+  });
+
+  it('draws a clip not listed solid', () => {
+    expect(fxAlpha('earth.spin')).toBe(1);
+    expect(fxAlpha('lightning.impact')).toBe(1);
+  });
+
+  it('draws a prototype key solid, not as an inherited member', () => {
+    expect(fxAlpha('toString')).toBe(1);
+    expect(fxAlpha('__proto__')).toBe(1);
+    expect(fxAlpha('constructor')).toBe(1);
   });
 });

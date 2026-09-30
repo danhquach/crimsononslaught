@@ -11,6 +11,7 @@ import {
   CHAIN_FRAME_RATE,
   EXPLOSION_SCALE_RADIUS,
   LARGE_BURN_MIN_RADIUS,
+  FX_ALPHA,
   FX_DEPTH,
   MAX_LIVE_AREAS,
   MAX_LIVE_FX,
@@ -86,5 +87,14 @@ describe('fx config (CO-082)', () => {
     expect(chain).toBeDefined();
     expect(CHAIN_FRAME_COUNT).toBe(chain?.frames.length);
     expect(CHAIN_FRAME_RATE).toBe(chain?.frameRate);
+  });
+
+  it('draws only real clips, and each see-through but not faint (#347)', () => {
+    const names = new Set(ANIMATIONS.map((anim) => anim.name));
+    for (const [clip, alpha] of Object.entries(FX_ALPHA)) {
+      expect(names.has(clip), clip).toBe(true);
+      expect(alpha, clip).toBeGreaterThanOrEqual(0.6);
+      expect(alpha, clip).toBeLessThan(1);
+    }
   });
 });

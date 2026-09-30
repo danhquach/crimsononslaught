@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { METEOR_CLIP, TELEGRAPH_TEXTURE } from '../config/strikes';
 import { FX_DEPTH, MAX_LIVE_TELEGRAPHS } from '../config/fx';
-import { telegraphScale } from '../core/fx';
+import { fxAlpha, telegraphScale } from '../core/fx';
 import {
   advanceTelegraphs,
   fallPosition,
@@ -34,6 +34,8 @@ export interface MeteorView {
   /** The clip it plays, or null when the atlas did not supply it and the placeholder stands in. */
   readonly clip: string | null;
   readonly rotation: number;
+  /** The meteor's drawn opacity (#347). */
+  readonly alpha: number;
 }
 
 interface LiveTelegraph {
@@ -99,6 +101,7 @@ export class TelegraphPool {
       displayWidth: sprite.displayWidth,
       clip: animated ? METEOR_CLIP : null,
       rotation: sprite.rotation,
+      alpha: sprite.alpha,
     }));
   }
 
@@ -123,12 +126,13 @@ export class TelegraphPool {
     sprite.anims.stop();
     const animated = showEffect(sprite, METEOR_CLIP);
     if (animated) {
-      sprite.setScale(drawScale).setRotation(fallRotation());
+      sprite.setScale(drawScale).setRotation(fallRotation()).setAlpha(fxAlpha(METEOR_CLIP));
     } else {
       sprite
         .setTexture(TELEGRAPH_TEXTURE)
         .setOrigin(0.5)
         .setRotation(0)
+        .setAlpha(1)
         .setScale(telegraphScale(telegraph.radius));
     }
     this.live.push({ telegraph, sprite, onLand, animated });
