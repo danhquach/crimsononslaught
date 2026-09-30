@@ -62,6 +62,8 @@ import {
   tickMagnet,
 } from '../core/pickups';
 import { planProps } from '../core/arenaDressing';
+import { MINIMAP_EVENT, readMinimapSettings, type MinimapFrame } from '../core/minimap';
+import { MINIMAP_REFRESH_MS } from '../config/minimap';
 import { membersOf } from '../core/groundArea';
 import { scaleDamage, type WaveScale } from '../core/enemy';
 import { eliteGemCount } from '../core/elites';
@@ -132,6 +134,7 @@ import {
   ARENA_PROP_COUNT,
   ARENA_PROP_FRAMES,
   ARENA_PROP_PLACEMENT,
+  ARENA_SIZE,
 } from '../config/arena';
 import { FRAMES } from '../config/frames';
 import { ARENA_DEPTH, PROP_DEPTH } from '../config/fx';
@@ -250,8 +253,8 @@ interface EarthLevelEntry {
 }
 
 /** Arena size in pixels (spec §9). Bounded: the camera and the player stop at the edge. */
-const WORLD_WIDTH = 3000;
-const WORLD_HEIGHT = 3000;
+const WORLD_WIDTH = ARENA_SIZE.width;
+const WORLD_HEIGHT = ARENA_SIZE.height;
 
 const ARENA_FILL = 0x121212;
 const ARENA_LINE = 0x1f1f1f;
@@ -469,6 +472,10 @@ export class GameScene extends Phaser.Scene {
   /** Hit feedback (#125): the numbers, and the settings that turn the rest down. */
   private numbers!: DamageNumberPool;
   private feedback = readFeedbackSettings({});
+  /** The minimap's switches (CO-207), read from the save at start and on resume. */
+  private minimap = readMinimapSettings({});
+  /** Run ms since the last minimap snapshot; starts due, so the first frame sends one. */
+  private minimapSinceMs = MINIMAP_REFRESH_MS;
   private shake: ShakeState = NO_SHAKE;
   /** Game has queued its own pause under an overlay (see `pauseUnder`). */
   private pausing = false;
@@ -1074,6 +1081,27 @@ export class GameScene extends Phaser.Scene {
     return boss.isDying;
   }
 
+  /** Test hook (CO-207): the boss is brought in now if the run has not reached it; whether it lives. */
+  spawnBossForTest(): boolean {
+    return this.bossForTest() !== undefined;
+  }
+
+  /**
+   * Test hook (CO-207): up to `count` enemies spread on a ring round the hero,
+   * for the minimap's crowd check; the live cap stops it. Returns how many landed.
+   */
+  spawnCrowdForTest(count: number): number {
+    let landed = 0;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const radius = 300 + (i % 7) * 120;
+      const x = Math.min(WORLD_WIDTH, Math.max(0, this.player.x + Math.cos(angle) * radius));
+      const y = Math.min(WORLD_HEIGHT, Math.max(0, this.player.y + Math.sin(angle) * radius));
+      if (this.enemies.spawn('swarm', x, y)) landed += 1;
+    }
+    return landed;
+  }
+
   /** The live boss, brought in first when the run has not reached it. */
   private bossForTest(): Boss | undefined {
     const find = (): Boss | undefined =>
@@ -1205,6 +1233,8 @@ export class GameScene extends Phaser.Scene {
     // screen pauses this scene, never the track.
     this.audio.startRunMusic();
     this.feedback = readFeedbackSettings(this.save().settings);
+    this.minimap = readMinimapSettings(this.save().settings);
+    this.minimapSinceMs = MINIMAP_REFRESH_MS;
     this.shake = NO_SHAKE;
 
     this.buildArena();
@@ -1318,6 +1348,8 @@ export class GameScene extends Phaser.Scene {
       this.startButton.reset();
       // Settings opened from the pause screen (CO-192) may have changed these.
       this.feedback = readFeedbackSettings(this.save().settings);
+      this.minimap = readMinimapSettings(this.save().settings);
+      this.minimapSinceMs = MINIMAP_REFRESH_MS;
     };
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
     // Losing focus pauses too, so a run is not lost in the background. The
@@ -1383,6 +1415,36 @@ export class GameScene extends Phaser.Scene {
     // the first one rather than only after the first hit.
     this.publishShield();
     this.publishLoadout();
+    this.publishMinimap(delta);
+  }
+
+  /**
+   * CO-207: the HUD's minimap is handed a snapshot every `MINIMAP_REFRESH_MS`,
+   * not every frame, and only the layers its switches show are gathered. The
+   * HUD draws from it and hides itself while this scene is paused.
+   */
+  private publishMinimap(delta: number): void {
+    this.minimapSinceMs += delta;
+    if (this.minimapSinceMs < MINIMAP_REFRESH_MS) return;
+    this.minimapSinceMs = 0;
+    const settings = { ...this.minimap };
+    const view = this.cameras.main.worldView;
+    const enemies: number[] = [];
+    if (settings.on && settings.enemies) {
+      const boss = this.enemies.boss;
+      for (const enemy of this.enemies.live) if (enemy !== boss) enemies.push(enemy.x, enemy.y);
+    }
+    const boss = settings.on && settings.boss ? this.enemies.boss : null;
+    const frame: MinimapFrame = {
+      settings,
+      arena: ARENA_SIZE,
+      player: { x: this.player.x, y: this.player.y },
+      view: { x: view.x, y: view.y, width: view.width, height: view.height },
+      boss: boss ? { x: boss.x, y: boss.y } : null,
+      pickups: settings.on && settings.pickups ? this.pickups.floorConsumables() : [],
+      enemies,
+    };
+    this.events.emit(MINIMAP_EVENT, frame);
   }
 
   /**

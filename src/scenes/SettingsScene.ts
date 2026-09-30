@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { type FeedbackSettings } from '../config/hitFeedback';
+import { type MinimapSettings } from '../config/minimap';
 import { stepVolume } from '../core/audioMix';
 import { readFeedbackSettings, writeFeedbackSettings } from '../core/hitFeedback';
+import { readMinimapSettings, writeMinimapSettings } from '../core/minimap';
 import {
   SAVE_REGISTRY_KEY,
   SCENE,
@@ -12,6 +14,7 @@ import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { audioOf } from '../render/audio';
 import { storeSaveJson } from '../storage/localSave';
 import { attachMenuInput, watchStartButton, type MenuItem } from './input';
+import { addSwitchIcon } from './minimapHud';
 import {
   addHintLine,
   addMenuRow,
@@ -21,23 +24,32 @@ import {
   type MenuRow,
 } from './menuUi';
 
-/** The two framed groups (CO-191): where each sits and how its rows are laid out. */
-const PANEL_X = 200;
-const PANEL_WIDTH = 560;
+/**
+ * The three framed groups (CO-191, CO-207): Volume and Feedback stacked on the
+ * left, Minimap beside them, each row laid out the same way.
+ */
+const LEFT_PANEL_X = 24;
+const RIGHT_PANEL_X = 496;
+const PANEL_WIDTH = 440;
 const PANEL_HEIGHT = 172;
 const VOLUME_PANEL_Y = 76;
 const FEEDBACK_PANEL_Y = 264;
+const MINIMAP_PANEL_HEIGHT = 264;
 const PANEL_ROW_TOP = 50;
 const PANEL_ROW_PITCH = 46;
 const PANEL_PADDING = 24;
 /** The −, value and + of a volume row are centred here, right of its label. */
-const VOLUME_CONTROL_X = PANEL_X + PANEL_WIDTH - 120;
+const VOLUME_CONTROL_X = LEFT_PANEL_X + PANEL_WIDTH - 120;
 const STEP_WIDTH = 44;
 /** A list row's label starts this far in from its left edge, after the ▶ marker. */
 const LIST_INDENT = 32;
 const BACK_Y = 470;
+/** A Minimap row's icon is this wide and sits after the ▶ marker; its label starts after it, with slack for taller fonts. */
+const SWITCH_ICON_SIZE = 16;
+const SWITCH_ICON_INDENT = SWITCH_ICON_SIZE + 8;
 
 type FeedbackToggle = 'numbers' | 'hitStop' | 'shake';
+type MinimapToggle = keyof MinimapSettings;
 type VolumeChannel = 'master' | 'music';
 
 /**
@@ -59,6 +71,12 @@ export class SettingsScene extends Phaser.Scene {
   /** The pause view to go back to; `null` when opened from the main menu. */
   private returnTo: PausePayload | null = null;
   private readonly labels: (() => void)[] = [];
+  /** Each Minimap row's icon, for the browser suite. */
+  private readonly switchIcons: {
+    key: MinimapToggle;
+    icon: Phaser.GameObjects.GameObject;
+    bounds: { x: number; y: number; width: number; height: number };
+  }[] = [];
 
   constructor() {
     super(SCENE.settings);
@@ -79,6 +97,7 @@ export class SettingsScene extends Phaser.Scene {
   create(): void {
     this.leaving = false;
     this.labels.length = 0;
+    this.switchIcons.length = 0;
     const { width, height } = this.scale;
 
     if (this.returnTo) this.coverPausedRun(width, height);
@@ -118,15 +137,16 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   /**
-   * The Volume and Feedback panels with their rows, drawn apart from the
+   * The Volume, Feedback and Minimap panels with their rows, drawn apart from the
    * backdrop and the title. The pause screen (CO-192) opens this same scene
    * rather than drawing its own, so both doors show these panels.
    */
   private drawPanels(): MenuItem[] {
     const audio = audioOf(this);
     const items: MenuItem[] = [];
-    drawPanel(this, PANEL_X, VOLUME_PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT, 'Volume');
-    drawPanel(this, PANEL_X, FEEDBACK_PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT, 'Feedback');
+    drawPanel(this, LEFT_PANEL_X, VOLUME_PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT, 'Volume');
+    drawPanel(this, LEFT_PANEL_X, FEEDBACK_PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT, 'Feedback');
+    drawPanel(this, RIGHT_PANEL_X, VOLUME_PANEL_Y, PANEL_WIDTH, MINIMAP_PANEL_HEIGHT, 'Minimap');
     const rowY = (panelY: number, i: number): number =>
       panelY + PANEL_ROW_TOP + i * PANEL_ROW_PITCH;
 
@@ -137,7 +157,7 @@ export class SettingsScene extends Phaser.Scene {
     ];
     volumeRows.forEach(([channel, label], i) => {
       const y = rowY(VOLUME_PANEL_Y, i);
-      this.addLabel(y, label);
+      this.addLabel(LEFT_PANEL_X, y, label);
       const nudge = (direction: 1 | -1): void => {
         audio.setSettings({ [channel]: stepVolume(audio.settings[channel], direction) });
         audio.play('ui.move');
@@ -168,6 +188,7 @@ export class SettingsScene extends Phaser.Scene {
     // Mute: the same switch as `M`, so the label follows a key press too.
     items.push(
       this.addToggle(
+        LEFT_PANEL_X,
         rowY(VOLUME_PANEL_Y, volumeRows.length),
         'Sound',
         () => !audio.settings.muted,
@@ -183,10 +204,32 @@ export class SettingsScene extends Phaser.Scene {
     feedbackRows.forEach(([key, label], i) => {
       items.push(
         this.addToggle(
+          LEFT_PANEL_X,
           rowY(FEEDBACK_PANEL_Y, i),
           label,
           () => isOn(readFeedbackSettings(this.save.settings), key),
           () => this.toggleFeedback(key),
+        ),
+      );
+    });
+
+    // The Minimap switches (CO-207): the first hides the whole map, the rest a layer each.
+    const minimapRows: readonly (readonly [MinimapToggle, string])[] = [
+      ['on', 'Minimap'],
+      ['viewport', 'Viewport box'],
+      ['boss', 'Boss'],
+      ['pickups', 'Pickups'],
+      ['enemies', 'Enemies'],
+    ];
+    minimapRows.forEach(([key, label], i) => {
+      items.push(
+        this.addToggle(
+          RIGHT_PANEL_X,
+          rowY(VOLUME_PANEL_Y, i),
+          label,
+          () => readMinimapSettings(this.save.settings)[key],
+          () => this.toggleMinimap(key),
+          key,
         ),
       );
     });
@@ -217,9 +260,9 @@ export class SettingsScene extends Phaser.Scene {
     for (const label of this.labels) label();
   }
 
-  private addLabel(y: number, text: string): void {
+  private addLabel(panelX: number, y: number, text: string): void {
     this.add
-      .text(PANEL_X + PANEL_PADDING + LIST_INDENT, y, text, {
+      .text(panelX + PANEL_PADDING + LIST_INDENT, y, text, {
         fontFamily: 'Georgia, serif',
         fontSize: '20px',
         color: '#dddddd',
@@ -228,7 +271,14 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   /** A switch is one row across the panel reading "Label: On", so it is a single click target. */
-  private addToggle(y: number, label: string, read: () => boolean, flip: () => void): MenuRow {
+  private addToggle(
+    panelX: number,
+    y: number,
+    label: string,
+    read: () => boolean,
+    flip: () => void,
+    iconFor?: MinimapToggle,
+  ): MenuRow {
     const toggle = (): void => {
       flip();
       audioOf(this).play('ui.confirm');
@@ -237,18 +287,45 @@ export class SettingsScene extends Phaser.Scene {
     const row = addMenuRow(this, {
       kind: 'bar',
       label: `${label}: On`,
-      x: PANEL_X + PANEL_WIDTH / 2,
+      x: panelX + PANEL_WIDTH / 2,
       y,
       width: PANEL_WIDTH - PANEL_PADDING * 2,
       onConfirm: toggle,
       align: 'left',
+      indent: iconFor ? SWITCH_ICON_INDENT : 0,
     });
+    const iconX = panelX + PANEL_PADDING + LIST_INDENT + SWITCH_ICON_SIZE / 2;
+    const icon = iconFor ? addSwitchIcon(this, iconFor, iconX, y, SWITCH_ICON_SIZE) : null;
+    if (iconFor && icon) {
+      const half = SWITCH_ICON_SIZE / 2;
+      const bounds = {
+        x: iconX - half,
+        y: y - half,
+        width: SWITCH_ICON_SIZE,
+        height: SWITCH_ICON_SIZE,
+      };
+      this.switchIcons.push({ key: iconFor, icon, bounds });
+    }
     this.labels.push(() => {
       const on = read();
       row.setLabel(`${label}: ${on ? 'On' : 'Off'}`);
       row.setDim(!on);
+      icon?.setAlpha(on ? 1 : 0.45);
     });
     return row;
+  }
+
+  /** Where each Minimap row's icon is, and whether it is atlas art, for the browser suite. */
+  get switchIconReports(): {
+    key: MinimapToggle;
+    art: boolean;
+    bounds: { x: number; y: number; width: number; height: number };
+  }[] {
+    return this.switchIcons.map(({ key, icon, bounds }) => ({
+      key,
+      art: icon.type === 'Image',
+      bounds,
+    }));
   }
 
   private toggleFeedback(key: FeedbackToggle): void {
@@ -257,7 +334,18 @@ export class SettingsScene extends Phaser.Scene {
     const on = isOn(current, key);
     const next: FeedbackSettings =
       key === 'numbers' ? { ...current, numbers: !on } : { ...current, [key]: on ? 0 : 1 };
-    const updated: Save = { ...save, settings: writeFeedbackSettings(save.settings, next) };
+    this.storeSettings(writeFeedbackSettings(save.settings, next));
+  }
+
+  private toggleMinimap(key: MinimapToggle): void {
+    const settings = this.save.settings;
+    const current = readMinimapSettings(settings);
+    this.storeSettings(writeMinimapSettings(settings, { ...current, [key]: !current[key] }));
+  }
+
+  /** The registry's save and storage both take `settings`, so the change holds now and next launch. */
+  private storeSettings(settings: Save['settings']): void {
+    const updated: Save = { ...this.save, settings };
     this.registry.set(SAVE_REGISTRY_KEY, updated);
     if (!storeSaveJson(serializeSave(updated))) console.warn('[save] could not store settings');
   }

@@ -25,11 +25,13 @@ import {
 import { MAX_BADGE_TEXT_CSS, MAX_RANK_CSS } from '../core/maxRank';
 import { PASSIVE_COLOR } from '../core/offerColors';
 import { onRunEvents, type LoadoutPassiveView, type RunEvent } from '../core/runEvents';
+import { MINIMAP_EVENT, type MinimapFrame } from '../core/minimap';
 import { SCENE } from '../core/scenePayloads';
 import { hasFrameArt } from '../render/atlas';
 import { barSlices } from '../render/barFrame';
 import { SPELL_ICON_ART_SIZE, spellIconArt } from '../render/spellIcon';
 import { CRIMSON_CSS, addBuildIcon, addPassiveTile } from './buildStrips';
+import { Minimap, type MinimapReport } from './minimapHud';
 
 const MARGIN = 16;
 const BAR_WIDTH = 240;
@@ -606,6 +608,7 @@ export class HudScene extends Phaser.Scene {
   private passiveParts: Phaser.GameObjects.GameObject[] = [];
   private shownPassives: readonly LoadoutPassiveView[] = [];
   private shownTiles: readonly HudPassiveTile[] = [];
+  private minimap!: Minimap;
 
   constructor() {
     super(SCENE.hud);
@@ -645,6 +648,16 @@ export class HudScene extends Phaser.Scene {
   /** The passive tiles on screen, in the order taken; the browser suite reads them. */
   get passiveTiles(): readonly HudPassiveTile[] {
     return this.shownTiles;
+  }
+
+  /** CO-207: the minimap's box, layers and both sides of its mapping; the browser suite reads it. */
+  get minimapReport(): MinimapReport {
+    return this.minimap.report;
+  }
+
+  /** Every object the minimap is made of, so the suite can check the rest of the HUD stays clear of it. */
+  get minimapParts(): Phaser.GameObjects.GameObject[] {
+    return this.minimap.parts;
   }
 
   /** The box round everything in the top-right corner; the browser suite checks it stays in the margin. */
@@ -707,6 +720,7 @@ export class HudScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     this.createCorner(width);
     this.slotIcons = [];
+    this.minimap = new Minimap(this);
     this.render();
 
     this.subscribe();
@@ -767,6 +781,19 @@ export class HudScene extends Phaser.Scene {
   private subscribe(): void {
     const unsubscribe = onRunEvents(this.scene.get(SCENE.game).events, (e) => this.apply(e));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, unsubscribe);
+
+    // CO-207: the minimap is drawn from the run's snapshots, and hidden while the
+    // run is paused (level-up, pause, Settings); the first snapshot after a
+    // resume shows it again.
+    const game = this.scene.get(SCENE.game).events;
+    const onFrame = (frame: MinimapFrame): void => this.minimap.show(frame);
+    const onPause = (): void => this.minimap.hide();
+    game.on(MINIMAP_EVENT, onFrame);
+    game.on(Phaser.Scenes.Events.PAUSE, onPause);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      game.off(MINIMAP_EVENT, onFrame);
+      game.off(Phaser.Scenes.Events.PAUSE, onPause);
+    });
   }
 
   private apply(event: RunEvent): void {

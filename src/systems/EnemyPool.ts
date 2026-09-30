@@ -98,6 +98,12 @@ export class EnemyPool {
     return live;
   }
 
+  /** The boss while it fights: in the world and not playing its death clip (CO-207: the minimap's marker). */
+  get boss(): Boss | null {
+    const boss = this.bossSprite;
+    return boss && boss.active && !boss.isDying ? boss : null;
+  }
+
   /**
    * Step every live enemy toward `target`. Damage-over-time owed this frame —
    * burn (CO-044) and bleed (#139) — is handed to `onDamage` so the run applies

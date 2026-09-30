@@ -1118,13 +1118,13 @@ test('Settings from the pause menu still hides the run when the menu backdrop is
   const shot = await page.screenshot();
   await info.attach('settings-from-pause-no-backdrop', { body: shot, contentType: 'image/png' });
 
-  // Beside the panels (x < 180 and x > 780) the screen is the black plate, all
+  // Beside the panels (x < 16 and x >= 944) the screen is the black plate, all
   // of it: the arena and the HUD's bars would show here otherwise.
   const png = PNG.sync.read(shot);
   let brightest = 0;
   for (let y = 0; y < 540; y++) {
     for (let x = 0; x < 960; x++) {
-      if (x >= 180 && x < 780) continue;
+      if (x >= 16 && x < 944) continue;
       const i = (y * png.width + x) * 4;
       brightest = Math.max(brightest, png.data[i] ?? 0, png.data[i + 1] ?? 0, png.data[i + 2] ?? 0);
     }
