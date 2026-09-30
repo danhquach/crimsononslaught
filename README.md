@@ -6,18 +6,11 @@
 A browser-based auto-battler "bullet heaven". You move; your spells fire on
 their own. Survive twenty minutes of escalating waves, then bring down the boss.
 
-![Lightning Sword, Ice Storm, Frost Nova Bomb, Fire Dragon and companions in a 15-minute crowd](docs/screenshots/combat.png)
+[![A 26-second clip: the title screen, spell select and the Upgrades shop, a Fire run's crowd at 15:00 with a level-up pick and the pause screen, then the boss at 20:00](docs/screenshots/demo.webp)](docs/screenshots/demo.mp4)
 
-| Pick a starting spell                                     | Level up: three cards, pick one                      | The boss at 20:00                        |
-| --------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------- |
-| ![Spell select screen](docs/screenshots/spell-select.png) | ![Level-up card pick](docs/screenshots/level-up.png) | ![Boss fight](docs/screenshots/boss.png) |
-
-| Pause: the run's spells, passives and relics | Spend Embers on permanent upgrades              |
-| -------------------------------------------- | ----------------------------------------------- |
-| ![Pause screen](docs/screenshots/pause.png)  | ![Upgrades shop](docs/screenshots/upgrades.png) |
-
-The run shots use the `?loadout=` test switch (below), so they show more spells,
-and more elements, than one run carries.
+The clip uses the `?startAt=`, `?invulnerable=1` and `?loadout=` test switches
+(below), so its runs start late and carry five Fire spells, more than a run's
+three slots. Click it for the full-size video.
 
 Built with [Phaser 3](https://phaser.io/), TypeScript, and Vite.
 
