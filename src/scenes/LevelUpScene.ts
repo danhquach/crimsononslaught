@@ -11,11 +11,13 @@ import type { ItemLook } from '../core/focusStyle';
 import type { OfferActionCounts } from '../core/offerActions';
 import { MAX_RANK_CSS, grantsMaxRank, offerRankLabel } from '../core/maxRank';
 import { CARD_FILL, CARD_FILL_HOVER, cssColor, offerColor } from '../core/offerColors';
+import { bindingLabel, defaultControls, keyBadge } from '../core/controls';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
 import { focusable, frameBox } from './focusRing';
-import { attachMenuInput, attachPadButtons, type MenuItem } from './input';
+import { controlsOf } from './controls';
+import { attachBoundPadButtons, attachMenuInput, attachPadButtons, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
 const CARD_HEIGHT = 260;
@@ -73,6 +75,8 @@ export class LevelUpScene extends Phaser.Scene {
   /** Set once this overlay has asked Game for something; everything after is ignored. */
   private acted = false;
   private banning = false;
+  /** The rebindable controls (CO-226), read as the overlay opens. */
+  private controls = defaultControls();
   private setBanning: (on: boolean) => void = () => undefined;
 
   constructor() {
@@ -98,6 +102,7 @@ export class LevelUpScene extends Phaser.Scene {
   create(): void {
     this.acted = false;
     this.banning = false;
+    this.controls = controlsOf(this);
     if (this.cards.length === 0) {
       // Game never launches us with an empty offer (see `resolveLevelUp`); if
       // something else does, never leave the run frozen behind an empty overlay.
@@ -123,7 +128,9 @@ export class LevelUpScene extends Phaser.Scene {
       .setOrigin(0.5);
     const keys = this.cards.length === 1 ? '1' : `1–${this.cards.length}`;
     const choose = relic ? 'Choose a buff for the rest of the run' : 'Choose an upgrade';
-    const pad = this.actions ? 'use a gamepad (X reroll, Y ban)' : 'use a gamepad';
+    const pad = this.actions
+      ? `use a gamepad (${bindingLabel(this.controls, 'pad', 'reroll')} reroll, ${bindingLabel(this.controls, 'pad', 'skip')} skip, ${bindingLabel(this.controls, 'pad', 'ban')} ban)`
+      : 'use a gamepad';
     const hint = `${choose}  ·  click a card, press ${keys}, or ${pad}`;
     const subtitle = this.add
       .text(width / 2, 118, hint, {
@@ -151,13 +158,17 @@ export class LevelUpScene extends Phaser.Scene {
       const index = offerIndexForKey(event.key, this.cards.length);
       const card = index === undefined ? undefined : this.cards[index];
       if (card) this.choose(card);
-      else if (this.actions && !event.repeat) this.onActionKey(event.key);
+      else if (this.actions && !event.repeat) this.onActionKey(event);
     });
-    // Pad (#377): X rerolls, Y toggles ban mode, B only leaves it, like R, B and Esc.
+    // Pad (#377): the bound reroll and ban buttons (X and Y), B only leaves ban mode, like Esc.
     if (this.actions) {
+      const { pad } = this.controls;
+      attachBoundPadButtons(this, [
+        { button: pad.reroll, handler: () => this.reroll() },
+        { button: pad.skip, handler: () => this.skip() },
+        { button: pad.ban, handler: () => this.toggleBan() },
+      ]);
       attachPadButtons(this, {
-        X: () => this.reroll(),
-        Y: () => this.toggleBan(),
         B: () => {
           if (this.banning) this.setBanning(false);
         },
@@ -165,13 +176,13 @@ export class LevelUpScene extends Phaser.Scene {
     }
   }
 
-  /** R, S and B press their buttons; Esc leaves ban mode. */
-  private onActionKey(key: string): void {
-    const lower = key.toLowerCase();
-    if (lower === 'r') this.reroll();
-    else if (lower === 's') this.skip();
-    else if (lower === 'b') this.toggleBan();
-    else if (key === 'Escape' && this.banning) this.setBanning(false);
+  /** The bound reroll, skip and ban keys (R, S and B) press their buttons; Esc leaves ban mode. */
+  private onActionKey(event: KeyboardEvent): void {
+    const keys = this.controls.keyboard;
+    if (event.code === keys.reroll) this.reroll();
+    else if (event.code === keys.skip) this.skip();
+    else if (event.code === keys.ban) this.toggleBan();
+    else if (event.key === 'Escape' && this.banning) this.setBanning(false);
   }
 
   /** Reroll (n), Skip and Ban (n) in a row under the cards, greyed out at 0. */
@@ -186,16 +197,24 @@ export class LevelUpScene extends Phaser.Scene {
       (width - rowWidth) / 2 + BUTTON_WIDTH / 2 + i * (BUTTON_WIDTH + BUTTON_GAP);
     const reroll = this.addButton(
       x(0),
-      'R',
+      keyBadge(this.controls.keyboard.reroll),
       `Reroll (${actions.rerolls})`,
       actions.rerolls > 0,
       () => this.reroll(),
     );
-    const skip = this.addButton(x(1), 'S', `Skip (+${SKIP_REROLL_BONUS} reroll)`, true, () =>
-      this.skip(),
+    const skip = this.addButton(
+      x(1),
+      keyBadge(this.controls.keyboard.skip),
+      `Skip (+${SKIP_REROLL_BONUS} reroll)`,
+      true,
+      () => this.skip(),
     );
-    const ban = this.addButton(x(2), 'B', `Ban (${actions.bans})`, actions.bans > 0, () =>
-      this.toggleBan(),
+    const ban = this.addButton(
+      x(2),
+      keyBadge(this.controls.keyboard.ban),
+      `Ban (${actions.bans})`,
+      actions.bans > 0,
+      () => this.toggleBan(),
     );
     this.setBanning = (on) => {
       this.banning = on;

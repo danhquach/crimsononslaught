@@ -30,6 +30,7 @@ import { isSave, parseSave, serializeSave } from '../core/save';
 import { validateMeta } from '../core/upgrades';
 import { loadSaveJson, storeSaveJson } from '../storage/localSave';
 import { installAtlas, queueAtlas, warnIfAtlasMissing } from '../render/atlas';
+import { controlsOf, isCapturing, trackHeldKeys } from './controls';
 import { installAudio, queueSounds, warnIfSoundsMissing } from '../render/audio';
 import { writeAudioSettings } from '../core/audioMix';
 import { generatePlaceholderTextures } from '../render/textures';
@@ -96,13 +97,35 @@ export class BootScene extends Phaser.Scene {
     // — a run may have been recorded since boot — and stored at once, so a
     // mute survives a reload without waiting for the run to end.
     warnIfSoundsMissing(this);
-    installAudio(this, save.settings, (settings) => {
-      const current: unknown = this.registry.get(SAVE_REGISTRY_KEY);
-      const base = isSave(current) ? current : save;
-      const updated = { ...base, settings: writeAudioSettings(base.settings, settings) };
-      this.registry.set(SAVE_REGISTRY_KEY, updated);
-      if (!storeSaveJson(serializeSave(updated))) console.warn('[save] could not store settings');
-    });
+    installAudio(
+      this,
+      save.settings,
+      (settings) => {
+        const current: unknown = this.registry.get(SAVE_REGISTRY_KEY);
+        const base = isSave(current) ? current : save;
+        const updated = { ...base, settings: writeAudioSettings(base.settings, settings) };
+        this.registry.set(SAVE_REGISTRY_KEY, updated);
+        if (!storeSaveJson(serializeSave(updated))) console.warn('[save] could not store settings');
+      },
+      // Read live, so a rebind (CO-226) holds without a reload; the pad is polled
+      // every frame, so the read is kept until the save object changes.
+      (() => {
+        let saved: unknown;
+        let held = { key: '', pad: -1 };
+        return () => {
+          const now: unknown = this.registry.get(SAVE_REGISTRY_KEY);
+          if (now !== saved) {
+            saved = now;
+            const { keyboard, pad } = controlsOf(this);
+            held = { key: keyboard.mute, pad: pad.mute };
+          }
+          return held;
+        };
+      })(),
+      () => isCapturing(this.registry),
+    );
+    // The held-key set the player's move keys read (CO-226), listening from the start.
+    trackHeldKeys();
 
     // Run seed: `?seed=<int>` reproduces a run; otherwise a fresh one per page
     // load. Logged so a bug report can quote it. SpellSelect reads it from the

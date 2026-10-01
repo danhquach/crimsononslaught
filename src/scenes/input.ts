@@ -59,6 +59,8 @@ export interface MenuInputOptions {
   enterDefault?: number;
   /** The item highlighted from the start, for a screen that returns to the row that opened it (#383). */
   initial?: number;
+  /** While true, no press is read: the Controls page is waiting for a key or button to bind (CO-226). */
+  suspended?: () => boolean;
 }
 
 /** The direction each arrow key presses. */
@@ -83,7 +85,7 @@ export type NavSource = 'pad' | 'keyboard';
 export function attachNavInput(
   scene: Phaser.Scene,
   onPress: (pressed: MenuInputState, source: NavSource) => void,
-  options: { keyboard?: boolean } = {},
+  options: { keyboard?: boolean; suspended?: () => boolean } = {},
 ): void {
   // Previous poll, for edge detection. Null until a pad is seen: the first poll
   // after a connect only takes a baseline, so a button already held down when
@@ -92,7 +94,9 @@ export function attachNavInput(
 
   const poll = (): void => {
     const pad = firstPad(scene);
-    if (!pad) {
+    // Suspended or unplugged, forget the baseline: the press that ends a
+    // suspension is not a menu press.
+    if (!pad || options.suspended?.()) {
       prev = null;
       return;
     }
@@ -120,6 +124,7 @@ export function attachNavInput(
     scene.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (handled.has(event)) return;
       handled.add(event);
+      if (options.suspended?.()) return;
       const dir = Object.hasOwn(ARROW_DIRECTION, event.key)
         ? ARROW_DIRECTION[event.key]
         : undefined;
@@ -181,7 +186,7 @@ export function attachMenuInput(
       if (target === undefined) select(0);
       else items[target]?.confirm();
     },
-    { keyboard: options.keyboard },
+    { keyboard: options.keyboard, suspended: options.suspended },
   );
 }
 
@@ -208,7 +213,8 @@ export interface StartButtonWatch {
  * steps can run before Phaser refreshes the pad, so a held A read up and then
  * down, and dashed. The button is therefore read from the browser's live pad.
  */
-export function watchPadButton(scene: Phaser.Scene, button: PadButton): StartButtonWatch {
+export function watchPadButton(scene: Phaser.Scene, button: PadButton | number): StartButtonWatch {
+  const index = typeof button === 'number' ? button : PAD_BUTTON[button];
   const edge = buttonEdge();
   let stale = false;
   return {
@@ -219,7 +225,7 @@ export function watchPadButton(scene: Phaser.Scene, button: PadButton): StartBut
         stale = false;
         return false;
       }
-      return edge.step(livePressed(pad, PAD_BUTTON[button]));
+      return edge.step(livePressed(pad, index));
     },
     reset: () => {
       edge.reset();
@@ -234,11 +240,6 @@ function livePressed(pad: Phaser.Input.Gamepad.Gamepad, index: number): boolean 
   return (live ?? pad).buttons[index]?.pressed ?? false;
 }
 
-/** Pad Start as a press edge (#252: it toggles the pause screen). */
-export function watchStartButton(scene: Phaser.Scene): StartButtonWatch {
-  return watchPadButton(scene, 'START');
-}
-
 /**
  * Pad face and shoulder buttons as press edges (#377): B goes back, LB and RB
  * flip tabs, X and Y act on the level-up row. One tracker per bound button,
@@ -250,9 +251,26 @@ export function attachPadButtons(
   scene: Phaser.Scene,
   handlers: Partial<Record<PadButton, () => void>>,
 ): { reset(): void } {
-  const bound = (Object.keys(handlers) as PadButton[]).map((name) => ({
-    index: PAD_BUTTON[name],
-    handler: handlers[name],
+  return attachBoundPadButtons(
+    scene,
+    (Object.keys(handlers) as PadButton[]).map((name) => ({
+      button: PAD_BUTTON[name],
+      handler: () => handlers[name]?.(),
+    })),
+  );
+}
+
+/**
+ * `attachPadButtons` for buttons named by index (CO-226): a rebound action's
+ * button is whatever the player bound, read once when the scene is created.
+ */
+export function attachBoundPadButtons(
+  scene: Phaser.Scene,
+  bindings: readonly { button: number; handler: () => void }[],
+): { reset(): void } {
+  const bound = bindings.map(({ button, handler }) => ({
+    index: button,
+    handler,
     edge: buttonEdge(),
   }));
 
@@ -260,7 +278,7 @@ export function attachPadButtons(
     const pad = firstPad(scene);
     for (const { index, handler, edge } of bound) {
       const down = pad ? (pad.buttons[index]?.pressed ?? false) : undefined;
-      if (edge.step(down)) handler?.();
+      if (edge.step(down)) handler();
     }
   };
 

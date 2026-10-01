@@ -276,7 +276,14 @@ test('the Controls tab lists the dash with its real bindings (#384)', async ({ p
 
   const texts = await sceneTexts(page, SCENE.help);
   const rows = controlHelpRows();
-  expect(rows.map((row) => row.action)).toEqual(['Move', 'Dash', 'Pause', 'Mute']);
+  expect(rows.map((row) => row.action)).toEqual([
+    'Move',
+    'Dash',
+    'Pause',
+    'Mute',
+    'Level-up',
+    'Help tabs',
+  ]);
   for (const row of rows) {
     expect(texts).toEqual(
       expect.arrayContaining([
@@ -287,6 +294,10 @@ test('the Controls tab lists the dash with its real bindings (#384)', async ({ p
     );
   }
   expect(texts).toContain('Keyboard: Space      Gamepad: A');
+  expect(texts).toContain(
+    'Keyboard: R reroll, S skip, B ban      Gamepad: X reroll, RB skip, Y ban',
+  );
+  expect(texts).toContain('Keyboard: Q / E      Gamepad: LB / RB');
   await expectOnScreen(page);
 
   await page.keyboard.press('Escape');

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CHANGELOG } from '../config/changelog';
+import { bindingLabel, defaultControls } from '../core/controls';
 import {
   FEEDBACK_URL,
   MAX_MESSAGE_LENGTH,
@@ -21,7 +22,8 @@ import { SCENE, isHelpPayload, type HelpView } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
 import { addSpellIcon } from '../render/spellIcon';
 import { CRIMSON_CSS, SERIF } from './buildStrips';
-import { attachMenuInput, attachPadButtons, type MenuItem } from './input';
+import { controlsOf } from './controls';
+import { attachBoundPadButtons, attachMenuInput, attachPadButtons, type MenuItem } from './input';
 import {
   addHintLine,
   addMenuRow,
@@ -58,8 +60,8 @@ const SPELL_TEXT_X = 300;
 const PAGER_WIDTH = 160;
 const PAGER_OFFSET = 206;
 
-/** Controls tab (#384): a 56 px row per action. */
-const CONTROL_ROW_PITCH = 56;
+/** Controls tab (#384): a 48 px row per action, six of them since CO-226. */
+const CONTROL_ROW_PITCH = 48;
 const CONTROL_TEXT_X = 200;
 
 /** About tab's changelog rows (#377): a heading per version, then its lines. */
@@ -100,6 +102,8 @@ export class HelpScene extends Phaser.Scene {
   private generation = 0;
   private sending = false;
   private sendRow: MenuRow | null = null;
+  /** The rebindable controls (CO-226), read as the screen opens. */
+  private controls = defaultControls();
 
   constructor() {
     super(SCENE.help);
@@ -125,6 +129,7 @@ export class HelpScene extends Phaser.Scene {
     this.sending = false;
     this.sendRow = null;
     this.generation += 1;
+    this.controls = controlsOf(this);
     const { width } = this.scale;
 
     drawMenuBackdrop(this, 'quiet');
@@ -149,23 +154,34 @@ export class HelpScene extends Phaser.Scene {
         }),
       );
       attachMenuInput(this, items, { keyboard: true });
-      addHintLine(this, 'click, arrows + Enter, or a gamepad (A select, B back, LB/RB tabs)');
+      const tabKeys = `${bindingLabel(this.controls, 'keyboard', 'helpPrev')}/${bindingLabel(this.controls, 'keyboard', 'helpNext')}`;
+      const tabButtons = `${bindingLabel(this.controls, 'pad', 'helpPrev')}/${bindingLabel(this.controls, 'pad', 'helpNext')}`;
+      addHintLine(
+        this,
+        `click, arrows + Enter, ${tabKeys} tabs, or a gamepad (A select, B back, ${tabButtons} tabs)`,
+      );
     }
 
     // Phaser applies a restart or a start on its next step and empties the key
     // queue at the end of it, so the Esc acted on here never reaches the view
     // it hands over to (see PauseScene).
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.repeat) return;
+      if (event.repeat) return;
+      // The bound tab keys (Q and E) walk the tabs like LB and RB.
+      if (event.code === this.controls.keyboard.helpPrev) this.shoulder(-1);
+      else if (event.code === this.controls.keyboard.helpNext) this.shoulder(1);
+      if (event.key !== 'Escape') return;
       if (this.current === 'feedback') this.show('about');
       else this.back();
     });
-    // Pad (#377): B is Esc; LB and RB walk the tabs, turning Spells pages first.
+    // Pad (#377): B is Esc; the bound tab buttons (LB and RB) walk the tabs, turning Spells pages first.
     attachPadButtons(this, {
       B: () => (this.current === 'feedback' ? this.show('about') : this.back()),
-      LB: () => this.shoulder(-1),
-      RB: () => this.shoulder(1),
     });
+    attachBoundPadButtons(this, [
+      { button: this.controls.pad.helpPrev, handler: () => this.shoulder(-1) },
+      { button: this.controls.pad.helpNext, handler: () => this.shoulder(1) },
+    ]);
   }
 
   private shoulder(dir: -1 | 1): void {
@@ -234,7 +250,7 @@ export class HelpScene extends Phaser.Scene {
 
   /** Controls tab (#384): a row per action with its keyboard key, its pad button and what it does. */
   private drawControls(): void {
-    const rows = controlHelpRows();
+    const rows = controlHelpRows(undefined, this.controls);
     drawPanel(this, 30, PANEL_TOP, 900, rows.length * CONTROL_ROW_PITCH + PANEL_PADDING * 2);
     rows.forEach((row, i) => {
       const y = PANEL_TOP + PANEL_PADDING + CONTROL_ROW_PITCH / 2 + i * CONTROL_ROW_PITCH;

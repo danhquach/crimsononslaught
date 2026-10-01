@@ -38,7 +38,9 @@ import {
 } from '../core/input';
 import { emitRunEvent } from '../core/runEvents';
 import { clipDurationMs, showClip } from '../render/animate';
+import { controlsOf, isKeyHeld } from '../scenes/controls';
 import { firstPad, watchPadButton, type StartButtonWatch } from '../scenes/input';
+import type { Controls } from '../core/controls';
 
 /** Half the 28 px placeholder circle; the atlas frames are placed around it (CO-081). */
 const BODY_RADIUS = 14;
@@ -46,8 +48,8 @@ const BODY_RADIUS = 14;
 const DEATH_CLIP = 'hero.death';
 
 /**
- * The player character (spec §5): WASD or arrows on the keyboard, left stick or
- * D-pad on a gamepad, both live at once. Speed is 180 px/s with diagonals
+ * The player character (spec §5): the bound move keys (WASD by default) or arrows
+ * on the keyboard, left stick or the bound D-pad buttons on a gamepad, both live at once. Speed is 180 px/s with diagonals
  * normalized; an Arcade body collides with the world bounds, so the arena edge
  * stops the player rather than a clamp in `update`.
  *
@@ -64,7 +66,7 @@ const DEATH_CLIP = 'hero.death';
  * are doing (`core/animation.ts`); with no atlas the placeholder circle stands
  * still and the run plays exactly as before.
  *
- * The dash (#384, `core/dash.ts`) is a built-in move: Space or pad A starts a
+ * The dash (#384, `core/dash.ts`) is a built-in move: its bound key (Space) or pad button (A) starts a
  * burst of `DashStats.distancePx` along the held direction, whose velocity
  * replaces the walk velocity for its length, so the arena edge stops it like a
  * step. The hero keeps its facing for the whole burst and wears a tint for the
@@ -77,7 +79,6 @@ const DEATH_CLIP = 'hero.death';
  */
 export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly cursors: Phaser.Types.Input.Keyboard.CursorKeys | undefined;
-  private readonly wasd: Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key> | undefined;
   private health: HealthState = createHealth();
   /** px/s before diagonal normalization; the Swift passive raises it (CO-110). */
   private moveSpeed = PLAYER_SPEED;
@@ -97,7 +98,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private dashFrom = { x: 0, y: 0 };
   /** A Space press since the last step; set by the key event, only while the scene runs. */
   private dashQueued = false;
-  private readonly padDash: StartButtonWatch;
+  private padDash: StartButtonWatch;
+  /** The bindings (CO-226), read at creation and again on a resume, when Settings may have changed them. */
+  private controls: Controls;
   /** Whether the invulnerability tint is on now. */
   private dashCued = false;
 
@@ -110,17 +113,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     body.setCircle(BODY_RADIUS);
     body.setCollideWorldBounds(true);
 
+    this.controls = controlsOf(scene);
     const keyboard = scene.input.keyboard ?? undefined;
     this.cursors = keyboard?.createCursorKeys();
-    this.wasd = keyboard?.addKeys('W,A,S,D') as
-      Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key> | undefined;
-    // Space as an event, not a polled key: a tap shorter than a frame is down and
-    // up again before the step reads it. A press while the scene is paused (the
-    // level-up overlay, the pause screen) is not a dash.
-    keyboard?.on('keydown-SPACE', (event: KeyboardEvent) => {
-      if (!event.repeat && scene.scene.isActive()) this.dashQueued = true;
+    // The dash key as an event, not a polled key: a tap shorter than a frame is
+    // down and up again before the step reads it. A press while the scene is
+    // paused (the level-up overlay, the pause screen) is not a dash.
+    keyboard?.on('keydown', (event: KeyboardEvent) => {
+      if (!event.repeat && event.code === this.controls.keyboard.dash && scene.scene.isActive())
+        this.dashQueued = true;
     });
-    this.padDash = watchPadButton(scene, 'A');
+    this.padDash = watchPadButton(scene, this.controls.pad.dash);
   }
 
   get hp(): number {
@@ -201,6 +204,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
    */
   resetDashInput(): void {
     this.dashQueued = false;
+    this.padDash.reset();
+  }
+
+  /** Re-read the bindings after Settings, opened from the pause screen, may have changed them. */
+  refreshControls(): void {
+    this.controls = controlsOf(this.scene);
+    this.padDash = watchPadButton(this.scene, this.controls.pad.dash);
     this.padDash.reset();
   }
 
@@ -385,20 +395,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private keyboardMove(): Vec2 {
-    const { cursors, wasd } = this;
+    const { cursors } = this;
+    const keys = this.controls.keyboard;
     return directionVector({
-      up: isDown(cursors?.up) || isDown(wasd?.W),
-      down: isDown(cursors?.down) || isDown(wasd?.S),
-      left: isDown(cursors?.left) || isDown(wasd?.A),
-      right: isDown(cursors?.right) || isDown(wasd?.D),
+      up: isDown(cursors?.up) || isKeyHeld(keys.moveUp),
+      down: isDown(cursors?.down) || isKeyHeld(keys.moveDown),
+      left: isDown(cursors?.left) || isKeyHeld(keys.moveLeft),
+      right: isDown(cursors?.right) || isKeyHeld(keys.moveRight),
     });
   }
 
   private padMove(): Vec2 {
     const pad = firstPad(this.scene);
     if (!pad) return { x: 0, y: 0 };
+    const buttons = this.controls.pad;
+    const down = (index: number): boolean => pad.buttons[index]?.pressed ?? false;
     return padVector(
-      { up: pad.up, down: pad.down, left: pad.left, right: pad.right },
+      {
+        up: down(buttons.moveUp),
+        down: down(buttons.moveDown),
+        left: down(buttons.moveLeft),
+        right: down(buttons.moveRight),
+      },
       stickVector(pad.leftStick.x, pad.leftStick.y),
     );
   }

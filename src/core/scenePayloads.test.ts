@@ -22,7 +22,12 @@ import {
   isResultPayload,
   isRunBuild,
   isRunStats,
+  controlsConfirm,
+  controlsDevice,
+  controlsNotice,
+  focusesControls,
   focusesKinds,
+  isControlsPage,
   isPickupsPage,
   isSettingsPayload,
   type ResultPayload,
@@ -266,6 +271,7 @@ describe('isPausePayload', () => {
   it('keeps the pause view beside the pickup kinds page flags, and reads only the exact flag values (#383)', () => {
     expect(isSettingsPayload({ pause: { view }, page: 'pickups' })).toBe(true);
     expect(isSettingsPayload({ pause: { view }, focus: 'kinds' })).toBe(true);
+    expect(isSettingsPayload({ pause: { view }, page: 'controls', device: 'pad' })).toBe(true);
     expect(isPickupsPage({ page: 'pickups' })).toBe(true);
     expect(focusesKinds({ focus: 'kinds' })).toBe(true);
     for (const bad of [
@@ -282,6 +288,51 @@ describe('isPausePayload', () => {
     for (const bad of [undefined, null, {}, 'kinds', { focus: 'Kinds' }, { focus: true }]) {
       expect(focusesKinds(bad)).toBe(false);
     }
+  });
+});
+
+describe('the Controls page flags (CO-226)', () => {
+  const hostile = [
+    undefined,
+    null,
+    {},
+    'pad',
+    'all',
+    { x: 'pad' },
+    { device: 'Pad' },
+    { device: ['pad'] },
+    { device: 1 },
+    { device: '__proto__' },
+    { confirm: 'ALL' },
+    { confirm: 'reset' },
+    { confirm: ['all'] },
+    { confirm: { toString: 'all' } },
+    { notice: 'All' },
+    { notice: '<img src=x>' },
+    { notice: 1 },
+  ];
+
+  it('reads exactly the allowed values', () => {
+    expect(isControlsPage({ page: 'controls' })).toBe(true);
+    expect(focusesControls({ focus: 'controls' })).toBe(true);
+    expect(controlsDevice({ device: 'pad' })).toBe('pad');
+    expect(controlsDevice({ device: 'keyboard' })).toBe('keyboard');
+    for (const reset of ['keyboard', 'pad', 'all'] as const) {
+      expect(controlsConfirm({ confirm: reset })).toBe(reset);
+      expect(controlsNotice({ notice: reset })).toBe(reset);
+    }
+  });
+
+  it('falls back on anything else', () => {
+    for (const bad of hostile) {
+      expect(isControlsPage(bad)).toBe(false);
+      expect(focusesControls(bad)).toBe(false);
+      expect(controlsDevice(bad)).toBe('keyboard');
+      expect(controlsConfirm(bad)).toBeNull();
+      expect(controlsNotice(bad)).toBeNull();
+    }
+    expect(isControlsPage({ page: 'Controls' })).toBe(false);
+    expect(focusesControls({ focus: 'kinds' })).toBe(false);
   });
 });
 
