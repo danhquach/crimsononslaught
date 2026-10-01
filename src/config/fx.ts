@@ -184,6 +184,13 @@ export const ELITE_MARK_DEPTH = -0.5;
  */
 export const ELITE_MARK = { clip: 'status.elite', span: 2.4 } as const;
 
+/**
+ * The dash's afterimages and wisps (#384) lie just under the hero, over the
+ * ground areas and the elite marks and under the entities drawn at depth 0, so
+ * the trail never covers the hero it follows.
+ */
+export const DASH_DEPTH = -0.1;
+
 /** The arena floor, under everything the run puts on it. */
 export const ARENA_DEPTH = -2;
 

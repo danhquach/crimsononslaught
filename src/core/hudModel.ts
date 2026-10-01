@@ -27,6 +27,8 @@ export interface HudModel {
   /** #144: the spells casting, default first, and the passives held. */
   spells: readonly LoadoutSpellView[];
   passives: readonly LoadoutPassiveView[];
+  /** #384: the dash's cooldown share run (0 to 1) and whether it is ready. */
+  dash: { progress: number; ready: boolean };
 }
 
 /**
@@ -81,6 +83,7 @@ export const INITIAL_HUD: Readonly<HudModel> = {
   shieldMax: 0,
   spells: [],
   passives: [],
+  dash: { progress: 1, ready: true },
 };
 
 /** Returns a new model with the event applied; the input is never mutated. */
@@ -105,6 +108,8 @@ export function applyRunEvent(model: Readonly<HudModel>, event: RunEvent): HudMo
       return { ...model, spells: event.payload.spells, passives: event.payload.passives };
     case 'embers':
       return { ...model, embers: event.payload.embers };
+    case 'dash':
+      return { ...model, dash: { progress: event.payload.progress, ready: event.payload.ready } };
   }
 }
 

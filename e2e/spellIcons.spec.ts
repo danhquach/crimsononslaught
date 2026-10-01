@@ -32,12 +32,15 @@ test('each casting spell shows its own icon in its HUD slot', async ({ page }) =
 
   const icons = await page.evaluate(async (hudKey) => {
     const { game } = await import('/src/main.ts');
-    return game.scene
-      .getScene(hudKey)
-      .children.list.map((child) => child as unknown as Phaser.GameObjects.Image)
-      .filter((child) => child.type === 'Image' && child.visible)
-      .map((child) => child.frame.name)
-      .filter((name) => name.startsWith('icon.'));
+    return (
+      game.scene
+        .getScene(hudKey)
+        .children.list.map((child) => child as unknown as Phaser.GameObjects.Image)
+        .filter((child) => child.type === 'Image' && child.visible)
+        .map((child) => child.frame.name)
+        // The dash icon (#384) beside the minimap is no spell slot.
+        .filter((name) => name.startsWith('icon.') && !name.startsWith('icon.dash.'))
+    );
   }, SCENE.hud);
   expect(icons).toEqual([PICKED, ...EXTRA].map((id) => `icon.${id}.0.art`));
 

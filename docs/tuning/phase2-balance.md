@@ -17,6 +17,12 @@ behind the crowd, hold the boss at 200–330 px and sidestep its telegraph, keep
 450 px off the walls. Level-up picks are kit-first: the element's own actives
 as they are offered, then Power, Haste, Expanse, Persistence, then the rest.
 
+**The dash (#384).** The bot never presses Space or pad A: it overrides only the
+`Player`'s keyboard move read, and the dash is read from its own Space key event
+and pad button. Every figure in this document is therefore a no-dash run and
+stays valid; a bot that dashes is a separate decision, and its runs would not be
+comparable with these.
+
 ## Ice roster viability (#141, 2026-09-22)
 
 Configs as merged with #141: Ice Arrow as the `ice` default, Frost Nova Bomb,

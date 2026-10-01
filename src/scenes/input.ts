@@ -186,25 +186,29 @@ export function attachMenuInput(
 }
 
 export interface StartButtonWatch {
-  /** True on the poll where Start goes down; call once a frame. */
+  /** True on the poll where the button goes down; call once a step. */
   pressed(): boolean;
   /** Take a fresh baseline, as after a stretch of not polling. */
   reset(): void;
 }
 
 /**
- * Pad Start as a press edge (#252: it toggles the pause screen). Like
+ * A pad button as a press edge, polled by its scene (#252 Start, #384 A). Like
  * `attachMenuInput`, the first poll after a connect only takes a baseline, so
- * a Start still held from the press that opened a screen does not close it
- * again.
+ * a button still held from the press that opened a screen does not fire again.
  *
  * After a `reset` the first poll is skipped as well (CO-179). Phaser refreshes
  * a scene's pads after the scenes update, so a scene's first update after a
  * resume still reads the pad as it was before it paused. Taken as the
  * baseline, that stale state made the Start that resumed a pause opened with
- * Esc read as a fresh press one frame later, and the pause opened again.
+ * Esc read as a fresh press one frame later, and the pause opened again. The
+ * same holds for the A that confirmed a level-up card and would dash.
+ *
+ * The skip alone was not enough on a slow machine (#384, CI): several Game
+ * steps can run before Phaser refreshes the pad, so a held A read up and then
+ * down, and dashed. The button is therefore read from the browser's live pad.
  */
-export function watchStartButton(scene: Phaser.Scene): StartButtonWatch {
+export function watchPadButton(scene: Phaser.Scene, button: PadButton): StartButtonWatch {
   const edge = buttonEdge();
   let stale = false;
   return {
@@ -215,13 +219,24 @@ export function watchStartButton(scene: Phaser.Scene): StartButtonWatch {
         stale = false;
         return false;
       }
-      return edge.step(pad.buttons[PAD_BUTTON.START]?.pressed ?? false);
+      return edge.step(livePressed(pad, PAD_BUTTON[button]));
     },
     reset: () => {
       edge.reset();
       stale = true;
     },
   };
+}
+
+/** Whether `index` is down on `pad` now, per the browser; Phaser's copy as a fallback. */
+function livePressed(pad: Phaser.Input.Gamepad.Gamepad, index: number): boolean {
+  const live = typeof navigator === 'undefined' ? null : navigator.getGamepads?.()[pad.index];
+  return (live ?? pad).buttons[index]?.pressed ?? false;
+}
+
+/** Pad Start as a press edge (#252: it toggles the pause screen). */
+export function watchStartButton(scene: Phaser.Scene): StartButtonWatch {
+  return watchPadButton(scene, 'START');
 }
 
 /**

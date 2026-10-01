@@ -23,6 +23,7 @@ export const RUN_EVENT = {
   shield: 'run:shield',
   loadout: 'run:loadout',
   embers: 'run:embers',
+  dash: 'run:dash',
 } as const;
 
 export type RunEventName = keyof typeof RUN_EVENT;
@@ -51,6 +52,8 @@ export interface RunEventPayloads {
   loadout: { spells: LoadoutSpellView[]; passives: LoadoutPassiveView[] };
   /** Embers collected this run (#195), banked at its end win or lose. */
   embers: { embers: number };
+  /** #384: how much of the dash's cooldown has run, 0 to 1, and whether a press would dash. Sent once a frame. */
+  dash: { progress: number; ready: boolean };
 }
 
 /**

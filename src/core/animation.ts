@@ -1,4 +1,5 @@
 import { ANIMATIONS, type Facing } from '../config/animations';
+import { DASH_POSE_CLIP } from '../config/dash';
 import type { EnemyType } from '../config/enemies';
 import type { FrameInfo } from '../config/frames';
 import type { ConsumableKind, PickupKind } from '../config/pickups';
@@ -46,11 +47,18 @@ export interface HeroPose {
   /** Inside the 0.5 s invulnerability window. */
   readonly hurt: boolean;
   readonly dead: boolean;
+  /** #384: mid-dash, from the press until the burst has carried the hero its distance. */
+  readonly dashing?: boolean;
 }
 
-/** Death outranks the hurt frame, which outranks walking, which outranks idling. */
+/**
+ * Death outranks the dash pose, which outranks the hurt frame, which outranks
+ * walking, which outranks idling. The dash clip is not in the atlas until its
+ * art is cut; `showClip` then leaves the hero on the clip it had.
+ */
 export function heroAnimation(pose: Readonly<HeroPose>): string {
   if (pose.dead) return 'hero.death';
+  if (pose.dashing) return `${DASH_POSE_CLIP}.${pose.facing}`;
   if (pose.hurt) return `hero.hurt.${pose.facing}`;
   return `hero.${pose.moving ? 'walk' : 'idle'}.${pose.facing}`;
 }

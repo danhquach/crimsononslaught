@@ -431,7 +431,10 @@ function sampleIcons(page: Page): Promise<IconSample> {
       list(key).filter((o) => o.type === 'Text') as unknown as Phaser.GameObjects.Text[];
     return {
       spells: [...(pause.view?.view.spells ?? [])],
-      hudArt: icons(scene.hud).map((image) => image.frame.name),
+      // The slot icons only: the dash icon (#384) beside the minimap is no spell.
+      hudArt: icons(scene.hud)
+        .map((image) => image.frame.name)
+        .filter((name) => !name.startsWith('icon.dash.')),
       hudTexts: texts(scene.hud).map((text) => text.text),
       pauseArt: icons(scene.pause).map((image) => ({
         frame: image.frame.name,

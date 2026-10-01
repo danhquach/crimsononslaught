@@ -11,6 +11,7 @@ import {
 } from '../core/feedback';
 import {
   clampSpellPage,
+  controlHelpRows,
   groupChangelog,
   helpShoulderStep,
   pickupHelpRows,
@@ -57,6 +58,10 @@ const SPELL_TEXT_X = 300;
 const PAGER_WIDTH = 160;
 const PAGER_OFFSET = 206;
 
+/** Controls tab (#384): a 56 px row per action. */
+const CONTROL_ROW_PITCH = 56;
+const CONTROL_TEXT_X = 200;
+
 /** About tab's changelog rows (#377): a heading per version, then its lines. */
 const ABOUT_ROW_TOP = 214;
 const ABOUT_ROW_PITCH = 22;
@@ -72,11 +77,11 @@ let lastSentAt: number | null = null;
 const FEEDBACK_KEY = import.meta.env.VITE_FEEDBACK_ACCESS_KEY;
 
 /**
- * Help screen (#226), reached from Intro and back to it. Three tabs: Pickups,
+ * Help screen (#226), reached from Intro and back to it. Four tabs: Pickups,
  * a row per thing on the floor with its art and what it does
  * (`core/helpModel.ts`); Spells (#327), a row per spell with its icon and what
  * its two upgrades add, the level-up card's own text; and About, the build's version, what's new
- * (`config/changelog.ts`) and a feedback form. Like Pause, a tab switch or the
+ * (`config/changelog.ts`) and a feedback form; Controls (#384) lists the keys and pad buttons. Like Pause, a tab switch or the
  * form restarts the scene on that view, so every view builds its own menu.
  *
  * The form is DOM (Phaser's DOM layer): a subject and a message, posted to the
@@ -131,6 +136,7 @@ export class HelpScene extends Phaser.Scene {
       const items: MenuItem[] = this.drawTabs();
       if (this.current === 'pickups') this.drawPickups();
       else if (this.current === 'spells') items.push(...this.drawSpells());
+      else if (this.current === 'controls') this.drawControls();
       else items.push(...this.drawAbout());
       items.push(
         addMenuRow(this, {
@@ -186,6 +192,7 @@ export class HelpScene extends Phaser.Scene {
     const tabs: readonly (readonly [label: string, view: HelpView])[] = [
       ['Pickups', 'pickups'],
       ['Spells', 'spells'],
+      ['Controls', 'controls'],
       ['About', 'about'],
     ];
     return tabs.map(([label, view], i) => {
@@ -221,6 +228,32 @@ export class HelpScene extends Phaser.Scene {
         .setOrigin(0, 0.5);
       this.add
         .text(TEXT_X, y + 10, row.effect, { fontFamily: SERIF, fontSize: '16px', color: '#dddddd' })
+        .setOrigin(0, 0.5);
+    });
+  }
+
+  /** Controls tab (#384): a row per action with its keyboard key, its pad button and what it does. */
+  private drawControls(): void {
+    const rows = controlHelpRows();
+    drawPanel(this, 30, PANEL_TOP, 900, rows.length * CONTROL_ROW_PITCH + PANEL_PADDING * 2);
+    rows.forEach((row, i) => {
+      const y = PANEL_TOP + PANEL_PADDING + CONTROL_ROW_PITCH / 2 + i * CONTROL_ROW_PITCH;
+      this.add
+        .text(ICON_X, y, row.action, { fontFamily: SERIF, fontSize: '19px', color: '#eeeeee' })
+        .setOrigin(0, 0.5);
+      this.add
+        .text(CONTROL_TEXT_X, y - 11, `Keyboard: ${row.keyboard}      Gamepad: ${row.gamepad}`, {
+          fontFamily: SERIF,
+          fontSize: '17px',
+          color: '#f0c674',
+        })
+        .setOrigin(0, 0.5);
+      this.add
+        .text(CONTROL_TEXT_X, y + 11, row.note, {
+          fontFamily: SERIF,
+          fontSize: '15px',
+          color: '#cccccc',
+        })
         .setOrigin(0, 0.5);
     });
   }

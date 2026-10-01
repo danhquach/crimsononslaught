@@ -87,8 +87,14 @@ URL parameters. Only `?seed=` works in the deployed build; the rest are read in 
 |                      | Keyboard / mouse                                  | Gamepad                                         |
 | -------------------- | ------------------------------------------------- | ----------------------------------------------- |
 | Move                 | WASD or arrow keys                                | Left stick (analog, deadzone 0.2) or D-pad      |
+| Dash                 | Space                                             | **A**                                           |
 | Menus and overlays   | Click, or the number keys / Enter shown on screen | D-pad or left stick to select, **A** to confirm |
 | Intro and its panels | Arrow keys to select, Enter to confirm, Esc back  | D-pad or left stick to select, **A** to confirm |
+
+The dash is a built-in move every loadout has: a 120 px burst along the way you
+are moving (or last faced), with a brief window in which nothing can hurt you,
+then a 3 s cooldown shown by the icon left of the minimap. It does nothing on
+the pause screen or the level-up overlay. The numbers live in `src/config/dash.ts`.
 
 Both input sources are live at once, and a pad plugged in mid-run is picked up
 without a reload. Mouse and keyboard stay primary: nothing is highlighted until

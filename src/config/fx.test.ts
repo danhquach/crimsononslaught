@@ -12,6 +12,8 @@ import {
   EXPLOSION_SCALE_RADIUS,
   LARGE_BURN_MIN_RADIUS,
   FX_ALPHA,
+  DASH_DEPTH,
+  ELITE_MARK_DEPTH,
   FX_DEPTH,
   MAX_LIVE_AREAS,
   MAX_LIVE_FX,
@@ -80,6 +82,12 @@ describe('fx config (CO-082)', () => {
     // Entities are drawn at the default depth 0; effects sit above them.
     expect(AREA_DEPTH).toBeLessThan(0);
     expect(FX_DEPTH).toBeGreaterThan(0);
+  });
+
+  it('lays the dash trail just under the hero and over the ground (#384)', () => {
+    expect(DASH_DEPTH).toBeLessThan(0);
+    expect(DASH_DEPTH).toBeGreaterThan(AREA_DEPTH);
+    expect(DASH_DEPTH).toBeGreaterThan(ELITE_MARK_DEPTH);
   });
 
   it('reads the chain clip from the atlas animations', () => {

@@ -1,5 +1,6 @@
 import type { TextureKey } from '../config/colors';
 import type { ChangelogEntry } from '../config/changelog';
+import { BASE_DASH, type DashStats } from '../config/dash';
 import type { EnemyType } from '../config/enemies';
 import { GEM_XP_VALUE } from '../config/gems';
 import { CURRENCY_NAME } from '../config/meta';
@@ -220,10 +221,46 @@ export function aboutRowCount(groups: readonly ChangelogGroup[]): number {
   return groups.reduce((n, g) => n + 1 + g.lines.length, 0);
 }
 
+/** One line of the Controls tab (#384): what to do, the keys and pad button that do it, and what it does. */
+export interface ControlHelpRow {
+  action: string;
+  keyboard: string;
+  gamepad: string;
+  note: string;
+}
+
+/**
+ * The Controls tab's rows. The bindings are the game's own: movement and the
+ * dash are read in `entities/Player.ts`, Esc and pad Start pause in
+ * `GameScene`, and M mutes from `render/audio.ts`. The dash note reads its
+ * numbers from `BASE_DASH`, so a retune changes the text.
+ */
+export function controlHelpRows(stats: Readonly<DashStats> = BASE_DASH): ControlHelpRow[] {
+  return [
+    {
+      action: 'Move',
+      keyboard: 'WASD or arrow keys',
+      gamepad: 'Left stick or D-pad',
+      note: 'Walk; a dash goes the way you are moving',
+    },
+    {
+      action: 'Dash',
+      keyboard: 'Space',
+      gamepad: 'A',
+      note: `Burst ${stats.distancePx} px; no damage while it runs; ${stats.cooldownMs / 1000} s cooldown`,
+    },
+    { action: 'Pause', keyboard: 'Esc', gamepad: 'Start', note: 'Pause the run' },
+    { action: 'Mute', keyboard: 'M', gamepad: 'none', note: 'Mute and unmute the sound' },
+  ];
+}
+
+/** The Help tabs, left to right; Spells' pages come before the next one. */
+const HELP_TAB_ORDER: readonly HelpView[] = ['pickups', 'spells', 'controls', 'about'];
+
 /**
  * Where a shoulder button (LB -1, RB +1) takes the Help screen (#377): the tabs
- * run Pickups, Spells, About without wrapping, and on Spells a press turns the
- * page before it leaves. `null` when there is nowhere to go, or on the
+ * run Pickups, Spells, Controls, About without wrapping, and on Spells a press
+ * turns the page before it leaves. `null` when there is nowhere to go, or on the
  * feedback form, which has no tabs.
  */
 export function helpShoulderStep(
@@ -233,10 +270,14 @@ export function helpShoulderStep(
   dir: -1 | 1,
 ): { view: HelpView; spellPage?: number } | null {
   if (view === 'feedback') return null;
-  if (view === 'pickups') return dir === 1 ? { view: 'spells', spellPage: 0 } : null;
-  if (view === 'about')
-    return dir === -1 ? { view: 'spells', spellPage: Math.max(pageCount - 1, 0) } : null;
-  const next = spellPage + dir;
-  if (next >= 0 && next < pageCount) return { view: 'spells', spellPage: next };
-  return { view: dir === 1 ? 'about' : 'pickups' };
+  if (view === 'spells') {
+    const next = spellPage + dir;
+    if (next >= 0 && next < pageCount) return { view: 'spells', spellPage: next };
+  }
+  const target = HELP_TAB_ORDER[HELP_TAB_ORDER.indexOf(view) + dir];
+  if (!target) return null;
+  // Arriving on Spells from the right lands on its last page, from the left on its first.
+  if (target === 'spells')
+    return { view: 'spells', spellPage: dir === 1 ? 0 : Math.max(pageCount - 1, 0) };
+  return { view: target };
 }

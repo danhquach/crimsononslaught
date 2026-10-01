@@ -121,6 +121,7 @@ describe('applyRunEvent', () => {
       shieldMax: 0,
       spells: [],
       passives: [],
+      dash: { progress: 1, ready: true },
     });
   });
 
@@ -153,6 +154,17 @@ describe('applyRunEvent', () => {
   it('embers sets the running Embers count (#195)', () => {
     const m = applyRunEvent(INITIAL_HUD, { name: 'embers', payload: { embers: 42 } });
     expect(m.embers).toBe(42);
+  });
+
+  it('dash sets the cooldown share and whether it is ready (#384)', () => {
+    const cooling = applyRunEvent(INITIAL_HUD, {
+      name: 'dash',
+      payload: { progress: 0.4, ready: false },
+    });
+    expect(cooling.dash).toEqual({ progress: 0.4, ready: false });
+    const ready = applyRunEvent(cooling, { name: 'dash', payload: { progress: 1, ready: true } });
+    expect(ready.dash).toEqual({ progress: 1, ready: true });
+    expect(cooling.hp).toBe(INITIAL_HUD.hp);
   });
 
   it('phase sets the run phase', () => {

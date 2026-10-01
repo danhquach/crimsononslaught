@@ -73,6 +73,11 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...facings('hero.walk', 4, 8, LOOP),
   ...facings('hero.hurt', 1, 10, ONCE),
   spec('hero.death', 6, 8, ONCE),
+  // Hero dash pose (CO-218): lean, burst, recover over the 150 ms dash. The
+  // smoke is a separate sheet so a dash spell can swap it without the hero.
+  ...facings('hero.dash', 3, 20, ONCE),
+  spec('dash.burst', 4, 14, ONCE),
+  spec('dash.wisp', 4, 10, ONCE),
 
   // Swarm enemy (CO-071). Spawn is drawn hole-last, so it plays 3, 0, 1, 2.
   spec('swarm.move', 4, 8, LOOP),
@@ -301,6 +306,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // HUD slot icons (CO-154): one still per roster spell, drawn by HudScene
   // straight from the atlas, never played.
   ...ROSTER_SPELL_IDS.map((id) => spec(`icon.${id}`, 1, 1, ONCE)),
+  // HUD dash icon (CO-218), drawn by HudScene beside the minimap.
+  spec('icon.dash', 1, 1, ONCE),
 
   // Pause screen build icons (CO-179): one still per passive and relic buff,
   // drawn by PauseScene straight from the atlas, never played. A buff with no

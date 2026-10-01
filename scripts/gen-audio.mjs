@@ -169,6 +169,12 @@ export const RECIPES = {
   'player.death': () =>
     mix([envelope(sweep(0.75, 420, 55), 0.01), 0.9], [envelope(noise(0.75, 32, 900), 0.01), 0.3]),
 
+  // #384: a whoosh that falls as the hero lands, noise-led so it is nothing like
+  // `player.hurt`'s buzz; and a soft rising ping, quieter and shorter than a pickup's.
+  'player.dash': () =>
+    mix([envelope(noise(0.2, 33, 3500), 0.03), 0.8], [envelope(sweep(0.2, 700, 220), 0.02), 0.35]),
+  'player.dashReady': () => ping(0.09, 1320, 1760),
+
   'progress.perk': () => concat(ping(0.1, 660, 660), ping(0.2, 990, 990)),
 
   // A magnet or a bomb plays its grab and its effect on the same frame, so the
