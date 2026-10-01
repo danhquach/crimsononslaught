@@ -20,10 +20,10 @@ import { expectRingReadable } from './ringProbe';
 
 /**
  * #290 in the browser: the result screen holds the largest build the game
- * allows without pushing "Play again" off the 960×540 screen, on every
- * outcome, and still starts exactly one SpellSelect. It is started directly
- * with a crafted payload; the real way in (End run from pause) is
- * `pause.spec.ts`'s, and a full Victory is `fullRun.spec.ts`'s.
+ * allows without pushing "Play again" or "Main menu" off the 960×540 screen,
+ * on every outcome, and still starts exactly one SpellSelect or one Intro. It
+ * is started directly with a crafted payload; the real way in (End run from
+ * pause) is `pause.spec.ts`'s, and a full Victory is `fullRun.spec.ts`'s.
  */
 
 const WIDTH = 960;
@@ -86,10 +86,14 @@ async function openResult(page: Page, payload: object): Promise<void> {
   await page.evaluate(
     async ({ scene, payload }) => {
       const { game } = await import('/src/main.ts');
-      const counter = window as unknown as { spellSelectStarts: number };
+      const counter = window as unknown as { spellSelectStarts: number; introStarts: number };
       counter.spellSelectStarts = 0;
+      counter.introStarts = 0;
       game.scene.getScene(scene.spellSelect).events.on('create', () => {
         counter.spellSelectStarts += 1;
+      });
+      game.scene.getScene(scene.intro).events.on('create', () => {
+        counter.introStarts += 1;
       });
       game.scene.stop(scene.intro);
       game.scene.start(scene.result, payload);
@@ -202,9 +206,15 @@ const buildFrames = [...PASSIVES, ...RELIC_BUFFS].map(({ id }) => `icon.${id}.0.
 
 const spellSelectStarts = (page: Page): Promise<number> =>
   page.evaluate(() => (window as unknown as { spellSelectStarts: number }).spellSelectStarts);
+const introStarts = (page: Page): Promise<number> =>
+  page.evaluate(() => (window as unknown as { introStarts: number }).introStarts);
+
+const HINT = 'click, press Enter, or gamepad A · Esc or B for the main menu';
 
 for (const outcome of ['win', 'lose', 'ended'] as const) {
-  test(`${outcome}: a maxed build keeps Play again and its hint on screen`, async ({ page }) => {
+  test(`${outcome}: a maxed build keeps Play again, Main menu and their hint on screen`, async ({
+    page,
+  }) => {
     const errors = collectErrors(page);
     await openResult(page, maxedPayload(outcome));
     await waitForScene(page, SCENE.result);
@@ -219,13 +229,18 @@ for (const outcome of ['win', 'lose', 'ended'] as const) {
     });
     expect(s.texts.map((t) => t.text)).toContain(RESULT_HEADLINES[outcome].subtitle);
 
-    const { button, hint } = s.controls ?? {};
+    const { button, menuButton, hint } = s.controls ?? {};
     expect(button && within(button, SLACK), JSON.stringify(button)).toBe(true);
+    expect(menuButton && within(menuButton, SLACK), JSON.stringify(menuButton)).toBe(true);
     expect(hint && within(hint, SLACK), JSON.stringify(hint)).toBe(true);
-    const label = s.texts.find((t) => t.text === 'Play again');
-    expect(label && within(label.box, SLACK)).toBe(true);
+    expect(button).toEqual(RESULT_LAYOUT.button);
+    expect(menuButton).toEqual(RESULT_LAYOUT.menuButton);
+    for (const text of ['Play again', 'Main menu']) {
+      const label = s.texts.find((t) => t.text === text);
+      expect(label && within(label.box, SLACK), text).toBe(true);
+    }
     // The hint's text box is where it draws, however tall CI's font makes it.
-    const hintText = s.texts.find((t) => t.text === 'click, press Enter, or gamepad A');
+    const hintText = s.texts.find((t) => t.text === HINT);
     expect(hintText && within(hintText.box, SLACK)).toBe(true);
 
     // Every passive and relic wears its icon art (CO-179), not its letters, all above the button.
@@ -298,6 +313,49 @@ for (const [name, click, enter] of [
     await waitForScene(page, SCENE.spellSelect);
     await frames(page, 10);
     expect(await spellSelectStarts(page)).toBe(1);
+    expect(await isSceneActive(page, SCENE.result)).toBe(false);
+    expect(errors).toEqual([]);
+  });
+}
+
+for (const [name, click, esc] of [
+  ['a click on Main menu opens', true, false],
+  ['Esc opens', false, true],
+  ['a click on Main menu and Esc on the same frame open', true, true],
+] as const) {
+  test(`${name} exactly one main menu (CO-218)`, async ({ page }) => {
+    const errors = collectErrors(page);
+    await openResult(page, maxedPayload('lose'));
+    await waitForScene(page, SCENE.result);
+    await frames(page, 4);
+    const { controls } = await sample(page);
+    const button = controls?.menuButton;
+    expect(button).toBeDefined();
+    if (!button) return;
+
+    const x = button.x + button.width / 2;
+    const y = button.y + button.height / 2;
+    await page.mouse.move(x, y);
+    if (click) await page.mouse.down();
+    await page.evaluate(
+      ({ x, y, click, esc }) => {
+        const canvas = document.querySelector('canvas');
+        const rect = canvas?.getBoundingClientRect();
+        if (!canvas || !rect) throw new Error('no canvas');
+        const at = { clientX: rect.left + x, clientY: rect.top + y, button: 0, bubbles: true };
+        if (click) canvas.dispatchEvent(new MouseEvent('mouseup', at));
+        if (esc) {
+          window.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }),
+          );
+        }
+      },
+      { x, y, click, esc },
+    );
+    await waitForScene(page, SCENE.intro);
+    await frames(page, 10);
+    expect(await introStarts(page)).toBe(1);
+    expect(await spellSelectStarts(page)).toBe(0);
     expect(await isSceneActive(page, SCENE.result)).toBe(false);
     expect(errors).toEqual([]);
   });
@@ -397,6 +455,8 @@ for (const [name, fault] of HOSTILE_BUILDS) {
 
 /** Standard-mapping pad buttons. */
 const A = 0;
+const B = 1;
+const RIGHT = 15;
 const UP = 12;
 const DOWN = 13;
 
@@ -562,7 +622,7 @@ test('pointing at a passive lights its rim and reads it out, and moving away res
   expect(errors).toEqual([]);
 });
 
-test('the arrows walk Play again and the strips, and Enter acts only on Play again', async ({
+test('the arrows walk both buttons and the strips, and Enter acts only on a button', async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -579,9 +639,34 @@ test('the arrows walk Play again and the strips, and Enter acts only on Play aga
   expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 0 });
   expect((await focusRing(page, SCENE.result)).box).toEqual(RESULT_LAYOUT.button);
 
+  // Right and left step between the buttons (CO-218).
   await page.keyboard.press('ArrowRight');
   await frames(page, 2);
+  expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 1 });
+  expect((await focusRing(page, SCENE.result)).box).toEqual(RESULT_LAYOUT.menuButton);
+  await expectRingReadable(page, SCENE.result, 'Main menu');
+  await page.keyboard.press('ArrowLeft');
+  await frames(page, 2);
+  expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 0 });
+
+  // Up goes to the last row, at the item nearest Play again, and Enter there does nothing.
+  await page.keyboard.press('ArrowUp');
+  await frames(page, 2);
   let nav = await readNav(page);
+  expect(nav.focus).toMatchObject({ zone: 'build', col: 0, menu: 0 });
+  const landed = nav.focus;
+  await page.keyboard.press('Enter');
+  await frames(page, 10);
+  expect(await isSceneActive(page, SCENE.result)).toBe(true);
+  expect(await spellSelectStarts(page)).toBe(0);
+  expect((await readNav(page)).focus).toEqual(landed);
+
+  // Up to the first strip item.
+  for (let i = 0; i < 6; i += 1) {
+    await page.keyboard.press('ArrowUp');
+    await frames(page, 2);
+  }
+  nav = await readNav(page);
   expect(nav.focus).toEqual({ zone: 'build', row: 0, col: 0, menu: 0 });
   expect(nav.info).toBe(infos[0]);
   expect(nav.cursor).not.toBeNull();
@@ -592,7 +677,7 @@ test('the arrows walk Play again and the strips, and Enter acts only on Play aga
   expect(box.y + box.height / 2).toBeCloseTo(nav.cursor!.y, 0);
   await expectRingReadable(page, SCENE.result, 'spell');
 
-  // Down through the strips to the last row, then off it onto Play again.
+  // Down through the strips to the last row, then off it onto the button nearest across.
   let last: PauseFocus | null = null;
   for (let i = 0; i < 6; i += 1) {
     await page.keyboard.press('ArrowDown');
@@ -607,27 +692,15 @@ test('the arrows walk Play again and the strips, and Enter acts only on Play aga
   expect(nav.cursor).toBeNull();
   expect(nav.info).toBe(INFO_HINT);
 
-  // Up goes back to the last row, and Enter there does nothing.
-  await page.keyboard.press('ArrowUp');
+  // Over to Main menu, and Enter opens exactly one main menu.
+  await page.keyboard.press('ArrowRight');
   await frames(page, 2);
-  nav = await readNav(page);
-  // The item nearest Play again across, on the last row.
-  expect(nav.focus).toMatchObject({ zone: 'build', row: (last as { row: number }).row });
-  const landed = nav.focus;
+  expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 1 });
   await page.keyboard.press('Enter');
+  await waitForScene(page, SCENE.intro);
   await frames(page, 10);
-  expect(await isSceneActive(page, SCENE.result)).toBe(true);
+  expect(await introStarts(page)).toBe(1);
   expect(await spellSelectStarts(page)).toBe(0);
-  expect((await readNav(page)).focus).toEqual(landed);
-
-  // Back to Play again along the first row, then Enter starts exactly one run.
-  await page.keyboard.press('ArrowDown');
-  await frames(page, 2);
-  expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 0 });
-  await page.keyboard.press('Enter');
-  await waitForScene(page, SCENE.spellSelect);
-  await frames(page, 10);
-  expect(await spellSelectStarts(page)).toBe(1);
   expect(errors).toEqual([]);
 });
 
@@ -722,7 +795,7 @@ for (const outcome of ['win', 'lose', 'ended'] as const) {
     // Every placement this screen promises the browser suite is unchanged.
     const s = await sample(page);
     expect(s.controls?.button).toEqual(RESULT_LAYOUT.button);
-    expect(s.texts.map((t) => t.text)).toContain('click, press Enter, or gamepad A');
+    expect(s.texts.map((t) => t.text)).toContain(HINT);
     console.log(
       `[info fits ${outcome}] items=${faces.length} longest=${longest.length} chars, ` +
         `max lines=${maxLines}, top=${minTop.toFixed(1)} (strips end ${relics.y + relics.height}), ` +
@@ -788,7 +861,7 @@ test('a defeat leaves the strips and the info line fully readable', async ({ pag
   expect(errors).toEqual([]);
 });
 
-test('an empty build has nothing to reach: the arrows stay on Play again and Enter starts one run', async ({
+test('an empty build has nothing to reach: up and down stay on the buttons and Enter starts one run', async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -799,7 +872,7 @@ test('an empty build has nothing to reach: the arrows stay on Play again and Ent
 
   await page.keyboard.press('ArrowRight');
   await frames(page, 2);
-  for (const key of ['ArrowRight', 'ArrowUp', 'ArrowDown']) {
+  for (const key of ['ArrowLeft', 'ArrowUp', 'ArrowDown']) {
     await page.keyboard.press(key);
     await frames(page, 2);
     const nav = await readNav(page);
@@ -811,5 +884,49 @@ test('an empty build has nothing to reach: the arrows stay on Play again and Ent
   await waitForScene(page, SCENE.spellSelect);
   await frames(page, 10);
   expect(await spellSelectStarts(page)).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('pad B opens exactly one main menu, without waking the highlight first (CO-218)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await installPad(page);
+  await openResult(page, maxedPayload('win'));
+  await waitForScene(page, SCENE.result);
+  await frames(page, 4); // the first poll after a connect only takes a baseline
+
+  await pressPad(page, B);
+  await waitForScene(page, SCENE.intro);
+  await frames(page, 10);
+  expect(await introStarts(page)).toBe(1);
+  expect(await spellSelectStarts(page)).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('the pad reaches Main menu with right, and A on it opens exactly one main menu', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await installPad(page);
+  await openResult(page, maxedPayload('lose'));
+  await waitForScene(page, SCENE.result);
+  await frames(page, 4);
+
+  await pressPad(page, A); // wakes Play again
+  await pressPad(page, RIGHT);
+  expect((await readNav(page)).focus).toEqual({ zone: 'menu', index: 1 });
+  const ring = await focusRing(page, SCENE.result);
+  expect(ring.box).toEqual(RESULT_LAYOUT.menuButton);
+  // Main menu's ring stays clear of Play again beside it and the hint under it.
+  const controls = (await sample(page)).controls!;
+  expect(ring.outer!.x).toBeGreaterThan(controls.button.x + controls.button.width);
+  expect(ring.outer!.y + ring.outer!.height).toBeLessThanOrEqual(controls.hint.y);
+  expect(await isSceneActive(page, SCENE.result)).toBe(true);
+  await pressPad(page, A);
+  await waitForScene(page, SCENE.intro);
+  await frames(page, 10);
+  expect(await introStarts(page)).toBe(1);
+  expect(await spellSelectStarts(page)).toBe(0);
   expect(errors).toEqual([]);
 });

@@ -3,49 +3,50 @@ import type { NavDirection } from './pauseNav';
 import { stepResultFocus } from './resultNav';
 
 const DIRS: readonly NavDirection[] = ['up', 'down', 'left', 'right'];
-const BUTTON = { zone: 'menu', index: 0 } as const;
+const PLAY = { zone: 'menu', index: 0 } as const;
+const MENU = { zone: 'menu', index: 1 } as const;
 const layout = {
   buildRows: [
     [428, 578, 728],
     [428, 476, 524, 572],
-    [428, 476],
+    [428, 476, 640],
   ],
-  buttonX: 480,
+  buttonXs: [358, 602],
 };
-const empty = { buildRows: [[], [], []], buttonX: 480 };
+const empty = { buildRows: [[], [], []], buttonXs: [358, 602] };
 
 describe('stepResultFocus', () => {
   it('wakes on Play again from nothing, whatever is pressed', () => {
-    for (const dir of DIRS) expect(stepResultFocus(null, dir, layout)).toEqual(BUTTON);
+    for (const dir of DIRS) expect(stepResultFocus(null, dir, layout)).toEqual(PLAY);
   });
 
-  it('steps right from Play again into the first strip item', () => {
-    expect(stepResultFocus(BUTTON, 'right', layout)).toEqual({
-      zone: 'build',
-      row: 0,
-      col: 0,
-      menu: 0,
-    });
+  it('steps right from Play again to Main menu and left back, without wrapping (CO-218)', () => {
+    expect(stepResultFocus(PLAY, 'right', layout)).toEqual(MENU);
+    expect(stepResultFocus(MENU, 'left', layout)).toEqual(PLAY);
+    expect(stepResultFocus(MENU, 'right', layout)).toEqual(MENU);
+    expect(stepResultFocus(PLAY, 'left', layout)).toEqual(PLAY);
   });
 
-  it('steps up from Play again onto the last row, at the item nearest the button', () => {
-    expect(stepResultFocus(BUTTON, 'up', layout)).toEqual({
-      zone: 'build',
-      row: 2,
-      col: 1,
-      menu: 0,
-    });
+  it('steps up from either button onto the last row, at the item nearest that button', () => {
+    expect(stepResultFocus(PLAY, 'up', layout)).toEqual({ zone: 'build', row: 2, col: 0, menu: 0 });
+    expect(stepResultFocus(MENU, 'up', layout)).toEqual({ zone: 'build', row: 2, col: 2, menu: 1 });
   });
 
-  it('keeps Play again on down and left', () => {
-    expect(stepResultFocus(BUTTON, 'down', layout)).toEqual(BUTTON);
-    expect(stepResultFocus(BUTTON, 'left', layout)).toEqual(BUTTON);
+  it('keeps either button on down', () => {
+    expect(stepResultFocus(PLAY, 'down', layout)).toEqual(PLAY);
+    expect(stepResultFocus(MENU, 'down', layout)).toEqual(MENU);
   });
 
-  it('goes down from the last row to Play again, and down elsewhere to the item nearest across', () => {
-    expect(stepResultFocus({ zone: 'build', row: 2, col: 1, menu: 0 }, 'down', layout)).toEqual(
-      BUTTON,
+  it('goes down from the last row to the button nearest across', () => {
+    expect(stepResultFocus({ zone: 'build', row: 2, col: 0, menu: 1 }, 'down', layout)).toEqual(
+      PLAY,
     );
+    expect(stepResultFocus({ zone: 'build', row: 2, col: 2, menu: 0 }, 'down', layout)).toEqual(
+      MENU,
+    );
+  });
+
+  it('goes down elsewhere to the item nearest across', () => {
     expect(stepResultFocus({ zone: 'build', row: 0, col: 1, menu: 0 }, 'down', layout)).toEqual({
       zone: 'build',
       row: 1,
@@ -54,10 +55,11 @@ describe('stepResultFocus', () => {
     });
   });
 
-  it('stays on the first row on up, and goes back to Play again off column 0', () => {
+  it('stays on the first row on up, and goes back to the button it came from off column 0', () => {
     const top = { zone: 'build', row: 0, col: 1, menu: 0 } as const;
     expect(stepResultFocus(top, 'up', layout)).toEqual(top);
-    expect(stepResultFocus({ ...top, col: 0 }, 'left', layout)).toEqual(BUTTON);
+    expect(stepResultFocus({ ...top, col: 0 }, 'left', layout)).toEqual(PLAY);
+    expect(stepResultFocus({ ...top, col: 0, menu: 1 }, 'left', layout)).toEqual(MENU);
   });
 
   it('walks along a row and stops at its end', () => {
@@ -67,20 +69,24 @@ describe('stepResultFocus', () => {
     expect(stepResultFocus(at(2), 'left', layout)).toEqual(at(1));
   });
 
-  it('falls back to Play again from a row that no longer exists', () => {
+  it('falls back to the button it came from off a row that no longer exists', () => {
     const stale = { zone: 'build', row: 9, col: 0, menu: 0 } as const;
-    for (const dir of DIRS) expect(stepResultFocus(stale, dir, layout)).toEqual(BUTTON);
+    for (const dir of DIRS) expect(stepResultFocus(stale, dir, layout)).toEqual(PLAY);
+    for (const dir of DIRS)
+      expect(stepResultFocus({ ...stale, menu: 1 }, dir, layout)).toEqual(MENU);
   });
 
-  it('stays on Play again with nothing in the strips', () => {
-    for (const dir of ['right', 'up', 'down'] as const) {
-      expect(stepResultFocus(BUTTON, dir, empty)).toEqual(BUTTON);
+  it('keeps up and down on the buttons with nothing in the strips, and left and right still step', () => {
+    for (const dir of ['up', 'down'] as const) {
+      expect(stepResultFocus(PLAY, dir, empty)).toEqual(PLAY);
+      expect(stepResultFocus(MENU, dir, empty)).toEqual(MENU);
     }
+    expect(stepResultFocus(PLAY, 'right', empty)).toEqual(MENU);
   });
 
   it('skips empty rows', () => {
-    const gaps = { buildRows: [[428, 476], [], [428]], buttonX: 480 };
-    expect(stepResultFocus(BUTTON, 'up', gaps)).toEqual({ zone: 'build', row: 1, col: 0, menu: 0 });
+    const gaps = { buildRows: [[428, 476], [], [428]], buttonXs: [358, 602] };
+    expect(stepResultFocus(PLAY, 'up', gaps)).toEqual({ zone: 'build', row: 1, col: 0, menu: 0 });
     expect(stepResultFocus({ zone: 'build', row: 0, col: 1, menu: 0 }, 'down', gaps)).toEqual({
       zone: 'build',
       row: 1,

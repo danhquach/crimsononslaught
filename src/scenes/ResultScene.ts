@@ -34,18 +34,21 @@ import {
 import { saveStoreFailed } from '../storage/localSave';
 import { addInspectable, infoLook, type BuildSlot } from './buildInspect';
 import { focusable } from './focusRing';
-import { attachNavInput, type MenuItem } from './input';
+import { attachNavInput, attachPadButtons, type MenuItem } from './input';
 
-const HINT = 'click, press Enter, or gamepad A';
+const HINT = 'click, press Enter, or gamepad A · Esc or B for the main menu';
 const BUTTON_REST_ALPHA = 0.6;
 const BUTTON_REST_TEXT = '#dddddd';
 /** A spell's name starts this far right of its icon's centre: clear of the icon and its level badge. */
 const NAME_INSET = SPELL_ICON_SIZE / 2 + 12;
 const NAV_DIRECTIONS: readonly NavDirection[] = ['up', 'down', 'left', 'right'];
 
-/** On-screen bounds of the button and its hint, for the browser suite. */
+/** On-screen bounds of the buttons and their hint, for the browser suite. */
 export interface ResultControls {
+  /** "Play again". */
   button: Box;
+  /** "Main menu" (CO-218). */
+  menuButton: Box;
   hint: Box;
 }
 
@@ -54,17 +57,19 @@ export interface ResultControls {
  * on its stand with the run level and a stats card on the left (greyed on a
  * loss); the run's spells, passives with ranks and relic buffs with stacks
  * (icon art, or lettered tiles without it) in the pause screen's framed strips
- * on the right; an info line under them; and "Play again" with its hint at a
- * fixed place at the bottom. Every area is fixed (`RESULT_LAYOUT`), so no
- * build moves the button. Pointing at a spell, passive or relic, or reaching
- * it with the arrows or a pad (CO-198), reads it out on the info line as the
- * pause screen does. Click, Enter or pad A on "Play again" start SpellSelect,
- * exactly once; A or Enter on a strip item does nothing. Started without a
- * valid payload it falls back to SpellSelect (spec §7).
+ * on the right; an info line under them; and "Play again" and "Main menu"
+ * with their hint at a fixed place at the bottom. Every area is fixed
+ * (`RESULT_LAYOUT`), so no build moves the buttons. Pointing at a spell,
+ * passive or relic, or reaching it with the arrows or a pad (CO-198), reads it
+ * out on the info line as the pause screen does. Click, Enter or pad A on
+ * "Play again" start SpellSelect, and on "Main menu" open Intro, as do Esc and
+ * pad B (CO-218); whichever comes first leaves, exactly once. A or Enter on a
+ * strip item does nothing. Started without a valid payload it falls back to
+ * SpellSelect (spec §7).
  */
 export class ResultScene extends Phaser.Scene {
   private payload: ResultPayload | null = null;
-  private restarted = false;
+  private leaving = false;
   private placed: ResultControls | null = null;
   /** Where the pad or the arrows have the highlight; `null` until the first press. */
   private focus: PauseFocus | null = null;
@@ -81,7 +86,7 @@ export class ResultScene extends Phaser.Scene {
     return this.payload;
   }
 
-  /** Where "Play again" and its hint were drawn; `null` before the screen is up. */
+  /** Where the buttons and their hint were drawn; `null` before the screen is up. */
   get controls(): Readonly<ResultControls> | null {
     return this.placed;
   }
@@ -90,7 +95,7 @@ export class ResultScene extends Phaser.Scene {
   get nav(): {
     focus: PauseFocus | null;
     info: string;
-    /** The centre of the strip item the pad has lit; `null` while the focus is on "Play again". */
+    /** The centre of the strip item the pad has lit; `null` while the focus is on a button. */
     cursor: { x: number; y: number } | null;
   } {
     const slot = this.padSlot;
@@ -110,7 +115,7 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.restarted = false;
+    this.leaving = false;
     this.placed = null;
     this.focus = null;
     this.padSlot = null;
@@ -150,7 +155,23 @@ export class ResultScene extends Phaser.Scene {
           addBuildIcon(scene, x, y, tile, RELIC_COLOR) ?? addRelicGem(scene, x, y, tile),
       ),
     ].filter((row) => row.length > 0);
-    this.attachFocus(this.drawPlayAgain(), rows);
+    const { button, menuButton } = RESULT_LAYOUT;
+    const playAgain = this.drawButton(button, 'Play again', () => this.playAgain());
+    const mainMenu = this.drawButton(menuButton, 'Main menu', () => this.mainMenu('ui.confirm'));
+    const hint = this.add
+      .text(width / 2, RESULT_LAYOUT.hintY, HINT, {
+        fontFamily: SERIF,
+        fontSize: '14px',
+        color: '#888888',
+      })
+      .setOrigin(0.5);
+    this.placed = { button: playAgain.box, menuButton: mainMenu.box, hint: boxOf(hint) };
+    this.attachFocus([playAgain.item, mainMenu.item], rows);
+    // Esc and pad B go back to the main menu, as back does on the other menu screens (CO-218).
+    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.repeat) this.mainMenu('ui.back');
+    });
+    attachPadButtons(this, { B: () => this.mainMenu('ui.back') });
     // The run's save was written just before this screen opened (#316).
     const notice = saveNotice(false, saveStoreFailed());
     if (notice !== null) {
@@ -318,24 +339,24 @@ export class ResultScene extends Phaser.Scene {
   }
 
   /**
-   * CO-198: the pad and the arrows walk "Play again" and the strips as one
+   * CO-198: the pad and the arrows walk the buttons and the strips as one
    * layout (`core/resultNav.ts`). Nothing is lit until the first press, which
    * wakes the highlight on "Play again"; Enter with nothing lit starts a new
-   * run at once, as before. A or Enter confirms on "Play again" and does
-   * nothing on a strip item.
+   * run at once, as before. A or Enter confirms on a button and does nothing
+   * on a strip item.
    */
-  private attachFocus(item: MenuItem, rows: readonly BuildSlot[][]): void {
-    const box = RESULT_LAYOUT.button;
+  private attachFocus(items: readonly MenuItem[], rows: readonly BuildSlot[][]): void {
+    const { button, menuButton } = RESULT_LAYOUT;
     const layout = {
       buildRows: rows.map((row) => row.map((s) => s.x)),
-      buttonX: box.x + box.width / 2,
+      buttonXs: [button, menuButton].map((box) => box.x + box.width / 2),
     };
     const focusOn = (next: PauseFocus): void => {
       const before = this.focus;
       if (before && JSON.stringify(before) === JSON.stringify(next)) return;
       this.focus = next;
       audioOf(this).play('ui.move');
-      item.setSelected(next.zone === 'menu');
+      items.forEach((item, i) => item.setSelected(next.zone === 'menu' && i === next.index));
       this.padSlot?.setLit(false);
       this.padSlot = next.zone === 'build' ? (rows[next.row]?.[next.col] ?? null) : null;
       this.padSlot?.setLit(true);
@@ -351,8 +372,8 @@ export class ResultScene extends Phaser.Scene {
         }
         if (!pressed.confirm) return;
         const focus = this.focus;
-        if (focus?.zone === 'menu') item.confirm();
-        else if (focus === null && source === 'keyboard') item.confirm();
+        if (focus?.zone === 'menu') items[focus.index]?.confirm();
+        else if (focus === null && source === 'keyboard') items[0]?.confirm();
         else if (focus === null) focusOn(stepResultFocus(null, 'down', layout));
       },
       { keyboard: true },
@@ -360,12 +381,11 @@ export class ResultScene extends Phaser.Scene {
   }
 
   /**
-   * "Play again" as the pause screen's Yes / No buttons look: a wine bar that
-   * lights up, with a crimson edge and a ▶ marker, under a pointer or once a
-   * pad has woken the highlight; its hint sits under it.
+   * A result button as the pause screen's Yes / No buttons look: a wine bar
+   * that lights up, with a crimson edge and a ▶ marker, under a pointer or
+   * once a pad has woken the highlight on it.
    */
-  private drawPlayAgain(): MenuItem {
-    const box = RESULT_LAYOUT.button;
+  private drawButton(box: Box, text: string, act: () => void): { item: MenuItem; box: Box } {
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
     // The bar is the click target, so it fades by its fill: Phaser never
@@ -373,7 +393,7 @@ export class ResultScene extends Phaser.Scene {
     const bar = this.add.rectangle(cx, cy, box.width, box.height, WINE, BUTTON_REST_ALPHA);
     const edge = this.add.rectangle(box.x + 1.5, cy, 3, box.height, CRIMSON).setAlpha(0);
     const label = this.add
-      .text(cx, cy, 'Play again', { fontFamily: SERIF, fontSize: '20px', color: BUTTON_REST_TEXT })
+      .text(cx, cy, text, { fontFamily: SERIF, fontSize: '20px', color: BUTTON_REST_TEXT })
       .setOrigin(0.5);
     const marker = this.add
       .text(cx - label.width / 2 - 20, cy, '▶', {
@@ -383,13 +403,6 @@ export class ResultScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5)
       .setAlpha(0);
-    const hint = this.add
-      .text(cx, RESULT_LAYOUT.hintY, HINT, {
-        fontFamily: SERIF,
-        fontSize: '14px',
-        color: '#888888',
-      })
-      .setOrigin(0.5);
 
     // The pointer lights the bar; a pad's focus also draws the shared ring (CO-196).
     const focus = focusable(this, box, ({ raised }) => {
@@ -404,22 +417,30 @@ export class ResultScene extends Phaser.Scene {
       audioOf(this).play('ui.move');
     });
     bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => focus.setHovered(false));
-    bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, () => this.playAgain());
+    bar.on(Phaser.Input.Events.GAMEOBJECT_POINTER_UP, act);
 
-    const bounds = (o: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Text): Box => {
-      const b = o.getBounds();
-      return { x: b.x, y: b.y, width: b.width, height: b.height };
-    };
-    this.placed = { button: bounds(bar), hint: bounds(hint) };
     // Pad A lights the button on its first press and confirms it on the next.
-    return { setSelected: focus.setFocused, confirm: () => this.playAgain() };
+    return { item: { setSelected: focus.setFocused, confirm: act }, box: boxOf(bar) };
   }
 
   /** Idempotent: a click and Enter in the same frame start exactly one SpellSelect. */
   private playAgain(): void {
-    if (this.restarted) return;
-    this.restarted = true;
+    if (this.leaving) return;
+    this.leaving = true;
     audioOf(this).play('ui.confirm');
     this.scene.start(SCENE.spellSelect);
   }
+
+  /** The main menu, guarded with `playAgain` so a click and Esc together leave exactly once. */
+  private mainMenu(sound: 'ui.confirm' | 'ui.back'): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    audioOf(this).play(sound);
+    this.scene.start(SCENE.intro);
+  }
+}
+
+function boxOf(o: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Text): Box {
+  const b = o.getBounds();
+  return { x: b.x, y: b.y, width: b.width, height: b.height };
 }

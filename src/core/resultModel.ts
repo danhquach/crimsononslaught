@@ -33,7 +33,7 @@ export const RESULT_HEADLINES: Readonly<Record<Outcome, ResultHeadline>> = {
 /** `[label, value]`, shown in order. */
 export type StatRow = readonly [label: string, value: string];
 
-/** Keys that confirm "Play again" (the main and numpad Enter both report `Enter`). */
+/** Keys that confirm a result button (the main and numpad Enter both report `Enter`). */
 export function isConfirmKey(key: string): boolean {
   return key === 'Enter';
 }
@@ -114,8 +114,8 @@ export interface Box {
 /**
  * Where everything sits (#290), fixed whatever the build: the headline on
  * top, the hero and stats card on the left, the three strips on the right and
- * "Play again" with its hint at the bottom. Nothing moves with the content, so
- * a long run can never push the button off the screen.
+ * "Play again" and "Main menu" with their hint at the bottom. Nothing moves
+ * with the content, so a long run can never push the buttons off the screen.
  */
 export const RESULT_LAYOUT = {
   headlineY: 42,
@@ -135,7 +135,12 @@ export const RESULT_LAYOUT = {
    * fit; anything taller hangs from the top, clear of the strips.
    */
   info: { x: 36, y: 392, width: 888, height: 44 },
-  button: { x: 370, y: 444, width: 220, height: 34 },
+  /**
+   * "Play again", and "Main menu" beside it (CO-218): 24 px apart, so neither's
+   * focus ring reaches the other.
+   */
+  button: { x: 248, y: 444, width: 220, height: 34 },
+  menuButton: { x: 492, y: 444, width: 220, height: 34 },
   hintY: 500,
   /** The save-failed line (#316), under the hint; 24 px clears two CI-height 14 px lines. */
   saveNoticeY: 524,

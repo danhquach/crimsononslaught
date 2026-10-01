@@ -18,7 +18,8 @@ import { cardCenter } from '../e2e/game';
  *
  * Positions mirror `e2e/help.spec.ts` and the menu rows (CO-191: Intro's plates
  * 54 px apart from y = 262; Help's tabs at y = 92; Send feedback at y = 410;
- * Send and Cancel at y = 446; Back at y = 478) and `ResultScene` (the Play again bar).
+ * Send and Cancel at y = 446; Back at y = 478) and `ResultScene` (the Play again
+ * bar, the left of its two).
  */
 
 const HELP_ENTRY = { x: 480, y: 262 + 3 * 54 };
@@ -29,7 +30,7 @@ const SEND = { x: 370, y: 446 };
 const CANCEL = { x: 590, y: 446 };
 const HELP_BACK = { x: 480, y: 478 };
 /** Inside the Play again bar's left end, clear of its label. */
-const PLAY_AGAIN_BAR = { x: 380, y: 468 };
+const PLAY_AGAIN_BAR = { x: 258, y: 468 };
 
 /**
  * Whether the row-label face is in use, not just fetched (the title is a
