@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Lint, test, build
+  build:
+    name: Lint, unit, build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,8 +32,6 @@ jobs:
           VITE_FEEDBACK_ACCESS_KEY: ${{ secrets.FEEDBACK_ACCESS_KEY }}
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
-      - name: Browser smoke tests
-        run: npm run test:e2e
       - name: Content-Security-Policy check on the built site
         # Builds into dist-csp/, so the dist/ deployed below is never rebuilt with the stand-in key.
         run: npm run test:csp
@@ -41,7 +39,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report
+          name: playwright-report-csp
           path: playwright-report
           retention-days: 7
       - name: Upload site for deploy
@@ -49,6 +47,46 @@ jobs:
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
+
+  e2e:
+    # The suite is bound to wall clock and runs one worker per machine, so it is
+    # split across runners instead: 5 shards come out within ~1 min of each other.
+    name: Browser smoke (${{ matrix.shard }}/5)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke tests
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/5
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-${{ matrix.shard }}
+          path: playwright-report
+          retention-days: 7
+
+  check:
+    # The required status check on main: green only when the build and every
+    # e2e shard are.
+    name: Lint, test, build
+    needs: [build, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed
+        if: needs.build.result != 'success' || needs.e2e.result != 'success'
+        run: exit 1
 
   deploy:
     name: Deploy to GitHub Pages
