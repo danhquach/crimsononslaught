@@ -48,7 +48,7 @@ function setIcon(icon: Phaser.GameObjects.Image, kind: IconKind, size: number): 
 /**
  * The icon a Minimap switch shows in Settings, centred on (x, y) and `size` px
  * across: the ring for the map, the white box for the viewport, atlas art for
- * the boss and pickups (the radar's flat shape without it) and red dots for enemies.
+ * the boss and each pickup kind, the chest for Pickups (the radar's flat shape without it) and red dots for enemies.
  */
 export function addSwitchIcon(
   scene: Phaser.Scene,
@@ -81,7 +81,7 @@ export function addSwitchIcon(
       g.fillRect(x + dx - 1.5, y + dy - 1.5, 3, 3);
     }
   } else {
-    const kind: IconKind = key === 'boss' ? 'boss' : 'chest';
+    const kind: IconKind = key === 'pickups' ? 'chest' : key;
     if (iconsArt(scene)) {
       g.destroy();
       const icon = scene.add.image(x, y, FRAMES[MINIMAP_ICON_FRAMES[kind]].page);

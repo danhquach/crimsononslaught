@@ -61,18 +61,13 @@ export interface MinimapView {
 
 /** The minimap switches held in a save's `settings`; own keys only, anything but a boolean is the default. */
 export function readMinimapSettings(saved: Readonly<SaveSettings>): MinimapSettings {
-  const read = (name: keyof MinimapSettings): boolean => {
+  const out = {} as MinimapSettings;
+  for (const name of Object.keys(MINIMAP_SETTING_KEYS) as (keyof MinimapSettings)[]) {
     const key = MINIMAP_SETTING_KEYS[name];
     const value = Object.hasOwn(saved, key) ? saved[key] : undefined;
-    return typeof value === 'boolean' ? value : DEFAULT_MINIMAP_SETTINGS[name];
-  };
-  return {
-    on: read('on'),
-    viewport: read('viewport'),
-    boss: read('boss'),
-    pickups: read('pickups'),
-    enemies: read('enemies'),
-  };
+    out[name] = typeof value === 'boolean' ? value : DEFAULT_MINIMAP_SETTINGS[name];
+  }
+  return out;
 }
 
 /** A save's `settings` with the minimap switches written over it; other keys kept. */
@@ -80,18 +75,15 @@ export function writeMinimapSettings(
   saved: Readonly<SaveSettings>,
   minimap: Readonly<MinimapSettings>,
 ): SaveSettings {
-  return {
-    ...saved,
-    [MINIMAP_SETTING_KEYS.on]: minimap.on === true,
-    [MINIMAP_SETTING_KEYS.viewport]: minimap.viewport === true,
-    [MINIMAP_SETTING_KEYS.boss]: minimap.boss === true,
-    [MINIMAP_SETTING_KEYS.pickups]: minimap.pickups === true,
-    [MINIMAP_SETTING_KEYS.enemies]: minimap.enemies === true,
-  };
+  const written: SaveSettings = { ...saved };
+  for (const name of Object.keys(MINIMAP_SETTING_KEYS) as (keyof MinimapSettings)[]) {
+    written[MINIMAP_SETTING_KEYS[name]] = minimap[name] === true;
+  }
+  return written;
 }
 
 /**
- * A save's `settings` without any `minimap.` key that is not one of the five
+ * A save's `settings` without any `minimap.` key that is not one of the
  * switches or whose value is not a boolean. The load-time allow-list (CO-207):
  * a stored file never grows the save with keys it invented.
  */
@@ -168,12 +160,15 @@ export function buildMinimapView(frame: Readonly<MinimapFrame>, box: number): Mi
     return segments;
   };
 
-  /** The off-screen pickups, the `MINIMAP_MAX_PICKUPS` nearest the player when there are more. */
+  /**
+   * The off-screen pickups whose kind is switched on, at most `MINIMAP_MAX_PICKUPS`:
+   * the nearest first, but gems last (#383), so hundreds of them never push a relic off the map.
+   */
   const nearestPickups = (f: Readonly<MinimapFrame>): MinimapView['pickups'] =>
     f.pickups
-      .filter((p) => !inView(f.view, p))
+      .filter((p) => settings[p.kind] && !inView(f.view, p))
       .map((p) => ({ dist: Math.hypot(p.x - player.x, p.y - player.y), p }))
-      .sort((a, b) => a.dist - b.dist)
+      .sort((a, b) => Number(a.p.kind === 'gem') - Number(b.p.kind === 'gem') || a.dist - b.dist)
       .slice(0, MINIMAP_MAX_PICKUPS)
       .map(({ p }) => ({ ...marker(p), kind: p.kind }));
 

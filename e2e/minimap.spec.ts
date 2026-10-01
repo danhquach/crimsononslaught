@@ -1,7 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { MAX_LIVE_ENEMIES } from '../src/config/enemies';
 import { FIRE_ROSTER_SPELL_IDS } from '../src/config/fireRoster';
-import { MINIMAP_SETTING_KEYS } from '../src/config/minimap';
+import {
+  DEFAULT_MINIMAP_SETTINGS,
+  MINIMAP_MAX_PICKUPS,
+  MINIMAP_PICKUP_KINDS,
+  MINIMAP_SETTING_KEYS,
+} from '../src/config/minimap';
 import { SPELL_IDS } from '../src/config/spells';
 import { PASSIVES } from '../src/config/passives';
 import { emptySave } from '../src/core/save';
@@ -19,6 +24,7 @@ import {
   frames,
   menuRows,
   readHud,
+  sceneTexts,
   startFromIntro,
   waitForScene,
 } from './game';
@@ -42,6 +48,55 @@ async function seedStorage(page: Page, json: string): Promise<void> {
 
 function saveWith(settings: Save['settings']): string {
   return JSON.stringify({ ...emptySave(), settings });
+}
+
+/** The eight relics lie off screen from the start and are marked by default (#383), so a test that counts markers leaves them out. */
+const NO_RELICS = saveWith({ [MINIMAP_SETTING_KEYS.relic]: false });
+const GEMS_ON = saveWith({ [MINIMAP_SETTING_KEYS.gem]: true });
+
+type Dropped = {
+  kind: 'ember' | 'gem' | 'health' | 'magnet' | 'bomb' | 'chest';
+  dx: number;
+  dy: number;
+};
+
+/** Put pickups at offsets from the hero, bypassing the drop plan. Returns how many landed. */
+function dropAt(page: Page, items: readonly Dropped[]): Promise<number> {
+  return page.evaluate(
+    async ([gameKey, list]) => {
+      const { game } = await import('/src/main.ts');
+      const scene = game.scene.getScene(gameKey) as unknown as {
+        player: { x: number; y: number };
+        gems: { spawn(x: number, y: number): unknown };
+        pickups: {
+          dropEmber(x: number, y: number, value: number): boolean;
+          dropConsumable(kind: string, x: number, y: number): boolean;
+        };
+      };
+      const { x, y } = scene.player;
+      let landed = 0;
+      for (const { kind, dx, dy } of list as readonly Dropped[]) {
+        const ok =
+          kind === 'gem'
+            ? scene.gems.spawn(x + dx, y + dy) !== null
+            : kind === 'ember'
+              ? scene.pickups.dropEmber(x + dx, y + dy, 1)
+              : scene.pickups.dropConsumable(kind, x + dx, y + dy);
+        if (ok) landed += 1;
+      }
+      return landed;
+    },
+    [SCENE.game, items] as const,
+  );
+}
+
+/** What the map marks, by kind, with the snapshot it came from, in one evaluate. */
+function markedKinds(page: Page): Promise<string[]> {
+  return page.evaluate(async (hudKey) => {
+    const { game } = await import('/src/main.ts');
+    const rep = (game.scene.getScene(hudKey) as HudScene).minimapReport;
+    return (rep.map?.pickups ?? []).map((p) => p.kind);
+  }, SCENE.hud);
 }
 
 async function startRun(page: Page, query = ''): Promise<void> {
@@ -81,6 +136,50 @@ function geometry(page: Page) {
     const player = rep.world?.player ?? { x: 0, y: 0 };
     return { rep, centre, radius, scale, player };
   }, SCENE.hud);
+}
+
+const KIND_LABELS = {
+  health: 'Health',
+  magnet: 'Magnet',
+  bomb: 'Bomb',
+  chest: 'Chest',
+  relic: 'Relic',
+  ember: 'Ember',
+  gem: 'XP gems',
+} as const;
+
+const KINDS_ROW = 'Pickup kinds  ▸';
+
+/** The pickup kinds page is up once its first switch is drawn; the main page once the row that opens it is. */
+async function waitForPage(page: Page, kinds: boolean): Promise<void> {
+  await waitForScene(page, SCENE.settings);
+  await expect
+    .poll(async () =>
+      (await menuRows(page, SCENE.settings)).some((r) =>
+        kinds ? r.label.startsWith('Health:') : r.label === KINDS_ROW,
+      ),
+    )
+    .toBe(true);
+}
+
+async function openKinds(page: Page): Promise<void> {
+  await clickRow(page, SCENE.settings, KINDS_ROW);
+  await waitForPage(page, true);
+}
+
+/** Press the down arrow until the row labelled `label` is the highlighted one. */
+async function arrowTo(page: Page, label: string): Promise<void> {
+  for (let i = 0; i < 24; i++) {
+    const rows = await menuRows(page, SCENE.settings);
+    if (rows.find((r) => r.selected)?.label === label) return;
+    await page.keyboard.press('ArrowDown');
+    await frames(page, 2);
+  }
+  throw new Error(`the arrows never reached "${label}"`);
+}
+
+async function selectedLabel(page: Page): Promise<string | undefined> {
+  return (await menuRows(page, SCENE.settings)).find((r) => r.selected)?.label;
 }
 
 test('the player sits at the centre and the viewport box where the world puts it', async ({
@@ -124,6 +223,7 @@ test('off-screen pickups in range sit at their spot, those beyond it are pinned 
   page,
 }) => {
   const errors = collectErrors(page);
+  await seedStorage(page, NO_RELICS);
   await startRun(page);
 
   const dropped = await page.evaluate(async (gameKey) => {
@@ -386,6 +486,11 @@ const HOSTILE = [
       'minimap.\u202Eviewport': false,
       'minimap.\u043En': false,
       'minimap.boss': 7,
+      'minimap.pickups.relic': 'false',
+      'minimap.pickups.gem': 1,
+      'minimap.pickups.health.x': false,
+      'minimap.pickups.constructor': false,
+      'minimap.pickups.\u0433em': true,
     }),
   },
   {
@@ -408,6 +513,7 @@ for (const { name, json } of HOSTILE) {
     const rep = await report(page);
     expect(rep.visible).toBe(true);
     expect(rep.layers).toEqual({ viewport: true, boss: false, pickups: true, enemies: false });
+    expect(rep.world?.settings).toEqual(DEFAULT_MINIMAP_SETTINGS);
     const settings = await page.evaluate(async (key) => {
       const { game } = await import('/src/main.ts');
       const save = game.registry.get(key) as Save | undefined;
@@ -429,10 +535,13 @@ const ICON_FRAMES = {
   magnet: 'pickupMagnet.idle.0',
   bomb: 'pickupBomb.idle.0',
   chest: 'pickupChest.idle.0',
+  relic: 'pickupRelic.idle.0',
+  ember: 'pickupEmber.idle.0',
+  gem: 'gem.idle.0',
   boss: 'boss.walk.down.0',
 } as const;
 
-/** One pickup of each kind, two in range and two pinned, all inside the arena, plus the boss. */
+/** One pickup of each kind but relics (the arena's own are marked), two in range and two pinned, all inside the arena, plus the boss. */
 async function placeMarkers(page: Page): Promise<void> {
   await page.evaluate(async (gameKey) => {
     const { game } = await import('/src/main.ts');
@@ -448,7 +557,15 @@ async function placeMarkers(page: Page): Promise<void> {
     scene.pickups.dropConsumable('chest', x - 1000, y - 900);
     scene.spawnBossForTest();
   }, SCENE.game);
-  await expect.poll(async () => (await report(page)).map?.pickups.length).toBe(4);
+  expect(
+    await dropAt(page, [
+      { kind: 'ember', dx: 650, dy: -500 },
+      { kind: 'gem', dx: -700, dy: 450 },
+    ]),
+  ).toBe(2);
+  await expect
+    .poll(async () => (await markedKinds(page)).filter((k) => k !== 'relic').length)
+    .toBe(6);
   await expect.poll(async () => (await report(page)).layers.boss).toBe(true);
 }
 
@@ -456,6 +573,7 @@ test('each pickup kind and the boss show their own atlas frame, and pinned icons
   page,
 }) => {
   const errors = collectErrors(page);
+  await seedStorage(page, GEMS_ON);
   await startRun(page);
   await placeMarkers(page);
   await frames(page, 3);
@@ -467,7 +585,7 @@ test('each pickup kind and the boss show their own atlas frame, and pinned icons
   expect(rep.icons).toHaveLength(pickups.length + 1);
   const iconAt = (m: { x: number; y: number }) =>
     rep.icons.find((i) => Math.abs(i.x - m.x) < 0.01 && Math.abs(i.y - m.y) < 0.01);
-  for (const kind of ['health', 'magnet', 'bomb', 'chest'] as const) {
+  for (const kind of MINIMAP_PICKUP_KINDS) {
     const marker = pickups.find((p) => p.kind === kind);
     expect(marker, `${kind} marker`).toBeTruthy();
     expect(iconAt(marker ?? { x: NaN, y: NaN })?.frame, `${kind} icon`).toBe(ICON_FRAMES[kind]);
@@ -485,12 +603,15 @@ test('without the atlas the markers fall back to flat shapes, with no errors', a
   const errors = collectErrors(page);
   const failed: string[] = [];
   page.on('requestfailed', (req) => failed.push(new URL(req.url()).pathname));
+  await seedStorage(page, GEMS_ON);
   await startRun(page);
   await placeMarkers(page);
   await frames(page, 3);
   const rep = await report(page);
   expect(rep.icons).toEqual([]);
-  expect(rep.map?.pickups).toHaveLength(4);
+  expect((rep.map?.pickups ?? []).map((p) => p.kind)).toEqual(
+    expect.arrayContaining([...MINIMAP_PICKUP_KINDS]),
+  );
   expect(rep.map?.boss).toBeTruthy();
   // The aborted download (retried by the loader) is the browser's own console
   // error, so it must be the only request that failed.
@@ -498,47 +619,55 @@ test('without the atlas the markers fall back to flat shapes, with no errors', a
   expect(errors.filter((e) => !e.includes('Failed to load resource'))).toEqual([]);
 });
 
+const PAGE_ICON_LABELS = {
+  main: {
+    on: 'Minimap',
+    viewport: 'Viewport box',
+    boss: 'Boss',
+    pickups: 'Pickups',
+    enemies: 'Enemies',
+  },
+  pickups: KIND_LABELS,
+} as const;
+
 for (const atlas of [true, false]) {
-  test(`each Minimap row has its icon left of its label, clear of it (${atlas ? 'atlas' : 'no atlas'})`, async ({
-    page,
-  }) => {
-    if (!atlas) await page.route('**/assets/atlas/props11.png', (route) => route.abort());
-    await page.goto('/?seed=1&invulnerable=1');
-    await waitForScene(page, SCENE.intro);
-    await clickRow(page, SCENE.intro, 'Settings');
-    await waitForScene(page, SCENE.settings);
-    const icons = await page.evaluate(async (key) => {
-      const { game } = await import('/src/main.ts');
-      return (game.scene.getScene(key) as unknown as SettingsScene).switchIconReports;
-    }, SCENE.settings);
-    const rows = await menuRows(page, SCENE.settings);
-    const labels = {
-      on: 'Minimap',
-      viewport: 'Viewport box',
-      boss: 'Boss',
-      pickups: 'Pickups',
-      enemies: 'Enemies',
-    };
-    expect(icons.map((i) => i.key)).toEqual(Object.keys(labels));
-    for (const icon of icons) {
-      const row = rows.find((r) => r.label.startsWith(`${labels[icon.key]}:`));
-      expect(row, `${icon.key} row`).toBeTruthy();
-      if (!row) continue;
-      const { bounds: b, labelBounds: l } = row;
-      expect(icon.bounds.x, `${icon.key} icon inside its row`).toBeGreaterThanOrEqual(b.x);
-      expect(
-        icon.bounds.x + icon.bounds.width + 8,
-        `${icon.key} icon to label gap`,
-      ).toBeLessThanOrEqual(l.x);
-      const iconMid = icon.bounds.y + icon.bounds.height / 2;
-      expect(Math.abs(iconMid - (l.y + l.height / 2)), `${icon.key} centres`).toBeLessThanOrEqual(
-        2,
-      );
-      expect(icon.art, `${icon.key} art`).toBe(
-        atlas && (icon.key === 'boss' || icon.key === 'pickups'),
-      );
-    }
-  });
+  for (const settingsPage of ['main', 'pickups'] as const) {
+    test(`each switch row on the ${settingsPage} Settings page has its icon left of its label, clear of it (${atlas ? 'atlas' : 'no atlas'})`, async ({
+      page,
+    }) => {
+      if (!atlas) await page.route('**/assets/atlas/props11.png', (route) => route.abort());
+      await page.goto('/?seed=1&invulnerable=1');
+      await waitForScene(page, SCENE.intro);
+      await clickRow(page, SCENE.intro, 'Settings');
+      await waitForPage(page, false);
+      if (settingsPage === 'pickups') await openKinds(page);
+      const icons = await page.evaluate(async (key) => {
+        const { game } = await import('/src/main.ts');
+        return (game.scene.getScene(key) as unknown as SettingsScene).switchIconReports;
+      }, SCENE.settings);
+      const rows = await menuRows(page, SCENE.settings);
+      const labels: Record<string, string> = PAGE_ICON_LABELS[settingsPage];
+      expect(icons.map((i) => i.key)).toEqual(Object.keys(labels));
+      for (const icon of icons) {
+        const row = rows.find((r) => r.label.startsWith(`${labels[icon.key]}:`));
+        expect(row, `${icon.key} row`).toBeTruthy();
+        if (!row) continue;
+        const { bounds: b, labelBounds: l } = row;
+        expect(icon.bounds.x, `${icon.key} icon inside its row`).toBeGreaterThanOrEqual(b.x);
+        expect(
+          icon.bounds.x + icon.bounds.width + 8,
+          `${icon.key} icon to label gap`,
+        ).toBeLessThanOrEqual(l.x);
+        const iconMid = icon.bounds.y + icon.bounds.height / 2;
+        expect(Math.abs(iconMid - (l.y + l.height / 2)), `${icon.key} centres`).toBeLessThanOrEqual(
+          2,
+        );
+        expect(icon.art, `${icon.key} art`).toBe(
+          atlas && !['on', 'viewport', 'enemies'].includes(icon.key),
+        );
+      }
+    });
+  }
 }
 
 /** Every visible HUD object outside the map that overlaps its box. */
@@ -596,6 +725,388 @@ for (const atlas of [true, false]) {
   });
 }
 
+test('relics, Embers and gems sit at their world spot on the map (#383)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await seedStorage(page, GEMS_ON);
+  await startRun(page);
+  expect(
+    await dropAt(page, [
+      { kind: 'ember', dx: 600, dy: 100 },
+      { kind: 'ember', dx: -1500, dy: 0 },
+      { kind: 'gem', dx: -100, dy: 450 },
+      { kind: 'gem', dx: 0, dy: -400 },
+    ]),
+  ).toBe(4);
+  await expect
+    .poll(async () => {
+      const kinds = await markedKinds(page);
+      return ['relic', 'ember', 'gem'].every((k) => kinds.includes(k));
+    })
+    .toBe(true);
+
+  // World and map from one snapshot: every marker of the three kinds is where its pickup is.
+  const read = await page.evaluate(async (hudKey) => {
+    const { game } = await import('/src/main.ts');
+    const { MINIMAP_BOX, MINIMAP_PADDING, MINIMAP_RANGE } = await import('/src/config/minimap.ts');
+    const rep = (game.scene.getScene(hudKey) as HudScene).minimapReport;
+    const centre = MINIMAP_BOX.size / 2;
+    const radius = centre - MINIMAP_PADDING;
+    const scale = radius / MINIMAP_RANGE;
+    const player = rep.world?.player ?? { x: 0, y: 0 };
+    const project = (p: { x: number; y: number }) => {
+      const rx = (p.x - player.x) * scale;
+      const ry = (p.y - player.y) * scale;
+      const dist = Math.hypot(rx, ry);
+      const k = dist <= radius ? 1 : radius / dist;
+      return { x: centre + rx * k, y: centre + ry * k, pinned: dist > radius };
+    };
+    const kinds = ['relic', 'ember', 'gem'];
+    const markers = (rep.map?.pickups ?? []).filter((m) => kinds.includes(m.kind));
+    const world = (rep.world?.pickups ?? []).filter((p) => kinds.includes(p.kind));
+    return {
+      markers: markers.map((m) => ({
+        kind: m.kind,
+        pinned: m.pinned,
+        match: world.some((p) => {
+          const at = project(p);
+          return p.kind === m.kind && Math.abs(at.x - m.x) < 0.01 && Math.abs(at.y - m.y) < 0.01;
+        }),
+      })),
+      worldCount: Object.fromEntries(
+        kinds.map((k) => [k, world.filter((p) => p.kind === k).length]),
+      ),
+    };
+  }, SCENE.hud);
+  console.log('markers', JSON.stringify(read));
+  for (const kind of ['relic', 'ember', 'gem']) {
+    const mine = read.markers.filter((m) => m.kind === kind);
+    expect(mine.length, `${kind} markers`).toBeGreaterThan(0);
+    expect(
+      mine.every((m) => m.match),
+      `${kind} markers at their spot`,
+    ).toBe(true);
+  }
+  expect(
+    read.markers.some((m) => m.kind === 'ember' && m.pinned),
+    'a pinned Ember',
+  ).toBe(true);
+  expect(
+    read.markers.some((m) => m.kind === 'ember' && !m.pinned),
+    'an in-range Ember',
+  ).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('each pickup kind switch hides only its own kind and survives a reload (#383)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/?seed=1&invulnerable=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Settings');
+  await waitForPage(page, false);
+  await openKinds(page);
+  const labels = async (): Promise<string[]> =>
+    (await menuRows(page, SCENE.settings)).map((row) => row.label);
+  expect((await labels()).slice(0, 7)).toEqual([
+    'Health: On',
+    'Magnet: On',
+    'Bomb: On',
+    'Chest: On',
+    'Relic: On',
+    'Ember: On',
+    'XP gems: Off',
+  ]);
+  await clickRow(page, SCENE.settings, 'Relic: On');
+  await clickRow(page, SCENE.settings, 'Health: On');
+  await clickRow(page, SCENE.settings, 'XP gems: Off');
+  await expect
+    .poll(() => storedSettings(page))
+    .toEqual(
+      expect.objectContaining({
+        [MINIMAP_SETTING_KEYS.relic]: false,
+        [MINIMAP_SETTING_KEYS.health]: false,
+        [MINIMAP_SETTING_KEYS.gem]: true,
+        [MINIMAP_SETTING_KEYS.ember]: true,
+      }),
+    );
+
+  await page.reload();
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Settings');
+  await waitForPage(page, false);
+  await openKinds(page);
+  expect(await labels()).toEqual(
+    expect.arrayContaining(['Relic: Off', 'Health: Off', 'XP gems: On', 'Ember: On']),
+  );
+  await clickRow(page, SCENE.settings, 'Back  (Esc)');
+  await waitForPage(page, false);
+  await clickRow(page, SCENE.settings, 'Back  (Esc)');
+  await waitForScene(page, SCENE.intro);
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  const { x, y } = cardCenter(SPELL_IDS.indexOf('fire'));
+  await page.mouse.click(x, y);
+  await waitForScene(page, SCENE.game);
+  await expect.poll(async () => (await report(page)).world !== null).toBe(true);
+  expect(
+    await dropAt(page, [
+      { kind: 'health', dx: 600, dy: 0 },
+      { kind: 'magnet', dx: -600, dy: 0 },
+      { kind: 'bomb', dx: 0, dy: 400 },
+      { kind: 'chest', dx: 0, dy: -400 },
+      { kind: 'ember', dx: 650, dy: 300 },
+      { kind: 'gem', dx: -650, dy: -300 },
+    ]),
+  ).toBe(6);
+  await expect.poll(async () => (await markedKinds(page)).includes('gem')).toBe(true);
+  const kinds = await markedKinds(page);
+  console.log('kinds', JSON.stringify(kinds));
+  expect([...new Set(kinds)].sort()).toEqual(['bomb', 'chest', 'ember', 'gem', 'magnet']);
+  expect(errors).toEqual([]);
+});
+
+test('Pickups Off hides every kind and the kind switches show disabled, values kept (#383)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await seedStorage(
+    page,
+    saveWith({ [MINIMAP_SETTING_KEYS.gem]: true, [MINIMAP_SETTING_KEYS.relic]: false }),
+  );
+  await page.goto('/?seed=1&invulnerable=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Settings');
+  await waitForPage(page, false);
+  await clickRow(page, SCENE.settings, 'Pickups: On');
+  await openKinds(page);
+  const kindRows = async () =>
+    (await menuRows(page, SCENE.settings)).filter((row) =>
+      Object.values(KIND_LABELS).some((name) => row.label.startsWith(`${name}:`)),
+    );
+  expect((await kindRows()).map((row) => row.enabled)).toEqual(Array(7).fill(false));
+  expect((await kindRows()).map((row) => row.label)).toEqual([
+    'Health: On',
+    'Magnet: On',
+    'Bomb: On',
+    'Chest: On',
+    'Relic: Off',
+    'Ember: On',
+    'XP gems: On',
+  ]);
+  // A click and the keyboard's Enter on a disabled kind change nothing.
+  await clickRow(page, SCENE.settings, 'Health: On');
+  await arrowTo(page, 'Health: On');
+  await page.keyboard.press('Enter');
+  await arrowTo(page, 'Relic: Off');
+  await page.keyboard.press('Enter');
+  await frames(page, 5);
+  expect((await kindRows()).map((row) => row.label)).toEqual([
+    'Health: On',
+    'Magnet: On',
+    'Bomb: On',
+    'Chest: On',
+    'Relic: Off',
+    'Ember: On',
+    'XP gems: On',
+  ]);
+  expect(await storedSettings(page)).toEqual(
+    expect.objectContaining({
+      [MINIMAP_SETTING_KEYS.pickups]: false,
+      [MINIMAP_SETTING_KEYS.gem]: true,
+      [MINIMAP_SETTING_KEYS.health]: true,
+      [MINIMAP_SETTING_KEYS.relic]: false,
+    }),
+  );
+
+  await page.keyboard.press('Escape');
+  await waitForPage(page, false);
+  await clickRow(page, SCENE.settings, 'Back  (Esc)');
+  await waitForScene(page, SCENE.intro);
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  const { x, y } = cardCenter(SPELL_IDS.indexOf('fire'));
+  await page.mouse.click(x, y);
+  await waitForScene(page, SCENE.game);
+  await expect.poll(async () => (await report(page)).world !== null).toBe(true);
+  expect(
+    await dropAt(page, [
+      { kind: 'health', dx: 600, dy: 0 },
+      { kind: 'ember', dx: 650, dy: 300 },
+      { kind: 'gem', dx: -650, dy: -300 },
+    ]),
+  ).toBe(3);
+  await frames(page, 15);
+  const rep = await report(page);
+  console.log(
+    'pickups off',
+    JSON.stringify({ world: rep.world?.pickups.length, map: rep.map?.pickups.length }),
+  );
+  expect(rep.world?.pickups).toEqual([]);
+  expect(rep.map?.pickups).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('the pickup kinds page opens by click or keyboard and closes by Back or Esc onto its row (#383)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/?seed=1&invulnerable=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Settings');
+  await waitForPage(page, false);
+  expect(await selectedLabel(page)).toBeUndefined();
+
+  // Click in, Back click out: the main page highlights the row that opened the page.
+  await openKinds(page);
+  expect(await sceneTexts(page, SCENE.settings)).toContain('Pickups');
+  await clickRow(page, SCENE.settings, 'Back  (Esc)');
+  await waitForPage(page, false);
+  expect(await selectedLabel(page)).toBe(KINDS_ROW);
+
+  // Arrows and Enter in, Esc out, the same landing; Esc on the main page then goes to Intro.
+  await page.keyboard.press('Enter');
+  await waitForPage(page, true);
+  expect(await selectedLabel(page)).toBeUndefined();
+  await page.keyboard.press('Escape');
+  await waitForPage(page, false);
+  expect(await selectedLabel(page)).toBe(KINDS_ROW);
+  await page.keyboard.press('Escape');
+  await waitForScene(page, SCENE.intro);
+
+  await clickRow(page, SCENE.intro, 'Settings');
+  await waitForPage(page, false);
+  await arrowTo(page, KINDS_ROW);
+  await page.keyboard.press('Enter');
+  await waitForPage(page, true);
+  expect(errors).toEqual([]);
+});
+
+test('the pickup kinds page keeps the pause view: Back and Esc end at Pause (#383)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await startRun(page);
+  await page.keyboard.press('Escape');
+  await waitForScene(page, SCENE.pause);
+  const settingsAt = await page.evaluate(async (pauseKey) => {
+    const { game } = await import('/src/main.ts');
+    const button = game.scene
+      .getScene(pauseKey)
+      .children.list.find(
+        (child) =>
+          child.type === 'Text' && (child as unknown as { text: string }).text === 'Settings',
+      ) as unknown as { getCenter(): { x: number; y: number } };
+    return button.getCenter();
+  }, SCENE.pause);
+  await page.mouse.click(settingsAt.x, settingsAt.y);
+  await waitForPage(page, false);
+  await openKinds(page);
+  await page.keyboard.press('Escape');
+  await waitForPage(page, false);
+  expect(await selectedLabel(page)).toBe(KINDS_ROW);
+  await openKinds(page);
+  await clickRow(page, SCENE.settings, 'Back  (Esc)');
+  await waitForPage(page, false);
+  // The pause view travelled through both trips: Back lands on Pause, with the run still frozen.
+  await clickRow(page, SCENE.settings, 'Back  (Esc)');
+  await waitForScene(page, SCENE.pause);
+  expect(
+    await page.evaluate(async (key) => {
+      const { game } = await import('/src/main.ts');
+      return game.scene.isActive(key);
+    }, SCENE.settings),
+  ).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('hundreds of gems leave the relics and rarer drops on the map (#383)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await seedStorage(page, GEMS_ON);
+  await startRun(page);
+  // 250 gems off screen on the near side of every other pickup, then a health pickup far out.
+  const gems = Array.from({ length: 250 }, (_, i) => ({
+    kind: 'gem' as const,
+    dx: 520 + (i % 25) * 4,
+    dy: Math.floor(i / 25) * 6 - 30,
+  }));
+  expect(await dropAt(page, [...gems, { kind: 'health', dx: -900, dy: 200 }])).toBe(251);
+  await expect.poll(async () => (await markedKinds(page)).includes('health')).toBe(true);
+  const read = await page.evaluate(async (hudKey) => {
+    const { game } = await import('/src/main.ts');
+    const { inView } = await import('/src/core/pickups.ts');
+    const rep = (game.scene.getScene(hudKey) as HudScene).minimapReport;
+    const world = rep.world;
+    const rare = (world?.pickups ?? []).filter(
+      (p) => p.kind !== 'gem' && world && !inView(world.view, p),
+    );
+    const map = rep.map?.pickups ?? [];
+    return {
+      gemsInWorld: (world?.pickups ?? []).filter((p) => p.kind === 'gem').length,
+      rareOffScreen: rare.length,
+      rareDrawn: map.filter((m) => m.kind !== 'gem').length,
+      gemsDrawn: map.filter((m) => m.kind === 'gem').length,
+      total: map.length,
+    };
+  }, SCENE.hud);
+  console.log('gems', JSON.stringify(read));
+  expect(read.gemsInWorld, 'gems in the snapshot').toBeGreaterThanOrEqual(200);
+  expect(read.rareOffScreen).toBeGreaterThanOrEqual(2);
+  expect(read.rareDrawn, 'every rare pickup off screen is drawn').toBe(read.rareOffScreen);
+  expect(read.total).toBe(MINIMAP_MAX_PICKUPS);
+  expect(read.gemsDrawn).toBe(MINIMAP_MAX_PICKUPS - read.rareDrawn);
+  expect(errors).toEqual([]);
+});
+
+/** Every row on the Settings page showing fits the screen, keeps its text inside its bar with slack for taller fonts, and clears the others. */
+async function expectRowsFit(page: Page, name: string): Promise<void> {
+  const rows = await menuRows(page, SCENE.settings);
+  expect(
+    rows.map((r) => r.label),
+    name,
+  ).toContain('Back  (Esc)');
+  for (const row of rows) {
+    const { x, y, width, height } = row.bounds;
+    const at = `${name}: ${row.label}`;
+    expect(x, `${at} left`).toBeGreaterThanOrEqual(0);
+    expect(y, `${at} top`).toBeGreaterThanOrEqual(0);
+    expect(x + width, `${at} right`).toBeLessThanOrEqual(960);
+    expect(y + height, `${at} bottom clears the hint bar`).toBeLessThanOrEqual(510);
+    const l = row.labelBounds;
+    expect(l.x + l.width + 8, `${at} text slack`).toBeLessThanOrEqual(x + width);
+    expect(l.y, `${at} text top`).toBeGreaterThanOrEqual(y);
+    expect(l.y + l.height, `${at} text bottom`).toBeLessThanOrEqual(y + height);
+  }
+  for (const [i, a] of rows.entries()) {
+    for (const b of rows.slice(i + 1)) {
+      const overlap =
+        a.bounds.x < b.bounds.x + b.bounds.width &&
+        b.bounds.x < a.bounds.x + a.bounds.width &&
+        a.bounds.y < b.bounds.y + b.bounds.height &&
+        b.bounds.y < a.bounds.y + a.bounds.height;
+      expect(overlap, `${name}: ${a.label} overlaps ${b.label}`).toBe(false);
+    }
+  }
+}
+
+test('the rows of both Settings pages, Back included, fit the screen and clear of each other (#383)', async ({
+  page,
+}) => {
+  await page.goto('/?seed=1&invulnerable=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Settings');
+  await waitForPage(page, false);
+  await expectRowsFit(page, 'main');
+  await openKinds(page);
+  await expectRowsFit(page, 'pickups');
+  // And with Pickups Off, the kinds page's dimmest state.
+  await clickRow(page, SCENE.settings, 'Back  (Esc)');
+  await waitForPage(page, false);
+  await clickRow(page, SCENE.settings, 'Pickups: On');
+  await openKinds(page);
+  await expectRowsFit(page, 'pickups, Pickups off');
+});
+
 test('a full crowd on the Enemies layer holds the fps floor', async ({ page }) => {
   const errors = collectErrors(page);
   await seedStorage(page, saveWith({ [MINIMAP_SETTING_KEYS.enemies]: true }));
@@ -626,5 +1137,49 @@ test('a full crowd on the Enemies layer holds the fps floor', async ({ page }) =
   expect(read.live, 'enemies alive').toBeGreaterThan(0);
   expect(read.dots, 'dots drawn').toBeGreaterThan(0);
   expect(read.fps, `fps over ${read.live} enemies`).toBeGreaterThan(MIN_FPS);
+  expect(errors).toEqual([]);
+});
+
+test('a full crowd with the gem layer on holds the fps floor (#383)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await seedStorage(
+    page,
+    saveWith({ [MINIMAP_SETTING_KEYS.enemies]: true, [MINIMAP_SETTING_KEYS.gem]: true }),
+  );
+  await startRun(page, '&timeScale=10');
+  const landed = await page.evaluate(
+    async ([gameKey, cap]) => {
+      const { game } = await import('/src/main.ts');
+      return (game.scene.getScene(gameKey) as GameScene).spawnCrowdForTest(cap);
+    },
+    [SCENE.game, MAX_LIVE_ENEMIES] as const,
+  );
+  expect(landed, 'crowd spawned').toBeGreaterThanOrEqual(MAX_LIVE_ENEMIES * 0.9);
+  const gems = Array.from({ length: 600 }, (_, i) => ({
+    kind: 'gem' as const,
+    dx: 520 + (i % 30) * 8,
+    dy: Math.floor(i / 30) * 12 - 120,
+  }));
+  expect(await dropAt(page, gems)).toBe(600);
+  await page.waitForTimeout(2000);
+
+  const read = await page.evaluate(
+    async ([gameKey, hudKey]) => {
+      const { game } = await import('/src/main.ts');
+      const rep = (game.scene.getScene(hudKey) as HudScene).minimapReport;
+      return {
+        fps: game.loop.actualFps,
+        live: (game.scene.getScene(gameKey) as GameScene).liveEnemyCount,
+        gems: (rep.world?.pickups ?? []).filter((p) => p.kind === 'gem').length,
+        drawn: (rep.map?.pickups ?? []).filter((p) => p.kind === 'gem').length,
+      };
+    },
+    [SCENE.game, SCENE.hud] as const,
+  );
+  console.log('fps', JSON.stringify(read));
+  expect(read.live, 'enemies alive').toBeGreaterThan(0);
+  expect(read.gems, 'gems in the snapshot').toBeGreaterThan(0);
+  expect(read.drawn, 'gem markers drawn').toBeGreaterThan(0);
+  expect(read.fps, `fps over ${read.live} enemies and ${read.gems} gems`).toBeGreaterThan(MIN_FPS);
   expect(errors).toEqual([]);
 });

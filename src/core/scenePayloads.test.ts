@@ -22,6 +22,8 @@ import {
   isResultPayload,
   isRunBuild,
   isRunStats,
+  focusesKinds,
+  isPickupsPage,
   isSettingsPayload,
   type ResultPayload,
   type RunBuild,
@@ -259,6 +261,27 @@ describe('isPausePayload', () => {
     expect(isSettingsPayload({ view })).toBe(false);
     expect(isSettingsPayload({ pause: { view, confirm: 'end' } })).toBe(false);
     expect(isSettingsPayload({ pause: { view, confirm: 'settings' } })).toBe(false);
+  });
+
+  it('keeps the pause view beside the pickup kinds page flags, and reads only the exact flag values (#383)', () => {
+    expect(isSettingsPayload({ pause: { view }, page: 'pickups' })).toBe(true);
+    expect(isSettingsPayload({ pause: { view }, focus: 'kinds' })).toBe(true);
+    expect(isPickupsPage({ page: 'pickups' })).toBe(true);
+    expect(focusesKinds({ focus: 'kinds' })).toBe(true);
+    for (const bad of [
+      undefined,
+      null,
+      {},
+      'pickups',
+      { page: 'Pickups' },
+      { page: ['pickups'] },
+      { page: 1 },
+    ]) {
+      expect(isPickupsPage(bad)).toBe(false);
+    }
+    for (const bad of [undefined, null, {}, 'kinds', { focus: 'Kinds' }, { focus: true }]) {
+      expect(focusesKinds(bad)).toBe(false);
+    }
   });
 });
 

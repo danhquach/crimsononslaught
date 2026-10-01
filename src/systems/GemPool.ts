@@ -41,6 +41,13 @@ export class GemPool {
     return this.group.countActive(true);
   }
 
+  /** Every gem on the floor and where it lies, appended to `out` as x, y, x, y, ... (#383: the minimap's markers). */
+  floorGems(out: number[]): void {
+    for (const child of this.group.getChildren()) {
+      if (child instanceof XpGem && child.active && !child.isCollected) out.push(child.x, child.y);
+    }
+  }
+
   /**
    * Drop one death's worth of gems at (x, y) — 1, or 3 for a tank (spec §5),
    * or `count` when given (an elite's, #126). Multi-gem drops are spread on a

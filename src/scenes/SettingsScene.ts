@@ -7,8 +7,11 @@ import { readMinimapSettings, writeMinimapSettings } from '../core/minimap';
 import {
   SAVE_REGISTRY_KEY,
   SCENE,
+  focusesKinds,
+  isPickupsPage,
   isSettingsPayload,
   type PausePayload,
+  type SettingsPayload,
 } from '../core/scenePayloads';
 import { emptySave, isSave, serializeSave, type Save } from '../core/save';
 import { audioOf } from '../render/audio';
@@ -34,7 +37,11 @@ const PANEL_WIDTH = 440;
 const PANEL_HEIGHT = 172;
 const VOLUME_PANEL_Y = 76;
 const FEEDBACK_PANEL_Y = 264;
-const MINIMAP_PANEL_HEIGHT = 264;
+const MINIMAP_PANEL_HEIGHT = 310;
+/** The pickup kinds page (#383): one centred panel of seven switches, a row every 42 px. */
+const KINDS_PANEL_X = (960 - PANEL_WIDTH) / 2;
+const KINDS_PANEL_HEIGHT = 330;
+const KINDS_ROW_PITCH = 42;
 const PANEL_ROW_TOP = 50;
 const PANEL_ROW_PITCH = 46;
 const PANEL_PADDING = 24;
@@ -70,6 +77,12 @@ export class SettingsScene extends Phaser.Scene {
   private leaving = false;
   /** The pause view to go back to; `null` when opened from the main menu. */
   private returnTo: PausePayload | null = null;
+  /** The pickup kinds page (#383) instead of the main one. */
+  private kindsPage = false;
+  /** Back from the kinds page: the main page opens with its `Pickup kinds` row highlighted. */
+  private focusKinds = false;
+  /** The main page's row that opens the kinds page. */
+  private kindsRow: MenuRow | null = null;
   private readonly labels: (() => void)[] = [];
   /** Each Minimap row's icon, for the browser suite. */
   private readonly switchIcons: {
@@ -89,6 +102,8 @@ export class SettingsScene extends Phaser.Scene {
 
   init(data: unknown): void {
     this.returnTo = isSettingsPayload(data) ? data.pause : null;
+    this.kindsPage = isPickupsPage(data);
+    this.focusKinds = focusesKinds(data);
     // Phaser replays the last launch payload on a payload-less start; clear it,
     // so the main menu's Settings never returns to a pause screen.
     this.scene.settings.data = {};
@@ -98,6 +113,7 @@ export class SettingsScene extends Phaser.Scene {
     this.leaving = false;
     this.labels.length = 0;
     this.switchIcons.length = 0;
+    this.kindsRow = null;
     const { width, height } = this.scale;
 
     if (this.returnTo) this.coverPausedRun(width, height);
@@ -108,8 +124,8 @@ export class SettingsScene extends Phaser.Scene {
     // The same backdrop, title, panels and rows from either door (CO-191), so
     // Settings looks the same from the main menu and from the pause screen.
     drawMenuBackdrop(this, 'quiet');
-    addMenuTitle(this, width / 2, 44, 'Settings');
-    const items = this.drawPanels();
+    addMenuTitle(this, width / 2, 44, this.kindsPage ? 'Pickups' : 'Settings');
+    const items = this.kindsPage ? this.drawKindsPanel() : this.drawPanels();
     const back = addMenuRow(this, {
       kind: 'bar',
       label: 'Back  (Esc)',
@@ -118,7 +134,11 @@ export class SettingsScene extends Phaser.Scene {
       width: 220,
       onConfirm: () => this.back(),
     });
-    attachMenuInput(this, [...items, back], { keyboard: true });
+    const initial = this.kindsRow ? items.indexOf(this.kindsRow) : -1;
+    attachMenuInput(this, [...items, back], {
+      keyboard: true,
+      initial: this.focusKinds && initial >= 0 ? initial : undefined,
+    });
     addHintLine(this);
 
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
@@ -214,19 +234,36 @@ export class SettingsScene extends Phaser.Scene {
       );
     });
 
-    // The Minimap switches (CO-207): the first hides the whole map, the rest a layer each.
-    const minimapRows: readonly (readonly [MinimapToggle, string])[] = [
+    // The Minimap switches (CO-207): the first hides the whole map, the rest a layer each;
+    // under Pickups, the row that opens the page of one switch per pickup kind (#383).
+    const minimapRows: readonly (readonly [MinimapToggle | 'kinds', string])[] = [
       ['on', 'Minimap'],
       ['viewport', 'Viewport box'],
       ['boss', 'Boss'],
       ['pickups', 'Pickups'],
+      ['kinds', 'Pickup kinds  ▸'],
       ['enemies', 'Enemies'],
     ];
     minimapRows.forEach(([key, label], i) => {
+      const y = rowY(VOLUME_PANEL_Y, i);
+      if (key === 'kinds') {
+        this.kindsRow = addMenuRow(this, {
+          kind: 'bar',
+          label,
+          x: RIGHT_PANEL_X + PANEL_WIDTH / 2,
+          y,
+          width: PANEL_WIDTH - PANEL_PADDING * 2,
+          onConfirm: () => this.openKinds(),
+          align: 'left',
+          indent: SWITCH_ICON_INDENT,
+        });
+        items.push(this.kindsRow);
+        return;
+      }
       items.push(
         this.addToggle(
           RIGHT_PANEL_X,
-          rowY(VOLUME_PANEL_Y, i),
+          y,
           label,
           () => readMinimapSettings(this.save.settings)[key],
           () => this.toggleMinimap(key),
@@ -235,6 +272,38 @@ export class SettingsScene extends Phaser.Scene {
       );
     });
     return items;
+  }
+
+  /** The pickup kinds page: one switch per kind in a single column, all dead while Pickups is Off. */
+  private drawKindsPanel(): MenuItem[] {
+    drawPanel(
+      this,
+      KINDS_PANEL_X,
+      VOLUME_PANEL_Y,
+      PANEL_WIDTH,
+      KINDS_PANEL_HEIGHT,
+      'Minimap pickups',
+    );
+    const kinds: readonly (readonly [MinimapToggle, string])[] = [
+      ['health', 'Health'],
+      ['magnet', 'Magnet'],
+      ['bomb', 'Bomb'],
+      ['chest', 'Chest'],
+      ['relic', 'Relic'],
+      ['ember', 'Ember'],
+      ['gem', 'XP gems'],
+    ];
+    return kinds.map(([key, label], i) =>
+      this.addToggle(
+        KINDS_PANEL_X,
+        VOLUME_PANEL_Y + PANEL_ROW_TOP + i * KINDS_ROW_PITCH,
+        label,
+        () => readMinimapSettings(this.save.settings)[key],
+        () => this.toggleMinimap(key),
+        key,
+        true,
+      ),
+    );
   }
 
   /**
@@ -279,8 +348,11 @@ export class SettingsScene extends Phaser.Scene {
     read: () => boolean,
     flip: () => void,
     iconFor?: MinimapToggle,
+    needsPickups = false,
   ): MenuRow {
+    const pickupsOn = (): boolean => readMinimapSettings(this.save.settings).pickups;
     const toggle = (): void => {
+      if (needsPickups && !pickupsOn()) return;
       flip();
       audioOf(this).play('ui.confirm');
       this.refresh();
@@ -310,8 +382,10 @@ export class SettingsScene extends Phaser.Scene {
     this.labels.push(() => {
       const on = read();
       row.setLabel(`${label}: ${on ? 'On' : 'Off'}`);
+      const enabled = !needsPickups || pickupsOn();
+      row.setEnabled(enabled);
       row.setDim(!on);
-      icon?.setAlpha(on ? 1 : 0.45);
+      icon?.setAlpha(on && enabled ? 1 : 0.45);
     });
     return row;
   }
@@ -351,11 +425,27 @@ export class SettingsScene extends Phaser.Scene {
     if (!storeSaveJson(serializeSave(updated))) console.warn('[save] could not store settings');
   }
 
+  /** The same scene again on the kinds page, carrying the pause view so Back still ends at Pause. */
+  private openKinds(): void {
+    if (this.leaving) return;
+    this.leaving = true;
+    audioOf(this).play('ui.confirm');
+    this.scene.start(SCENE.settings, {
+      ...(this.returnTo ? { pause: this.returnTo } : {}),
+      page: 'pickups',
+    } satisfies SettingsPayload);
+  }
+
   private back(): void {
     if (this.leaving) return;
     this.leaving = true;
     audioOf(this).play('ui.confirm');
-    if (this.returnTo) this.scene.start(SCENE.pause, this.returnTo);
+    if (this.kindsPage) {
+      this.scene.start(SCENE.settings, {
+        ...(this.returnTo ? { pause: this.returnTo } : {}),
+        focus: 'kinds',
+      } satisfies SettingsPayload);
+    } else if (this.returnTo) this.scene.start(SCENE.pause, this.returnTo);
     else this.scene.start(SCENE.intro);
   }
 }

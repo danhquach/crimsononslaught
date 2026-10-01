@@ -14,6 +14,13 @@ export const MINIMAP_SETTING_KEYS = {
   boss: 'minimap.boss',
   pickups: 'minimap.pickups',
   enemies: 'minimap.enemies',
+  health: 'minimap.pickups.health',
+  magnet: 'minimap.pickups.magnet',
+  bomb: 'minimap.pickups.bomb',
+  chest: 'minimap.pickups.chest',
+  relic: 'minimap.pickups.relic',
+  ember: 'minimap.pickups.ember',
+  gem: 'minimap.pickups.gem',
 } as const;
 
 /** Every save key this feature owns starts with this; anything else under it is dropped on load. */
@@ -25,15 +32,30 @@ export interface MinimapSettings {
   boss: boolean;
   pickups: boolean;
   enemies: boolean;
+  /** One switch per pickup kind (#383); `pickups` above hides them all. */
+  health: boolean;
+  magnet: boolean;
+  bomb: boolean;
+  chest: boolean;
+  relic: boolean;
+  ember: boolean;
+  gem: boolean;
 }
 
-/** Enemies start off: a full crowd is the costliest layer to draw. */
+/** Enemies and XP gems start off: a full crowd and hundreds of gems are the costliest layers to draw. */
 export const DEFAULT_MINIMAP_SETTINGS: Readonly<MinimapSettings> = {
   on: true,
   viewport: true,
   boss: true,
   pickups: true,
   enemies: false,
+  health: true,
+  magnet: true,
+  bomb: true,
+  chest: true,
+  relic: true,
+  ember: true,
+  gem: false,
 };
 
 /** Run-clock ms between the snapshots Game hands the HUD. */
@@ -62,7 +84,7 @@ export const MINIMAP_ENEMY_DOT = 2;
 export const MINIMAP_ICON_SIZE = 11;
 export const MINIMAP_BOSS_ICON_SIZE = 14;
 
-/** Icons drawn for floor pickups at once; the nearest ones win, the rest are not drawn. */
+/** Icons drawn for floor pickups at once; rare kinds are drawn first and XP gems only fill what is left, nearest first within each. */
 export const MINIMAP_MAX_PICKUPS = 24;
 
 /** The atlas frame each marker shows; without the atlas the flat shapes in `MINIMAP_COLORS` stand in. */
@@ -71,6 +93,9 @@ export const MINIMAP_ICON_FRAMES = {
   magnet: 'pickupMagnet.idle.0',
   bomb: 'pickupBomb.idle.0',
   chest: 'pickupChest.idle.0',
+  relic: 'pickupRelic.idle.0',
+  ember: 'pickupEmber.idle.0',
+  gem: 'gem.idle.0',
   boss: 'boss.walk.down.0',
 } as const satisfies Record<string, FrameName>;
 
@@ -87,9 +112,20 @@ export const MINIMAP_COLORS = {
   magnet: PLACEHOLDERS.pickup_magnet.color,
   bomb: PLACEHOLDERS.pickup_bomb.color,
   chest: PLACEHOLDERS.pickup_chest.color,
+  relic: PLACEHOLDERS.pickup_relic.color,
+  ember: PLACEHOLDERS.pickup_ember.color,
+  gem: PLACEHOLDERS.gem.color,
 } as const;
 
 /** Floor pickups the map marks when they lie off screen. */
-export const MINIMAP_PICKUP_KINDS = ['health', 'magnet', 'bomb', 'chest'] as const;
+export const MINIMAP_PICKUP_KINDS = [
+  'health',
+  'magnet',
+  'bomb',
+  'chest',
+  'relic',
+  'ember',
+  'gem',
+] as const;
 
 export type MinimapPickupKind = (typeof MINIMAP_PICKUP_KINDS)[number];

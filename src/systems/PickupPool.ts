@@ -70,13 +70,16 @@ export class PickupPool {
     return counts;
   }
 
-  /** Every consumable on the floor, chests too, and where it lies (CO-207: the minimap's markers). */
-  floorConsumables(): { kind: ConsumableKind; x: number; y: number }[] {
-    const found: { kind: ConsumableKind; x: number; y: number }[] = [];
+  /** Every pickup on the floor and where it lies: consumables by their own kind, plus Embers and relics (CO-207, #383: the minimap's markers). */
+  floorPickups(): { kind: ConsumableKind | 'ember' | 'relic'; x: number; y: number }[] {
+    const found: { kind: ConsumableKind | 'ember' | 'relic'; x: number; y: number }[] = [];
     for (const child of this.group.getChildren()) {
-      if (live(child) && child.kind === 'consumable') {
-        found.push({ kind: child.consumableKind, x: child.x, y: child.y });
-      }
+      if (!live(child)) continue;
+      found.push({
+        kind: child.kind === 'consumable' ? child.consumableKind : child.kind,
+        x: child.x,
+        y: child.y,
+      });
     }
     return found;
   }
