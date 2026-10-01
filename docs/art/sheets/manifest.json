@@ -2081,7 +2081,7 @@
         [
           { "anim": "relic_ancient_fury", "cols": [1, 1], "centred": true },
           { "anim": "relic_hourglass", "cols": [2, 2], "centred": true },
-          { "anim": "relic_colossus", "cols": [3, 3], "centred": true },
+          { "anim": "relic_impaler", "cols": [3, 3], "centred": true },
           { "anim": "relic_tailwind", "cols": [4, 4], "centred": true },
           { "anim": "relic_everfrost", "cols": [5, 5], "centred": true }
         ]

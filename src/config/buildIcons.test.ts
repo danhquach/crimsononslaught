@@ -4,14 +4,10 @@ import { ART_BOXES, FRAMES, FRAME_NAMES } from './frames';
 import { PASSIVES } from './passives';
 import { RELIC_BUFFS } from './relics';
 
-/** Relics still drawn as their two letters (#377); the rest must have an icon. */
-const NO_ICON_YET = ['relic_impaler'];
-const IDS = [...PASSIVES, ...RELIC_BUFFS]
-  .map((entry) => entry.id)
-  .filter((id) => !NO_ICON_YET.includes(id));
+const IDS = [...PASSIVES, ...RELIC_BUFFS].map((entry) => entry.id);
 
 describe('BUILD_ICON_FRAMES', () => {
-  it('gives every passive and every relic buff but the unfinished its own icon frame in the atlas', () => {
+  it('gives every passive and every relic buff its own icon frame in the atlas', () => {
     const frames = IDS.map((id) => buildIconFrame(id));
     for (const [i, frame] of frames.entries()) {
       expect(frame, IDS[i]).toBeDefined();
@@ -33,7 +29,7 @@ describe('buildIconFrame', () => {
   it('finds a passive and a relic, and returns nothing for an unknown id', () => {
     expect(buildIconFrame('passive_power')).toBe('icon.passive_power.0');
     expect(buildIconFrame('relic_sages_tome')).toBe('icon.relic_sages_tome.0');
-    expect(buildIconFrame('relic_impaler')).toBeUndefined();
+    expect(buildIconFrame('relic_impaler')).toBe('icon.relic_impaler.0');
     expect(buildIconFrame('fire')).toBeUndefined();
     for (const key of ['toString', '__proto__', 'constructor', 'hasOwnProperty']) {
       expect(buildIconFrame(key), key).toBeUndefined();
