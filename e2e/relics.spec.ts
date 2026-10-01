@@ -1,9 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import { ARENA_SIZE } from '../src/config/arena';
 import type { PlayerProfile } from '../src/config/passives';
-import { RELIC_COUNT } from '../src/config/pickups';
 import { relicBuffById } from '../src/config/relics';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import type { OfferCard } from '../src/core/levelUp';
+import { relicCountFor } from '../src/core/pickups';
 import { SCENE } from '../src/core/scenePayloads';
 import type { Spellbook } from '../src/core/spellbook';
 import type { Pickup } from '../src/entities/Pickup';
@@ -122,7 +123,7 @@ test('touching a relic offers 3 relic cards, and a buff pick changes the stat', 
   for (const card of offer.cards) expect(['relic', 'charge']).toContain(card.kind);
   expect(offer.relics, 'nothing taken before the pick').toEqual([]);
   expect(offer.report.relics, 'the relic is counted').toBe(1);
-  expect(offer.report.live.relic, 'the relic left the floor').toBe(RELIC_COUNT - 1);
+  expect(offer.report.live.relic, 'the relic left the floor').toBe(relicCountFor(ARENA_SIZE) - 1);
   const texts = await sceneTexts(page, SCENE.levelUp);
   expect(texts).toContain('Relic found!');
   // CO-159: the touch asked for the relic's own cue.

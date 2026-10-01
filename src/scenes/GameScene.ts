@@ -61,6 +61,7 @@ import {
   bombTargets,
   placeRelics,
   planDrop,
+  relicCountFor,
   rollDrops,
   tickMagnet,
 } from '../core/pickups';
@@ -155,7 +156,6 @@ import {
   CHEST_EMBERS,
   HEAL_AMOUNT,
   MAGNET_DURATION_MS,
-  RELIC_COUNT,
   type ConsumableKind,
   type PickupKind,
 } from '../config/pickups';
@@ -2088,14 +2088,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Spec §5 (#195): the run's relics, on seeded spots clear of the player's
+   * Spec §5 (#195): the run's relics, as many as the arena's size sets (CO-208), on seeded spots clear of the player's
    * start, of the arena edge and of each other. Returns the spots, which the
    * arena's props keep clear of.
    */
   private placeRelics(): Vec2[] {
     const start = { x: this.player.x, y: this.player.y };
     const world = { width: WORLD_WIDTH, height: WORLD_HEIGHT };
-    const spots = placeRelics(this.pickupRng, world, start, RELIC_COUNT);
+    const spots = placeRelics(this.pickupRng, world, start, relicCountFor(world));
     for (const spot of spots) this.pickups.placeRelic(spot.x, spot.y);
     return spots;
   }

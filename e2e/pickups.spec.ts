@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { MAX_LIVE_PICKUPS, RELIC_COUNT } from '../src/config/pickups';
+import { ARENA_SIZE } from '../src/config/arena';
+import { MAX_LIVE_PICKUPS } from '../src/config/pickups';
 import { SOUNDS } from '../src/config/sounds';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
+import { relicCountFor } from '../src/core/pickups';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
@@ -31,6 +33,8 @@ import {
 
 const PICKED: SpellId = 'fire';
 const START_AT_S = 240;
+/** CO-208: the relics the first map places, from its size. */
+const RELICS = relicCountFor(ARENA_SIZE);
 
 /** Budgeted in run time, read off the HUD's timer, so every machine samples the same stretch (#187). */
 const RUN_MS = 60_000;
@@ -85,7 +89,7 @@ test('relics lie in the arena at start and collected Embers count up on the HUD'
   await recordSounds(page);
 
   const first = await sample(page);
-  expect(first?.report.live.relic, 'relics on the floor at start').toBe(RELIC_COUNT);
+  expect(first?.report.live.relic, 'relics on the floor at start').toBe(RELICS);
   expect(first?.report.relics, 'relics picked up at start').toBe(0);
 
   const trace: Sample[] = [];
@@ -119,7 +123,7 @@ test('relics lie in the arena at start and collected Embers count up on the HUD'
   // never drifts from what is really on the floor.
   expect(trace.map((t) => t.report.drops)).toEqual(floor);
   // Nobody steers, so the player never walks the 400 px out to a relic.
-  expect(last?.report.live.relic).toBe(RELIC_COUNT);
+  expect(last?.report.live.relic).toBe(RELICS);
 
   // CO-159: the Embers collected asked for their cue, capped per window, and
   // the relics nobody touched asked for none.
