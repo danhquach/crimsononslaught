@@ -1435,13 +1435,24 @@ export class GameScene extends Phaser.Scene {
       for (const enemy of this.enemies.live) if (enemy !== boss) enemies.push(enemy.x, enemy.y);
     }
     const boss = settings.on && settings.boss ? this.enemies.boss : null;
+    const pickups: MinimapFrame['pickups'] = [];
+    if (settings.on && settings.pickups) {
+      for (const p of this.pickups.floorPickups()) if (settings[p.kind]) pickups.push(p);
+      if (settings.gem) {
+        const gems: number[] = [];
+        this.gems.floorGems(gems);
+        for (let i = 0; i + 1 < gems.length; i += 2) {
+          pickups.push({ kind: 'gem', x: gems[i] ?? 0, y: gems[i + 1] ?? 0 });
+        }
+      }
+    }
     const frame: MinimapFrame = {
       settings,
       arena: ARENA_SIZE,
       player: { x: this.player.x, y: this.player.y },
       view: { x: view.x, y: view.y, width: view.width, height: view.height },
       boss: boss ? { x: boss.x, y: boss.y } : null,
-      pickups: settings.on && settings.pickups ? this.pickups.floorConsumables() : [],
+      pickups,
       enemies,
     };
     this.events.emit(MINIMAP_EVENT, frame);

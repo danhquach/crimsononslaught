@@ -442,6 +442,16 @@ describe('parseSave minimap settings (CO-207)', () => {
     expect(parsed.save.settings).toEqual({ 'minimap.on': false, 'audio.master': 0.4 });
   });
 
+  it('keeps the pickup kind switches and drops hostile look-alikes (#383)', () => {
+    const parsed = parseSave(
+      withSettings(
+        '{"minimap.pickups.gem":true,"minimap.pickups.relic":"no","minimap.pickups.health.x":true,"minimap.pickups.constructor":true,"minimap.pickups.g\u200bem":true}',
+      ),
+    );
+    expect(parsed.status).toBe('ok');
+    expect(parsed.save.settings).toEqual({ 'minimap.pickups.gem': true });
+  });
+
   it('resets a save whose settings carry a __proto__ object, leaving Object.prototype alone', () => {
     const parsed = parseSave(withSettings('{"__proto__":{"minimap.on":false}}'));
     expect(parsed.status).toBe('reset');

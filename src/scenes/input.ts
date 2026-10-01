@@ -57,6 +57,8 @@ export interface MenuInputOptions {
    * highlight.
    */
   enterDefault?: number;
+  /** The item highlighted from the start, for a screen that returns to the row that opened it (#383). */
+  initial?: number;
 }
 
 /** The direction each arrow key presses. */
@@ -152,7 +154,8 @@ export function attachMenuInput(
 ): void {
   if (items.length === 0) return;
 
-  let selected = -1;
+  let selected = options.initial ?? -1;
+  items[selected]?.setSelected(true);
 
   // The move cue plays here (CO-102) and the confirm cue in the action each
   // item runs, so a click, a key and a pad press through the same action all

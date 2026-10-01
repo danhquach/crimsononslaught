@@ -115,10 +115,14 @@ export interface PausePayload {
 /**
  * `Pause -> Settings` (CO-192): the pause view Settings hands back to Pause on
  * Back, so the run's build reads the same as before. Left out, as from the
- * main menu, Back returns to Intro.
+ * main menu, Back returns to Intro. `page: 'pickups'` opens the pickup kinds
+ * page (#383); Back from it restarts Settings with `focus: 'kinds'`, so the
+ * main page lands on the row that opened it.
  */
 export interface SettingsPayload {
-  pause: PausePayload;
+  pause?: PausePayload;
+  page?: 'pickups';
+  focus?: 'kinds';
 }
 
 /** What the Help screen shows (#226): a tab, or the About tab's feedback form. */
@@ -220,8 +224,20 @@ export function isPausePayload(data: unknown): data is PausePayload {
 }
 
 /** `pause` must be the plain menu view: a confirmation is never what Settings returns to. */
-export function isSettingsPayload(data: unknown): data is SettingsPayload {
+export function isSettingsPayload(
+  data: unknown,
+): data is SettingsPayload & { pause: PausePayload } {
   return isRecord(data) && isPausePayload(data.pause) && data.pause.confirm === undefined;
+}
+
+/** Settings' pickup kinds page was asked for (#383); anything else is the main page. */
+export function isPickupsPage(data: unknown): boolean {
+  return isRecord(data) && data.page === 'pickups';
+}
+
+/** Settings is coming back from the pickup kinds page (#383). */
+export function focusesKinds(data: unknown): boolean {
+  return isRecord(data) && data.focus === 'kinds';
 }
 
 export function isHelpPayload(data: unknown): data is HelpPayload {

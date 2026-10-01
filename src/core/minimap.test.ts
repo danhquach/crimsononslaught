@@ -3,6 +3,7 @@ import {
   DEFAULT_MINIMAP_SETTINGS,
   MINIMAP_MAX_PICKUPS,
   MINIMAP_PADDING,
+  MINIMAP_PICKUP_KINDS,
   MINIMAP_RANGE,
   MINIMAP_SETTING_KEYS,
 } from '../config/minimap';
@@ -38,7 +39,14 @@ describe('readMinimapSettings', () => {
   });
 
   it('round-trips what writeMinimapSettings stored', () => {
-    const settings = { on: false, viewport: false, boss: false, pickups: false, enemies: true };
+    const settings = {
+      ...DEFAULT_MINIMAP_SETTINGS,
+      on: false,
+      pickups: false,
+      enemies: true,
+      relic: false,
+      gem: true,
+    };
     expect(readMinimapSettings(writeMinimapSettings({}, settings))).toEqual(settings);
   });
 
@@ -52,6 +60,13 @@ describe('readMinimapSettings', () => {
     },
   );
 
+  it('gives an old save, which has none of the pickup kind switches, their defaults', () => {
+    const settings = readMinimapSettings({ 'minimap.on': false, 'minimap.pickups': false });
+    expect(settings).toEqual({ ...DEFAULT_MINIMAP_SETTINGS, on: false, pickups: false });
+    expect(settings.gem).toBe(false);
+    expect(settings.relic).toBe(true);
+  });
+
   it('ignores a key that only the prototype has', () => {
     const saved = Object.create({ 'minimap.on': false }) as SaveSettings;
     expect(readMinimapSettings(saved).on).toBe(true);
@@ -59,7 +74,7 @@ describe('readMinimapSettings', () => {
 });
 
 describe('writeMinimapSettings', () => {
-  it('keeps the other keys and writes the five switches as booleans', () => {
+  it('keeps the other keys and writes every switch as booleans', () => {
     const written = writeMinimapSettings(
       { 'audio.master': 0.5, 'feedback.shake': 1 },
       {
@@ -103,6 +118,33 @@ describe('dropUnknownMinimapKeys', () => {
 
   it('drops an allowed key whose value is not a boolean', () => {
     expect(dropUnknownMinimapKeys({ 'minimap.on': 'yes', 'minimap.boss': 1 })).toEqual({});
+  });
+
+  it('keeps the pickup kind switches and drops look-alikes of them (#383)', () => {
+    const saved: SaveSettings = {
+      'minimap.pickups.relic': false,
+      'minimap.pickups.gem': true,
+      'minimap.pickups.health': 'true',
+      'minimap.pickups.ember': null as unknown as boolean,
+      'minimap.pickups.health.x': true,
+      'minimap.pickups.constructor': true,
+      'minimap.pickups.re\u200Blic': true,
+      'minimap.pickups.\u202Egem': true,
+      'minimap.pickups.\u0433em': true,
+      [`minimap.pickups.${'a'.repeat(100_000)}`]: true,
+    };
+    expect(dropUnknownMinimapKeys(saved)).toEqual({
+      'minimap.pickups.relic': false,
+      'minimap.pickups.gem': true,
+    });
+  });
+
+  it('reads defaults for hostile values of the pickup kind switches (#383)', () => {
+    const saved = JSON.parse(
+      '{"minimap.pickups.relic":"true","minimap.pickups.gem":1,"minimap.pickups.ember":{"__proto__":{"x":1}},"minimap.pickups.health":[],"__proto__":true}',
+    ) as SaveSettings;
+    expect(readMinimapSettings(dropUnknownMinimapKeys(saved))).toEqual(DEFAULT_MINIMAP_SETTINGS);
+    expect(({} as Record<string, unknown>).x).toBeUndefined();
   });
 
   it('leaves none of 10,000 junk minimap keys', () => {
@@ -251,6 +293,60 @@ describe('buildMinimapView', () => {
     expect(ys[ys.length - 1]).toBeCloseTo(C + (300 + (MINIMAP_MAX_PICKUPS - 1) * 10) * SCALE);
   });
 
+  const KINDS = MINIMAP_PICKUP_KINDS;
+  const everyKind = KINDS.map((kind, i) => ({ kind, x: 1500 + 600 + i * 20, y: 1500 }));
+  const allOn = { ...DEFAULT_MINIMAP_SETTINGS, gem: true };
+
+  it('maps relics, Embers and gems like the other pickups (#383)', () => {
+    const view = buildMinimapView(frame({ settings: allOn, pickups: everyKind }), BOX);
+    expect(view.pickups.map((p) => p.kind).sort()).toEqual([...KINDS].sort());
+    for (const p of view.pickups) {
+      const world = everyKind.find((w) => w.kind === p.kind);
+      expect(p.x).toBeCloseTo(C + ((world?.x ?? 0) - 1500) * SCALE);
+      expect(p.y).toBeCloseTo(C);
+    }
+  });
+
+  it.each(KINDS)('the %s switch hides only its own kind (#383)', (kind) => {
+    const view = buildMinimapView(
+      frame({ settings: { ...allOn, [kind]: false }, pickups: everyKind }),
+      BOX,
+    );
+    expect(view.pickups.map((p) => p.kind).sort()).toEqual(KINDS.filter((k) => k !== kind).sort());
+  });
+
+  it('hides every kind with Pickups off, whatever the kind switches say (#383)', () => {
+    const view = buildMinimapView(
+      frame({ settings: { ...allOn, pickups: false }, pickups: everyKind }),
+      BOX,
+    );
+    expect(view.pickups).toEqual([]);
+  });
+
+  it('keeps a far relic and the near health on the map under 200 nearer gems (#383)', () => {
+    const gems = Array.from({ length: 200 }, (_, i) => ({
+      kind: 'gem' as const,
+      x: 1500 + 600 + (i % 20),
+      y: 1500 + Math.floor(i / 20),
+    }));
+    const view = buildMinimapView(
+      frame({
+        settings: allOn,
+        pickups: [
+          ...gems,
+          { kind: 'relic', x: 1500 + 950, y: 1500 },
+          { kind: 'health', x: 1500, y: 2300 },
+        ],
+      }),
+      BOX,
+    );
+    const kinds = view.pickups.map((p) => p.kind);
+    expect(view.pickups).toHaveLength(MINIMAP_MAX_PICKUPS);
+    expect(kinds).toContain('relic');
+    expect(kinds).toContain('health');
+    expect(kinds.filter((k) => k === 'gem')).toHaveLength(MINIMAP_MAX_PICKUPS - 2);
+  });
+
   it('pins the boss and pickups beyond the range to the rim along their direction', () => {
     const view = buildMinimapView(
       frame({
@@ -277,7 +373,13 @@ describe('buildMinimapView', () => {
   });
 
   it('comes out empty for every layer whose switch is off', () => {
-    const off = { on: true, viewport: false, boss: false, pickups: false, enemies: false };
+    const off = {
+      ...DEFAULT_MINIMAP_SETTINGS,
+      viewport: false,
+      boss: false,
+      pickups: false,
+      enemies: false,
+    };
     const view = buildMinimapView(
       frame({
         settings: off,
