@@ -193,6 +193,18 @@ describe('RESULT_LAYOUT', () => {
     expect(hintY + 12).toBeLessThanOrEqual(540 - 8);
   });
 
+  it('puts Main menu beside Play again, alike, centred as a pair and clear of its ring (CO-218)', () => {
+    const { button, menuButton, hintY } = RESULT_LAYOUT;
+    expect(menuButton.y).toBe(button.y);
+    expect(menuButton.width).toBe(button.width);
+    expect(menuButton.height).toBe(button.height);
+    expect(menuButton.x + menuButton.width).toBeLessThanOrEqual(960 - 8);
+    expect(hintY).toBeGreaterThan(menuButton.y + menuButton.height);
+    expect((button.x + menuButton.x + menuButton.width) / 2).toBe(960 / 2);
+    // Each button's focus ring stops `ringOutset()` out; the two rings must not meet.
+    expect(menuButton.x - (button.x + button.width)).toBeGreaterThan(2 * ringOutset());
+  });
+
   it('puts the save-failed line under the hint and inside the screen (#316)', () => {
     const { hintY, saveNoticeY } = RESULT_LAYOUT;
     // Both are 14 px lines centred on their y; CI fonts run up to 12 px either side.
