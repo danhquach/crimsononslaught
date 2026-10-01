@@ -1,7 +1,20 @@
 import Phaser from 'phaser';
 import { PICKUP_RADIUS } from '../config/gems';
+import { BASE_DASH, DASH_CUE, DASH_TRAIL, type DashStats } from '../config/dash';
 import { PLAYER_SPEED } from '../config/player';
 import { DEFAULT_FACING, facingFromVector, heroAnimation, type Facing } from '../core/animation';
+import {
+  DASH_EVENT,
+  IDLE_DASH,
+  cooldownProgress,
+  dashVelocity,
+  isDashInvulnerable,
+  isDashReady,
+  sanitizeDashStats,
+  tickDash,
+  tryStartDash,
+  type DashState,
+} from '../core/dash';
 import {
   PLAYER_EVENT,
   createHealth,
@@ -25,7 +38,7 @@ import {
 } from '../core/input';
 import { emitRunEvent } from '../core/runEvents';
 import { clipDurationMs, showClip } from '../render/animate';
-import { firstPad } from '../scenes/input';
+import { firstPad, watchPadButton, type StartButtonWatch } from '../scenes/input';
 
 /** Half the 28 px placeholder circle; the atlas frames are placed around it (CO-081). */
 const BODY_RADIUS = 14;
@@ -51,6 +64,14 @@ const DEATH_CLIP = 'hero.death';
  * are doing (`core/animation.ts`); with no atlas the placeholder circle stands
  * still and the run plays exactly as before.
  *
+ * The dash (#384, `core/dash.ts`) is a built-in move: Space or pad A starts a
+ * burst of `DashStats.distancePx` along the held direction, whose velocity
+ * replaces the walk velocity for its length, so the arena edge stops it like a
+ * step. The hero keeps its facing for the whole burst and wears a tint for the
+ * dash's own invulnerability window; `GameScene` reads `dashInvulnerable` ahead
+ * of the run's defences. The stats are the run's copy, so a later spell can
+ * change them through `setDashStats`.
+ *
  * `update` is driven by `GameScene`, not by Phaser, so a paused Game (level-up
  * overlay) freezes the player with it.
  */
@@ -70,6 +91,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** Run-clock ms of death clip still to play; the death event fires when it runs out. */
   private deathMs = 0;
   private dead = false;
+  private dashStats: DashStats = BASE_DASH;
+  private dash: DashState = IDLE_DASH;
+  /** Where the current burst took off, for laying its trail. */
+  private dashFrom = { x: 0, y: 0 };
+  /** A Space press since the last step; set by the key event, only while the scene runs. */
+  private dashQueued = false;
+  private readonly padDash: StartButtonWatch;
+  /** Whether the invulnerability tint is on now. */
+  private dashCued = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'player');
@@ -84,6 +114,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.cursors = keyboard?.createCursorKeys();
     this.wasd = keyboard?.addKeys('W,A,S,D') as
       Record<'W' | 'A' | 'S' | 'D', Phaser.Input.Keyboard.Key> | undefined;
+    // Space as an event, not a polled key: a tap shorter than a frame is down and
+    // up again before the step reads it. A press while the scene is paused (the
+    // level-up overlay, the pause screen) is not a dash.
+    keyboard?.on('keydown-SPACE', (event: KeyboardEvent) => {
+      if (!event.repeat && scene.scene.isActive()) this.dashQueued = true;
+    });
+    this.padDash = watchPadButton(scene, 'A');
   }
 
   get hp(): number {
@@ -113,6 +150,60 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setHealth({ ...this.health, invulnMs: 0 });
   }
 
+  /** Inside the dash's own invulnerability window (#384); `GameScene` drops every hit while it runs. */
+  get dashInvulnerable(): boolean {
+    return isDashInvulnerable(this.dash);
+  }
+
+  /** The run's dash numbers right now. */
+  get dashNumbers(): Readonly<DashStats> {
+    return this.dashStats;
+  }
+
+  /** The HUD's view of the cooldown: share run, and whether a press would dash. */
+  get dashCooldown(): { progress: number; ready: boolean } {
+    return { progress: cooldownProgress(this.dash, this.dashStats), ready: isDashReady(this.dash) };
+  }
+
+  /** Test hook (#384): the dash as the browser suite reads it, in one object. */
+  get dashReport(): {
+    state: 'dashing' | 'cooldown' | 'ready';
+    anim: string;
+    tinted: boolean;
+    invulnerable: boolean;
+    progress: number;
+    facing: Facing;
+  } {
+    const ready = isDashReady(this.dash);
+    return {
+      state: this.dash.dashing ? 'dashing' : ready ? 'ready' : 'cooldown',
+      anim: this.anims.currentAnim?.key ?? '',
+      tinted: this.dashCued,
+      invulnerable: this.dashInvulnerable,
+      progress: cooldownProgress(this.dash, this.dashStats),
+      facing: this.facing,
+    };
+  }
+
+  /**
+   * Passive- or spell-driven dash numbers (#384): the only write path. A field
+   * that is not usable keeps its current value.
+   */
+  setDashStats(stats: Partial<DashStats>): void {
+    this.dashStats = sanitizeDashStats(stats, this.dashStats);
+  }
+
+  /**
+   * Forget a Space or A press made while the scene was not running. Called on
+   * resume: the pad is read through `watchPadButton`'s skipped first poll, since
+   * Phaser refreshes pads after the scene's update and the A that confirmed a
+   * level-up card would otherwise read as a press (CO-179).
+   */
+  resetDashInput(): void {
+    this.dashQueued = false;
+    this.padDash.reset();
+  }
+
   get speed(): number {
     return this.moveSpeed;
   }
@@ -131,10 +222,61 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setHealth(tickHealth(this.health, deltaMs));
     this.regenerate(deltaMs);
     const move = resolveMove(this.keyboardMove(), this.padMove());
-    const { x, y } = moveVelocity(move, this.speed);
+    const pressed = this.dashPressed();
+    if (pressed) this.startDash(move);
+    // True on the step that finishes the burst too: it still carries the last of the distance.
+    const bursting = this.dash.dashing;
+    const tick = tickDash(this.dash, this.dashStats, deltaMs, DASH_TRAIL.spacingMs);
+    this.dash = tick.state;
+
+    // The burst replaces the walk, and holds the facing it took off with.
+    const { x, y } = bursting
+      ? dashVelocity(tick.displacement, deltaMs)
+      : moveVelocity(move, this.speed);
     this.setVelocity(x, y);
-    this.facing = facingFromVector(move, this.facing);
-    this.show({ moving: x !== 0 || y !== 0 });
+    if (!bursting) this.facing = facingFromVector(move, this.facing);
+    this.cueDash();
+    this.show({ moving: x !== 0 || y !== 0, dashing: bursting });
+    this.announceDash(tick.trail, tick.ready);
+  }
+
+  /** Both inputs are read every step so the pad's edge tracker never misses a poll. */
+  private dashPressed(): boolean {
+    const key = this.dashQueued;
+    this.dashQueued = false;
+    return this.padDash.pressed() || key;
+  }
+
+  private startDash(move: Vec2): void {
+    const { state, started } = tryStartDash(this.dash, this.dashStats, move, this.facing);
+    if (!started) return;
+    this.dash = state;
+    this.dashFrom = { x: this.x, y: this.y };
+    this.facing = facingFromVector(state.dir, this.facing);
+    this.scene.events.emit(DASH_EVENT.start, { x: this.x, y: this.y });
+  }
+
+  /** The tint is on exactly while the window runs; a tint, so it never fights the hit flicker's alpha. */
+  private cueDash(): void {
+    const cued = isDashInvulnerable(this.dash);
+    if (cued === this.dashCued) return;
+    this.dashCued = cued;
+    if (cued) this.setTint(DASH_CUE.tint);
+    else this.clearTint();
+  }
+
+  /** After the pose is shown, so a ghost copies the frame the hero is in. */
+  private announceDash(trail: readonly number[], ready: boolean): void {
+    const bounds = this.scene.physics.world.bounds;
+    for (const along of trail) {
+      const x = this.dashFrom.x + this.dash.dir.x * along;
+      const y = this.dashFrom.y + this.dash.dir.y * along;
+      this.scene.events.emit(DASH_EVENT.trail, {
+        x: Math.min(bounds.right, Math.max(bounds.x, x)),
+        y: Math.min(bounds.bottom, Math.max(bounds.y, y)),
+      });
+    }
+    if (ready) this.scene.events.emit(DASH_EVENT.ready);
   }
 
   /** Spec §5: a hit costs HP, less the profile's damage reduction (#139), and grants 0.5 s of invulnerability; hits inside it are ignored. */
@@ -207,14 +349,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /** The clip for this step's state; the hurt frame rides on top of the flicker. */
-  private show(state: { moving: boolean }): void {
-    const name = heroAnimation({
+  private show(state: { moving: boolean; dashing?: boolean }): void {
+    const pose = {
       facing: this.facing,
       moving: state.moving,
       hurt: isInvulnerable(this.health),
       dead: this.dead,
-    });
-    showClip(this, name, BODY_RADIUS);
+      dashing: state.dashing ?? false,
+    };
+    // Without the dash clip in the atlas the hero keeps walking through it.
+    if (!showClip(this, heroAnimation(pose), BODY_RADIUS) && pose.dashing) {
+      showClip(this, heroAnimation({ ...pose, dashing: false, moving: true }), BODY_RADIUS);
+    }
   }
 
   /**
@@ -223,8 +369,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
    */
   private startDeath(): void {
     this.dead = true;
+    this.dash = IDLE_DASH;
     this.setVelocity(0, 0);
     this.setAlpha(1);
+    this.clearTint();
+    this.dashCued = false;
     this.show({ moving: false });
     this.deathMs = clipDurationMs(this.scene, DEATH_CLIP);
     if (this.deathMs <= 0) this.finishDeath();

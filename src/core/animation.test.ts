@@ -86,6 +86,20 @@ describe('heroAnimation', () => {
     expect(dead).toBe('hero.death');
     expectClip(dead);
   });
+
+  it('shows the dash pose per facing over the hurt frame and walking, under death (#384)', () => {
+    for (const facing of FACINGS) {
+      const dash = heroAnimation({ facing, moving: true, hurt: true, dead: false, dashing: true });
+      expect(dash).toBe(`hero.dash.${facing}`);
+      expectClip(dash);
+      expect(heroAnimation({ facing, moving: false, hurt: false, dead: true, dashing: true })).toBe(
+        'hero.death',
+      );
+      expect(heroAnimation({ facing, moving: true, hurt: true, dead: false, dashing: false })).toBe(
+        `hero.hurt.${facing}`,
+      );
+    }
+  });
 });
 
 describe('enemyAnimation', () => {

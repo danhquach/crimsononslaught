@@ -51,3 +51,13 @@ export const BAR_ART: Readonly<Record<BarId, BarArt>> = {
     trough: { left: 10, top: 8, right: 10, bottom: 8 },
   },
 };
+
+/**
+ * The dash icon (#384): a disc the size of a spell slot's, at the bottom right
+ * just left of the minimap (`config/minimap.ts`'s box, x 824 to 944 and y 404
+ * to 524), clear of the slot icons along the bottom-left.
+ */
+export const DASH_ICON = { x: 792, y: 506, radius: 18 } as const;
+
+/** The icon art for it (`icon.<name>.0`, like the spell icons); a run without the atlas draws a ring and a glyph. */
+export const DASH_ICON_FRAME: FrameName = 'icon.dash.0';

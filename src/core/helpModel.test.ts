@@ -18,6 +18,7 @@ import {
   aboutRowCount,
   clampSpellPage,
   groupChangelog,
+  controlHelpRows,
   helpShoulderStep,
   pickupHelpRows,
   spellHelpPages,
@@ -240,16 +241,18 @@ describe('groupChangelog (#377)', () => {
   });
 });
 
-describe('helpShoulderStep (#377)', () => {
-  it('walks Pickups -> Spells pages -> About with RB', () => {
+describe('helpShoulderStep (#377, #384)', () => {
+  it('walks Pickups -> Spells pages -> Controls -> About with RB', () => {
     expect(helpShoulderStep('pickups', 0, 3, 1)).toEqual({ view: 'spells', spellPage: 0 });
     expect(helpShoulderStep('spells', 0, 3, 1)).toEqual({ view: 'spells', spellPage: 1 });
     expect(helpShoulderStep('spells', 1, 3, 1)).toEqual({ view: 'spells', spellPage: 2 });
-    expect(helpShoulderStep('spells', 2, 3, 1)).toEqual({ view: 'about' });
+    expect(helpShoulderStep('spells', 2, 3, 1)).toEqual({ view: 'controls' });
+    expect(helpShoulderStep('controls', 0, 3, 1)).toEqual({ view: 'about' });
   });
 
   it('walks back with LB', () => {
-    expect(helpShoulderStep('about', 0, 3, -1)).toEqual({ view: 'spells', spellPage: 2 });
+    expect(helpShoulderStep('about', 0, 3, -1)).toEqual({ view: 'controls' });
+    expect(helpShoulderStep('controls', 0, 3, -1)).toEqual({ view: 'spells', spellPage: 2 });
     expect(helpShoulderStep('spells', 2, 3, -1)).toEqual({ view: 'spells', spellPage: 1 });
     expect(helpShoulderStep('spells', 0, 3, -1)).toEqual({ view: 'pickups' });
   });
@@ -265,7 +268,35 @@ describe('helpShoulderStep (#377)', () => {
   });
 
   it('copes with a single page', () => {
-    expect(helpShoulderStep('spells', 0, 1, 1)).toEqual({ view: 'about' });
-    expect(helpShoulderStep('about', 0, 1, -1)).toEqual({ view: 'spells', spellPage: 0 });
+    expect(helpShoulderStep('spells', 0, 1, 1)).toEqual({ view: 'controls' });
+    expect(helpShoulderStep('controls', 0, 1, -1)).toEqual({ view: 'spells', spellPage: 0 });
+  });
+});
+
+describe('controlHelpRows (#384)', () => {
+  const byAction = (action: string) => controlHelpRows().find((r) => r.action === action);
+
+  it('lists Move, Dash, Pause and Mute in that order', () => {
+    expect(controlHelpRows().map((r) => r.action)).toEqual(['Move', 'Dash', 'Pause', 'Mute']);
+  });
+
+  it('names the real bindings', () => {
+    expect(byAction('Move')).toMatchObject({ keyboard: 'WASD or arrow keys' });
+    expect(byAction('Dash')).toMatchObject({ keyboard: 'Space', gamepad: 'A' });
+    expect(byAction('Pause')).toMatchObject({ keyboard: 'Esc', gamepad: 'Start' });
+    expect(byAction('Mute')).toMatchObject({ keyboard: 'M' });
+  });
+
+  it('reads the dash numbers from its stats', () => {
+    const note = controlHelpRows({
+      distancePx: 200,
+      durationMs: 100,
+      invulnMs: 100,
+      cooldownMs: 1500,
+    })[1]!.note;
+    expect(note).toContain('200 px');
+    expect(note).toContain('1.5 s');
+    expect(byAction('Dash')?.note).toContain('120 px');
+    expect(byAction('Dash')?.note).toContain('3 s');
   });
 });

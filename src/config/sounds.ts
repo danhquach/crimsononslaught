@@ -45,6 +45,8 @@ export const SOUND_KEYS = [
   'player.hurt',
   'player.lowHealth',
   'player.death',
+  'player.dash',
+  'player.dashReady',
   'progress.gem',
   'progress.levelUp',
   'progress.perk',
@@ -137,6 +139,9 @@ export const SOUNDS: Readonly<Record<SoundKey, SoundDef>> = {
   'player.hurt': clip('player.hurt', 0.7, 100),
   'player.lowHealth': clip('player.lowHealth', 0.6, 2000),
   'player.death': clip('player.death', 0.9, 500),
+  // #384: a dash is one press and the cooldown is seconds long, so one start per window is plenty.
+  'player.dash': clip('player.dash', 0.5, 150),
+  'player.dashReady': clip('player.dashReady', 0.3, 500),
   'progress.gem': clip('progress.gem', 0.35, 60, 2),
   'progress.levelUp': clip('progress.levelUp', 0.7, 200),
   'progress.perk': clip('progress.perk', 0.6, 200),

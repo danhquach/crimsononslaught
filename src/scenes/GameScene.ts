@@ -29,6 +29,9 @@ import { BOSS_EVENT, type BossPhasePayload } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor, consumableSoundFor } from '../config/sounds';
 import { hasFrameArt } from '../render/atlas';
 import { audioOf, type Audio } from '../render/audio';
+import { DASH_EVENT } from '../core/dash';
+import { DashTrailPool } from '../systems/DashTrailPool';
+import type { DashStats } from '../config/dash';
 import {
   LEVEL_UP_EVENT,
   resolveLevelUp,
@@ -467,6 +470,8 @@ export class GameScene extends Phaser.Scene {
   private heroKillInMs: number | undefined;
   /** Test hook (#315): whether a delayed hero kill has come due this run. */
   private heroKillFired = false;
+  /** The dash's afterimages (#384), made once per run. */
+  private dashTrail!: DashTrailPool;
   /** The game's one audio layer (CO-102); every cue in the run goes through it. */
   private audio!: Audio;
   /** Hit feedback (#125): the numbers, and the settings that turn the rest down. */
@@ -1062,6 +1067,55 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
+  /**
+   * Test hook (#384): the hero's dash and its trail, read together so a test
+   * sees one moment of the running game. `ghosts` are the afterimages out now.
+   */
+  get dashReport(): {
+    hero: Player['dashReport'];
+    stats: Readonly<DashStats>;
+    ghosts: ReturnType<DashTrailPool['report']>;
+    wisps: number;
+    puffShown: boolean;
+    x: number;
+    y: number;
+    hp: number;
+    immune: boolean;
+  } {
+    return {
+      hero: this.player.dashReport,
+      stats: this.player.dashNumbers,
+      ghosts: this.dashTrail.report(),
+      wisps: this.dashTrail.wisps,
+      puffShown: this.dashTrail.puffShown,
+      x: this.player.x,
+      y: this.player.y,
+      hp: this.player.hp,
+      immune: this.player.immune,
+    };
+  }
+
+  /** Test hook (#384): the hero stands at `x, y` (kept inside the world), for the edge checks. */
+  placeHeroForTest(x: number, y: number): void {
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    body.reset(Math.min(WORLD_WIDTH, Math.max(0, x)), Math.min(WORLD_HEIGHT, Math.max(0, y)));
+  }
+
+  /** Test hook (#384): change the run's dash numbers, as a spell would. */
+  setDashStatsForTest(patch: Partial<DashStats>): void {
+    this.player.setDashStats(patch);
+  }
+
+  /**
+   * Test hook (#384): one enemy shot of `damage`, fired from a few px beside
+   * the hero through the real pool, so it reaches `hurtPlayer` the way a ranged
+   * enemy's does. Returns whether it left the pool (false at the cap).
+   */
+  fireShotAtHeroForTest(damage: number): boolean {
+    const from = { x: this.player.x + 6, y: this.player.y };
+    return this.enemyShots.fire(from, this.player, damage) !== null;
+  }
+
   /** Test hook (#315): the run's XP, the level it would take, and the level-ups owed but not yet shown. */
   get xpReport(): { level: number; xp: number; xpToNext: number; pendingLevelUps: number } {
     const { level, xp, xpToNext } = this.run;
@@ -1240,6 +1294,7 @@ export class GameScene extends Phaser.Scene {
     this.buildArena();
     this.player = new Player(this, WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
     this.cameras.main.startFollow(this.player, true);
+    this.dashTrail = new DashTrailPool(this, this.player);
 
     this.enemies = new EnemyPool(this);
     this.enemyShots = new EnemyShotPool(this);
@@ -1346,12 +1401,28 @@ export class GameScene extends Phaser.Scene {
     const onResume = (): void => {
       this.pausing = false;
       this.startButton.reset();
+      // A Space pressed or an A held while paused, as for Start, is not a dash.
+      this.player.resetDashInput();
       // Settings opened from the pause screen (CO-192) may have changed these.
       this.feedback = readFeedbackSettings(this.save().settings);
       this.minimap = readMinimapSettings(this.save().settings);
       this.minimapSinceMs = MINIMAP_REFRESH_MS;
     };
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
+    // #384: the dash's cues. The player says what happened, this scene plays it.
+    const onDashStart = ({ x, y }: Vec2): void => {
+      this.audio.play('player.dash');
+      this.dashTrail.puff(x, y);
+    };
+    const onDashTrail = ({ x, y }: Vec2): void => {
+      this.dashTrail.lay(x, y);
+    };
+    const onDashReady = (): void => {
+      this.audio.play('player.dashReady');
+    };
+    this.events.on(DASH_EVENT.start, onDashStart);
+    this.events.on(DASH_EVENT.trail, onDashTrail);
+    this.events.on(DASH_EVENT.ready, onDashReady);
     // Losing focus pauses too, so a run is not lost in the background. The
     // game's emitter outlives this scene; these come off on shutdown below.
     const onFocusLost = (): void => {
@@ -1368,6 +1439,9 @@ export class GameScene extends Phaser.Scene {
       window.removeEventListener('beforeunload', onBeforeUnload);
       this.events.off(PAUSE_EVENT.choose, onChoose);
       this.events.off(Phaser.Scenes.Events.RESUME, onResume);
+      this.events.off(DASH_EVENT.start, onDashStart);
+      this.events.off(DASH_EVENT.trail, onDashTrail);
+      this.events.off(DASH_EVENT.ready, onDashReady);
       this.game.events.off(Phaser.Core.Events.BLUR, onFocusLost);
       this.game.events.off(Phaser.Core.Events.HIDDEN, onFocusLost);
       this.events.off(LEVEL_UP_EVENT.pick, onPick);
@@ -1415,6 +1489,7 @@ export class GameScene extends Phaser.Scene {
     // the first one rather than only after the first hit.
     this.publishShield();
     this.publishLoadout();
+    emitRunEvent(this.events, 'dash', this.player.dashCooldown);
     this.publishMinimap(delta);
   }
 
@@ -1518,6 +1593,7 @@ export class GameScene extends Phaser.Scene {
     // moves, so a new enemy chases from the moment it lands.
     this.spawns.update(step.startMs / 1000, step.deltaMs / 1000);
     this.player.update(step.deltaMs);
+    this.dashTrail.update(step.deltaMs);
     this.enemies.update(
       step.deltaMs,
       this.player,
@@ -1847,7 +1923,8 @@ export class GameScene extends Phaser.Scene {
       this.damageEnemy(enemy, enemy.remainingHp, 'tick');
       return;
     }
-    if (this.invulnerable) return;
+    // #384: a dash is not a hit the enemy's own window should be spent on.
+    if (this.invulnerable || this.player.dashInvulnerable) return;
     if (!enemy.tryContact()) return;
     this.hurtPlayer(enemy.contactDamage);
   }
@@ -1867,6 +1944,9 @@ export class GameScene extends Phaser.Scene {
    */
   private hurtPlayer(amount: number): number {
     if (this.invulnerable) return 0;
+    // #384: the dash's own window drops contact, enemy shots, the boss and
+    // exploder blasts alike, ahead of the shields: it must not spend their pool.
+    if (this.player.dashInvulnerable) return 0;
     // The boss's killing blow has won the run (#315): nothing hurts the hero
     // after it, so its death clip cannot turn the win into a loss.
     if (!heroHurtable(this.decidedOutcome)) return 0;

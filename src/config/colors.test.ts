@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { PLACEHOLDERS, TEXTURE_KEYS } from './colors';
+import { DASH_CUE, DASH_TRAIL } from './dash';
+import { ROSTER_SPELL_CARDS } from './rosterCards';
+import { SPELL_CARDS } from './spells';
 
 // The spec (section 6) fixes the set of texture keys every entity may request.
 const SPEC_KEYS = [
@@ -82,6 +85,26 @@ describe('enemy shot vs player shots (#126)', () => {
   it('has a shape no player shot has', () => {
     const shapes = PLAYER_SHOTS.map((key) => PLACEHOLDERS[key].shape);
     expect(shapes).not.toContain(PLACEHOLDERS.proj_enemy.shape);
+  });
+});
+
+describe('dash look vs everything else (#384)', () => {
+  /** What the dash must never be mistaken for: the enemy shot, the boss, every element and every spell. */
+  const OTHERS: Record<string, number> = {
+    proj_enemy: PLACEHOLDERS.proj_enemy.color,
+    boss: PLACEHOLDERS.boss.color,
+  };
+  for (const [id, card] of Object.entries(SPELL_CARDS)) OTHERS[`element ${id}`] = card.color;
+  for (const [id, card] of Object.entries(ROSTER_SPELL_CARDS)) OTHERS[id] = card.color;
+
+  it.each([
+    ['ghostTint', DASH_TRAIL.ghostTint],
+    ['cue tint', DASH_CUE.tint],
+  ])('keeps the %s at least 45° of hue from each of them', (_name, color) => {
+    for (const [key, other] of Object.entries(OTHERS)) {
+      const gap = Math.abs(hue(color) - hue(other));
+      expect(Math.min(gap, 360 - gap), key).toBeGreaterThanOrEqual(45);
+    }
   });
 });
 

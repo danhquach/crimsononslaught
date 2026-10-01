@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { PLACEHOLDERS } from '../config/colors';
 import { ART_BOXES, FRAMES, type FrameName } from '../config/frames';
-import { BAR_ART, type BarArt } from '../config/hud';
+import { DASH_TRAIL } from '../config/dash';
+import { BAR_ART, DASH_ICON, DASH_ICON_FRAME, type BarArt } from '../config/hud';
 import { artFrame } from '../core/animation';
 import {
   cornerCounts,
@@ -574,6 +575,94 @@ class SlotIcon {
   }
 }
 
+/** The dash icon (#384) while it is cooling: the disc and art dim, the cooldown wedge stays readable. */
+const DASH_COOLING_ALPHA = 0.45;
+
+/** What the browser suite reads off the dash icon. */
+export interface DashIconReport {
+  ready: boolean;
+  /** The share of the cooldown that has run, quantised to the wedge's steps. */
+  progress: number;
+  /** Whether the icon art is drawn, or the ring and glyph stand in. */
+  art: boolean;
+  bounds: { left: number; top: number; right: number; bottom: number };
+}
+
+/**
+ * The dash's HUD icon (#384): the cut art when the atlas has it, else a ring and
+ * a glyph. Full when the dash is ready, dimmed with a dark wedge shrinking
+ * clockwise (the slot icons' wedge textures) while it cools. Every part is made
+ * once; a frame only changes properties, and nothing is touched when the
+ * quantised cooldown and readiness have not moved.
+ */
+class DashIcon {
+  private readonly disc: Phaser.GameObjects.Arc;
+  private readonly icon: Phaser.GameObjects.Image;
+  private readonly wedge: Phaser.GameObjects.Image;
+  private readonly glyph: Phaser.GameObjects.Text;
+  private readonly hasArt: boolean;
+  private ready = true;
+  private step = 0;
+
+  constructor(scene: Phaser.Scene) {
+    ensureSlotTextures(scene);
+    const { x, y, radius } = DASH_ICON;
+    this.disc = scene.add.circle(x, y, radius, 0x000000, 0.55);
+    this.hasArt = hasFrameArt(scene, DASH_ICON_FRAME);
+    this.icon = this.hasArt
+      ? scene.add.image(x, y, FRAMES[DASH_ICON_FRAME].page, artFrame(DASH_ICON_FRAME))
+      : scene.add.image(x, y, '__DEFAULT');
+    this.icon.setVisible(this.hasArt);
+    // Whole-number scale, so the pixel art stays even.
+    if (this.hasArt) {
+      this.icon.setScale(
+        Math.max(1, Math.floor(SLOT_ICON_SIZE / Math.max(this.icon.width, this.icon.height))),
+      );
+    }
+    this.wedge = scene.add.image(x, y, wedgeKey(1)).setAlpha(SLOT_WEDGE_ALPHA).setVisible(false);
+    this.glyph = scene.add
+      .text(x, y, '»', { ...SLOT_GLYPH_STYLE, fontSize: '20px' })
+      .setOrigin(0.5)
+      .setVisible(!this.hasArt);
+    this.apply(true, 0, true);
+  }
+
+  /** Bring the icon to `dash`; a no-op when nothing visible changed. */
+  set(dash: Readonly<{ progress: number; ready: boolean }>): void {
+    // Any time still to run shows at least one step, so it reads ready only when it is.
+    const step = dash.ready ? 0 : Math.max(1, Math.ceil((1 - dash.progress) * SLOT_WEDGE_STEPS));
+    this.apply(dash.ready, step, false);
+  }
+
+  private apply(ready: boolean, step: number, force: boolean): void {
+    if (!force && ready === this.ready && step === this.step) return;
+    this.ready = ready;
+    this.step = step;
+    const alpha = ready ? 1 : DASH_COOLING_ALPHA;
+    this.disc.setAlpha(alpha);
+    this.disc.setStrokeStyle(2, ready ? DASH_TRAIL.ghostTint : 0x777777);
+    this.icon.setAlpha(alpha);
+    this.glyph.setAlpha(alpha);
+    this.wedge.setVisible(step > 0);
+    if (step > 0) this.wedge.setTexture(wedgeKey(step));
+  }
+
+  get report(): DashIconReport {
+    const box = this.disc.getBounds();
+    return {
+      ready: this.ready,
+      progress: this.ready ? 1 : 1 - this.step / SLOT_WEDGE_STEPS,
+      art: this.hasArt,
+      bounds: { left: box.left, top: box.top, right: box.right, bottom: box.bottom },
+    };
+  }
+
+  /** The icon's objects, so the suite can check no other HUD part overlaps them. */
+  get parts(): Phaser.GameObjects.GameObject[] {
+    return [this.disc, this.icon, this.wedge, this.glyph];
+  }
+}
+
 /**
  * HUD overlay: timer, HP bar, XP bar + level, kill and Ember counts, boss HP
  * bar, the loadout's slot icons and the passives held.
@@ -609,6 +698,7 @@ export class HudScene extends Phaser.Scene {
   private shownPassives: readonly LoadoutPassiveView[] = [];
   private shownTiles: readonly HudPassiveTile[] = [];
   private minimap!: Minimap;
+  private dashIcon!: DashIcon;
 
   constructor() {
     super(SCENE.hud);
@@ -653,6 +743,16 @@ export class HudScene extends Phaser.Scene {
   /** CO-207: the minimap's box, layers and both sides of its mapping; the browser suite reads it. */
   get minimapReport(): MinimapReport {
     return this.minimap.report;
+  }
+
+  /** #384: the dash icon's state and box; the browser suite reads it. */
+  get dashIconReport(): DashIconReport {
+    return this.dashIcon.report;
+  }
+
+  /** Every object the dash icon is made of. */
+  get dashIconParts(): Phaser.GameObjects.GameObject[] {
+    return this.dashIcon.parts;
   }
 
   /** Every object the minimap is made of, so the suite can check the rest of the HUD stays clear of it. */
@@ -721,6 +821,7 @@ export class HudScene extends Phaser.Scene {
     this.createCorner(width);
     this.slotIcons = [];
     this.minimap = new Minimap(this);
+    this.dashIcon = new DashIcon(this);
     this.render();
 
     this.subscribe();
@@ -798,6 +899,11 @@ export class HudScene extends Phaser.Scene {
 
   private apply(event: RunEvent): void {
     this.model = applyRunEvent(this.model, event);
+    // Sent every frame: it moves one icon, so the rest of the HUD is not redrawn for it.
+    if (event.name === 'dash') {
+      this.dashIcon.set(this.model.dash);
+      return;
+    }
     this.render();
   }
 

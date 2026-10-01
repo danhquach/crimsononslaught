@@ -3,7 +3,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import { E2E_FEEDBACK_KEY } from '../playwright.config';
 import { CHANGELOG } from '../src/config/changelog';
 import { FEEDBACK_URL } from '../src/core/feedback';
-import { pickupHelpRows, spellHelpPages } from '../src/core/helpModel';
+import { controlHelpRows, pickupHelpRows, spellHelpPages } from '../src/core/helpModel';
 import { AUDIO_REGISTRY_KEY, SCENE, type HelpView } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import {
@@ -165,8 +165,8 @@ async function expectSpellsPageFits(
   };
   const menu = await menuRows(page, SCENE.help);
   expect(menu.filter((row) => row.active).map((row) => row.label)).toEqual(['Spells']);
-  const tabs = menu.filter((row) => ['Pickups', 'Spells', 'About'].includes(row.label));
-  expect(tabs.map((row) => row.label)).toEqual(['Pickups', 'Spells', 'About']);
+  const tabs = menu.filter((row) => ['Pickups', 'Spells', 'Controls', 'About'].includes(row.label));
+  expect(tabs.map((row) => row.label)).toEqual(['Pickups', 'Spells', 'Controls', 'About']);
   const back = menu.find((row) => row.label === 'Back  (Esc)')!;
 
   // Slack for CI's taller fonts: nothing may come within 8 px of the tabs, Back or the side edges.
@@ -260,6 +260,35 @@ test('the Spells tab lists every spell of each element with its two upgrades, in
   expect(errors).toEqual([]);
 });
 
+test('the Controls tab lists the dash with its real bindings (#384)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Help');
+  await waitForView(page, 'pickups');
+  await clickRow(page, SCENE.help, 'Controls');
+  await waitForView(page, 'controls');
+
+  const texts = await sceneTexts(page, SCENE.help);
+  const rows = controlHelpRows();
+  expect(rows.map((row) => row.action)).toEqual(['Move', 'Dash', 'Pause', 'Mute']);
+  for (const row of rows) {
+    expect(texts).toEqual(
+      expect.arrayContaining([
+        row.action,
+        `Keyboard: ${row.keyboard}      Gamepad: ${row.gamepad}`,
+        row.note,
+      ]),
+    );
+  }
+  expect(texts).toContain('Keyboard: Space      Gamepad: A');
+  await expectOnScreen(page);
+
+  await page.keyboard.press('Escape');
+  await waitForScene(page, SCENE.intro);
+  expect(errors).toEqual([]);
+});
+
 test('the Spells pager is reached by keyboard and turns the page', async ({ page }) => {
   // Only with a second element's text in the table does a pager exist to reach.
   const pages = spellHelpPages();
@@ -273,7 +302,7 @@ test('the Spells pager is reached by keyboard and turns the page', async ({ page
 
   // Menu order: tabs, `Next >` (page 0 has no `< Prev`), Back. Arrows reveal the first entry.
   await page.keyboard.press('ArrowRight'); // reveals the Pickups tab
-  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight'); // Spells, About, Next >
+  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight'); // Spells, Controls, About, Next >
   const lit = (await menuRows(page, SCENE.help)).filter((row) => row.selected);
   expect(lit.map((row) => row.label)).toEqual([`${pages[1]!.title} >`]);
   await page.keyboard.press('Enter');
@@ -297,6 +326,7 @@ test('the keyboard opens Help, switches to About, and Esc returns', async ({ pag
 
   await page.keyboard.press('ArrowRight'); // reveals the Pickups tab
   await page.keyboard.press('ArrowRight'); // Spells
+  await page.keyboard.press('ArrowRight'); // Controls
   await page.keyboard.press('ArrowRight'); // About
   await page.keyboard.press('Enter');
   await waitForView(page, 'about');
@@ -373,6 +403,7 @@ test('a gamepad opens Help, reaches About, and backs out', async ({ page }) => {
   await frames(4);
   await press(DOWN); // reveals the Pickups tab
   await press(DOWN); // Spells
+  await press(DOWN); // Controls
   await press(DOWN); // About
   await press(A);
   await waitForView(page, 'about');
@@ -412,11 +443,13 @@ test('a gamepad walks the Help tabs with LB/RB and backs out with B (#377)', asy
 
   await step(PAD.RB, 'spells', 0);
   for (let p = 1; p < pages; p += 1) await step(PAD.RB, 'spells', p);
+  await step(PAD.RB, 'controls');
   await step(PAD.RB, 'about');
   await padPress(page, PAD.RB); // nowhere right of About
   await frames(page, 4);
   expect(await helpView(page)).toBe('about');
 
+  await step(PAD.LB, 'controls');
   await step(PAD.LB, 'spells', pages - 1);
   for (let p = pages - 2; p >= 0; p -= 1) await step(PAD.LB, 'spells', p);
   await step(PAD.LB, 'pickups');
