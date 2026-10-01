@@ -276,7 +276,9 @@ test('the cooldown ignores a press, the icon follows it, and the cues play (and 
   page,
 }) => {
   const errors = collectErrors(page);
-  await startRun(page, `&timeScale=10${ISOLATED}`);
+  // Real time: at timeScale 10 the 3 s cooldown is 0.3 s of wall clock, and a
+  // slow CI runner let it run out between the presses (#384).
+  await startRun(page, `&timeScale=1${ISOLATED}`);
   await recordSounds(page);
   await trackDash(page);
 

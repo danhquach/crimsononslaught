@@ -203,6 +203,10 @@ export interface StartButtonWatch {
  * baseline, that stale state made the Start that resumed a pause opened with
  * Esc read as a fresh press one frame later, and the pause opened again. The
  * same holds for the A that confirmed a level-up card and would dash.
+ *
+ * The skip alone was not enough on a slow machine (#384, CI): several Game
+ * steps can run before Phaser refreshes the pad, so a held A read up and then
+ * down, and dashed. The button is therefore read from the browser's live pad.
  */
 export function watchPadButton(scene: Phaser.Scene, button: PadButton): StartButtonWatch {
   const edge = buttonEdge();
@@ -215,13 +219,19 @@ export function watchPadButton(scene: Phaser.Scene, button: PadButton): StartBut
         stale = false;
         return false;
       }
-      return edge.step(pad.buttons[PAD_BUTTON[button]]?.pressed ?? false);
+      return edge.step(livePressed(pad, PAD_BUTTON[button]));
     },
     reset: () => {
       edge.reset();
       stale = true;
     },
   };
+}
+
+/** Whether `index` is down on `pad` now, per the browser; Phaser's copy as a fallback. */
+function livePressed(pad: Phaser.Input.Gamepad.Gamepad, index: number): boolean {
+  const live = typeof navigator === 'undefined' ? null : navigator.getGamepads?.()[pad.index];
+  return (live ?? pad).buttons[index]?.pressed ?? false;
 }
 
 /** Pad Start as a press edge (#252: it toggles the pause screen). */
