@@ -105,8 +105,18 @@ export const CHEST_EMBERS = 25;
  */
 export const MAX_LIVE_PICKUPS = 500;
 
-/** Spec §5: relics placed in the arena at run start. */
-export const RELIC_COUNT = 8;
+/**
+ * CO-208: how many relics a map places at run start, from its area (see
+ * `relicCountFor`). The first map's 3000×3000 px sets the density at 5 relics;
+ * a map's count is that density times its area, rounded, then held to
+ * `min`–`max` so a tiny or a huge map still gets a sensible number.
+ */
+export const RELIC_COUNT_RULE = {
+  /** Relics per px² of arena. */
+  density: 5 / (3000 * 3000),
+  min: 3,
+  max: 12,
+} as const;
 
 /** Spec §5: how the relics are spread over the arena, in px. */
 export const RELIC_PLACEMENT = {

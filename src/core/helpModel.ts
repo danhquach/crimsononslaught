@@ -1,5 +1,6 @@
 import type { TextureKey } from '../config/colors';
 import type { ChangelogEntry } from '../config/changelog';
+import { ARENA_SIZE } from '../config/arena';
 import { BASE_DASH, type DashStats } from '../config/dash';
 import type { EnemyType } from '../config/enemies';
 import { GEM_XP_VALUE } from '../config/gems';
@@ -25,6 +26,7 @@ import {
 import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVELS, spellLevelText, type SpellLevelTable } from '../config/spellLevels';
 import { MAX_OFFER_SIZE } from './levelUp';
+import { relicCountFor } from './pickups';
 import type { HelpView } from './scenePayloads';
 
 /**
@@ -117,7 +119,7 @@ export function pickupHelpRows(): PickupHelpRow[] {
       clip: 'pickupRelic.idle',
       texture: PICKUP_TEXTURES.relic,
       name: 'Relic',
-      source: 'several placed round the map at run start, more on bigger maps',
+      source: `${relicCountFor(ARENA_SIZE)} placed round the map at run start, more on bigger maps`,
       effect: `pick 1 of ${MAX_OFFER_SIZE}: a buff for the rest of the run (buffs stack), or more Rerolls or Bans`,
     },
   ];

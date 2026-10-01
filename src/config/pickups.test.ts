@@ -17,7 +17,7 @@ import {
   MAGNET_DURATION_MS,
   MAX_LIVE_PICKUPS,
   PICKUP_TEXTURES,
-  RELIC_COUNT,
+  RELIC_COUNT_RULE,
   RELIC_PLACEMENT,
 } from './pickups';
 import { WAVES } from './waves';
@@ -56,9 +56,11 @@ describe('pickup tunables', () => {
   });
 
   it('matches the spec §5 relic placement', () => {
-    expect(RELIC_COUNT).toBe(8);
+    expect(RELIC_COUNT_RULE).toEqual({ density: 5 / (3000 * 3000), min: 3, max: 12 });
+    expect(RELIC_COUNT_RULE.min).toBeGreaterThan(0);
+    expect(RELIC_COUNT_RULE.max).toBeGreaterThan(RELIC_COUNT_RULE.min);
     expect(RELIC_PLACEMENT).toMatchObject({ minFromStart: 400, minApart: 500, edgeMargin: 100 });
-    expect(RELIC_PLACEMENT.maxAttempts).toBeGreaterThan(RELIC_COUNT);
+    expect(RELIC_PLACEMENT.maxAttempts).toBeGreaterThan(RELIC_COUNT_RULE.max);
   });
 
   it('gives each kind and each consumable its own texture, none of them the gem’s, and relics the largest', () => {

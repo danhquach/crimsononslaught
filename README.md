@@ -43,9 +43,9 @@ touch controls, more maps — is tracked as GitHub issues.
   projectile speed, duration, crit, damage taken, move speed, max HP,
   regeneration, gem pull, XP, Pierce). **Reroll**, **Skip** (earns a reroll)
   and **Ban** reshape an offer.
-- **Relics.** Eight relics lie around the arena. Touching one pauses the run
-  on three cards, mostly relic buffs that last the rest of the run, sometimes
-  extra rerolls or bans.
+- **Relics.** Five relics lie around the arena; a bigger map holds more.
+  Touching one pauses the run on three cards, mostly relic buffs that last the
+  rest of the run, sometimes extra rerolls or bans.
 - **Enemies.** Swarm from the start, fast from 2:00 and tank from 4:00; ranged
   enemies from 6:00 keep their distance and shoot, exploders from 8:00 blow up on the player,
   splitters from 10:00 burst into three splitlings, and shielded enemies from

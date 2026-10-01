@@ -6,6 +6,7 @@ import {
   ELITE_CHEST_CHANCE,
   EMBER_DROPS,
   MAX_LIVE_PICKUPS,
+  RELIC_COUNT_RULE,
   RELIC_PLACEMENT,
   type ConsumableKind,
   type FlashRule,
@@ -156,6 +157,19 @@ export function inView(view: ViewRect, point: Readonly<Vec2>): boolean {
     point.y >= view.y &&
     point.y <= view.y + view.height
   );
+}
+
+/**
+ * CO-208: the relics a `world`-sized map places at run start: its area times
+ * `RELIC_COUNT_RULE.density`, rounded, held to `min`–`max`. Placement may still
+ * fit fewer (`placeRelics`).
+ */
+export function relicCountFor(
+  world: { readonly width: number; readonly height: number },
+  rule: { readonly density: number; readonly min: number; readonly max: number } = RELIC_COUNT_RULE,
+): number {
+  const count = Math.round(world.width * world.height * rule.density);
+  return Math.min(rule.max, Math.max(rule.min, count));
 }
 
 export interface PlacementRules {

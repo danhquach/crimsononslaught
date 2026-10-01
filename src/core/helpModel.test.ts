@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ANIMATIONS } from '../config/animations';
+import { ARENA_SIZE } from '../config/arena';
 import { TEXTURE_KEYS } from '../config/colors';
 import { GEM_XP_VALUE } from '../config/gems';
 import {
@@ -25,6 +26,7 @@ import {
   spellHelpRows,
 } from './helpModel';
 import { MAX_OFFER_SIZE } from './levelUp';
+import { relicCountFor } from './pickups';
 
 const row = (name: string) => {
   const found = pickupHelpRows().find((r) => r.name === name);
@@ -61,10 +63,11 @@ describe('pickupHelpRows', () => {
     expect(row('Magnet').effect).toContain(`${MAGNET_DURATION_MS / 1000} s`);
     expect(row('Bomb').effect).toContain(`${BOMB_DAMAGE} damage`);
     expect(row('Chest').effect).toContain(`${CHEST_EMBERS} Embers`);
+    // CO-208: the count the map places, not a fixed one.
     expect(row('Relic').source).toBe(
-      'several placed round the map at run start, more on bigger maps',
+      `${relicCountFor(ARENA_SIZE)} placed round the map at run start, more on bigger maps`,
     );
-    expect(row('Relic').source).not.toMatch(/\d/);
+    expect(row('Relic').source).toMatch(/^5 /);
     expect(row('Relic').effect).toContain(`1 of ${MAX_OFFER_SIZE}`);
   });
 

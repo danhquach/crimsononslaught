@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ARENA_PROP_COUNT, ARENA_PROP_FRAMES, ARENA_PROP_PLACEMENT } from '../config/arena';
-import { RELIC_COUNT } from '../config/pickups';
 import { planProps } from './arenaDressing';
-import { placeRelics } from './pickups';
+import { placeRelics, relicCountFor } from './pickups';
 import { createRng, deriveSeed } from './rng';
 
 const WORLD = { width: 3000, height: 3000 };
@@ -13,7 +12,12 @@ const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
 
 /** A run's dressing as `GameScene` plans it: clear of the start and of that seed's relics. */
 function dress(seed: number) {
-  const relics = placeRelics(createRng(deriveSeed(seed, 'pickups')), WORLD, START, RELIC_COUNT);
+  const relics = placeRelics(
+    createRng(deriveSeed(seed, 'pickups')),
+    WORLD,
+    START,
+    relicCountFor(WORLD),
+  );
   const keepClear = [START, ...relics];
   const props = planProps(
     createRng(deriveSeed(seed, 'arena')),

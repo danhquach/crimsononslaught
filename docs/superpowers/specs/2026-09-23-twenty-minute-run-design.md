@@ -190,7 +190,10 @@ tunables are in `config/pickups.ts`, the rules in `core/pickups.ts`.
 
 ## 5. Map pickups ("relics", new ticket)
 
-- **8 relics** are placed at run start, on seeded spots in the 3000×3000 arena:
+- **5 relics** (8 until CO-208) are placed at run start, on seeded spots in the 3000×3000 arena.
+  The count comes from the map's area: `relicCountFor(world)` in
+  `core/pickups.ts` takes `RELIC_COUNT_RULE` (first map's 5 per 3000×3000 px),
+  rounds, and holds it to 3–12. Spots:
   - at least 400 px from the player's start;
   - at least 500 px from each other;
   - at least 100 px inside the arena edge.
@@ -201,7 +204,7 @@ tunables are in `config/pickups.ts`, the rules in `core/pickups.ts`.
 - Relics never despawn and never respawn. Once taken, a relic is gone.
 - Picking one up calls `onRelic()`, which only emits `pickup:relic` and counts
   it into `RunStats.relics`. The effect is designed in a later ticket.
-- The pool's `maxSize` is `MAX_LIVE_PICKUPS + RELIC_COUNT`, so relics never
+- The pool's `maxSize` is `MAX_LIVE_PICKUPS + RELIC_COUNT_RULE.max`, so relics never
   take a slot away from drops.
 
 ## 6. Tests
@@ -219,7 +222,7 @@ tunables are in `config/pickups.ts`, the rules in `core/pickups.ts`.
 **e2e (Playwright)**
 - `fullRun` on `?startAt=1190&invulnerable=1` reaches the boss and a Result
   with an Embers count.
-- A pickups smoke test sees 8 relics in the arena at start, and an Embers count
+- A pickups smoke test sees the map's relic count (5 on the first map) in the arena at start, and an Embers count
   that rises during play.
 - Run e2e specs alone and re-run once before diagnosing a flake.
 

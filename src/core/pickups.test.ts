@@ -6,7 +6,7 @@ import {
   EMBER_DROPS,
   MAX_LIVE_PICKUPS,
   PICKUP_FLASH,
-  RELIC_COUNT,
+  RELIC_COUNT_RULE,
   RELIC_PLACEMENT,
   type ConsumableKind,
 } from '../config/pickups';
@@ -18,6 +18,7 @@ import {
   PICKUP_EVENT,
   placeRelics,
   planDrop,
+  relicCountFor,
   rollDrops,
   tickMagnet,
 } from './pickups';
@@ -217,8 +218,9 @@ describe('placeRelics', () => {
   it('places every relic in the arena for many seeds, keeping the spacing', () => {
     const { minFromStart, minApart, edgeMargin } = RELIC_PLACEMENT;
     for (let seed = 0; seed < 200; seed++) {
-      const spots = placeRelics(createRng(deriveSeed(seed, 'pickups')), WORLD, START, RELIC_COUNT);
-      expect(spots, `seed ${seed}`).toHaveLength(RELIC_COUNT);
+      const count = relicCountFor(WORLD);
+      const spots = placeRelics(createRng(deriveSeed(seed, 'pickups')), WORLD, START, count);
+      expect(spots, `seed ${seed}`).toHaveLength(count);
       spots.forEach((spot, i) => {
         expect(distance(spot, START)).toBeGreaterThanOrEqual(minFromStart);
         expect(spot.x).toBeGreaterThanOrEqual(edgeMargin);
@@ -233,7 +235,7 @@ describe('placeRelics', () => {
   });
 
   it('replays the same spots from the same seed', () => {
-    const place = () => placeRelics(createRng(99), WORLD, START, RELIC_COUNT);
+    const place = () => placeRelics(createRng(99), WORLD, START, relicCountFor(WORLD));
     expect(place()).toEqual(place());
   });
 
@@ -242,20 +244,68 @@ describe('placeRelics', () => {
     // spots 500 apart at its corners, and the centre is ruled out by the start.
     const small = { width: 1200, height: 1200 };
     const { rng, draws } = counting(5);
-    const spots = placeRelics(rng, small, { x: 600, y: 600 }, RELIC_COUNT);
-    expect(spots.length).toBeLessThan(RELIC_COUNT);
+    const spots = placeRelics(rng, small, { x: 600, y: 600 }, RELIC_COUNT_RULE.max);
+    expect(spots.length).toBeLessThan(RELIC_COUNT_RULE.max);
     // Two draws a candidate, and it stopped at the attempt cap.
     expect(draws()).toBe(RELIC_PLACEMENT.maxAttempts * 2);
   });
 
   it('places nothing in an arena narrower than its margins', () => {
-    expect(placeRelics(createRng(1), { width: 150, height: 3000 }, START, RELIC_COUNT)).toEqual([]);
+    expect(
+      placeRelics(createRng(1), { width: 150, height: 3000 }, START, RELIC_COUNT_RULE.max),
+    ).toEqual([]);
   });
 
   it('stops drawing once every relic is placed', () => {
     const { rng, draws } = counting(8);
-    placeRelics(rng, WORLD, START, RELIC_COUNT);
+    placeRelics(rng, WORLD, START, relicCountFor(WORLD));
     expect(draws()).toBeLessThan(RELIC_PLACEMENT.maxAttempts * 2);
+  });
+});
+
+describe('relicCountFor (CO-208)', () => {
+  const { min, max } = RELIC_COUNT_RULE;
+  const square = (side: number) => ({ width: side, height: side });
+
+  it('gives the first map 5 relics', () => {
+    expect(relicCountFor(WORLD)).toBe(5);
+  });
+
+  it('scales with the area, rounded', () => {
+    expect(relicCountFor(square(4000))).toBe(9); // 8.9
+    expect(relicCountFor({ width: 6000, height: 3000 })).toBe(10);
+    expect(relicCountFor({ width: 3000, height: 3300 })).toBe(6); // 5.5 rounds up
+    expect(relicCountFor({ width: 3000, height: 2700 })).toBe(5); // 4.5 rounds up
+    expect(relicCountFor({ width: 3000, height: 2600 })).toBe(4); // 4.3
+  });
+
+  it('never gives fewer than the minimum, a tiny or empty map included', () => {
+    expect(relicCountFor(square(2000))).toBe(min); // 2.2
+    expect(relicCountFor(square(100))).toBe(min);
+    expect(relicCountFor(square(0))).toBe(min);
+  });
+
+  it('never gives more than the maximum, however big the map', () => {
+    expect(relicCountFor(square(10_000))).toBe(max); // 55.6
+    expect(relicCountFor(square(1_000_000))).toBe(max);
+  });
+
+  it('never falls as the map grows', () => {
+    let last = 0;
+    for (let side = 0; side <= 12_000; side += 250) {
+      const count = relicCountFor(square(side));
+      expect(count, `side ${side}`).toBeGreaterThanOrEqual(last);
+      expect(count).toBeGreaterThanOrEqual(min);
+      expect(count).toBeLessThanOrEqual(max);
+      last = count;
+    }
+  });
+
+  it('applies the rule it is given', () => {
+    const rule = { density: 1 / 1_000_000, min: 1, max: 4 };
+    expect(relicCountFor(square(1000), rule)).toBe(1);
+    expect(relicCountFor(square(1900), rule)).toBe(4); // 3.61
+    expect(relicCountFor(square(5000), rule)).toBe(4);
   });
 });
 

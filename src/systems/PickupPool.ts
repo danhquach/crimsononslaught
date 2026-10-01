@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import {
   CONSUMABLE_KINDS,
   MAX_LIVE_PICKUPS,
-  RELIC_COUNT,
+  RELIC_COUNT_RULE,
   type ConsumableKind,
   type PickupKind,
 } from '../config/pickups';
@@ -21,9 +21,10 @@ export type Collected =
  * group of reusable `Pickup` sprites, capped, and reclaimed when collected.
  * Nothing needs cleaning up at run end: the group dies with the scene.
  *
- * The group holds `MAX_LIVE_PICKUPS` drops plus `RELIC_COUNT` relics. Drops
- * are counted against their own cap here rather than left to the group's
- * `maxSize`, which alone would let a drop take a collected relic's slot.
+ * The group holds `MAX_LIVE_PICKUPS` drops plus the most relics a map can
+ * place, `RELIC_COUNT_RULE.max`. Drops are counted against their own cap here
+ * rather than left to the group's `maxSize`, which alone would let a drop take
+ * a collected relic's slot.
  *
  * `group` is the overlap target for collection (CollisionSystem, CO-032).
  */
@@ -35,7 +36,7 @@ export class PickupPool {
   constructor(scene: Phaser.Scene) {
     this.group = scene.physics.add.group({
       classType: Pickup,
-      maxSize: MAX_LIVE_PICKUPS + RELIC_COUNT,
+      maxSize: MAX_LIVE_PICKUPS + RELIC_COUNT_RULE.max,
       // Updated from `update` below with the player's position, and only while
       // Game runs, so a paused scene freezes them.
       runChildUpdate: false,
@@ -115,7 +116,7 @@ export class PickupPool {
     return this.drop('consumable', x, y, 0, consumable);
   }
 
-  /** Place one relic at (x, y) (spec §5). Its slot is reserved, so it only fails past `RELIC_COUNT`. */
+  /** Place one relic at (x, y) (spec §5). Its slot is reserved, so it only fails past `RELIC_COUNT_RULE.max`. */
   placeRelic(x: number, y: number): boolean {
     return this.spawn('relic', x, y) !== null;
   }

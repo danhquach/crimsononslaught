@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { E2E_FEEDBACK_KEY } from '../playwright.config';
+import { ARENA_SIZE } from '../src/config/arena';
 import { CHANGELOG } from '../src/config/changelog';
 import { FEEDBACK_URL } from '../src/core/feedback';
 import { controlHelpRows, pickupHelpRows, spellHelpPages } from '../src/core/helpModel';
+import { relicCountFor } from '../src/core/pickups';
 import { AUDIO_REGISTRY_KEY, SCENE, type HelpView } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
 import {
@@ -106,7 +108,10 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
 
   const texts = await sceneTexts(page, SCENE.help);
   expect(texts).toEqual(expect.arrayContaining(['Help', 'Pickups', 'About', ...NAMES]));
-  expect(texts).toContain('several placed round the map at run start, more on bigger maps');
+  // CO-208: the Relic row quotes the count the first map places.
+  expect(texts).toContain(
+    `${relicCountFor(ARENA_SIZE)} placed round the map at run start, more on bigger maps`,
+  );
   for (const row of pickupHelpRows()) {
     expect(texts).toEqual(expect.arrayContaining([row.source, row.effect]));
   }
