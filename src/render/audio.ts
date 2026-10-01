@@ -23,6 +23,7 @@ import {
   type MusicGains,
   type RunMusic,
 } from '../core/musicMix';
+import { buttonEdge } from '../core/input';
 import { createRng, deriveSeed, type Rng } from '../core/rng';
 import { AUDIO_REGISTRY_KEY } from '../core/scenePayloads';
 
@@ -239,28 +240,55 @@ export class Audio {
 }
 
 /**
- * Build the game's `Audio` from the saved settings and register it. `M` on
- * the page toggles mute from any scene — the keyboard plugin is per scene, so
- * the listener sits on the document. Music fades are stepped from the game's
- * own loop for the same reason: it outlives every scene. Called once, from Boot.
+ * Build the game's `Audio` from the saved settings and register it. The
+ * bound mute key (`M` by default, CO-226) on the page toggles mute from any
+ * scene — the keyboard plugin is per scene, so the listener sits on the
+ * document — and so does the bound pad button, polled on the game's loop.
+ * Neither acts while `capturing()` says a rebind is waiting for that very
+ * press. Music fades are stepped from the game's own loop for the same
+ * reason: it outlives every scene. Called once, from Boot.
  */
 export function installAudio(
   scene: Phaser.Scene,
   saved: Parameters<typeof readAudioSettings>[0],
   onChange: (settings: Readonly<AudioSettings>) => void,
+  binding: () => { key: string; pad: number },
+  capturing: () => boolean,
 ): Audio {
   const audio = new Audio(scene.sound, scene.cache.audio, readAudioSettings(saved), onChange);
   scene.registry.set(AUDIO_REGISTRY_KEY, audio);
   // Never removed: Boot runs once per page load, so this is one listener for
   // the life of the page. A second Boot would add a second toggle.
   document.addEventListener('keydown', (event) => {
-    if (event.repeat || (event.key !== 'm' && event.key !== 'M')) return;
+    if (event.repeat || event.code !== binding().key || capturing() || isTextField(event.target))
+      return;
     console.info(`[audio] muted=${audio.toggleMute()}`);
   });
-  scene.game.events.on(Phaser.Core.Events.STEP, (_time: number, delta: number) =>
-    audio.stepMusic(delta),
-  );
+  const padMute = buttonEdge();
+  scene.game.events.on(Phaser.Core.Events.STEP, (_time: number, delta: number) => {
+    audio.stepMusic(delta);
+    // The first live pad, as the browser reports it. While a rebind waits the
+    // edge is dropped, so the press that was captured is not a mute on release.
+    const pad = capturing() ? undefined : livePad();
+    if (padMute.step(pad ? (pad.buttons[binding().pad]?.pressed ?? false) : undefined)) {
+      console.info(`[audio] muted=${audio.toggleMute()}`);
+    }
+  });
   return audio;
+}
+
+/** A typed letter in a text box is text, not a mute. */
+function isTextField(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+  );
+}
+
+function livePad(): Gamepad | undefined {
+  if (typeof navigator === 'undefined') return undefined;
+  for (const pad of navigator.getGamepads?.() ?? []) if (pad?.connected) return pad;
+  return undefined;
 }
 
 /**

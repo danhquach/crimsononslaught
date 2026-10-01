@@ -37,7 +37,7 @@ interface Screen {
   name: string;
   scene: string;
   /** The payload the screen is opened with, if it takes one. */
-  data?: { view: string };
+  data?: Record<string, string>;
   /** Presses to the first row; SpellSelect's cards come before its buttons. */
   presses?: number;
   /** The screen takes no arrow keys, only a pad (SpellSelect, Upgrades). */
@@ -47,6 +47,7 @@ interface Screen {
 const SCREENS: Screen[] = [
   { name: 'intro', scene: SCENE.intro },
   { name: 'settings', scene: SCENE.settings },
+  { name: 'settings-controls', scene: SCENE.settings, data: { page: 'controls' } },
   { name: 'profile', scene: SCENE.profile },
   { name: 'help-pickups', scene: SCENE.help, data: { view: 'pickups' } },
   { name: 'help-about', scene: SCENE.help, data: { view: 'about' } },

@@ -1,4 +1,5 @@
 import { upgradeById } from '../config/meta';
+import { dropUnknownControlKeys } from './controls';
 import { dropUnknownMinimapKeys } from './minimap';
 import type { Outcome, RunStats } from './scenePayloads';
 
@@ -155,7 +156,10 @@ export function migrate(
   const normalized = normalizeUpgrades(current);
   return {
     ok: true,
-    save: { ...normalized, settings: dropUnknownMinimapKeys(normalized.settings) },
+    save: {
+      ...normalized,
+      settings: dropUnknownControlKeys(dropUnknownMinimapKeys(normalized.settings)),
+    },
   };
 }
 

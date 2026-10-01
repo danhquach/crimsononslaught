@@ -1,6 +1,7 @@
 import type { TextureKey } from '../config/colors';
 import type { ChangelogEntry } from '../config/changelog';
 import { ARENA_SIZE } from '../config/arena';
+import type { ControlAction } from '../config/controls';
 import { BASE_DASH, type DashStats } from '../config/dash';
 import type { EnemyType } from '../config/enemies';
 import { GEM_XP_VALUE } from '../config/gems';
@@ -25,6 +26,7 @@ import {
 } from '../config/loadout';
 import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVELS, spellLevelText, type SpellLevelTable } from '../config/spellLevels';
+import { bindingLabel, defaultControls, moveLabel, type Controls } from './controls';
 import { MAX_OFFER_SIZE } from './levelUp';
 import { relicCountFor } from './pickups';
 import type { HelpView } from './scenePayloads';
@@ -232,27 +234,50 @@ export interface ControlHelpRow {
 }
 
 /**
- * The Controls tab's rows. The bindings are the game's own: movement and the
- * dash are read in `entities/Player.ts`, Esc and pad Start pause in
- * `GameScene`, and M mutes from `render/audio.ts`. The dash note reads its
- * numbers from `BASE_DASH`, so a retune changes the text.
+ * The Controls tab's rows. The bindings are the player's own (CO-226): movement
+ * and the dash are read in `entities/Player.ts`, the pause key and button in
+ * `GameScene`, mute in `render/audio.ts`, Reroll, Skip and Ban in `LevelUpScene`
+ * and the tab keys in `HelpScene`. The dash note reads its numbers from
+ * `BASE_DASH`, so a retune changes the text.
  */
-export function controlHelpRows(stats: Readonly<DashStats> = BASE_DASH): ControlHelpRow[] {
+export function controlHelpRows(
+  stats: Readonly<DashStats> = BASE_DASH,
+  controls: Readonly<Controls> = defaultControls(),
+): ControlHelpRow[] {
+  const both = (action: ControlAction): Pick<ControlHelpRow, 'keyboard' | 'gamepad'> => ({
+    keyboard: bindingLabel(controls, 'keyboard', action),
+    gamepad: bindingLabel(controls, 'pad', action),
+  });
+  const trio = (device: 'keyboard' | 'pad'): string =>
+    `${bindingLabel(controls, device, 'reroll')} reroll, ${bindingLabel(controls, device, 'skip')} skip, ${bindingLabel(controls, device, 'ban')} ban`;
+  const pair = (device: 'keyboard' | 'pad'): string =>
+    `${bindingLabel(controls, device, 'helpPrev')} / ${bindingLabel(controls, device, 'helpNext')}`;
   return [
     {
       action: 'Move',
-      keyboard: 'WASD or arrow keys',
-      gamepad: 'Left stick or D-pad',
+      keyboard: moveLabel(controls, 'keyboard'),
+      gamepad: moveLabel(controls, 'pad'),
       note: 'Walk; a dash goes the way you are moving',
     },
     {
       action: 'Dash',
-      keyboard: 'Space',
-      gamepad: 'A',
+      ...both('dash'),
       note: `Burst ${stats.distancePx} px; no damage while it runs; ${stats.cooldownMs / 1000} s cooldown`,
     },
-    { action: 'Pause', keyboard: 'Esc', gamepad: 'Start', note: 'Pause the run' },
-    { action: 'Mute', keyboard: 'M', gamepad: 'none', note: 'Mute and unmute the sound' },
+    { action: 'Pause', ...both('pause'), note: 'Pause the run' },
+    { action: 'Mute', ...both('mute'), note: 'Mute and unmute the sound' },
+    {
+      action: 'Level-up',
+      keyboard: trio('keyboard'),
+      gamepad: trio('pad'),
+      note: 'On the level-up screen; 1-3 pick a card',
+    },
+    {
+      action: 'Help tabs',
+      keyboard: pair('keyboard'),
+      gamepad: pair('pad'),
+      note: 'Previous and next tab of this screen',
+    },
   ];
 }
 

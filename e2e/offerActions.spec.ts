@@ -275,3 +275,16 @@ test('pad Y enters ban mode, B only leaves it, and X rerolls (#377)', async ({ p
   expect(rerolled.run.rerolls).toBe(2);
   expect(errors).toEqual([]);
 });
+
+test('pad RB skips the offer and pays a reroll, the way S does (CO-226)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await addFakePad(page);
+  await startRun(page);
+  await openLevelUp(page);
+  await frames(page, 4);
+
+  await padPress(page, PAD.RB);
+  const skipped = await waitFor(page, 'the skip closed the offer', (s) => !s.open);
+  expect(skipped.run.rerolls).toBe(4);
+  expect(errors).toEqual([]);
+});

@@ -23,7 +23,8 @@ import {
   type ConfirmAction,
   type PauseChoosePayload,
 } from '../core/pauseModel';
-import { watchStartButton, type StartButtonWatch } from './input';
+import { controlsOf } from './controls';
+import { watchPadButton, type StartButtonWatch } from './input';
 import { artFrame } from '../core/animation';
 import { BOSS_EVENT, type BossPhasePayload } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor, consumableSoundFor } from '../config/sounds';
@@ -66,6 +67,7 @@ import {
   tickMagnet,
 } from '../core/pickups';
 import { planProps } from '../core/arenaDressing';
+import { defaultControls } from '../core/controls';
 import { MINIMAP_EVENT, readMinimapSettings, type MinimapFrame } from '../core/minimap';
 import { MINIMAP_REFRESH_MS } from '../config/minimap';
 import { membersOf } from '../core/groundArea';
@@ -484,7 +486,9 @@ export class GameScene extends Phaser.Scene {
   private shake: ShakeState = NO_SHAKE;
   /** Game has queued its own pause under an overlay (see `pauseUnder`). */
   private pausing = false;
-  /** Pad Start (#252): pauses the run, polled in `update`. */
+  /** The rebindable controls (CO-226), read at start and on resume. */
+  private controls = defaultControls();
+  /** The bound pad pause button, Start by default (#252): pauses the run, polled in `update`. */
   private startButton!: StartButtonWatch;
   /** Run time left on a magnet pickup (#128); while above 0 every gem on the map drifts in. */
   private magnetMsLeft = 0;
@@ -1288,6 +1292,7 @@ export class GameScene extends Phaser.Scene {
     this.audio.startRunMusic();
     this.feedback = readFeedbackSettings(this.save().settings);
     this.minimap = readMinimapSettings(this.save().settings);
+    this.controls = controlsOf(this);
     this.minimapSinceMs = MINIMAP_REFRESH_MS;
     this.shake = NO_SHAKE;
 
@@ -1393,14 +1398,18 @@ export class GameScene extends Phaser.Scene {
     const onChoose = ({ action }: PauseChoosePayload): void => this.leaveFromPause(action);
     this.events.on(PAUSE_EVENT.choose, onChoose);
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.repeat) this.openPause();
+      if (event.code === this.controls.keyboard.pause && !event.repeat) this.openPause();
     });
-    this.startButton = watchStartButton(this);
+    this.startButton = watchPadButton(this, this.controls.pad.pause);
     // A paused scene polls nothing, so the Start that resumed it (or one still
     // held) is not a fresh press.
     const onResume = (): void => {
       this.pausing = false;
+      // Settings opened from the pause screen (CO-226) may have rebound the pause button.
+      this.controls = controlsOf(this);
+      this.startButton = watchPadButton(this, this.controls.pad.pause);
       this.startButton.reset();
+      this.player.refreshControls();
       // A Space pressed or an A held while paused, as for Start, is not a dash.
       this.player.resetDashInput();
       // Settings opened from the pause screen (CO-192) may have changed these.

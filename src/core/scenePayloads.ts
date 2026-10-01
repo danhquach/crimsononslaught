@@ -1,3 +1,4 @@
+import type { ControlDevice } from '../config/controls';
 import { ROSTER_SPELL_IDS, isRosterSpellId, type RosterSpellId } from '../config/loadout';
 import { PASSIVES, isPassiveId, type PassiveId } from '../config/passives';
 import { RELIC_BUFFS, isRelicBuffId, type RelicBuffId } from '../config/relics';
@@ -121,9 +122,20 @@ export interface PausePayload {
  */
 export interface SettingsPayload {
   pause?: PausePayload;
-  page?: 'pickups';
-  focus?: 'kinds';
+  page?: 'pickups' | 'controls';
+  focus?: 'kinds' | 'controls';
+  /** The Controls page's open tab (CO-226); left out, Keyboard. */
+  device?: ControlDevice;
+  /** The Controls page asks Yes or No before this reset; Settings restarts itself with it. */
+  confirm?: ControlsReset;
+  /** The Controls page says this reset just happened. */
+  notice?: ControlsReset;
 }
+
+/** What a Controls reset covers: one device's bindings, or both. */
+export const CONTROLS_RESETS = ['keyboard', 'pad', 'all'] as const;
+
+export type ControlsReset = (typeof CONTROLS_RESETS)[number];
 
 /** What the Help screen shows (#226): a tab, or the About tab's feedback form. */
 export const HELP_VIEWS = ['pickups', 'spells', 'controls', 'about', 'feedback'] as const;
@@ -228,6 +240,35 @@ export function isSettingsPayload(
   data: unknown,
 ): data is SettingsPayload & { pause: PausePayload } {
   return isRecord(data) && isPausePayload(data.pause) && data.pause.confirm === undefined;
+}
+
+/** Settings' Controls page was asked for (CO-226). */
+export function isControlsPage(data: unknown): boolean {
+  return isRecord(data) && data.page === 'controls';
+}
+
+/** The Controls page's tab; anything but the Controller tab is Keyboard. */
+export function controlsDevice(data: unknown): ControlDevice {
+  return isRecord(data) && data.device === 'pad' ? 'pad' : 'keyboard';
+}
+
+function resetOf(value: unknown): ControlsReset | null {
+  return (CONTROLS_RESETS as readonly unknown[]).includes(value) ? (value as ControlsReset) : null;
+}
+
+/** The reset the Controls page is asking Yes or No about, or `null`. */
+export function controlsConfirm(data: unknown): ControlsReset | null {
+  return isRecord(data) ? resetOf(data.confirm) : null;
+}
+
+/** The reset the Controls page reports as done, or `null`. */
+export function controlsNotice(data: unknown): ControlsReset | null {
+  return isRecord(data) ? resetOf(data.notice) : null;
+}
+
+/** Settings is coming back from the Controls page (CO-226). */
+export function focusesControls(data: unknown): boolean {
+  return isRecord(data) && data.focus === 'controls';
 }
 
 /** Settings' pickup kinds page was asked for (#383); anything else is the main page. */

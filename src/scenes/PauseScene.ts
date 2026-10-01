@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { defaultControls, joinLabels, keyLabel, menuSafe, padLabel } from '../core/controls';
 import { PASSIVE_COLOR, RELIC_COLOR, offerColor } from '../core/offerColors';
 import {
   CONFIRM_PROMPTS,
@@ -43,9 +44,10 @@ import {
   attachMenuInput,
   attachNavInput,
   attachPadButtons,
-  watchStartButton,
+  watchPadButton,
   type MenuItem,
 } from './input';
+import { controlsOf } from './controls';
 import { addMenuRow } from './menuUi';
 
 const BACKDROP_ALPHA = 0.8;
@@ -120,6 +122,9 @@ export class PauseScene extends Phaser.Scene {
     };
   }
 
+  /** The rebindable controls (CO-226), read as the screen opens. */
+  private controls = defaultControls();
+
   init(data: unknown): void {
     this.payload = isPausePayload(data) ? data : null;
     // Phaser replays the last launch payload on a payload-less launch; clear it.
@@ -131,6 +136,7 @@ export class PauseScene extends Phaser.Scene {
     this.focus = null;
     this.padSlot = null;
     this.info = null;
+    this.controls = controlsOf(this);
     if (!this.payload) {
       console.warn('[Pause] launched without a valid payload; resuming Game');
       this.resume();
@@ -155,13 +161,20 @@ export class PauseScene extends Phaser.Scene {
     // keys arrive, so a key this screen acts on never reaches the scene it
     // hands over to.
     const back = confirm ? () => this.backToMenu(view) : () => this.resume();
+    // The bound pause key and button (CO-226) back out as well, unless they are one the
+    // menus keep for themselves; Esc and B always do.
+    const { keyboard, pad } = this.controls;
+    const keyBacks = menuSafe('keyboard', keyboard.pause);
+    const padBacks = menuSafe('pad', pad.pause);
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.repeat) back();
+      if (event.repeat) return;
+      if (event.key === 'Escape' || (keyBacks && event.code === keyboard.pause)) back();
     });
-    // Pad B backs out like Esc and Start (#377).
+    // Pad B backs out like Esc and the pause button (#377).
     attachPadButtons(this, { B: back });
     // The scene's own emitter keeps its listeners across a restart; drop this one.
-    const start = watchStartButton(this);
+    // An index no pad has when the pause button is one the menus keep for themselves.
+    const start = watchPadButton(this, padBacks ? pad.pause : -1);
     const pollStart = (): void => {
       if (start.pressed()) back();
     };
@@ -186,7 +199,7 @@ export class PauseScene extends Phaser.Scene {
       }),
     );
     const hintY = MENU_TOP + PAUSE_ACTIONS.length * MENU_PITCH + 12;
-    this.addHint(STAND_X, hintY, 'Esc, Start or B to resume');
+    this.addHint(STAND_X, hintY, `${this.leaveKeys(true)} to resume`);
     this.addHint(STAND_X, hintY + 22, 'click, arrows + Enter, or a gamepad');
 
     this.info = this.add.text(STRIP_X, 440, INFO_HINT, {
@@ -388,7 +401,18 @@ export class PauseScene extends Phaser.Scene {
       }),
     ];
     attachMenuInput(this, items, { keyboard: true, enterDefault: 1 });
-    this.addHint(width / 2, 410, 'Esc or Start to go back');
+    this.addHint(width / 2, 410, `${this.leaveKeys(false)} to go back`);
+  }
+
+  /** The keys and buttons that leave this screen, as the hints name them: Esc, the bound pause inputs and, resuming, B. */
+  private leaveKeys(withB: boolean): string {
+    const { keyboard, pad } = this.controls;
+    return joinLabels([
+      'Esc',
+      ...(menuSafe('keyboard', keyboard.pause) ? [keyLabel(keyboard.pause)] : []),
+      ...(menuSafe('pad', pad.pause) ? [padLabel(pad.pause)] : []),
+      ...(withB ? ['B'] : []),
+    ]);
   }
 
   private addHint(x: number, y: number, text: string): void {

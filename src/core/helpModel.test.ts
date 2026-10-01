@@ -14,6 +14,7 @@ import {
 import { ROSTER_SPELL_IDS, SPELLS_BY_ELEMENT, elementOf } from '../config/loadout';
 import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVEL_TEXT_MAX, SPELL_LEVELS, type SpellLevelTable } from '../config/spellLevels';
+import { defaultControls, rebind } from './controls';
 import {
   MAX_SPELL_HELP_ROWS,
   aboutRowCount,
@@ -279,15 +280,49 @@ describe('helpShoulderStep (#377, #384)', () => {
 describe('controlHelpRows (#384)', () => {
   const byAction = (action: string) => controlHelpRows().find((r) => r.action === action);
 
-  it('lists Move, Dash, Pause and Mute in that order', () => {
-    expect(controlHelpRows().map((r) => r.action)).toEqual(['Move', 'Dash', 'Pause', 'Mute']);
+  it('lists Move, Dash, Pause, Mute, Level-up and Help tabs in that order', () => {
+    expect(controlHelpRows().map((r) => r.action)).toEqual([
+      'Move',
+      'Dash',
+      'Pause',
+      'Mute',
+      'Level-up',
+      'Help tabs',
+    ]);
   });
 
-  it('names the real bindings', () => {
-    expect(byAction('Move')).toMatchObject({ keyboard: 'WASD or arrow keys' });
+  it('names the default bindings', () => {
+    expect(byAction('Move')).toMatchObject({
+      keyboard: 'W A S D or arrow keys',
+      gamepad: 'Left stick or D-pad',
+    });
     expect(byAction('Dash')).toMatchObject({ keyboard: 'Space', gamepad: 'A' });
     expect(byAction('Pause')).toMatchObject({ keyboard: 'Esc', gamepad: 'Start' });
-    expect(byAction('Mute')).toMatchObject({ keyboard: 'M' });
+    expect(byAction('Mute')).toMatchObject({ keyboard: 'M', gamepad: 'Back' });
+    expect(byAction('Level-up')).toMatchObject({
+      keyboard: 'R reroll, S skip, B ban',
+      gamepad: 'X reroll, RB skip, Y ban',
+    });
+    expect(byAction('Help tabs')).toMatchObject({ keyboard: 'Q / E', gamepad: 'LB / RB' });
+  });
+
+  it('names the current bindings, not the defaults (CO-226)', () => {
+    let controls = defaultControls();
+    for (const [action, key] of [
+      ['moveUp', 'KeyI'],
+      ['dash', 'ShiftLeft'],
+      ['mute', 'KeyN'],
+      ['helpNext', 'KeyP'],
+    ] as const) {
+      const result = rebind(controls, 'keyboard', action, key);
+      if (result.ok) controls = result.controls;
+    }
+    const row = (action: string) =>
+      controlHelpRows(undefined, controls).find((r) => r.action === action);
+    expect(row('Move')?.keyboard).toBe('I A S D or arrow keys');
+    expect(row('Dash')?.keyboard).toBe('Left Shift');
+    expect(row('Mute')?.keyboard).toBe('N');
+    expect(row('Help tabs')?.keyboard).toBe('Q / P');
   });
 
   it('reads the dash numbers from its stats', () => {
