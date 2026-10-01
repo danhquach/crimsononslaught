@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type Phaser from 'phaser';
 import { ROSTER_SPELL_IDS } from '../src/config/loadout';
-import { buildIconFrame } from '../src/config/buildIcons';
 import { PASSIVES } from '../src/config/passives';
 import { RELIC_BUFFS } from '../src/config/relics';
 import { ROSTER_SPELL_CARDS } from '../src/config/rosterCards';
@@ -199,11 +198,7 @@ function expectBuildAboveButton(s: Sample, passives: Box[], relics: Box[]): void
   }
 }
 
-const buildFrames = [...PASSIVES, ...RELIC_BUFFS]
-  .filter(({ id }) => buildIconFrame(id) !== undefined)
-  .map(({ id }) => `icon.${id}.0.art`);
-// A relic with no icon art yet wears its letter gem (#377).
-const relicsWithoutIcon = RELIC_BUFFS.filter(({ id }) => buildIconFrame(id) === undefined).length;
+const buildFrames = [...PASSIVES, ...RELIC_BUFFS].map(({ id }) => `icon.${id}.0.art`);
 
 const spellSelectStarts = (page: Page): Promise<number> =>
   page.evaluate(() => (window as unknown as { spellSelectStarts: number }).spellSelectStarts);
@@ -237,7 +232,7 @@ for (const outcome of ['win', 'lose', 'ended'] as const) {
     expectBuildAboveButton(s, s.passiveIcons, [...s.relicIcons, ...s.relicGems]);
     for (const frame of buildFrames) expect(s.iconFrames, frame).toContain(frame);
     expect(s.passiveTiles).toEqual([]);
-    expect(s.relicGems).toHaveLength(relicsWithoutIcon);
+    expect(s.relicGems).toEqual([]);
     // No text overflows the screen either.
     for (const t of s.texts) expect(within(t.box, 0), t.text).toBe(true);
     expect(errors).toEqual([]);

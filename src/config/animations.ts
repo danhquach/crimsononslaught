@@ -304,13 +304,10 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
 
   // Pause screen build icons (CO-179): one still per passive and relic buff,
   // drawn by PauseScene straight from the atlas, never played. A buff with no
-  // icon art yet (Impaler, #377) has no clip; its tile keeps its two letters.
-  // Colossus's art is no longer drawn (#377) but stays on its page, so dropping
-  // it would re-quantise the page's palette.
+  // icon art yet has no clip; its tile keeps its two letters.
   ...[...PASSIVES, ...RELIC_BUFFS]
     .filter(({ id }) => buildIconFrame(id) !== undefined)
     .map(({ id }) => spec(`icon.${id}`, 1, 1, ONCE)),
-  spec('icon.relic_colossus', 1, 1, ONCE),
 
   // HUD bar frames and their end marks (CO-156): stills, never played; each
   // frame is cut into caps and a middle by `render/barFrame.ts`. The shield

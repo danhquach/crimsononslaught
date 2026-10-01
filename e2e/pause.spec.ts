@@ -570,7 +570,9 @@ test('every spell name fits inside the Spells strip, and passives and relics wea
   page,
 }) => {
   const errors = collectErrors(page);
-  await pauseWithLoadout(page, LONG_LOADOUT, BUILD);
+  // Every relic wears an icon, Impaler too (CO-217).
+  const build = { ...BUILD, relics: [...BUILD.relics, 'relic_impaler' as const] };
+  await pauseWithLoadout(page, LONG_LOADOUT, build);
 
   const sample = await sampleStrip(page);
   expect(sample.strip).not.toBeNull();
@@ -590,7 +592,7 @@ test('every spell name fits inside the Spells strip, and passives and relics wea
   }
 
   // Each passive and relic draws its own icon art, not its letters.
-  const expected = [...BUILD.passives, ...BUILD.relics].map((id) => `icon.${id}.0.art`);
+  const expected = [...build.passives, ...build.relics].map((id) => `icon.${id}.0.art`);
   for (const frame of expected) expect(sample.icons).toContain(frame);
   expect(errors).toEqual([]);
 });
