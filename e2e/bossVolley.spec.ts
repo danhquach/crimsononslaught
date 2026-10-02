@@ -122,6 +122,13 @@ test('volleys keep their 15 s cooldown, enraged too, with the hero far away', as
   await startRun(page, `${SCALE}&invulnerable=1`);
   await breakBar(page, true);
   expect((await report(page))?.enraged).toBe(true);
+  // CO-225: an enraged charge leg is a chain now, so skills come less often and the seeded rolls
+  // gave one volley before the first level-up paused the clock. A forced first volley starts the
+  // cooldown the same way a natural one does, so the natural ones after it keep 15 s from it.
+  await page.evaluate(async (scene) => {
+    const { game } = await import('/src/main.ts');
+    (game.scene.getScene(scene.game) as GameScene).skipBossToSkillForTest('volley');
+  }, SCENE);
 
   const startClock = (await report(page))?.volley.clockS ?? 0;
   let last: Report | null = null;

@@ -109,7 +109,9 @@ export const BOSS_CC_DR: Readonly<BossCcDr> = {
  * to 2.8 s (`attackGapMul` 0.7), got by shortening only the chase leg (2.6 s to
  * 1.4 s). The telegraph (0.8 s) is the player's warning and the clip is paced to
  * it, and the charge (0.6 s) is its length, so both stay. The charge's speed
- * grows with `speedMul`, so it reaches 312 px against 240.
+ * grows with `speedMul`, so it reaches 312 px against 240. The 2.8 s is the
+ * period of a single charge: since CO-225 an enraged charge leg is a chain
+ * (`BOSS_CHAIN`), so the leg is longer and skills come less often.
  */
 export interface BossEnrage {
   /** Enrages at or under this fraction of one bar's HP (of the last bar: the HP total less the others). */
@@ -131,6 +133,22 @@ export const BOSS_ENRAGE: Readonly<BossEnrage> = {
   attackGapMul: 0.7,
   damageTakenMul: 1.5,
 };
+
+/**
+ * The enraged charge chain (CO-225): an enraged boss's charge leg is
+ * `minCharges` to `maxCharges` charges back to back, the count drawn once per
+ * chain from the boss's skill stream. Both are 2 for now (a PM call: the boss
+ * has enough skills at hand); a `maxCharges` of 3 brings back a random 2 or 3.
+ * The first telegraph is the usual `BOSS.telegraphS`; each charge after it is warned for `telegraphS` only, the
+ * boss re-locking toward the hero as that warning ends. There is no gap between
+ * charges: the chained telegraph is the stop. A chain of n charges lasts
+ * 1.4 + 0.8 + 0.6 + (n - 1) x (0.4 + 0.6) s, 3.8 s for two.
+ *
+ * `telegraphS` is half the first warning and a starting value to tune: it must
+ * stay long enough to see and sidestep (not under about 0.3 s), and it fits the
+ * 0.42 s `boss.telegraph` cue. Calm bosses never chain.
+ */
+export const BOSS_CHAIN = { minCharges: 2, maxCharges: 2, telegraphS: 0.4 } as const;
 
 /** A boss skill (CO-222): its wind-up warning and the beat it lands in. Later skills append here. */
 export type BossSkillId = 'slam' | 'volley' | 'summon';

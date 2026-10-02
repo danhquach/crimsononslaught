@@ -1,0 +1,24 @@
+# CO-225 Art: the boss's chain charge
+
+Ticket: [#393](https://github.com/danhquach/crimsononslaught/issues/393)
+
+An enraged boss's charge leg is a chain of two charges. Two effects mark it: a red streak that trails behind every enraged charge, and a hard four-spike glint that plays once on each chained telegraph (the shorter warning before the second and later charges). The look is concept A of the pick: a hot red streak with an orange-white head, and a white-cored red star. Both are cut onto their own atlas page 29, so no other page is re-quantised.
+
+## `boss_chain_fx.png`: the charge trail and the warning glint
+
+Save as `docs/art/sheets/CO-225/boss_chain_fx.png`. Generated from text only (no reference image). Copy the whole block below; it is the complete prompt.
+
+Delivered as: JPEG 1536x768 px from `openai/gpt-image-2`, on a green key (the art is red, and red fringe fights a magenta key). Pixels with green above both red and blue were snapped to #00FF00 (1,100,627 of them, the whole background and the dark-green fringe the JPEG left on the star's thin spikes); near-white pixels with a green cast (minimum channel 170 or more, 1,343 of them) were kept with green set to their larger other channel, as on CO-224. Key-coloured pixels sealed inside a drawing, not joined to the sheet's background (249, pinholes in the pale-yellow and white cores where the JPEG cast tipped green above red and blue), were put back from the delivered pixel with green held to the larger of red and blue the same way, so the cores stay whole. Nothing was dropped by size (32 connected parts, none under 6 px), so the speed lines stay. The drawings sat on the 384 px grid but the trail's tip ran to 362 px, inside the 30 px clearance, so each frame was moved by whole pixels into a 448 px cell (sheet 1792x896), not resampled. Row 1: each frame's body (its largest part) has its right edge 157 px right of the cell centre and its vertical middle on the cell centre, and the speed lines move with their body, so the head holds still and only the flicker and the line shift animate; the tail tip differs by up to 10 px between frames (left clearance 66, 66, 76 and 72 px). Row 2: each star is placed with the centroid of its whitest pixels on the cell centre, so the four frames grow and fade about one point. Measured on the delivered sheet: the trail drawings are 316 px long and 88 px tall with the lines (the body about 40 px thick), and the glint is 92x105, 320x301, 164x170 and 48x52 px for frames 1 to 4. The smallest clearance to any cell edge is 64 px. Saved as PNG with no C2PA chunk (`npm run art:strip` found nothing to strip). Cut at `sheetCell` 800 (2.24 sheet px per game px, so the trail is about 141 px long and 40 px thick in the atlas) on `props29`, both rows `centred`: row 1 is `boss.chainTrail` (loop), row 2 `boss.chainFlash` (once). The game draws the trail 140 px long, turned to the charge's direction, and the glint 90 px wide.
+
+```text
+Create one pixel-art sprite sheet of two small visual effects for a top-down game, seen from above.
+
+The canvas is 1536 by 768 pixels, a grid of 384 pixel square cells, four cells across and two cells down. Each row is one animation and the columns are its frames in time order from left to right.
+Row 1, loop, a charge trail heading to the right: a long straight streak of hot red light, about 300 pixels long and 70 pixels tall, centred in the cell. It is thickest and brightest at its right end, with an orange-white core there, and tapers to a sharp crimson point at its left end, with three or four short thin red speed lines above and below it. Four frames of one seamless loop: the core flickers a little brighter and dimmer and the speed lines shift slightly left. Same size and same place in all four frames.
+Row 2, plays once, a short sharp warning glint: a hard-edged four-pointed star with a white core and red spikes, centred in the cell. Frame 1 small, about 100 pixels across; frame 2 at its peak, about 220 pixels across with long thin spikes; frame 3 about 140 pixels across and dimmer; frame 4 a small fading red spark.
+Every drawing stays inside its cell with at least 30 pixels of plain green round it and never touches a cell edge.
+
+Colours: bright red #FF3030, crimson #C8102E, orange #FF8C1A, pale yellow #FFE08A and white #FFFFFF for the cores, dark red #5A0A14 only on the outer edge. No green, blue or violet anywhere in the drawings.
+Style: chunky pixel art, crisp hard edges, no blur, no anti-aliasing, no soft glow halo, no gradients; original design.
+Background: the file is one sheet of flat pure green #00FF00 with the drawings sitting straight on it, fully opaque, no texture, noise or vignette. Nothing marks the cells: no tile, panel, line, border or frame. No text anywhere: one letter, number, label or watermark ruins the sheet.
+```

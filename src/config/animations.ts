@@ -165,6 +165,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...facings('boss.summon', 1, 2, ONCE),
   spec('boss.summonCircle', 4, 6, LOOP),
   spec('boss.summonBurst', 4, 10, ONCE),
+  spec('boss.chainTrail', 4, 12, LOOP),
+  spec('boss.chainFlash', 4, 10, ONCE),
 
   // XP gem (CO-075).
   spec('gem.idle', 4, 6, LOOP),

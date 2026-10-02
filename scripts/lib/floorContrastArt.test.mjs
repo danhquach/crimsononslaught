@@ -125,6 +125,9 @@ const fading = [
 ];
 const controls = ['swarm.move', 'fast.move', 'exploder.move', 'gem.idle', ...facings('hero.walk')];
 const props = ['arena.tree', 'arena.bush'];
+/** CO-225: the chain charge's trail (every frame is drawn) and glint (the median frame; its last is a tiny spark). */
+const chainTrail = ['boss.chainTrail'];
+const chainFlash = ['boss.chainFlash'];
 
 const pct = (share) => `${(share * 100).toFixed(1)}%`;
 
@@ -138,6 +141,8 @@ describe('floor contrast (CO-194)', () => {
     [moving, 'worst'],
     [fading, 'median'],
     [controls, 'worst'],
+    [chainTrail, 'worst'],
+    [chainFlash, 'median'],
   ]) {
     for (const clip of clips) {
       it(`${clip} stands out on its ${how} frame (${pct(ENEMY_MIN)} of its pixels or more)`, () => {

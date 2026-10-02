@@ -1,5 +1,6 @@
 import {
   BOSS,
+  BOSS_CHAIN,
   BOSS_ENRAGE,
   BOSS_SKILL_RANGE,
   BOSS_SKILL_ROTATION,
@@ -16,9 +17,11 @@ import type { Vec2 } from './enemy';
 /**
  * Boss rules that do not need an engine (spec §5 "Boss"): the charge cycle —
  * chase, 0.8 s telegraph, 0.6 s charge, every 4 s — and the movement each frame
- * of it asks for. Between charges the boss uses one skill (CO-222): a windup
- * with a warning, then the skill landing; the legs alternate charge, skill. The
- * skill is drawn at random, weighted by how far the hero stands (CO-223).
+ * of it asks for. An enraged boss chains 2 charges in a leg (CO-225): each
+ * after the first is warned for 0.4 s and re-locks toward the hero. Between
+ * charges the boss uses one skill (CO-222): a windup with a warning, then the
+ * skill landing; the legs alternate charge, skill. The skill is drawn at random,
+ * weighted by how far the hero stands (CO-223).
  *
  * `entities/Boss.ts` is the Phaser side; everything decidable without Phaser
  * lives here so it is Vitest-covered.
@@ -51,6 +54,8 @@ export const BOSS_EVENT = {
 
 export interface BossPhasePayload {
   readonly phase: BossPhase;
+  /** CO-225: whether a telegraph or charge is a chained one (the second or later of its chain). */
+  readonly chained: boolean;
 }
 
 export interface BossBarBreakPayload {
@@ -118,6 +123,26 @@ export interface BossCycle {
   readonly clockS: number;
   /** Boss clock each skill is next allowed to start a windup at; absent = ready. */
   readonly readyAtS: Readonly<Partial<Record<BossSkillId, number>>>;
+  /** CO-225: charges in the current leg's chain; 1 when calm or outside a chain. */
+  readonly chainLength: number;
+  /** CO-225: which charge of the chain the telegraph or charge now is, 0-based; chained = link > 0. */
+  readonly link: number;
+  /** CO-225: boss clock at which the current (or last) telegraph began, exact whatever the frame's length. */
+  readonly telegraphAtS: number;
+}
+
+/** One telegraph that ended in a frame, when the charge direction locked (CO-225). */
+export interface BossLock {
+  /** Boss clock the telegraph ended and the direction locked at. */
+  readonly atS: number;
+  /** Boss clock the telegraph began at. */
+  readonly telegraphAtS: number;
+  /** The locked unit direction; zero when the target stood on the boss. */
+  readonly dir: Vec2;
+  /** Whether it was a chained telegraph (`link` > 0). */
+  readonly chained: boolean;
+  readonly link: number;
+  readonly chainLength: number;
 }
 
 /** What one frame came to: the cycle after it, and the movement it asks for. */
@@ -143,6 +168,8 @@ export interface BossStep {
     readonly aim: Vec2;
     readonly atS: number;
   }[];
+  /** CO-225: one per telegraph that ended this frame, so a long frame reports each lock exactly once. */
+  readonly locks: readonly BossLock[];
 }
 
 const NO_DIRECTION: Vec2 = { x: 0, y: 0 };
@@ -158,18 +185,21 @@ const ENRAGED_CHASE_S = BOSS.cycleS * BOSS_ENRAGE.attackGapMul - BOSS.telegraphS
 /**
  * How long `phase` lasts (#388). Enrage shortens only the chase: the telegraph
  * is the player's warning and the charge is a fixed length. A skill's windup
- * and landing (CO-222) are its own timings, enraged or not.
+ * and landing (CO-222) are its own timings, enraged or not. A `chained`
+ * telegraph (CO-225) is the shorter warning before the second or later charge
+ * of an enraged chain.
  */
 export function phaseLengthS(
   phase: BossPhase,
   enraged = false,
   skill?: BossSkillId | null,
+  chained = false,
 ): number {
   switch (phase) {
     case 'chase':
       return enraged ? ENRAGED_CHASE_S : CHASE_S;
     case 'telegraph':
-      return BOSS.telegraphS;
+      return chained ? BOSS_CHAIN.telegraphS : BOSS.telegraphS;
     case 'charge':
       return BOSS.chargeS;
     case 'windup':
@@ -177,6 +207,15 @@ export function phaseLengthS(
     case 'skill':
       return BOSS_SKILLS[skill ?? 'slam'].activeS;
   }
+}
+
+/**
+ * How many charges an enraged chain has (CO-225): `minCharges` to `maxCharges`,
+ * drawn with exactly one call of `rand` (clamped in case it returns 1).
+ */
+export function chainChargeCount(rand: () => number): number {
+  const { minCharges, maxCharges } = BOSS_CHAIN;
+  return Math.min(maxCharges, minCharges + Math.floor(rand() * (maxCharges - minCharges + 1)));
 }
 
 /** HP at or under which the boss is enraged (#388): half the last bar. */
@@ -340,6 +379,9 @@ export function startBossCycle(): BossCycle {
     skillDir: NO_DIRECTION,
     clockS: 0,
     readyAtS: {},
+    chainLength: 1,
+    link: 0,
+    telegraphAtS: 0,
   };
 }
 
@@ -360,6 +402,9 @@ export function beginWindup(
     ...cycle,
     phase: 'windup',
     remainingS: phaseLengthS('windup', false, skill),
+    // A forced skill (test hook) can cut a chain short: nothing of it survives.
+    chainLength: 1,
+    link: 0,
     skill,
     skillDir: unitToward(from, target),
     readyAtS:
@@ -380,7 +425,16 @@ export function beginWindup(
  * nowhere. The chase legs all aim where the target stood at the start of the
  * frame, as a regular enemy's chase does (`chaseVelocity`).
  *
- * `enraged` (#388) speeds the chase and charge and shortens the chase leg.
+ * `enraged` (#388) speeds the chase and charge and shortens the chase leg. It
+ * also chains the charge leg (CO-225): as the chase ends in a charge, one draw
+ * from `rand` (after the skill pick's draw, when the leg was a skill leg that
+ * fell back to a charge) gives the chain's length; the second and later are warned
+ * for `BOSS_CHAIN.telegraphS` and each locks toward `target` as seen from
+ * `from` when its telegraph ends. A calm boss draws nothing for it. Every lock
+ * is reported once in `locks`, whatever the frame's length. A frame that spans
+ * several locks aims all of them from its start-of-frame `from` and `target`,
+ * the same limit as the single charge's (#89 averaging); in game, frames are
+ * about 1/60 s, so this only matters for a scaled test clock.
  *
  * `skills` (CO-222) is the list the current bar draws from. Empty, the boss
  * only charges. A chase that ends with a skill due enters a windup that picks
@@ -403,9 +457,11 @@ export function stepBossCycle(
   blocked: ReadonlySet<BossSkillId> = NO_SKILLS,
 ): BossStep {
   if (!(deltaS > 0) || !Number.isFinite(deltaS))
-    return { cycle, velocity: NO_DIRECTION, impacts: [] };
+    return { cycle, velocity: NO_DIRECTION, impacts: [], locks: [] };
   let { phase, remainingS, chargeDir, next, skill, skillDir, readyAtS } = cycle;
+  let { chainLength, link, telegraphAtS } = cycle;
   const impacts: { skill: BossSkillId; aim: Vec2; atS: number }[] = [];
+  const locks: BossLock[] = [];
   const chaseDir = unitToward(from, target);
   const distance = Math.hypot(target.x - from.x, target.y - from.y);
   let moveX = 0;
@@ -420,7 +476,17 @@ export function stepBossCycle(
   while (left >= remainingS) {
     travel(remainingS);
     left -= remainingS;
-    if (phase === 'telegraph') chargeDir = unitToward(from, target);
+    if (phase === 'telegraph') {
+      chargeDir = unitToward(from, target);
+      locks.push({
+        atS: cycle.clockS + deltaS - left,
+        telegraphAtS,
+        dir: chargeDir,
+        chained: link > 0,
+        link,
+        chainLength,
+      });
+    }
     if (phase === 'chase') {
       // A skill leg whose skills are all cooling down is a charge instead (CO-223).
       const picked =
@@ -439,12 +505,25 @@ export function stepBossCycle(
         skill = picked;
         skillDir = begun.skillDir;
         readyAtS = begun.readyAtS;
-      } else phase = 'telegraph';
+      } else {
+        phase = 'telegraph';
+        chainLength = enraged ? chainChargeCount(rand) : 1;
+        link = 0;
+        telegraphAtS = cycle.clockS + deltaS - left;
+      }
     } else if (phase === 'telegraph') {
       phase = 'charge';
     } else if (phase === 'charge') {
-      phase = 'chase';
-      next = 'skill';
+      if (link < chainLength - 1) {
+        phase = 'telegraph';
+        link += 1;
+        telegraphAtS = cycle.clockS + deltaS - left;
+      } else {
+        phase = 'chase';
+        next = 'skill';
+        chainLength = 1;
+        link = 0;
+      }
     } else if (phase === 'windup') {
       phase = 'skill';
       if (skill) impacts.push({ skill, aim: skillDir, atS: cycle.clockS + deltaS - left });
@@ -453,7 +532,7 @@ export function stepBossCycle(
       next = 'charge';
       skill = null;
     }
-    remainingS = phaseLengthS(phase, enraged, skill);
+    remainingS = phaseLengthS(phase, enraged, skill, link > 0);
   }
   travel(left);
   const scale = speedFactor / deltaS;
@@ -467,9 +546,13 @@ export function stepBossCycle(
       skillDir,
       clockS: cycle.clockS + deltaS,
       readyAtS,
+      chainLength,
+      link,
+      telegraphAtS,
     },
     velocity: { x: moveX * scale, y: moveY * scale },
     impacts,
+    locks,
   };
 }
 
