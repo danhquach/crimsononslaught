@@ -386,3 +386,10 @@ describe('icicleFrost (CO-182)', () => {
     });
   });
 });
+
+describe('applyFrost on a regular enemy (CO-221)', () => {
+  it('still freezes: the boss shrugs a freeze off in `bossFrost`, nothing else does', () => {
+    const freezing = { slowPct: 0.4, slowDuration: 2, freeze: true, freezeDuration: 1 };
+    expect(applyFrost(NO_FROST, freezing).frozenS).toBe(1);
+  });
+});

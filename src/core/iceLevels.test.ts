@@ -13,9 +13,10 @@ import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
 import { PROFILE_CLAMPS } from '../config/passives';
 import type { SpellLevel } from '../config/spellLevels';
 import { BASE_ICE_SHIELD_STATS } from '../config/shields';
-import { NO_BOSS_CC, diminishFrost } from './bossCrowdControl';
+import { BOSS_CC_RESIST } from '../config/boss';
+import { NO_BOSS_CC, bossFrost } from './bossCrowdControl';
 import { advanceArea, createArea } from './groundArea';
-import { NO_FROST, applyFrost, tickFrost, type FrostHit } from './frostNova';
+import { NO_FROST, applyFrost, freezeDurationOf, tickFrost, type FrostHit } from './frostNova';
 import {
   clusterBurst,
   clusterHeadings,
@@ -342,17 +343,16 @@ describe('hailsDue', () => {
 });
 
 /**
- * The boss's worst case (#315, #328): every level 3 freeze source lands on it at
- * the Haste clamp's cadence, each through the very functions `Boss.applyFrost`
- * runs (`diminishFrost`, then `applyFrost`, then `tickFrost` each frame). Each
- * source is an always-lands freeze of its fixed length, the strongest reading of
- * its roll. Diminishing returns count every stun, from any source, so the run of
- * freezes only shortens; the tests hold it to what a build could ever do to it.
+ * The boss against every Ice level 3 freeze source (CO-221): it is never
+ * frozen. Each source goes through the very functions `Boss.applyFrost` runs
+ * (`bossFrost`, then `applyFrost`, then `tickFrost` each frame) and comes out a
+ * slow, at most a quarter of twice its freeze (or of its own slow, when longer),
+ * halved again on repeats. Each source is an always-lands freeze of its fixed
+ * length, the strongest reading of its roll.
  */
-describe('boss crowd control, every Ice level 3 freeze at once', () => {
+describe('boss crowd control, every Ice level 3 freeze source', () => {
   const HASTE = PROFILE_CLAMPS.cooldownMul?.min ?? 1;
   const DT = 1 / 60;
-  const EPS = 2 * DT;
 
   interface Source {
     name: string;
@@ -387,94 +387,61 @@ describe('boss crowd control, every Ice level 3 freeze at once', () => {
   };
   const all = [orb, deep, ring, burst];
 
-  /** `sources` firing at `first + k * period`, on a boss for `totalS` seconds. */
-  function frozenRun(
-    sources: readonly Source[],
-    firsts: readonly number[],
-    totalS = 60,
-  ): { longestS: number; frozenS: number } {
+  it('runs at the cadences the plan names', () => {
+    expect(all.map((s) => Number(s.period.toFixed(3)))).toEqual([1.96, 4.2, 2.1, 1.225]);
+    for (const source of all) expect(source.hit.freeze, source.name).toBe(true);
+  });
+
+  it('never freezes the boss, from any source or phasing, and slows it instead', () => {
+    const cut = BOSS_CC_RESIST.durationFactor;
+    for (const source of all) {
+      for (const phase of [0, 0.3, 0.7, 1]) {
+        let cc = NO_BOSS_CC;
+        let frost = NO_FROST;
+        for (let k = 0; k < 20; k += 1) {
+          const nowS = source.period * (phase + k);
+          const landed = bossFrost(cc, source.hit, nowS);
+          cc = landed.state;
+          frost = applyFrost(frost, landed.hit);
+          expect(frost.frozenS, source.name).toBe(0);
+          expect(landed.shrugged, source.name).toBe(true);
+          expect(landed.hit.slowPct, source.name).toBeGreaterThanOrEqual(
+            BOSS_CC_RESIST.freezeSlowPct,
+          );
+          // At most a quarter of the longer of its own slow and twice its freeze.
+          const cap =
+            cut *
+            Math.max(
+              source.hit.slowDuration,
+              BOSS_CC_RESIST.freezeSlowPerFreezeS * freezeDurationOf(source.hit),
+            );
+          expect(landed.hit.slowDuration, source.name).toBeLessThanOrEqual(cap + 1e-9);
+          expect(frost.slowRemainingS, source.name).toBeLessThanOrEqual(cap + 1e-9);
+          frost = tickFrost(frost, source.period).state;
+        }
+      }
+    }
+  });
+
+  it('keeps every source frame-by-frame unfrozen when all land together', () => {
     let cc = NO_BOSS_CC;
     let frost = NO_FROST;
-    const next = [...firsts];
-    let longestS = 0;
-    let runS = 0;
-    let frozenS = 0;
-    for (let frame = 0; frame < Math.round(totalS / DT); frame += 1) {
+    const next = all.map((s) => s.period);
+    let slowedS = 0;
+    for (let frame = 0; frame < Math.round(60 / DT); frame += 1) {
       const nowS = frame * DT;
-      sources.forEach((source, i) => {
+      all.forEach((source, i) => {
         while (nowS >= next[i]! - 1e-9) {
-          const landed = diminishFrost(cc, source.hit, frost.frozenS, nowS);
+          const landed = bossFrost(cc, source.hit, nowS);
           cc = landed.state;
           frost = applyFrost(frost, landed.hit);
           next[i]! += source.period;
         }
       });
       frost = tickFrost(frost, DT).state;
-      if (frost.frozenS > 0) {
-        runS += DT;
-        frozenS += DT;
-        longestS = Math.max(longestS, runS);
-      } else {
-        runS = 0;
-      }
+      expect(frost.frozenS).toBe(0);
+      if (frost.slowRemainingS > 0) slowedS += DT;
     }
-    return { longestS, frozenS };
-  }
-
-  it('runs at the cadences the plan names', () => {
-    expect(all.map((s) => Number(s.period.toFixed(3)))).toEqual([1.96, 4.2, 2.1, 1.225]);
-    for (const source of all) expect(source.hit.freeze, source.name).toBe(true);
-  });
-
-  it('holds the boss for under 2 s at a stretch and 2.5 s in a minute, at any phasing', () => {
-    // Sweep where in its own period each source lands its first hit. Chained,
-    // overlapping freezes can stretch one stop past a single second, but each
-    // is halved by the last, so the stretch is bounded by 1 + 1/2 + 1/4 ... < 2.
-    const phases = [0, 0.2, 0.4, 0.6, 0.8, 1];
-    let longest = 0;
-    let total = 0;
-    for (const a of phases) {
-      for (const b of phases) {
-        for (const c of phases) {
-          for (const d of phases) {
-            const p = [a, b, c, d];
-            const run = frozenRun(
-              all,
-              all.map((s, i) => s.period * p[i]!),
-            );
-            longest = Math.max(longest, run.longestS);
-            total = Math.max(total, run.frozenS);
-          }
-        }
-      }
-    }
-    expect(longest).toBeLessThan(2);
-    expect(total).toBeLessThanOrEqual(2.5);
-  });
-
-  it('holds a boss with no other source to what the source allows on its own', () => {
-    // One source alone: a single fixed freeze at a time (no chaining), never over its length.
-    for (const source of all) {
-      const run = frozenRun([source], [source.period]);
-      expect(run.longestS, source.name).toBeLessThanOrEqual(1 + EPS);
-    }
-  });
-
-  it('lets a Deep freeze alone hold the boss for no more than its share of the cast', () => {
-    // 4.2 s between casts is past the 4 s diminishing window, so every freeze lands at full length.
-    const run = frozenRun([deep], [deep.period], 600);
-    expect(run.frozenS / 600).toBeLessThanOrEqual(DEEP_FREEZE.freezeS / deep.period + 0.005);
-  });
-
-  it('never lets a running freeze be cut short by a diminished repeat', () => {
-    // Two hits a moment apart: the second is halved, and the freeze keeps the longer.
-    let cc = NO_BOSS_CC;
-    let frost = NO_FROST;
-    const first = diminishFrost(cc, orb.hit, frost.frozenS, 0);
-    cc = first.state;
-    frost = applyFrost(frost, first.hit);
-    const second = diminishFrost(cc, deep.hit, frost.frozenS, 0.1);
-    frost = applyFrost(frost, second.hit);
-    expect(frost.frozenS).toBe(FROST_ORB.freezeS);
+    expect(slowedS).toBeGreaterThan(0);
   });
 });

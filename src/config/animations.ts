@@ -311,6 +311,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...ROSTER_SPELL_IDS.map((id) => spec(`icon.${id}`, 1, 1, ONCE)),
   // HUD dash icon (CO-218), drawn by HudScene beside the minimap.
   spec('icon.dash', 1, 1, ONCE),
+  // The shield popped over the boss when it shrugs off a stun or freeze (CO-221), drawn by GameScene straight from the atlas, never played.
+  spec('status.immune', 1, 1, ONCE),
 
   // Pause screen build icons (CO-179): one still per passive and relic buff,
   // drawn by PauseScene straight from the atlas, never played. A buff with no

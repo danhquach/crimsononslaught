@@ -21,13 +21,16 @@ export type BossPhase = 'chase' | 'telegraph' | 'charge';
  * time the charge cycle moves on (CO-102: the telegraph and charge cues).
  * `barBreak` fires with `{ left }` when a hit takes a bar off the boss and some
  * are left (#387); the killing blow fires none, `died` is its cue. `enrage`
- * fires once, when a hit takes the boss to its enrage threshold (#388).
+ * fires once, when a hit takes the boss to its enrage threshold (#388). `immune`
+ * fires with `{ x, y }` over the boss when a stun or freeze is shrugged off
+ * (CO-221), throttled by the entity.
  */
 export const BOSS_EVENT = {
   died: 'boss:died',
   phase: 'boss:phase',
   barBreak: 'boss:barBreak',
   enrage: 'boss:enrage',
+  immune: 'boss:immune',
 } as const;
 
 export interface BossPhasePayload {
@@ -37,6 +40,12 @@ export interface BossPhasePayload {
 export interface BossBarBreakPayload {
   /** Bars still alive after the hit. */
   readonly left: number;
+}
+
+export interface BossImmunePayload {
+  /** Where to show the pop: just above the boss's body. */
+  readonly x: number;
+  readonly y: number;
 }
 
 export interface BossCycle {

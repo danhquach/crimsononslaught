@@ -2253,6 +2253,16 @@
         [{ "anim": "bossFlames", "cols": [1, 4], "centred": true }],
         [{ "anim": "bossFlames", "cols": [1, 4], "centred": true }]
       ]
+    },
+    {
+      "key": "status",
+      "ticket": "CO-221",
+      "file": "CO-221/status_immune.png",
+      "page": 25,
+      "cols": 1,
+      "rows": 1,
+      "sheetCell": 224,
+      "rowSpecs": [[{ "anim": "immune", "cols": [1, 1], "centred": true }]]
     }
   ]
 }

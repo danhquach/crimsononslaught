@@ -20,8 +20,8 @@ import { PASSIVES, PROFILE_CLAMPS } from '../config/passives';
 import type { SpellLevel } from '../config/spellLevels';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { startBossCycle, stepBossCycle } from './boss';
-import { NO_BOSS_CC, applyBossCc, type BossCcState } from './bossCrowdControl';
-import { applyStun, chainPath, resolveCast, tickStun } from './chainLightning';
+import { NO_BOSS_CC, resistBossCc, type BossCcState } from './bossCrowdControl';
+import { chainPath, resolveCast } from './chainLightning';
 import { tickHitCooldown } from './hitWindow';
 import {
   bladeArcReady,
@@ -613,153 +613,8 @@ describe('Lightning Sword levels', () => {
 });
 
 /**
- * The boss's worst case (#315, #329): every level 3 stun lands on it at the
- * Haste clamp's cadence, each through the very calls `Boss` makes: `applyBossCc`
- * scales the length, `applyStun` refreshes, `tickStun` counts down. Each source
- * is an always-lands stun (the strongest reading of its roll), the fixed
- * Thunderbolt one included. Diminishing returns count every stun from any
- * source, so however they interleave the k-th stun in a run is at most
- * `stunDuration / 2^(k-1)` and the run of them can never sum past twice the
- * longest first stun.
- */
-describe('boss crowd control, every Lightning level 3 stun at once', () => {
-  const DT = 1 / 60;
-  const EPS = 2 * DT;
-  const PERSISTENCE = PASSIVES.find((p) => p.id === 'passive_persistence')?.amount ?? NaN;
-
-  interface StunSource {
-    name: string;
-    /** Seconds between casts at the Haste clamp. */
-    period: number;
-    stunS: number;
-    /** Stuns one cast lands on the boss: a lone boss is struck once per bolt, and by every strike of a volley. */
-    hits: number;
-  }
-
-  /** The sources at a stun stretched by `mul` (Persistence); the Thunderbolt's is fixed and never stretched. */
-  function sources(mul: number): StunSource[] {
-    const bolt = BASE_SPELL_STATS.lightning;
-    return [
-      {
-        name: 'thunderbolt',
-        period: THUNDERBOLT.every * bolt.cooldown * HASTE,
-        stunS: THUNDERBOLT.stunS,
-        hits: 1,
-      },
-      {
-        name: 'bolt',
-        period: bolt.cooldown * HASTE,
-        stunS: bolt.stunDuration * mul,
-        // Level 3 throws 2 strikes, and a boss alone in range takes both.
-        hits: bolt.strikes + 1,
-      },
-      {
-        name: 'chain',
-        period: BASE_CHAIN_LIGHTNING_STATS.cooldown * HASTE,
-        stunS: BASE_CHAIN_LIGHTNING_STATS.stunDuration * mul,
-        // A bolt or fork never strikes one enemy twice.
-        hits: 1,
-      },
-    ];
-  }
-
-  /** `srcs` firing at `first + k * period`, on a boss for `totalS` seconds. */
-  function stunnedRun(
-    srcs: readonly StunSource[],
-    firsts: readonly number[],
-    totalS = 60,
-  ): { longestS: number; stunnedS: number } {
-    let cc: BossCcState = NO_BOSS_CC;
-    let remainingS = 0;
-    const next = [...firsts];
-    let longestS = 0;
-    let runS = 0;
-    let stunnedS = 0;
-    for (let frame = 0; frame < Math.round(totalS / DT); frame += 1) {
-      const nowS = frame * DT;
-      srcs.forEach((source, i) => {
-        while (nowS >= next[i]! - 1e-9) {
-          for (let h = 0; h < source.hits; h += 1) {
-            const applied = applyBossCc(cc, 'stun', source.stunS, nowS);
-            cc = applied.state;
-            remainingS = applyStun(remainingS, applied.durationS);
-          }
-          next[i]! += source.period;
-        }
-      });
-      remainingS = tickStun(remainingS, DT).remainingS;
-      if (remainingS > 0) {
-        runS += DT;
-        stunnedS += DT;
-        longestS = Math.max(longestS, runS);
-      } else {
-        runS = 0;
-      }
-    }
-    return { longestS, stunnedS };
-  }
-
-  it('runs at the cadences the plan names', () => {
-    expect(sources(1).map((s) => Number(s.period.toFixed(3)))).toEqual([1.575, 0.315, 0.49]);
-    expect(BASE_SPELL_STATS.lightning.strikes + 1).toBe(2);
-  });
-
-  for (const [label, mul] of [
-    ['unstretched', 1],
-    ['4 Persistence', PERSISTENCE ** 4],
-  ] as const) {
-    it(`${label}: holds the boss under two stuns' length at a stretch and 2.5 in a minute, at any phasing`, () => {
-      const srcs = sources(mul);
-      const stunS = BASE_SPELL_STATS.lightning.stunDuration * mul;
-      // Sweep where in its own period each source lands its first cast.
-      const phases = [0, 0.2, 0.4, 0.6, 0.8, 1];
-      let longest = 0;
-      let total = 0;
-      for (const a of phases) {
-        for (const b of phases) {
-          for (const c of phases) {
-            const p = [a, b, c];
-            const run = stunnedRun(
-              srcs,
-              srcs.map((s, i) => s.period * p[i]!),
-            );
-            longest = Math.max(longest, run.longestS);
-            total = Math.max(total, run.stunnedS);
-          }
-        }
-      }
-      // Chained stuns each shorten by half, so a stretch is bounded by stunS x (1 + 1/2 + 1/4 ...) < 2 stunS.
-      expect(longest).toBeLessThan(2 * stunS);
-      expect(total).toBeLessThanOrEqual(2.5 * stunS);
-    });
-  }
-
-  it('holds the Thunderbolt alone to its own second at a stretch, and 2 s in a minute', () => {
-    const [thunderbolt] = sources(1) as [StunSource];
-    const run = stunnedRun([thunderbolt], [thunderbolt.period]);
-    expect(run.longestS).toBeLessThanOrEqual(THUNDERBOLT.stunS + EPS);
-    // 1 + 1/2 + 1/4 ...: one repeat inside 4 s of the last is half the one before.
-    expect(run.stunnedS).toBeLessThanOrEqual(2 * THUNDERBOLT.stunS + EPS);
-  });
-
-  it('holds each other source alone under its chain of halved stuns', () => {
-    for (const source of sources(1).slice(1)) {
-      const run = stunnedRun([source], [source.period]);
-      expect(run.longestS, source.name).toBeLessThan(2 * source.stunS);
-    }
-  });
-
-  it('takes a full-length stun again once the boss has gone 4 s without one', () => {
-    // Casts 5 s apart are past the diminishing window, so each is a first stun.
-    const [thunderbolt] = sources(1) as [StunSource];
-    const run = stunnedRun([{ ...thunderbolt, period: 5 }], [0], 12);
-    expect(run.stunnedS).toBeGreaterThan(3 * THUNDERBOLT.stunS - 4 * EPS);
-  });
-});
-
-/**
  * The same boss, staggered (#315, #329): every level 3 stagger source lands on
- * it at once, through `applyBossCc`, `applyStagger`, `tickStagger`, and its
+ * it at once, through `resistBossCc` (CO-221), `applyStagger`, `tickStagger`, and its
  * charge cycle moves at `staggerSpeedFactor`. The staggers are shorter than the
  * hits that refresh them, so an undiminished boss would never move; diminishing
  * returns count every one and shrink each, so it is stopped for well under its
@@ -842,7 +697,7 @@ describe('boss crowd control, every Lightning level 3 stagger at once', () => {
         while (nowS >= next[s]! - 1e-9) {
           for (let h = 0; h < source.hits; h += 1) {
             const length = source.staggerS * mul;
-            const applied = diminishing ? applyBossCc(cc, 'stagger', length, nowS) : undefined;
+            const applied = diminishing ? resistBossCc(cc, 'stagger', length, nowS) : undefined;
             if (applied) cc = applied.state;
             remainingS = applyStagger(remainingS, applied ? applied.durationS : length);
           }

@@ -26,7 +26,12 @@ import {
 import { controlsOf } from './controls';
 import { watchPadButton, type StartButtonWatch } from './input';
 import { artFrame } from '../core/animation';
-import { BOSS_EVENT, phaseLengthS, type BossPhasePayload } from '../core/boss';
+import {
+  BOSS_EVENT,
+  phaseLengthS,
+  type BossImmunePayload,
+  type BossPhasePayload,
+} from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor, consumableSoundFor } from '../config/sounds';
 import { hasFrameArt } from '../render/atlas';
 import { audioOf, type Audio } from '../render/audio';
@@ -143,7 +148,8 @@ import {
   ARENA_SIZE,
 } from '../config/arena';
 import { FRAMES } from '../config/frames';
-import { ARENA_DEPTH, PROP_DEPTH } from '../config/fx';
+import { BOSS_IMMUNE_FRAME } from '../config/boss';
+import { ARENA_DEPTH, NUMBER_DEPTH, PROP_DEPTH } from '../config/fx';
 import {
   ENEMY_ARCHETYPES,
   EXPLODER_BLAST,
@@ -161,7 +167,13 @@ import {
   type ConsumableKind,
   type PickupKind,
 } from '../config/pickups';
-import { LARGE_EXPLOSION_SCALE, SHAKES, type ShakeKind } from '../config/hitFeedback';
+import {
+  LARGE_EXPLOSION_SCALE,
+  NUMBER_RISE_MS,
+  NUMBER_RISE_PX,
+  SHAKES,
+  type ShakeKind,
+} from '../config/hitFeedback';
 import {
   NO_SHAKE,
   critDamage,
@@ -473,6 +485,8 @@ export class GameScene extends Phaser.Scene {
   private decidedOutcome: DecidedOutcome | undefined;
   /** Test hook (#315): run ms left before the hero is killed, counted down in `simulate`; unset when none is due. */
   private heroKillInMs: number | undefined;
+  /** CO-221: "Immune" pops shown, for the e2e spec. */
+  private immunePopsForTest = 0;
   /** Test hook (#315): whether a delayed hero kill has come due this run. */
   private heroKillFired = false;
   /** The dash's afterimages (#384), made once per run. */
@@ -1215,22 +1229,31 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Test hook (#315): one `kind` of crowd control lands on the boss for
+   * Test hook (#315, CO-221): one `kind` of crowd control lands on the boss for
    * `durationS` through the same calls a spell makes, and the seconds left on
-   * each stop are returned as they stand right after, so a test can read the
-   * diminished length without the clock moving between. The boss is brought in
-   * first when the run has not reached it.
+   * each stop are returned as they stand right after, with the "Immune" pops
+   * shown so far, so a test can read the resisted length without the clock
+   * moving between. The boss is brought in first when the run has not reached it.
    */
   applyBossCcForTest(
-    kind: 'stun' | 'stagger' | 'freeze',
+    kind: 'stun' | 'stagger' | 'freeze' | 'slow',
     durationS: number,
-  ): Boss['crowdControlRemainingS'] | undefined {
+  ): (Boss['crowdControlRemainingS'] & { immunePops: number }) | undefined {
     const boss = this.bossForTest();
     if (!boss) return undefined;
     if (kind === 'stun') boss.applyStun(durationS);
     else if (kind === 'stagger') boss.applyStagger(durationS);
-    else boss.applyFrost({ slowPct: 0, slowDuration: 0, freeze: true, freezeDuration: durationS });
-    return boss.crowdControlRemainingS;
+    else if (kind === 'slow') {
+      boss.applyFrost({ slowPct: 0.3, slowDuration: durationS, freeze: false });
+    } else {
+      boss.applyFrost({ slowPct: 0, slowDuration: 0, freeze: true, freezeDuration: durationS });
+    }
+    return { ...boss.crowdControlRemainingS, immunePops: this.immunePopsForTest };
+  }
+
+  /** Test hook (CO-221): the boss's own clock, the one its "Immune" pop gap is read on. */
+  bossClockForTest(): number | undefined {
+    return this.enemies.live.find((enemy): enemy is Boss => enemy instanceof Boss)?.clockForTest;
   }
 
   /**
@@ -1453,6 +1476,9 @@ export class GameScene extends Phaser.Scene {
       if (boss) this.bossEnrageFx.play(boss);
     };
     this.events.on(BOSS_EVENT.enrage, onBossEnrage);
+    // CO-221: a stun or freeze the boss shrugged off shows the shield over it.
+    const onBossImmune = ({ x, y }: BossImmunePayload): void => this.showImmunePop(x, y);
+    this.events.on(BOSS_EVENT.immune, onBossImmune);
     // #252: Esc or pad Start pauses, and the pause screen sends back the way
     // out it confirmed. The keyboard plugin drops its own listener on shutdown.
     const onChoose = ({ action }: PauseChoosePayload): void => this.leaveFromPause(action);
@@ -1523,6 +1549,7 @@ export class GameScene extends Phaser.Scene {
       this.events.off(BOSS_EVENT.phase, onBossPhase);
       this.events.off(BOSS_EVENT.barBreak, onBossBarBreak);
       this.events.off(BOSS_EVENT.enrage, onBossEnrage);
+      this.events.off(BOSS_EVENT.immune, onBossImmune);
     });
 
     this.scene.launch(SCENE.hud);
@@ -2358,6 +2385,29 @@ export class GameScene extends Phaser.Scene {
     const next = nextShake(this.shake, SHAKES[kind], this.time.now, this.feedback.shake);
     this.shake = next.state;
     if (next.play) this.cameras.main.shake(next.play.durationMs, next.play.intensity, true);
+  }
+
+  /**
+   * CO-221: the shield pop over the boss when it shrugs off a stun or freeze:
+   * it sits on top of the boss's body, clear of its head, and rises and fades
+   * like a damage number, above the effects. Without the
+   * atlas there is no art to show, like the arena props, and the pop is skipped.
+   * The tween and image go with the scene on shutdown.
+   */
+  private showImmunePop(x: number, y: number): void {
+    this.immunePopsForTest += 1;
+    if (!hasFrameArt(this, BOSS_IMMUNE_FRAME)) return;
+    const pop = this.add
+      .image(x, y, FRAMES[BOSS_IMMUNE_FRAME].page, artFrame(BOSS_IMMUNE_FRAME))
+      .setOrigin(0.5, 1)
+      .setDepth(NUMBER_DEPTH);
+    this.tweens.add({
+      targets: pop,
+      y: y - NUMBER_RISE_PX,
+      alpha: 0,
+      duration: NUMBER_RISE_MS,
+      onComplete: () => pop.destroy(),
+    });
   }
 
   /**

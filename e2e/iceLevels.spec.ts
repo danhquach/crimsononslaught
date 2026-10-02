@@ -1,6 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
-  DEEP_FREEZE,
   FROST_ORB,
   MAX_LIVE_MINI_URCHINS,
   MAX_LIVE_SHARDS,
@@ -580,10 +579,8 @@ test('Ice Storm level 3 freezes everything inside on the last tick a patch pays'
       for (const d of storm.deepFreezes) {
         expect(d.tickNumber, 'a deep freeze is on the last tick').toBe(d.count);
         expect(d.frozenAfter, 'enemies frozen by one deep freeze').toBe(d.inside);
-        // A boss's freeze goes through its diminishing returns and is never longer than the storm's own.
-        if (d.bossFrozenS !== null) {
-          expect(d.bossFrozenS).toBeLessThanOrEqual(DEEP_FREEZE.freezeS + 1e-6);
-        }
+        // CO-221: the boss is never frozen; a deep freeze is a short slow on it.
+        if (d.bossFrozenS !== null) expect(d.bossFrozenS, 'the boss is not frozen').toBe(0);
       }
       // Level 3 keeps level 2's hail.
       expect(storm.hail.every((h) => h.tickNumber % 2 === 0)).toBe(true);

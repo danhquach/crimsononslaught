@@ -5,8 +5,9 @@
  * numbers they run on. First-cut values: the bot sweep tunes them (#147's pass).
  *
  * Nothing here stuns. Every new crowd-control effect is a stagger (or a shove),
- * and every stagger goes through `Enemy.applyStagger`, so the boss's diminishing
- * returns (`BOSS_CC_DR`) cap them; only Aftershock's throw is clamped for the boss. The
+ * and every stagger goes through `Enemy.applyStagger`; the boss cuts each to a
+ * quarter of its length (CO-221, `BOSS_CC_RESIST`) and then diminishes repeats
+ * (`BOSS_CC_DR`); only Aftershock's throw is clamped for the boss. The
  * art is the roster's own clips, but for the Landslide's rut (CO-203).
  *
  * Pure data, no Phaser import.
