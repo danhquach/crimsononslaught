@@ -10,13 +10,15 @@ import {
   stepBossCycle,
   type BossBarBreakPayload,
   type BossCycle,
+  type BossImmunePayload,
   type BossPhase,
   type BossPhasePayload,
 } from '../core/boss';
 import {
   NO_BOSS_CC,
-  applyBossCc,
-  diminishFrost,
+  bossFrost,
+  immunePopDue,
+  resistBossCc,
   type BossCcKind,
   type BossCcState,
 } from '../core/bossCrowdControl';
@@ -44,8 +46,8 @@ const ENRAGE_TINT = 0xff6a6a;
  *
  * It lives in the enemy pool's group (`EnemyPool.spawnBoss`), so every spell's
  * targeting and overlap wiring reaches it unchanged, and burns, slows and stuns
- * apply as they do to any enemy — a slow or stun scales the charge too — save
- * for the diminishing returns below. One of a kind: never recycled as a regular
+ * apply as they do to any enemy — a slow scales the charge too — save for the
+ * crowd-control rules below. One of a kind: never recycled as a regular
  * enemy; the pool drops it when it dies.
  *
  * Its HP is published as `run:bossHp` on the scene emitter (CO-051), on spawn
@@ -58,9 +60,12 @@ const ENRAGE_TINT = 0xff6a6a;
  * It faces its last velocity: the player while it chases, so the telegraph
  * that follows the stop faces them too, and the locked line while it charges.
  *
- * Its crowd control diminishes (#315): every stun, stagger and slow repeated
- * within a few seconds lasts a fraction of the last (`core/bossCrowdControl.ts`),
- * so Persistence can interrupt the boss but never lock it down.
+ * Its crowd control is resisted (CO-221): a stun does nothing, a freeze is a
+ * short slow, and a stagger or slow lasts a quarter as long. A stun or freeze
+ * shrugged off shows an "Immune" pop (`BOSS_EVENT.immune`), throttled. It also
+ * diminishes (#315): every stagger and slow repeated within a few seconds lasts
+ * a fraction of the last (`core/bossCrowdControl.ts`), so Persistence can
+ * interrupt the boss but never lock it down.
  *
  * Enrage (#388): a hit that leaves it at or under half its last bar latches
  * it enraged for the rest of the fight (`BOSS_ENRAGE`): harder contact, faster,
@@ -76,6 +81,8 @@ export class Boss extends Enemy {
   /** Seconds this boss has been alive, run time; the clock its crowd-control windows are read on (#315). */
   private clockS = 0;
   private cc: BossCcState = NO_BOSS_CC;
+  /** Boss clock of the last "Immune" pop, so a stream of stuns shows one now and then (CO-221). */
+  private lastImmuneS = -Infinity;
   /** #387: bars still alive as of the last hit, so a hit that takes one off can be told. */
   private barsLeft = BOSS.bars;
   /** #388: latched once the boss has crossed its enrage threshold; reset on spawn. */
@@ -104,6 +111,11 @@ export class Boss extends Enemy {
     return this.cycle.phase;
   }
 
+  /** Test hook (CO-221): the boss clock, which advances only as the boss steers. */
+  get clockForTest(): number {
+    return this.clockS;
+  }
+
   /** Standing still and flashing: the 0.8 s warning before a charge (spec §5). */
   get telegraphing(): boolean {
     return this.cycle.phase === 'telegraph';
@@ -114,38 +126,48 @@ export class Boss extends Enemy {
     this.cycle = startBossCycle();
     this.clockS = 0;
     this.cc = NO_BOSS_CC;
+    this.lastImmuneS = -Infinity;
     this.barsLeft = BOSS.bars;
     this.enraged = false;
     this.arise(BOSS, x, y);
     this.emitHp();
   }
 
-  /** Diminishing returns (#315): a repeated stun is shorter. The roll that landed it was drawn before this. */
-  override applyStun(stunS: number): void {
-    super.applyStun(this.diminish('stun', stunS));
+  /** CO-221: a stun does nothing to the boss; the damage that came with it still lands. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- keeps the base signature; the length is ignored
+  override applyStun(_stunS: number): void {
+    this.shrug();
   }
 
-  /** Diminishing returns (#315): a repeated stagger is shorter. */
+  /** CO-221: a quarter of the length, then diminishing returns (#315). */
   override applyStagger(staggerS: number): void {
-    super.applyStagger(this.diminish('stagger', staggerS));
+    super.applyStagger(this.resist('stagger', staggerS));
   }
 
   /**
-   * Diminishing returns (#315): a freeze is a stun, so it shares the stun count,
-   * and never cuts a running freeze short; a slow is scaled in length, not in
-   * strength (`diminishFrost`).
+   * CO-221: a freeze is shrugged off and becomes a short slow; any slow is cut
+   * and diminished in length, not in strength (`bossFrost`).
    */
   override applyFrost(hit: Readonly<FrostHit>): void {
-    const applied = diminishFrost(this.cc, hit, this.crowdControlRemainingS.frozenS, this.clockS);
+    const applied = bossFrost(this.cc, hit, this.clockS);
     this.cc = applied.state;
+    if (applied.shrugged) this.shrug();
     super.applyFrost(applied.hit);
   }
 
   /** The length `durationS` of `kind` takes on this boss now, counting it as an application. */
-  private diminish(kind: BossCcKind, durationS: number): number {
-    const applied = applyBossCc(this.cc, kind, durationS, this.clockS);
+  private resist(kind: BossCcKind, durationS: number): number {
+    const applied = resistBossCc(this.cc, kind, durationS, this.clockS);
     this.cc = applied.state;
     return applied.durationS;
+  }
+
+  /** A stun or freeze did nothing: say so over the boss, at most once per `immunePopGapS`. */
+  private shrug(): void {
+    if (!immunePopDue(this.lastImmuneS, this.clockS)) return;
+    this.lastImmuneS = this.clockS;
+    const payload: BossImmunePayload = { x: this.x, y: this.y - this.bodyRadius };
+    this.scene.events.emit(BOSS_EVENT.immune, payload);
   }
 
   /**

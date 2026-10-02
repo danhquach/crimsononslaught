@@ -20,7 +20,7 @@ import { PASSIVES } from '../config/passives';
 import type { SpellLevel } from '../config/spellLevels';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { startBossCycle, stepBossCycle } from './boss';
-import { NO_BOSS_CC, applyBossCc, type BossCcState } from './bossCrowdControl';
+import { NO_BOSS_CC, resistBossCc, type BossCcState } from './bossCrowdControl';
 import { rollBleed } from './earthSpike';
 import {
   aftershockDamage,
@@ -1011,7 +1011,7 @@ describe('boss crowd control, every Earth level 3 stagger at once', () => {
       sources.forEach((source, s) => {
         while (nowS >= next[s]! - 1e-9) {
           const length = source.staggerS * mul;
-          const applied = diminishing ? applyBossCc(cc, 'stagger', length, nowS) : undefined;
+          const applied = diminishing ? resistBossCc(cc, 'stagger', length, nowS) : undefined;
           if (applied) cc = applied.state;
           remainingS = applyStagger(remainingS, applied ? applied.durationS : length);
           next[s]! += source.period;

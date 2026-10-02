@@ -38,6 +38,7 @@ export const ATLAS_PAGES = [
   { key: 'props22', texture: 'assets/atlas/props22.png', data: 'assets/atlas/props22.json' },
   { key: 'props23', texture: 'assets/atlas/props23.png', data: 'assets/atlas/props23.json' },
   { key: 'props24', texture: 'assets/atlas/props24.png', data: 'assets/atlas/props24.json' },
+  { key: 'props25', texture: 'assets/atlas/props25.png', data: 'assets/atlas/props25.json' },
 ] as const satisfies readonly AtlasPage[];
 
 /** Texture key of an atlas page. */
@@ -749,6 +750,7 @@ export const FRAMES = {
   'status.elite.1': { w: 72, h: 46, anchorX: 36, anchorY: 23, page: 'props16' },
   'status.elite.2': { w: 72, h: 46, anchorX: 36, anchorY: 23, page: 'props16' },
   'status.elite.3': { w: 72, h: 46, anchorX: 36, anchorY: 23, page: 'props16' },
+  'status.immune.0': { w: 46, h: 44, anchorX: 23, anchorY: 22, page: 'props25' },
   'status.stagger.0': { w: 39, h: 21, anchorX: 21, anchorY: 13, page: 'props4' },
   'status.stagger.1': { w: 39, h: 21, anchorX: 21, anchorY: 13, page: 'props4' },
   'status.stagger.2': { w: 39, h: 21, anchorX: 21, anchorY: 13, page: 'props4' },
@@ -1063,6 +1065,7 @@ export const ART_BOXES = {
   'splitter.spawn': { x: 1, y: 1, w: 32, h: 27 },
   'status.bleed': { x: 1, y: 1, w: 12, h: 20 },
   'status.elite': { x: 2, y: 2, w: 68, h: 41 },
+  'status.immune': { x: 11, y: 2, w: 32, h: 33 },
   'status.stagger': { x: 1, y: 1, w: 37, h: 19 },
   'swarm.death': { x: 1, y: 1, w: 20, h: 20 },
   'swarm.hurt': { x: 1, y: 1, w: 18, h: 13 },

@@ -6,8 +6,9 @@
  * bot sweep tunes them (#147's pass).
  *
  * Every freeze here is an unscaled constant that goes through
- * `Enemy.applyFrost`, so the boss's diminishing returns (`BOSS_CC_DR`) cap it
- * and no passive stretches it.
+ * `Enemy.applyFrost`, and no passive stretches it. On the boss a freeze is no
+ * freeze but a short slow (CO-221, `BOSS_CC_RESIST`), under its diminishing
+ * returns (`BOSS_CC_DR`).
  *
  * Pure data, no Phaser import.
  */

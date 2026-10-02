@@ -7,8 +7,9 @@
  *
  * Every new stun is one of two things: a fixed 1 s constant (the Thunderbolt's)
  * or a roll the level added on a stream of its own; every new stagger is a
- * stagger. All of them go through `Enemy.applyStun` / `applyStagger`, so the
- * boss's diminishing returns (`BOSS_CC_DR`) cap them, and none is ever stretched
+ * stagger. All of them go through `Enemy.applyStun` / `applyStagger`. The boss
+ * takes no stun (CO-221) and a quarter of a stagger's length, under its
+ * diminishing returns (`BOSS_CC_RESIST`, `BOSS_CC_DR`); none is ever stretched
  * by a passive. The art is the roster's own clips: no new sheet.
  *
  * Pure data, no Phaser import.

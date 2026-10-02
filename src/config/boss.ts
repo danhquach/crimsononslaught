@@ -1,4 +1,5 @@
 import type { TextureKey } from './colors';
+import type { FrameName } from './frames';
 
 /**
  * The boss (spec §5 "Boss"): its stats and the timings of its charge cycle.
@@ -46,13 +47,42 @@ export const BOSS: Readonly<BossConfig> = {
 };
 
 /**
+ * How the boss shrugs off crowd control (CO-221), on top of `BOSS_CC_DR`. A
+ * stun does nothing to it (the damage still lands). A freeze does not hold it:
+ * it becomes a `freezeSlowPct` slow lasting `freezeSlowPerFreezeS` times the
+ * freeze's length, before the cut below, so a base 1 s freeze is a 0.5 s slow
+ * on the boss, costing it about a quarter of the travel the stop would have.
+ * Stagger and slow last `durationFactor` of their length, measured from the
+ * Persistence-stretched value (Persistence is in the duration before it gets
+ * here), and the repeat-halving still applies after. Knockback and Aftershock's
+ * throw are unchanged. `immunePopGapS` is the least boss-clock time between two
+ * "Immune" pops, so a build that stuns every frame does not paint a wall of them.
+ */
+export interface BossCcResist {
+  durationFactor: number;
+  freezeSlowPct: number;
+  freezeSlowPerFreezeS: number;
+  immunePopGapS: number;
+}
+
+export const BOSS_CC_RESIST: Readonly<BossCcResist> = {
+  durationFactor: 0.25,
+  freezeSlowPct: 0.5,
+  freezeSlowPerFreezeS: 2,
+  immunePopGapS: 1.5,
+};
+
+/** The shield frame the "Immune" pop draws (CO-221), over the boss when a stun or freeze is shrugged off. */
+export const BOSS_IMMUNE_FRAME: FrameName = 'status.immune.0';
+
+/**
  * Diminishing returns on the boss's crowd control (#315). A default the lead
- * chose, no spec value: Persistence stretches every stun, stagger and slow
+ * chose, no spec value: Persistence stretches every stagger and slow
  * without a cap, so a sword build re-staggered the boss before each stop ended
  * and it never moved or charged again. Each repeat of a kind within `resetS`
  * lasts `factor` times the one before; a kind that goes `resetS` s without an
- * application starts over at full length. Stun (an ice freeze included),
- * stagger and slow count separately. Regular enemies take none of it.
+ * application starts over at full length. Stagger and slow count separately;
+ * the boss takes no stun and no freeze (`BOSS_CC_RESIST`, CO-221). Regular enemies take none of it.
  *
  * Slows fall off too, by design: the boss is meant to be harder to affect by
  * every status, so a standing-area slow fades on it the longer it stands in.
