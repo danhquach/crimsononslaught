@@ -41,6 +41,20 @@ async function startRun(page: Page, query = ''): Promise<void> {
   await expect.poll(async () => (await report(page)) !== null, { timeout: 20_000 }).toBe(true);
 }
 
+/**
+ * One sample with the hero kept 400 px from the boss, in the far band where the
+ * pick favours the volley, so a volley comes on any seed's rolls.
+ */
+function reportFar(page: Page): Promise<Report | null> {
+  return page.evaluate(async (scene) => {
+    const { game } = await import('/src/main.ts');
+    const g = game.scene.getScene(scene.game) as GameScene;
+    const boss = g.bossReport;
+    if (boss) g.placeHeroForTest(boss.x + 400, boss.y);
+    return g.bossReport;
+  }, SCENE);
+}
+
 function report(page: Page): Promise<Report | null> {
   return page.evaluate(async (scene) => {
     const { game } = await import('/src/main.ts');
@@ -83,7 +97,7 @@ test('bar 1 holds no volley, and breaking it lets one come', async ({ page }) =>
 
   await breakBar(page);
   await expect
-    .poll(async () => (await report(page))?.volley.volleys ?? 0, { timeout: 40_000 })
+    .poll(async () => (await reportFar(page))?.volley.volleys ?? 0, { timeout: 40_000 })
     .toBeGreaterThanOrEqual(1);
   const after = await report(page);
   console.log('volley log', JSON.stringify(after?.volley.log));
@@ -102,9 +116,7 @@ test('bar 1 holds no volley, and breaking it lets one come', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
-test('volleys keep their 15 s cooldown, enraged too, and the rest of the skill legs are slams', async ({
-  page,
-}) => {
+test('volleys keep their 15 s cooldown, enraged too, with the hero far away', async ({ page }) => {
   test.setTimeout(55_000);
   const errors = collectErrors(page);
   await startRun(page, `${SCALE}&invulnerable=1`);
@@ -115,7 +127,7 @@ test('volleys keep their 15 s cooldown, enraged too, and the rest of the skill l
   let last: Report | null = null;
   const deadline = Date.now() + 40_000;
   while (Date.now() < deadline) {
-    last = await report(page);
+    last = await reportFar(page);
     if (!last || last.volley.clockS - startClock >= 70) break;
     await page.waitForTimeout(250);
   }
@@ -132,11 +144,11 @@ test('volleys keep their 15 s cooldown, enraged too, and the rest of the skill l
     'slams',
     slams.length,
   );
-  // The pick is random by distance (nearby, the slam is favoured), so only the
-  // cooldown is guaranteed: at least one volley, none closer than 15 s, and no
-  // more than the cooldown allows in the span.
+  // The pick is random by distance; with the hero kept far the volley is
+  // favoured, so volleys come often, but never closer than 15 s and never more
+  // than the cooldown allows in the span.
   const spanS = (last?.volley.clockS ?? 0) - startClock;
-  expect(volleys.length).toBeGreaterThanOrEqual(1);
+  expect(volleys.length).toBeGreaterThanOrEqual(2);
   expect(volleys.length).toBeLessThanOrEqual(Math.floor(spanS / BOSS_VOLLEY.cooldownS) + 1);
   expect(volleys.every((v) => v.enraged && v.bolts === 14)).toBe(true);
   for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(BOSS_VOLLEY.cooldownS - 1e-6);

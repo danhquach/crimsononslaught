@@ -14,7 +14,6 @@ import {
   FX_ALPHA,
   DASH_DEPTH,
   BOSS_AURA_DEPTH,
-  BOSS_BOLT_FX,
   BOSS_SLAM_FX,
   BOSS_SLAM_WARN_DEPTH,
   ELITE_MARK_DEPTH,
@@ -28,7 +27,7 @@ import {
   SPIN_BASE_ORBIT_SPEED,
   TELEGRAPH_SCALE_RADIUS,
 } from './fx';
-import { BOSS_VOLLEY } from './boss';
+import { BOSS_BOLT, BOSS_VOLLEY } from './boss';
 import { PLACEHOLDERS } from './colors';
 import { ART_BOXES } from './frames';
 import { BASE_EARTH_SHIELD_STATS } from './shields';
@@ -132,11 +131,11 @@ describe('Ground slam fx (CO-222)', () => {
 
 describe('Bolt volley fx (CO-223)', () => {
   it("draws the bolt's orb about as wide as its hit circle, and both clips exist", () => {
-    const orb = ART_BOXES[BOSS_BOLT_FX.fly].h;
+    const orb = ART_BOXES[BOSS_BOLT.clip].h;
     expect(orb).toBeGreaterThanOrEqual(BOSS_VOLLEY.boltRadius * 2 - 2);
     expect(orb).toBeLessThanOrEqual(BOSS_VOLLEY.boltRadius * 2 + 2);
     const names = new Set(ANIMATIONS.map((anim) => anim.name));
-    expect(names.has(BOSS_BOLT_FX.fly)).toBe(true);
-    expect(names.has(BOSS_BOLT_FX.hit)).toBe(true);
+    expect(names.has(BOSS_BOLT.clip)).toBe(true);
+    expect(names.has(BOSS_BOLT.hitClip)).toBe(true);
   });
 });

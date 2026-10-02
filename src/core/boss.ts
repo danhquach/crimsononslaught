@@ -16,8 +16,8 @@ import type { Vec2 } from './enemy';
  * Boss rules that do not need an engine (spec §5 "Boss"): the charge cycle —
  * chase, 0.8 s telegraph, 0.6 s charge, every 4 s — and the movement each frame
  * of it asks for. Between charges the boss uses one skill (CO-222): a windup
- * with a warning, then the skill landing; the legs alternate charge, skill. The skill is drawn at random,
- * weighted by how far the hero stands.
+ * with a warning, then the skill landing; the legs alternate charge, skill. The
+ * skill is drawn at random, weighted by how far the hero stands (CO-223).
  *
  * `entities/Boss.ts` is the Phaser side; everything decidable without Phaser
  * lives here so it is Vitest-covered.

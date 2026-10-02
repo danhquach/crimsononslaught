@@ -481,6 +481,7 @@ export class GameScene extends Phaser.Scene {
   private spikeLevelRng!: Rng;
   /** The Earthquake's second-centre tie-break only (#330); see `QUAKE_LEVEL_STREAM`. */
   private quakeLevelRng!: Rng;
+  /** The boss's distance-weighted skill picks only (CO-223); see `BOSS_SKILL_STREAM`. */
   private bossSkillRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
