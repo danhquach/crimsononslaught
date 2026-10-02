@@ -324,6 +324,11 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
     spec(`hud.${bar}Frame`, 1, 1, ONCE),
     spec(`hud.${bar}Mark`, 1, 1, ONCE),
   ]),
+
+  // The boss bar's break (#387): the glass cracks across the tube and shards
+  // burst off it, each played once by HudScene's BossFx over the code flash.
+  spec('hud.bossCrack', 4, 16, ONCE),
+  spec('hud.bossShards', 4, 14, ONCE),
 ];
 
 /**

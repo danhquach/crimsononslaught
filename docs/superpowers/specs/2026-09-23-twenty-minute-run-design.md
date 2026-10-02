@@ -65,6 +65,10 @@ Starting values (a tuning pass is expected, §7):
   on the field keep the stats they spawned with.
 - `BOSS.hp` goes from 2400 to 7200, a starting value that matches a
   20-minute build. Speed, contact damage and the charge cycle are unchanged.
+  #387 doubles it again to 14400, shown as `BOSS.bars` = 2 bars of 7200 (first
+  violet, last red, any between amber) with a `×N` count beside the label,
+  and the fight's target window doubles with it, to 90–180 s. Damage is not
+  retuned for it.
 - The 300 live-enemy cap is unchanged.
 
 Invariants the tests pin:

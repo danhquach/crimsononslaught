@@ -228,6 +228,9 @@ src/
   Phase 1 shipped 1500 against one spell and a seven-node perk tree; CO-125
   raised it to hold the boss fight in its 45–90 s window against a three-active
   loadout and an uncapped passive stack.
+  Superseded: the 20-minute run (#127) made it 7200 and #387 doubled that to
+  14400, drawn as two bars of 7200 (violet, then red) with a `×2` count and a
+  break cue per bar. The fight's target window is now 90–180 s.
 - Every 4 s: 0.8 s telegraph (color flash), then charge toward player's
   position at 400 px/s for 0.6 s.
 - Remaining regular enemies keep living but no new spawns.

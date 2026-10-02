@@ -9,7 +9,10 @@ import type { TextureKey } from './colors';
  * `entities/Boss.ts` reads it on spawn; `core/boss.ts` reads the timings.
  */
 export interface BossConfig {
+  /** Total HP across every bar. */
   hp: number;
+  /** #387: how many equal bars `hp` is drawn as; the HUD peels one off at a time. */
+  bars: number;
   /** Chase speed in px/s between charges. */
   speed: number;
   /** Damage dealt to the player on contact, at most once per 0.5 s. */
@@ -29,7 +32,9 @@ export interface BossConfig {
 
 export const BOSS: Readonly<BossConfig> = {
   // #127: sized for a 20-minute build; a starting value, tuned later.
-  hp: 7200,
+  // #387: doubled, shown as two bars of 7200 so the fight reads as two rounds.
+  hp: 14400,
+  bars: 2,
   speed: 70,
   contactDamage: 30,
   radius: 40,

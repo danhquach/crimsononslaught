@@ -19,14 +19,22 @@ export type BossPhase = 'chase' | 'telegraph' | 'charge';
  * `died` fires once the death animation has played out, not on the killing
  * blow (CO-081): the win waits for it. `phase` fires with `{ phase }` each
  * time the charge cycle moves on (CO-102: the telegraph and charge cues).
+ * `barBreak` fires with `{ left }` when a hit takes a bar off the boss and some
+ * are left (#387); the killing blow fires none, `died` is its cue.
  */
 export const BOSS_EVENT = {
   died: 'boss:died',
   phase: 'boss:phase',
+  barBreak: 'boss:barBreak',
 } as const;
 
 export interface BossPhasePayload {
   readonly phase: BossPhase;
+}
+
+export interface BossBarBreakPayload {
+  /** Bars still alive after the hit. */
+  readonly left: number;
 }
 
 export interface BossCycle {

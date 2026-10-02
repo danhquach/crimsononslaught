@@ -2214,6 +2214,19 @@
       "rows": 1,
       "sheetCell": 144,
       "rowSpecs": [[{ "anim": "dash", "cols": [1, 1], "centred": true }]]
+    },
+    {
+      "key": "hud",
+      "ticket": "CO-219",
+      "file": "CO-219/boss_bar_break.png",
+      "page": 23,
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 288,
+      "rowSpecs": [
+        [{ "anim": "bossCrack", "cols": [1, 4], "centred": true }],
+        [{ "anim": "bossShards", "cols": [1, 4], "centred": true }]
+      ]
     }
   ]
 }

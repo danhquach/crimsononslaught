@@ -943,3 +943,36 @@ once its 110 px ring would catch 3.
   - This arm carries one active more than the control, and the comparison measures
     the bomb added, not the bomb against another spell. A full five-active Ice build
     still has to be read against the window.
+
+## Two boss bars (#387)
+
+The boss's HP doubles from 7200 to 14400, drawn as two bars of 7200 on the one HUD
+boss bar. The fight-length window doubles with it, from 45–90 s to 90–180 s. The
+ticket asked for 3×; the PM chose 2× for now, and the bar code takes its count from
+`BOSS.bars`, so a third bar is a config change.
+
+- **Method:** the scratch bot of the earlier sections, `timeScale=8`, one run at a
+  time on a fresh Vite server serving `main` (915185d) at 7200 HP. Time-to-kill is
+  the survival time past 20:00.
+- **The 14400 HP arm was not swept.** The PM chose to record the baseline and the
+  expected fight length instead. One smoke run (Lightning, seed 1) took 127 s against
+  107 s at 7200 HP; one seed is no measure given the spread below.
+
+| Arm (7200 HP) | Wins | Boss TTK min / median / max | TTK in 45–90 s |
+|---|---|---|---|
+| Lightning, invulnerable | 5 / 5 | 35 / 107 / 248 s | 1 of 5 |
+| Fire, invulnerable | 5 / 5 | 34 / 45 / 245 s | 1 of 5 |
+| Ice, invulnerable | 5 / 5 | 21 / 33 / 73 s | 2 of 5 |
+| Earth, invulnerable | 5 / 5 | 46 / 103 / 1165 s | 2 of 5 |
+| Lightning, mortal | 5 / 5 | 50 / 72 / 244 s | 3 of 5 |
+
+- **Expected at 14400 HP:** the boss takes no damage scaled by its max HP, so the
+  fight should take about twice as long: medians of roughly 210 s for Lightning and
+  Earth and roughly 65–90 s for Ice and Fire. Fire and Ice would land on the window's floor,
+  Lightning and Earth past its ceiling.
+- **The spread is wide:** the same element varies up to 7× across seeds (Earth's
+  1165 s is one seed whose build stalled). Five seeds per arm do not settle a median;
+  a pooled 40-run sweep would, before any damage is retuned against the new window.
+- **No survival pressure:** every mortal run won, so a fight twice as long is not
+  yet expected to cost runs. A longer fight means twice the contact time with the
+  boss, which the next sweep should watch.
