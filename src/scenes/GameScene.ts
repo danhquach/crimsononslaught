@@ -669,6 +669,7 @@ export class GameScene extends Phaser.Scene {
     phase: string;
     chaseS: number;
     skill: string | null;
+    windupLeftS: number;
     clip: string | null;
     x: number;
     y: number;
@@ -696,6 +697,7 @@ export class GameScene extends Phaser.Scene {
       phase: boss.phase,
       chaseS: phaseLengthS('chase', boss.isEnraged),
       skill: boss.skill,
+      windupLeftS: boss.windupLeftS,
       clip: boss.anims.currentAnim?.key ?? null,
       x: boss.x,
       y: boss.y,

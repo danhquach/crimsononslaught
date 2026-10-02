@@ -125,6 +125,11 @@ export class Boss extends Enemy {
     return this.cycle.skill;
   }
 
+  /** CO-222: seconds of the wind-up left on the boss clock, 0 outside one. */
+  get windupLeftS(): number {
+    return this.cycle.phase === 'windup' ? this.cycle.remainingS : 0;
+  }
+
   /** Test hook (CO-222): charges begun since spawn. */
   get chargesForTest(): number {
     return this.charges;

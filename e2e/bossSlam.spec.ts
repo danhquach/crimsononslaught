@@ -107,20 +107,28 @@ test('a hero bitten just before the slam still takes it, through the hit-immunit
   const errors = collectErrors(page);
   await startRun(page);
   await slamWithHeroAt(page, BOSS_SLAM.radius * 0.65);
-  await expect.poll(async () => (await report(page))?.phase).toBe('windup');
-  // Late in the 1 s wind-up the hero steps into the boss's body (40 px plus its
-  // own 14): the bite opens the hero's 0.5 s immunity window, and the slam lands
-  // inside it. Checked in the same evaluate that the wind-up is still running.
-  await page.waitForTimeout(650);
-  const bitten = await page.evaluate(async (scene) => {
-    const { game } = await import('/src/main.ts');
-    const g = game.scene.getScene(scene.game) as GameScene;
-    const boss = g.bossReport;
-    if (boss?.phase !== 'windup') return null;
-    g.placeHeroForTest(boss.x + 45, boss.y);
-    return boss.slam.slams;
-  }, SCENE);
-  expect(bitten).toBe(0);
+  // Late in the 1 s wind-up, by the boss's own clock, the hero steps into its
+  // body (40 px plus the hero's 14): the bite opens the hero's 0.5 s immunity
+  // window, and the slam lands inside it. The wind-up left is read and the hero
+  // placed in one evaluate, so a slow runner cannot let the slam pass between
+  // them; a wall-clock wait missed the wind-up on CI.
+  let step = 'waiting';
+  const deadline = Date.now() + 10_000;
+  while (step === 'waiting' && Date.now() < deadline) {
+    step = await page.evaluate(
+      async ({ scene, within }) => {
+        const { game } = await import('/src/main.ts');
+        const g = game.scene.getScene(scene.game) as GameScene;
+        const boss = g.bossReport;
+        if (!boss || boss.slam.slams > 0) return 'missed';
+        if (boss.phase !== 'windup' || boss.windupLeftS > within) return 'waiting';
+        g.placeHeroForTest(boss.x + 45, boss.y);
+        return 'placed';
+      },
+      { scene: SCENE, within: 0.45 },
+    );
+  }
+  expect(step).toBe('placed');
   // Once the slam lands the hero steps well clear, so further bites cannot
   // end the run during the second of sampling after it.
   await expect
