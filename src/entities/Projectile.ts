@@ -14,6 +14,8 @@ export interface ProjectileLook {
    * it, so the hit radius stays the placeholder's whatever the art's size.
    */
   readonly scale?: number;
+  /** Body radius in px; none = half the placeholder's width (CO-223: a boss bolt's hit circle is its own). */
+  readonly radius?: number;
 }
 
 /** Fire's fireball, on its own flight clip since CO-153: `fire.fly` stays the companion's shot. */
@@ -57,7 +59,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.range = range;
     // Half the placeholder's width, so the body matches what is drawn whichever
     // look this pooled shot wore last time.
-    const radius = PLACEHOLDERS[look.texture].width / 2;
+    const radius = look.radius ?? PLACEHOLDERS[look.texture].width / 2;
     clearClip(this);
     // Scale is sticky on a pooled sprite: back to native before any look.
     this.setScale(1);

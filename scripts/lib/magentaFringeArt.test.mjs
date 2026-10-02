@@ -98,6 +98,7 @@ describe('magenta fringe (CO-171)', () => {
   for (const clip of [
     'boss.walk.down',
     'boss.slamWindup.down',
+    'boss.volleyWindup.down',
     'pickupBomb.idle',
     'pickupHealth.idle',
     'ice.slow',

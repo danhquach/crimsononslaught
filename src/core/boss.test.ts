@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS, BOSS_ENRAGE, BOSS_SLAM } from '../config/boss';
+import { createRng } from './rng';
+import { BOSS, BOSS_ENRAGE, BOSS_SLAM, BOSS_VOLLEY, type BossSkillId } from '../config/boss';
 import {
   BOSS_EVENT,
   bossEnraged,
   bossMods,
+  bossRangeBand,
   bossSkillsFor,
   enrageThresholdHp,
   enterEnrage,
@@ -14,6 +16,8 @@ import {
   startBossCycle,
   stepBossCycle,
   type BossCycle,
+  volleyBoltDirections,
+  volleyDamage,
 } from './boss';
 
 const ORIGIN = { x: 0, y: 0 };
@@ -36,8 +40,10 @@ describe('startBossCycle (CO-050)', () => {
       remainingS: CHASE_S,
       chargeDir: { x: 0, y: 0 },
       next: 'charge',
-      skillTurn: 0,
       skill: null,
+      skillDir: { x: 0, y: 0 },
+      clockS: 0,
+      readyAtS: {},
     });
     expect(CHASE_S).toBeCloseTo(2.6, 9);
   });
@@ -369,7 +375,7 @@ describe('skill rotation (CO-222)', () => {
     expect(before.impacts).toEqual([]);
     const after = stepBossCycle(startBossCycle(), 7.7, ORIGIN, TARGET, 1, false, SLAM);
     expect(after.cycle.phase).toBe('skill');
-    expect(after.impacts).toEqual([{ skill: 'slam' }]);
+    expect(after.impacts).toMatchObject([{ skill: 'slam' }]);
   });
 
   it('alternates charge and skill legs over a minute: charges 8 s apart', () => {
@@ -415,27 +421,26 @@ describe('skill rotation (CO-222)', () => {
       skill: 'slam' as const,
     };
     const step = stepBossCycle(windup, 1, ORIGIN, TARGET, 1, false, SLAM);
-    expect(step.impacts).toEqual([{ skill: 'slam' }]);
+    expect(step.impacts).toMatchObject([{ skill: 'slam' }]);
     expect(step.cycle.phase).toBe('skill');
     expect(stepBossCycle(step.cycle, 0.1, ORIGIN, TARGET, 1, false, SLAM).impacts).toEqual([]);
   });
 
-  it('picks round-robin from a list, and clamps the list to the last bar', () => {
-    expect(pickBossSkill(['slam'], 0)).toBe('slam');
-    expect(pickBossSkill(['slam'], 5)).toBe('slam');
+  it('picks the one skill a list holds, and clamps the list to the last bar', () => {
+    expect(pickBossSkill(['slam'], {}, 0, 0, () => 0.99)).toBe('slam');
+    expect(pickBossSkill(['slam'], {}, 0, 999, () => 0)).toBe('slam');
     expect(bossSkillsFor(0)).toEqual(['slam']);
-    expect(bossSkillsFor(1)).toEqual(['slam']);
+    expect(bossSkillsFor(1)).toEqual(['slam', 'volley']);
     expect(bossSkillsFor(9)).toEqual(bossSkillsFor(BOSS.bars - 1));
     expect(bossSkillsFor(-1)).toEqual(bossSkillsFor(0));
   });
 
-  it('keeps the chosen skill when the list changes mid-windup, and counts the turn once', () => {
+  it('keeps the chosen skill when the list changes mid-windup', () => {
     const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 0.1 };
     const windup = stepBossCycle(chase, 0.2, ORIGIN, TARGET, 1, false, SLAM).cycle;
-    expect(windup).toMatchObject({ phase: 'windup', skill: 'slam', skillTurn: 1 });
+    expect(windup).toMatchObject({ phase: 'windup', skill: 'slam' });
     const step = stepBossCycle(windup, 2, ORIGIN, TARGET, 1, false, []);
-    expect(step.impacts).toEqual([{ skill: 'slam' }]);
-    expect(step.cycle.skillTurn).toBe(1);
+    expect(step.impacts).toMatchObject([{ skill: 'slam' }]);
   });
 
   it('does not shorten a windup or landing when enrage starts', () => {
@@ -466,5 +471,174 @@ describe('skill rotation (CO-222)', () => {
 
   it('has an event name for the landing', () => {
     expect(BOSS_EVENT.skill).toBe('boss:skill');
+  });
+});
+
+describe('boss bolt volley (CO-223)', () => {
+  const BOTH: readonly BossSkillId[] = ['slam', 'volley'];
+  const TARGET = { x: 100, y: 0 };
+  const DEG = Math.PI / 180;
+
+  it('picks only ready skills, by weight: roll 0 is the first, the top of the roll the last', () => {
+    expect(pickBossSkill(BOTH, {}, 0, 100, () => 0)).toBe('slam');
+    expect(pickBossSkill(BOTH, {}, 0, 100, () => 0.999)).toBe('volley');
+    // Cooling down until 15 s: only the slam is in the roll.
+    expect(pickBossSkill(BOTH, { volley: 15 }, 14.9, 400, () => 0.999)).toBe('slam');
+    expect(pickBossSkill(BOTH, { volley: 15 }, 15, 400, () => 0.999)).toBe('volley');
+    expect(pickBossSkill(['volley'], { volley: 15 }, 1, 400, () => 0)).toBeNull();
+    expect(pickBossSkill([], {}, 0, 0, () => 0)).toBeNull();
+  });
+
+  it('draws nothing from the stream when no skill is ready', () => {
+    let draws = 0;
+    const rand = () => (draws += 1);
+    pickBossSkill(['volley'], { volley: 15 }, 1, 400, rand);
+    pickBossSkill([], {}, 0, 0, rand);
+    expect(draws).toBe(0);
+    pickBossSkill(BOTH, {}, 0, 0, rand);
+    expect(draws).toBe(1);
+  });
+
+  it('bands the hero distance: under 160 near, over 280 far, between mid', () => {
+    expect(bossRangeBand(0)).toBe('near');
+    expect(bossRangeBand(159.9)).toBe('near');
+    expect(bossRangeBand(160)).toBe('mid');
+    expect(bossRangeBand(280)).toBe('mid');
+    expect(bossRangeBand(280.1)).toBe('far');
+  });
+
+  /** Share of `n` seeded rolls that pick `want`, with both skills ready. */
+  function share(distancePx: number, want: BossSkillId, readyAtS = {}, seed = 7, n = 4000): number {
+    const rng = createRng(seed);
+    let hits = 0;
+    for (let i = 0; i < n; i += 1)
+      if (pickBossSkill(BOTH, readyAtS, 100, distancePx, () => rng.next()) === want) hits += 1;
+    return hits / n;
+  }
+
+  it('near the hero it slams about 75% of the time, far it volleys about 75%', () => {
+    expect(share(100, 'slam')).toBeGreaterThan(0.65);
+    expect(share(100, 'slam')).toBeLessThan(0.85);
+    expect(share(400, 'volley')).toBeGreaterThan(0.65);
+    expect(share(400, 'volley')).toBeLessThan(0.85);
+    // Mid: an even toss.
+    expect(share(220, 'slam')).toBeGreaterThan(0.45);
+    expect(share(220, 'slam')).toBeLessThan(0.55);
+  });
+
+  it('always slams while the volley cools, at any distance', () => {
+    for (const d of [0, 100, 220, 400]) expect(share(d, 'slam', { volley: 999 }, 3, 500)).toBe(1);
+  });
+
+  it('repeats its picks for a seed and differs across seeds', () => {
+    const picks = (seed: number) => {
+      const rng = createRng(seed);
+      return Array.from({ length: 40 }, () => pickBossSkill(BOTH, {}, 0, 220, () => rng.next()));
+    };
+    expect(picks(5)).toEqual(picks(5));
+    expect(picks(5)).not.toEqual(picks(6));
+  });
+
+  it('picks by the distance between boss and hero as the chase ends, through the cycle', () => {
+    const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 0 };
+    const high = () => 0.5;
+    const far = stepBossCycle(chase, 0.01, ORIGIN, { x: 400, y: 0 }, 1, false, BOTH, high);
+    const near = stepBossCycle(chase, 0.01, ORIGIN, { x: 50, y: 0 }, 1, false, BOTH, high);
+    // The same roll: far, the middle of it is a volley; near, it falls on the slam.
+    expect(far.cycle.skill).toBe('volley');
+    expect(near.cycle.skill).toBe('slam');
+  });
+
+  it('never volleys on bar 1: that list holds the slam alone', () => {
+    let cycle = startBossCycle();
+    const seen = new Set<string>();
+    for (let t = 0; t < 120; t += 0.05) {
+      const step = stepBossCycle(cycle, 0.05, ORIGIN, TARGET, 1, false, bossSkillsFor(0));
+      step.impacts.forEach((i) => seen.add(i.skill));
+      cycle = step.cycle;
+    }
+    expect([...seen]).toEqual(['slam']);
+  });
+
+  it('falls back to a charge when the only skill is cooling down', () => {
+    const chase = {
+      ...startBossCycle(),
+      next: 'skill' as const,
+      remainingS: 0,
+      readyAtS: { volley: 99 },
+    };
+    expect(stepBossCycle(chase, 0.01, ORIGIN, TARGET, 1, false, ['volley']).cycle.phase).toBe(
+      'telegraph',
+    );
+  });
+
+  for (const [label, stepS, enraged, heroX] of [
+    ['1/60 s frames, far', 1 / 60, false, 400],
+    ['3 s frames, far', 3, false, 400],
+    ['1/60 s frames, near', 1 / 60, false, 100],
+    ['3 s frames, near', 3, false, 100],
+    ['1/60 s frames, far, enraged', 1 / 60, true, 400],
+    ['3 s frames, far, enraged', 3, true, 400],
+  ] as const) {
+    it(`keeps volley wind-ups 15 s apart and still volleys over 180 s (${label})`, () => {
+      const rng = createRng(11);
+      const hero = { x: heroX, y: 0 };
+      let cycle = startBossCycle();
+      const starts: number[] = [];
+      const impacts: number[] = [];
+      for (let t = 0; t < 180 - 1e-9; t += stepS) {
+        const step = stepBossCycle(cycle, stepS, ORIGIN, hero, 1, enraged, BOTH, () => rng.next());
+        cycle = step.cycle;
+        for (const hit of step.impacts) if (hit.skill === 'volley') impacts.push(hit.atS);
+        const after = cycle.readyAtS.volley;
+        if (after !== undefined && starts[starts.length - 1] !== after) starts.push(after);
+      }
+      // Each stamp is the wind-up's start plus the cooldown, so stamps 15 s apart = starts 15 s apart.
+      for (let i = 1; i < starts.length; i += 1)
+        expect((starts[i] as number) - (starts[i - 1] as number)).toBeGreaterThanOrEqual(
+          BOSS_VOLLEY.cooldownS - 1e-6,
+        );
+      for (let i = 1; i < impacts.length; i += 1)
+        expect((impacts[i] as number) - (impacts[i - 1] as number)).toBeGreaterThanOrEqual(
+          BOSS_VOLLEY.cooldownS - 1e-6,
+        );
+      expect(impacts.length).toBeGreaterThanOrEqual(heroX > 280 ? 3 : 1);
+    });
+  }
+
+  it('locks the aim as the wind-up starts and reports it at the impact', () => {
+    const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 0 };
+    const wound = stepBossCycle(chase, 0.01, ORIGIN, { x: 0, y: 50 }, 1, false, ['volley']);
+    expect(wound.cycle.skillDir).toEqual({ x: 0, y: 1 });
+    // The hero moves; the aim stays.
+    const landed = stepBossCycle(wound.cycle, 2, ORIGIN, { x: 50, y: 0 }, 1, false, ['volley']);
+    expect(landed.impacts).toHaveLength(1);
+    expect(landed.impacts[0]?.aim).toEqual({ x: 0, y: 1 });
+    expect(landed.impacts[0]?.atS).toBeCloseTo(BOSS_VOLLEY.windupS, 9);
+  });
+
+  it('fires 14 bolts: slot 0 on the aim, none within 11 degrees of the sides', () => {
+    for (const aim of [0, 1, -2.5, Math.PI]) {
+      const dirs = volleyBoltDirections(aim);
+      expect(dirs).toHaveLength(14);
+      expect(Math.atan2(dirs[0]?.y as number, dirs[0]?.x as number)).toBeCloseTo(
+        Math.atan2(Math.sin(aim), Math.cos(aim)),
+        9,
+      );
+      for (const side of [aim + Math.PI / 2, aim - Math.PI / 2]) {
+        for (const d of dirs) {
+          const diff = Math.atan2(
+            Math.sin(Math.atan2(d.y, d.x) - side),
+            Math.cos(Math.atan2(d.y, d.x) - side),
+          );
+          expect(Math.abs(diff)).toBeGreaterThan(11 * DEG);
+        }
+      }
+    }
+  });
+
+  it('deals 20, or 30 enraged', () => {
+    expect(volleyDamage(false)).toBe(20);
+    expect(volleyDamage(true)).toBe(30);
   });
 });

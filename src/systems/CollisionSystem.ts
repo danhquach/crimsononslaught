@@ -21,6 +21,8 @@ export interface CollisionHandlers {
   readonly onEnemyContact: (enemy: Enemy) => void;
   /** A ranged enemy's shot is touching the player (#126). */
   readonly onEnemyShot: (shot: EnemyShot) => void;
+  /** One of the boss's bolts is touching the player (CO-223); optional because the bolt pool is. */
+  readonly onBossBolt?: (bolt: EnemyShot) => void;
   /** The player is touching a gem (spec §5: gems are XP on touch). */
   readonly onGemPickup: (gem: XpGem) => void;
   /** The player is touching an Ember, a consumable or a relic (#195). */
@@ -58,6 +60,7 @@ export class CollisionSystem {
     gems: GemPool,
     pickups: PickupPool,
     handlers: CollisionHandlers,
+    bossBolts?: EnemyShotPool,
   ) {
     this.scene = scene;
     this.enemies = enemies;
@@ -69,6 +72,12 @@ export class CollisionSystem {
     this.scene.physics.add.overlap(player, enemyShots.group, (_player, shot) => {
       if (shot instanceof EnemyShot) this.handlers.onEnemyShot(shot);
     });
+    // The boss's volley bolts (CO-223) fly in a pool of their own, with their own handler.
+    if (bossBolts) {
+      this.scene.physics.add.overlap(player, bossBolts.group, (_player, bolt) => {
+        if (bolt instanceof EnemyShot) this.handlers.onBossBolt?.(bolt);
+      });
+    }
     this.scene.physics.add.overlap(player, gems.group, (_player, gem) => {
       if (gem instanceof XpGem) this.handlers.onGemPickup(gem);
     });
