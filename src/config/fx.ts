@@ -1,4 +1,5 @@
 import { ANIMATIONS } from './animations';
+import { BOSS_BOLT } from './boss';
 import { PLACEHOLDERS } from './colors';
 import { ENEMY_ARCHETYPES, MAX_LIVE_ENEMIES } from './enemies';
 import { BASE_EARTH_SHIELD_STATS } from './shields';
@@ -211,6 +212,14 @@ export const BOSS_SLAM_FX = {
   shockAlpha: 1,
 } as const;
 export const BOSS_SLAM_WARN_DEPTH = -0.15;
+
+/**
+ * CO-223: the Bolt volley's bolt. The sprite is drawn flying to the right, its
+ * trail on the left, with its origin on the orb's centre, so it is rotated to the
+ * flight angle about that origin at scale 1 (the orb is drawn about 16 px across,
+ * the bolt's 8 px hit radius). `hit` plays once where a bolt ends on the hero.
+ */
+export const BOSS_BOLT_FX = { fly: BOSS_BOLT.clip, hit: BOSS_BOLT.hitClip } as const;
 
 /**
  * The dash's afterimages and wisps (#384) lie just under the hero, over the

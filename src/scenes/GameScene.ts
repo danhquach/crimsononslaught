@@ -29,9 +29,12 @@ import { artFrame } from '../core/animation';
 import {
   BOSS_EVENT,
   phaseLengthS,
+  volleyBoltDirections,
   type BossImmunePayload,
   type BossPhasePayload,
   type BossSkillPayload,
+  type BossSlamPayload,
+  type BossVolleyPayload,
 } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor, consumableSoundFor } from '../config/sounds';
 import { hasFrameArt } from '../render/atlas';
@@ -149,7 +152,7 @@ import {
   ARENA_SIZE,
 } from '../config/arena';
 import { FRAMES } from '../config/frames';
-import { BOSS_IMMUNE_FRAME } from '../config/boss';
+import { BOSS_BOLT, BOSS_IMMUNE_FRAME, BOSS_VOLLEY, type BossSkillId } from '../config/boss';
 import { ARENA_DEPTH, NUMBER_DEPTH, PROP_DEPTH } from '../config/fx';
 import {
   ENEMY_ARCHETYPES,
@@ -365,6 +368,12 @@ const SPIKE_LEVEL_STREAM = 'spikeLevelBleeds';
 const QUAKE_LEVEL_STREAM = 'quakeLevelPicks';
 
 /**
+ * Which skill the boss picks between charges (CO-223) draws from a stream of
+ * its own, so its rolls never move a seed's spawns, offers or drops.
+ */
+const BOSS_SKILL_STREAM = 'bossSkills';
+
+/**
  * Where a death's Ember and consumable land, from the death spot, so neither
  * hides under the gem that lands on the spot itself. Well inside the pickup
  * radius, so walking over the gem takes them too.
@@ -418,8 +427,17 @@ export class GameScene extends Phaser.Scene {
     slams: number;
     hits: number;
     hpLost: number;
-    log: { chargesBefore: number; hit: boolean; hpLost: number }[];
+    log: { atS: number; chargesBefore: number; hit: boolean; hpLost: number }[];
   } = { slams: 0, hits: 0, hpLost: 0, log: [] };
+  /** The boss's volley bolts in the air (CO-223): a pool apart from the ranged enemies' shots. */
+  private bossBolts!: EnemyShotPool;
+  /** Test hook (CO-223): volleys fired, bolts that hit the hero, the HP they took and a line per volley. */
+  private volleyTally: {
+    volleys: number;
+    boltHits: number;
+    hpLost: number;
+    log: { atS: number; enraged: boolean; bolts: number; aimRad: number }[];
+  } = { volleys: 0, boltHits: 0, hpLost: 0, log: [] };
   /** #126: splits owed by splitters killed this step; spawned after the physics step. */
   private splits: Split[] = [];
   /** Test hook (#126): blasts set off, blasts that reached the player and the HP they took, children spawned and dropped. */
@@ -463,6 +481,7 @@ export class GameScene extends Phaser.Scene {
   private spikeLevelRng!: Rng;
   /** The Earthquake's second-centre tie-break only (#330); see `QUAKE_LEVEL_STREAM`. */
   private quakeLevelRng!: Rng;
+  private bossSkillRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -677,7 +696,17 @@ export class GameScene extends Phaser.Scene {
       slams: number;
       hits: number;
       hpLost: number;
-      log: { chargesBefore: number; hit: boolean; hpLost: number }[];
+      log: { atS: number; chargesBefore: number; hit: boolean; hpLost: number }[];
+    };
+    volley: {
+      volleys: number;
+      boltHits: number;
+      hpLost: number;
+      log: { atS: number; enraged: boolean; bolts: number; aimRad: number }[];
+      readyInS: number;
+      boltsAlive: number;
+      aimRad: number;
+      clockS: number;
     };
     auraVisible: boolean;
     auraClip: string | null;
@@ -702,6 +731,14 @@ export class GameScene extends Phaser.Scene {
       x: boss.x,
       y: boss.y,
       slam: { ...this.slamTally, log: [...this.slamTally.log] },
+      volley: {
+        ...this.volleyTally,
+        log: [...this.volleyTally.log],
+        readyInS: boss.volleyReadyInS,
+        boltsAlive: this.bossBolts.liveCount,
+        aimRad: boss.skillAimRad,
+        clockS: boss.clockForTest, // the cycle steps the same deltas, so it equals the log's atS clock
+      },
       auraVisible: this.bossEnrageFx.auraVisible,
       auraClip: this.bossEnrageFx.auraClip,
       burstPlays: this.bossEnrageFx.burstPlays,
@@ -1184,9 +1221,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Test hook (#384): the hero stands at `x, y` (kept inside the world), for the edge checks. */
-  placeHeroForTest(x: number, y: number): void {
+  placeHeroForTest(x: number, y: number): { x: number; y: number } {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     body.reset(Math.min(WORLD_WIDTH, Math.max(0, x)), Math.min(WORLD_HEIGHT, Math.max(0, y)));
+    return { x: this.player.x, y: this.player.y };
   }
 
   /** Test hook (#384): change the run's dash numbers, as a spell would. */
@@ -1237,13 +1275,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Test hook (CO-222): the boss ends its chase now with a skill due, so its
-   * windup starts on the next step. The boss is brought in first. Returns whether it lives.
+   * Test hook (CO-222, CO-223): the boss starts `skill`'s wind-up now, aimed at
+   * the hero as they stand, cooldown or not. The boss is brought in first.
+   * Returns whether it lives.
    */
-  skipBossToSkillForTest(): boolean {
+  skipBossToSkillForTest(skill: BossSkillId = 'slam'): boolean {
     const boss = this.bossForTest();
     if (!boss) return false;
-    boss.skipToSkillForTest();
+    boss.skipToSkillForTest(skill, this.player);
     return true;
   }
 
@@ -1383,6 +1422,7 @@ export class GameScene extends Phaser.Scene {
     this.chainLevelRng = createRng(deriveSeed(seed, CHAIN_LEVEL_STREAM));
     this.spikeLevelRng = createRng(deriveSeed(seed, SPIKE_LEVEL_STREAM));
     this.quakeLevelRng = createRng(deriveSeed(seed, QUAKE_LEVEL_STREAM));
+    this.bossSkillRng = createRng(deriveSeed(seed, BOSS_SKILL_STREAM));
     this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -1420,9 +1460,18 @@ export class GameScene extends Phaser.Scene {
 
     this.enemies = new EnemyPool(this);
     this.enemyShots = new EnemyShotPool(this);
+    this.bossBolts = new EnemyShotPool(this, {
+      look: { texture: 'proj_enemy', clip: BOSS_BOLT.clip, radius: BOSS_VOLLEY.boltRadius },
+      maxSize: BOSS_BOLT.maxLive,
+      speed: BOSS_VOLLEY.boltSpeed,
+      range: BOSS_VOLLEY.boltRange,
+    });
+    // A bolt that flies its whole range fades where it ends (CO-223).
+    this.bossBolts.onSpent = (bolt) => this.fx.burst(BOSS_BOLT.hitClip, bolt.x, bolt.y);
     this.shotHits = 0;
     this.shotHpLost = 0;
     this.slamTally = { slams: 0, hits: 0, hpLost: 0, log: [] };
+    this.volleyTally = { volleys: 0, boltHits: 0, hpLost: 0, log: [] };
     this.splits = [];
     this.blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
     this.guardTally = { blocked: 0, full: 0, blockedRaw: 0, blockedDealt: 0 };
@@ -1462,9 +1511,11 @@ export class GameScene extends Phaser.Scene {
       {
         onEnemyContact: (enemy) => this.onEnemyContact(enemy),
         onEnemyShot: (shot) => this.onEnemyShot(shot),
+        onBossBolt: (bolt) => this.onBossBolt(bolt),
         onGemPickup: (gem) => this.onGemPickup(gem),
         onPickup: (pickup) => this.onPickup(pickup),
       },
+      this.bossBolts,
     );
     // The four Phase 1 spell ids are also the four element ids (spec §9.1), so
     // the chosen spell is this run's element and its always-equipped default.
@@ -1755,6 +1806,7 @@ export class GameScene extends Phaser.Scene {
     );
     // Before the physics step, so a shot spent at its range cannot land a hit past it.
     this.enemyShots.update();
+    this.bossBolts.update();
     // #128: a live magnet reaches every gem on the map; Embers and consumables
     // keep to the player's own radius.
     const player = this.player;
@@ -2092,6 +2144,18 @@ export class GameScene extends Phaser.Scene {
     this.shotHpLost += this.hurtPlayer(shot.damage);
   }
 
+  /** CO-223: a boss bolt is spent on the hero it touches, whether or not the hit lands; it bursts where it hit. */
+  private onBossBolt(bolt: EnemyShot): void {
+    if (!bolt.active) return;
+    const { x, y } = bolt;
+    bolt.despawn();
+    this.fx.burst(BOSS_BOLT.hitClip, x, y);
+    const hpLost = this.hurtPlayer(bolt.damage);
+    if (hpLost <= 0) return;
+    this.volleyTally.boltHits += 1;
+    this.volleyTally.hpLost += hpLost;
+  }
+
   /**
    * Every hit the player takes, whatever dealt it (#126): `?invulnerable=1`,
    * the immunity window, the shields, then HP, with the cues on what landed.
@@ -2412,7 +2476,26 @@ export class GameScene extends Phaser.Scene {
    * CO-222: a boss skill lands. The cue and shake play wherever the hero is; the
    * hero takes `damage` if the ring reaches them, through the immunity window.
    */
-  private onBossSkill({ x, y, radius, damage }: BossSkillPayload): void {
+  private onBossSkill(payload: BossSkillPayload): void {
+    if (payload.skill === 'volley') this.onBossVolley(payload);
+    else this.onBossSlam(payload);
+  }
+
+  /** CO-223: the volley fires its bolts from the boss's spot, round the aim locked at the wind-up. */
+  private onBossVolley({ x, y, aimRad, damage, atS }: BossVolleyPayload): void {
+    this.audio.play('boss.volley');
+    this.shakeFor('bossVolley');
+    let fired = 0;
+    for (const dir of volleyBoltDirections(aimRad)) {
+      if (this.bossBolts.fireDir({ x, y }, dir, damage)) fired += 1;
+    }
+    const tally = this.volleyTally;
+    tally.volleys += 1;
+    tally.log.push({ atS, enraged: this.enemies.boss?.isEnraged ?? false, bolts: fired, aimRad });
+  }
+
+  /** CO-222: the slam hits the hero if the ring reaches them, through the immunity window. */
+  private onBossSlam({ x, y, radius, damage, atS }: BossSlamPayload): void {
     this.audio.play('boss.slam');
     this.shakeFor('bossSlam');
     this.bossSlamFx.impact(x, y);
@@ -2424,7 +2507,7 @@ export class GameScene extends Phaser.Scene {
       tally.hits += 1;
       tally.hpLost += hpLost;
     }
-    tally.log.push({ chargesBefore: this.enemies.boss?.chargesForTest ?? 0, hit, hpLost });
+    tally.log.push({ atS, chargesBefore: this.enemies.boss?.chargesForTest ?? 0, hit, hpLost });
   }
 
   /** #126: spawn the children every split this step owes; one past the live cap is dropped. */
@@ -2499,7 +2582,7 @@ export class GameScene extends Phaser.Scene {
       { width: WORLD_WIDTH, height: WORLD_HEIGHT },
       this.rng.next() * Math.PI * 2,
     );
-    this.enemies.spawnBoss(point.x, point.y);
+    this.enemies.spawnBoss(point.x, point.y, this.bossSkillRng);
     this.audio.play('boss.spawn');
     this.audio.startBossMusic();
   }

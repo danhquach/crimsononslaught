@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { MAX_LIVE_ENEMIES, type EnemyType } from '../config/enemies';
 import { UNSCALED, canSpawn, type Vec2, type WaveScale } from '../core/enemy';
+import type { Rng } from '../core/rng';
 import { Boss } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 
@@ -75,13 +76,13 @@ export class EnemyPool {
    * when none is in the group and appended to it; a call while one lives puts
    * that sprite back at full HP where asked.
    */
-  spawnBoss(x: number, y: number): Boss {
+  spawnBoss(x: number, y: number, skillRng: Rng): Boss {
     this.releaseDeadBoss();
     if (!this.bossSprite) {
       this.bossSprite = new Boss(this.group.scene);
       this.group.add(this.bossSprite, true);
     }
-    this.bossSprite.spawnBoss(x, y);
+    this.bossSprite.spawnBoss(x, y, skillRng);
     return this.bossSprite;
   }
 

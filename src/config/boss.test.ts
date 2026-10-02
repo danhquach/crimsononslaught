@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS, BOSS_CC_DR, BOSS_ENRAGE, BOSS_SKILL_ROTATION, BOSS_SKILLS, BOSS_SLAM } from './boss';
+import {
+  BOSS,
+  BOSS_CC_DR,
+  BOSS_ENRAGE,
+  BOSS_SKILL_RANGE,
+  BOSS_SKILL_ROTATION,
+  BOSS_SKILL_WEIGHTS,
+  BOSS_SKILLS,
+  BOSS_SLAM,
+} from './boss';
 import { TEXTURE_KEYS } from './colors';
 
 describe('boss stats (CO-050)', () => {
@@ -70,5 +79,15 @@ describe('boss ground slam (CO-222)', () => {
   it('has a rotation list per bar, the first holding the slam', () => {
     expect(BOSS_SKILL_ROTATION).toHaveLength(BOSS.bars);
     expect(BOSS_SKILL_ROTATION[0]).toEqual(['slam']);
+    expect(BOSS_SKILL_ROTATION[1]).toEqual(['slam', 'volley']);
+  });
+
+  it('weights every skill by how far the hero is: the slam up close, the volley far off', () => {
+    expect(BOSS_SKILL_RANGE.nearPx).toBeLessThan(BOSS_SKILL_RANGE.farPx);
+    expect(Object.keys(BOSS_SKILL_WEIGHTS).sort()).toEqual(Object.keys(BOSS_SKILLS).sort());
+    for (const row of Object.values(BOSS_SKILL_WEIGHTS))
+      for (const w of Object.values(row)) expect(w).toBeGreaterThan(0);
+    expect(BOSS_SKILL_WEIGHTS.slam).toEqual({ near: 3, mid: 1, far: 1 });
+    expect(BOSS_SKILL_WEIGHTS.volley).toEqual({ near: 1, mid: 1, far: 3 });
   });
 });

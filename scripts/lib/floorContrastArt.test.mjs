@@ -101,6 +101,8 @@ const moving = [
   ...facings('boss.telegraph'),
   ...facings('boss.slamWindup'),
   ...facings('boss.slam'),
+  ...facings('boss.volleyWindup'),
+  ...facings('boss.volley'),
   'boss.hurt.left',
   'boss.hurt.right',
   'splitter.move',

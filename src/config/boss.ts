@@ -132,13 +132,18 @@ export const BOSS_ENRAGE: Readonly<BossEnrage> = {
 };
 
 /** A boss skill (CO-222): its wind-up warning and the beat it lands in. Later skills append here. */
-export type BossSkillId = 'slam';
+export type BossSkillId = 'slam' | 'volley';
 
 export interface BossSkillTiming {
   /** Seconds the boss stands and the warning shows before the skill lands. */
   windupS: number;
   /** Seconds the skill's clip plays out after it lands. */
   activeS: number;
+  /**
+   * Seconds from a wind-up starting to the next one of this skill being allowed
+   * (CO-223); absent = no cooldown. It runs on the boss clock, so a scaled run keeps it.
+   */
+  cooldownS?: number;
 }
 
 /**
@@ -150,10 +155,67 @@ export interface BossSkillTiming {
  */
 export const BOSS_SLAM = { windupS: 1.0, activeS: 0.4, radius: 120, damage: 30 } as const;
 
-export const BOSS_SKILLS: Readonly<Record<BossSkillId, BossSkillTiming>> = { slam: BOSS_SLAM };
+/**
+ * Bolt volley (CO-223): the boss stops and turns toward the hero for `windupS`,
+ * then fires `slots` bolts at even angles round it, slot 0 along the aim locked
+ * as the wind-up began. The slots in `gapSlots` (±90° of the aim) are left
+ * empty, so two 45° gaps open to the sides: 14 bolts, each flying `boltSpeed`
+ * px/s for `boltRange` px, hitting a hero for `damage` times the enrage
+ * multiplier. A hero 120 px out stands in a gap if they sidestep within the 1.2 s
+ * warning. No RNG. `cooldownS` keeps the next volley 15 s from the wind-up's start.
+ */
+export const BOSS_VOLLEY = {
+  windupS: 1.2,
+  activeS: 0.5,
+  cooldownS: 15,
+  slots: 16,
+  gapSlots: [4, 12],
+  boltSpeed: 110,
+  boltRange: 520,
+  damage: 20,
+  boltRadius: 8,
+} as const;
+
+/**
+ * The volley bolt (CO-223): the flight clip, drawn heading right and turned to
+ * its flight, and the clip a bolt bursts in where it hits or fades; `maxLive`
+ * caps the pool (14 bolts a volley, so two volleys' worth in flight at most).
+ */
+export const BOSS_BOLT = { clip: 'boss.bolt', hitClip: 'boss.boltHit', maxLive: 32 } as const;
+
+export const BOSS_SKILLS: Readonly<Record<BossSkillId, BossSkillTiming>> = {
+  slam: BOSS_SLAM,
+  volley: BOSS_VOLLEY,
+};
 
 /**
  * Which skills the boss draws from, by bars broken (index 0 = first bar; past
- * the end, the last list). One skill leg runs between charges, picked in turn.
+ * the end, the last list). One skill leg runs between charges, picked at random
+ * from the ready ones, weighted by how far the hero is (`BOSS_SKILL_WEIGHTS`).
  */
-export const BOSS_SKILL_ROTATION: readonly (readonly BossSkillId[])[] = [['slam'], ['slam']];
+export const BOSS_SKILL_ROTATION: readonly (readonly BossSkillId[])[] = [
+  ['slam'],
+  ['slam', 'volley'],
+];
+
+/**
+ * How far the hero stands from the boss, banded (CO-223): under `nearPx` is
+ * near, over `farPx` is far, between is mid. Roughly the slam's ring (120 px)
+ * and the edge of a hero's sidestep room, a starting point to tune.
+ */
+export const BOSS_SKILL_RANGE = { nearPx: 160, farPx: 280 } as const;
+
+export type BossRangeBand = 'near' | 'mid' | 'far';
+
+/**
+ * The weight each skill carries in a roll, by the hero's band (CO-223): near,
+ * the slam is picked 3 times in 4 against the volley; far, the volley is. Only
+ * ready skills of the bar's list enter the roll; a skill's row is its own, so a
+ * later skill adds a row here.
+ */
+export const BOSS_SKILL_WEIGHTS: Readonly<
+  Record<BossSkillId, Readonly<Record<BossRangeBand, number>>>
+> = {
+  slam: { near: 3, mid: 1, far: 1 },
+  volley: { near: 1, mid: 1, far: 3 },
+};

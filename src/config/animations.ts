@@ -151,6 +151,13 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('boss.slamWarnRim', 4, 8, LOOP),
   spec('boss.slamWarnFill', 4, 8, LOOP),
   spec('boss.slamShock', 4, 10, ONCE),
+  // CO-223: the Bolt volley, paced to its 1.2 s wind-up (3 frames at 2.5 fps, holding
+  // the last, the orbs at their biggest) and 0.5 s release (the one flaring frame
+  // held). The bolt loops while it flies and its burst plays once where it ends.
+  ...facings('boss.volleyWindup', 3, 2.5, ONCE),
+  ...facings('boss.volley', 1, 2, ONCE),
+  spec('boss.bolt', 4, 10, LOOP),
+  spec('boss.boltHit', 4, 14, ONCE),
 
   // XP gem (CO-075).
   spec('gem.idle', 4, 6, LOOP),

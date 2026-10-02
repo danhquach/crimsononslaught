@@ -230,6 +230,9 @@ export const RECIPES = {
       [envelope(sweep(0.45, 110, 38), 0.004), 0.9],
       [envelope(noise(0.45, 65, 1800), 0.004), 0.6],
     ),
+  // CO-223: a rising airy whoosh over a short noise burst as the bolts leave, 0.5 s.
+  'boss.volley': () =>
+    mix([envelope(sweep(0.5, 220, 640), 0.05), 0.7], [envelope(noise(0.5, 71, 2600), 0.03), 0.6]),
   'boss.death': () =>
     mix([envelope(sweep(1.0, 300, 35), 0.02), 0.9], [envelope(noise(1.0, 43, 700), 0.02), 0.4]),
 

@@ -2302,6 +2302,35 @@
       "rows": 1,
       "sheetCell": 384,
       "rowSpecs": [[{ "anim": "slamShock", "cols": [1, 4], "centred": true }]]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-223",
+      "file": "CO-223/boss_volley.png",
+      "page": 27,
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 600,
+      "recolour": { "gamma": 0.8, "rim": "#ff8a3d" },
+      "rowSpecs": [
+        [{ "anim": "volleyWindup", "facing": "down", "cols": [1, 3] }, { "anim": "volley", "facing": "down", "cols": [4, 4] }],
+        [{ "anim": "volleyWindup", "facing": "up", "cols": [1, 3] }, { "anim": "volley", "facing": "up", "cols": [4, 4] }],
+        [{ "anim": "volleyWindup", "facing": "left", "cols": [1, 3] }, { "anim": "volley", "facing": "left", "cols": [4, 4] }],
+        [{ "anim": "volleyWindup", "facing": "right", "cols": [1, 3] }, { "anim": "volley", "facing": "right", "cols": [4, 4] }]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-223",
+      "file": "CO-223/boss_volley_fx.png",
+      "page": 27,
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 256,
+      "rowSpecs": [
+        [{ "anim": "bolt", "cols": [1, 4] }],
+        [{ "anim": "boltHit", "cols": [1, 4], "centred": true }]
+      ]
     }
   ]
 }

@@ -1,8 +1,15 @@
 import Phaser from 'phaser';
 import { BOSS, BOSS_SLAM, type BossSkillId } from '../config/boss';
-import { bossAnimation, type Clip, type EnemyPhase } from '../core/animation';
+import {
+  bossAnimation,
+  facingFromVector,
+  type Clip,
+  type EnemyPhase,
+  type Facing,
+} from '../core/animation';
 import {
   BOSS_EVENT,
+  beginWindup,
   bossMods,
   bossSkillsFor,
   enterEnrage,
@@ -10,6 +17,7 @@ import {
   slamDamage,
   startBossCycle,
   stepBossCycle,
+  volleyDamage,
   type BossBarBreakPayload,
   type BossCycle,
   type BossImmunePayload,
@@ -28,6 +36,7 @@ import {
 import type { Vec2 } from '../core/enemy';
 import type { FrostHit } from '../core/frostNova';
 import { bossBarBroke, bossBarLayers } from '../core/hudModel';
+import { createRng, type Rng } from '../core/rng';
 import { emitRunEvent } from '../core/runEvents';
 import { Enemy } from './Enemy';
 
@@ -83,6 +92,8 @@ const ENRAGE_TINT = 0xff6a6a;
  */
 export class Boss extends Enemy {
   private cycle: BossCycle = startBossCycle();
+  /** The stream the skill rolls draw from (CO-223); the run hands one in at spawn. */
+  private skillRng: Rng = createRng(0);
   /** Whether the atlas is drawing the telegraph, so the tint fallback can stand down. */
   private animated = false;
   /** Seconds this boss has been alive, run time; the clock its crowd-control windows are read on (#315). */
@@ -96,6 +107,8 @@ export class Boss extends Enemy {
   private enraged = false;
   /** Test hook (CO-222): charges begun since spawn. */
   private charges = 0;
+  /** Test hook (CO-223): a wind-up to begin at the top of the next step. */
+  private forcedSkill: { skill: BossSkillId; target: Vec2 } | null = null;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y);
@@ -135,9 +148,33 @@ export class Boss extends Enemy {
     return this.charges;
   }
 
-  /** Test hook (CO-222): end the chase now with a skill due, so the windup starts on the next step. */
-  skipToSkillForTest(): void {
-    this.cycle = { ...this.cycle, phase: 'chase', remainingS: 0, next: 'skill', skill: null };
+  /** CO-223: seconds until a volley may begin its wind-up, on the boss clock; 0 when ready. */
+  get volleyReadyInS(): number {
+    return Math.max(0, (this.cycle.readyAtS.volley ?? 0) - this.cycle.clockS);
+  }
+
+  /**
+   * Test hook (CO-222, CO-223): the boss starts `skill`'s wind-up now, aimed at
+   * `target`, whatever its list and cooldown say; the skill's cooldown starts as
+   * it would for a real wind-up.
+   */
+  skipToSkillForTest(skill: BossSkillId, target: Readonly<Vec2>): void {
+    // Begun at the top of the next step, not here, so the clip, tint and warning
+    // all change on the same frame as the phase, as for a real wind-up.
+    this.forcedSkill = { skill, target: { x: target.x, y: target.y } };
+  }
+
+  /** CO-223: the angle a skill's wind-up locked its aim at, radians; 0 when nothing locked it. */
+  get skillAimRad(): number {
+    return Math.atan2(this.cycle.skillDir.y, this.cycle.skillDir.x);
+  }
+
+  /** CO-223: the volley's aim faces the boss through its wind-up and landing; otherwise its last move. */
+  protected override get facingDir(): Facing {
+    const { phase, skill, skillDir } = this.cycle;
+    if (skill === 'volley' && (phase === 'windup' || phase === 'skill'))
+      return facingFromVector(skillDir, super.facingDir);
+    return super.facingDir;
   }
 
   /** Test hook (CO-221): the boss clock, which advances only as the boss steers. */
@@ -146,9 +183,11 @@ export class Boss extends Enemy {
   }
 
   /** Come alive at (x, y) at full HP with the cycle at its start. */
-  spawnBoss(x: number, y: number): void {
+  spawnBoss(x: number, y: number, skillRng: Rng): void {
     this.cycle = startBossCycle();
+    this.skillRng = skillRng;
     this.charges = 0;
+    this.forcedSkill = null;
     this.clockS = 0;
     this.cc = NO_BOSS_CC;
     this.lastImmuneS = -Infinity;
@@ -238,8 +277,22 @@ export class Boss extends Enemy {
     const wasFlashing = this.flashing;
     const before = this.cycle.phase;
     const from = { x: this.x, y: this.y };
+    if (this.forcedSkill) {
+      const { skill, target: aim } = this.forcedSkill;
+      this.forcedSkill = null;
+      this.cycle = beginWindup(this.cycle, skill, this.cycle.clockS, from, aim);
+    }
     const skills = bossSkillsFor(BOSS.bars - this.barsLeft);
-    const step = stepBossCycle(this.cycle, deltaS, this, target, speedFactor, this.enraged, skills);
+    const step = stepBossCycle(
+      this.cycle,
+      deltaS,
+      this,
+      target,
+      speedFactor,
+      this.enraged,
+      skills,
+      () => this.skillRng.next(),
+    );
     this.cycle = step.cycle;
     if (this.cycle.phase === 'charge' && before !== 'charge') this.charges += 1;
     if (this.flashing !== wasFlashing) this.refreshTint();
@@ -250,14 +303,12 @@ export class Boss extends Enemy {
     // The slam lands where the boss stood at the frame's start: it holds still
     // through a wind-up, so only a frame long enough to also span the chase
     // before it (a scaled clock) lands it short of where the boss ends up.
-    for (const { skill } of step.impacts) {
-      const payload: BossSkillPayload = {
-        skill,
-        x: from.x,
-        y: from.y,
-        radius: BOSS_SLAM.radius,
-        damage: slamDamage(this.enraged),
-      };
+    for (const { skill, aim, atS } of step.impacts) {
+      const base = { x: from.x, y: from.y, atS };
+      const payload: BossSkillPayload =
+        skill === 'volley'
+          ? { ...base, skill, aimRad: Math.atan2(aim.y, aim.x), damage: volleyDamage(this.enraged) }
+          : { ...base, skill, radius: BOSS_SLAM.radius, damage: slamDamage(this.enraged) };
       this.scene.events.emit(BOSS_EVENT.skill, payload);
     }
     return step.velocity;
