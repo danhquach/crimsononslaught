@@ -14,6 +14,8 @@ import {
   FX_ALPHA,
   DASH_DEPTH,
   BOSS_AURA_DEPTH,
+  BOSS_CHAIN_FX,
+  BOSS_TRAIL_DEPTH,
   BOSS_SLAM_FX,
   BOSS_SLAM_WARN_DEPTH,
   ELITE_MARK_DEPTH,
@@ -27,7 +29,7 @@ import {
   SPIN_BASE_ORBIT_SPEED,
   TELEGRAPH_SCALE_RADIUS,
 } from './fx';
-import { BOSS_BOLT, BOSS_VOLLEY } from './boss';
+import { BOSS, BOSS_BOLT, BOSS_VOLLEY } from './boss';
 import { PLACEHOLDERS } from './colors';
 import { ART_BOXES } from './frames';
 import { BASE_EARTH_SHIELD_STATS } from './shields';
@@ -154,5 +156,29 @@ describe('Boss summon art (CO-224)', () => {
     }
     expect(names.has('boss.summonCircle')).toBe(true);
     expect(names.has('boss.summonBurst')).toBe(true);
+  });
+});
+
+describe('Boss chain charge art (CO-225)', () => {
+  it('draws the trail long and thin, about its configured length, and both clips exist', () => {
+    const trail = ART_BOXES[BOSS_CHAIN_FX.trail];
+    expect(trail.w).toBeGreaterThanOrEqual(3 * trail.h);
+    expect(trail.w).toBeGreaterThanOrEqual(BOSS_CHAIN_FX.trailLengthPx - 20);
+    expect(trail.w).toBeLessThanOrEqual(BOSS_CHAIN_FX.trailLengthPx + 20);
+    const names = new Set(ANIMATIONS.map((anim) => anim.name));
+    expect(names.has(BOSS_CHAIN_FX.trail)).toBe(true);
+    expect(names.has(BOSS_CHAIN_FX.flash)).toBe(true);
+  });
+
+  it('draws the glint roughly square, wider than the boss body', () => {
+    const flash = ART_BOXES[BOSS_CHAIN_FX.flash];
+    expect(Math.abs(flash.w - flash.h)).toBeLessThanOrEqual(0.2 * flash.w);
+    expect(BOSS_CHAIN_FX.flashPx).toBeGreaterThan(BOSS.radius * 2);
+  });
+
+  it('lays the trail over the aura and slam warning, under the dash and every entity', () => {
+    expect(BOSS_TRAIL_DEPTH).toBeGreaterThan(BOSS_AURA_DEPTH);
+    expect(BOSS_TRAIL_DEPTH).toBeGreaterThan(BOSS_SLAM_WARN_DEPTH);
+    expect(BOSS_TRAIL_DEPTH).toBeLessThan(DASH_DEPTH);
   });
 });

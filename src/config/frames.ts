@@ -42,6 +42,7 @@ export const ATLAS_PAGES = [
   { key: 'props26', texture: 'assets/atlas/props26.png', data: 'assets/atlas/props26.json' },
   { key: 'props27', texture: 'assets/atlas/props27.png', data: 'assets/atlas/props27.json' },
   { key: 'props28', texture: 'assets/atlas/props28.png', data: 'assets/atlas/props28.json' },
+  { key: 'props29', texture: 'assets/atlas/props29.png', data: 'assets/atlas/props29.json' },
 ] as const satisfies readonly AtlasPage[];
 
 /** Texture key of an atlas page. */
@@ -80,6 +81,14 @@ export const FRAMES = {
   'boss.boltHit.1': { w: 48, h: 48, anchorX: 24, anchorY: 24, page: 'props27' },
   'boss.boltHit.2': { w: 48, h: 48, anchorX: 24, anchorY: 24, page: 'props27' },
   'boss.boltHit.3': { w: 48, h: 48, anchorX: 24, anchorY: 24, page: 'props27' },
+  'boss.chainFlash.0': { w: 148, h: 140, anchorX: 74, anchorY: 70, page: 'props29' },
+  'boss.chainFlash.1': { w: 148, h: 140, anchorX: 74, anchorY: 70, page: 'props29' },
+  'boss.chainFlash.2': { w: 148, h: 140, anchorX: 74, anchorY: 70, page: 'props29' },
+  'boss.chainFlash.3': { w: 148, h: 140, anchorX: 74, anchorY: 70, page: 'props29' },
+  'boss.chainTrail.0': { w: 146, h: 46, anchorX: 73, anchorY: 23, page: 'props29' },
+  'boss.chainTrail.1': { w: 146, h: 46, anchorX: 73, anchorY: 23, page: 'props29' },
+  'boss.chainTrail.2': { w: 146, h: 46, anchorX: 73, anchorY: 23, page: 'props29' },
+  'boss.chainTrail.3': { w: 146, h: 46, anchorX: 73, anchorY: 23, page: 'props29' },
   'boss.charge.down.0': { w: 93, h: 94, anchorX: 48, anchorY: 48, page: 'props2' },
   'boss.charge.down.1': { w: 93, h: 94, anchorX: 48, anchorY: 48, page: 'props2' },
   'boss.charge.left.0': { w: 82, h: 94, anchorX: 34, anchorY: 46, page: 'props2' },
@@ -909,6 +918,8 @@ export const ART_BOXES = {
   'arena.tree': { x: 1, y: 1, w: 47, h: 45 },
   'boss.bolt': { x: 1, y: 1, w: 48, h: 16 },
   'boss.boltHit': { x: 2, y: 2, w: 44, h: 43 },
+  'boss.chainFlash': { x: 2, y: 2, w: 143, h: 134 },
+  'boss.chainTrail': { x: 2, y: 3, w: 141, h: 40 },
   'boss.charge.down': { x: 1, y: 1, w: 91, h: 92 },
   'boss.charge.left': { x: 1, y: 1, w: 80, h: 92 },
   'boss.charge.right': { x: 1, y: 1, w: 83, h: 92 },

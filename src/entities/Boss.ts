@@ -58,6 +58,19 @@ const SUMMON_RING = [
   BOSS_SUMMON.circleRadius,
 ] as const;
 
+/** CO-225: one line per telegraph that ended, for the e2e hook; `from` and `target` are what the lock aimed between. */
+export interface BossChainLogEntry {
+  readonly atS: number;
+  readonly telegraphAtS: number;
+  readonly dir: Vec2;
+  readonly chained: boolean;
+  readonly link: number;
+  readonly chainLength: number;
+  readonly enraged: boolean;
+  readonly from: Vec2;
+  readonly target: Vec2;
+}
+
 /** #388: the red an enraged placeholder ring is multiplied by; with the atlas the aura says it instead. */
 const ENRAGE_TINT = 0xff6a6a;
 
@@ -98,6 +111,9 @@ const ENRAGE_TINT = 0xff6a6a;
  * it enraged for the rest of the fight (`BOSS_ENRAGE`): harder contact, faster,
  * a shorter chase between charges, and it takes more damage. It tells the run
  * once through `BOSS_EVENT.enrage`; the crossing hit itself is not amplified.
+ * Enraged, its charge leg is a chain of `BOSS_CHAIN` charges, 2 for now (CO-225):
+ * each charge after the first is warned for 0.4 s with the boss facing the
+ * hero, and locks toward where the hero stands as that warning ends.
  *
  * All the decisions live in `core/boss.ts`; this class only moves the sprite.
  */
@@ -124,6 +140,10 @@ export class Boss extends Enemy {
   private charges = 0;
   /** Test hook (CO-223): a wind-up to begin at the top of the next step. */
   private forcedSkill: { skill: BossSkillId; target: Vec2 } | null = null;
+  /** Test hook (CO-225): a line per telegraph that ended, newest last. */
+  private readonly chainLog: BossChainLogEntry[] = [];
+  /** CO-225: where the hero stood at the last step, so a chained telegraph can face it. */
+  private heroAt: Vec2 | null = null;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y);
@@ -156,6 +176,21 @@ export class Boss extends Enemy {
   /** CO-222: seconds of the wind-up left on the boss clock, 0 outside one. */
   get windupLeftS(): number {
     return this.cycle.phase === 'windup' ? this.cycle.remainingS : 0;
+  }
+
+  /** CO-225: the unit direction of the charge, locked as its telegraph ended; zero outside a charge. */
+  get chargeDir(): Vec2 {
+    return this.cycle.chargeDir;
+  }
+
+  /** CO-225: whether the telegraph now showing is a chained one (the second or later charge of a chain). */
+  get isChainedTelegraph(): boolean {
+    return this.cycle.phase === 'telegraph' && this.cycle.link > 0;
+  }
+
+  /** Test hook (CO-225): a copy of the lock log, one line per telegraph that ended since spawn. */
+  get chainLogForTest(): BossChainLogEntry[] {
+    return this.chainLog.map((entry) => ({ ...entry }));
   }
 
   /** Test hook (CO-222): charges begun since spawn. */
@@ -196,11 +231,20 @@ export class Boss extends Enemy {
     return Math.atan2(this.cycle.skillDir.y, this.cycle.skillDir.x);
   }
 
-  /** CO-223: a skill's aim faces the boss through its wind-up and landing; otherwise its last move. */
+  /**
+   * CO-223: a skill's aim faces the boss through its wind-up and landing;
+   * CO-225: a chained telegraph faces the hero it is about to charge at, not the
+   * line of the charge before; otherwise its last move.
+   */
   protected override get facingDir(): Facing {
     const { phase, skill, skillDir } = this.cycle;
     if (skill !== null && (phase === 'windup' || phase === 'skill'))
       return facingFromVector(skillDir, super.facingDir);
+    if (this.isChainedTelegraph && this.heroAt)
+      return facingFromVector(
+        { x: this.heroAt.x - this.x, y: this.heroAt.y - this.y },
+        super.facingDir,
+      );
     return super.facingDir;
   }
 
@@ -222,6 +266,8 @@ export class Boss extends Enemy {
     this.summonSpots = null;
     this.charges = 0;
     this.forcedSkill = null;
+    this.chainLog.length = 0;
+    this.heroAt = null;
     this.clockS = 0;
     this.cc = NO_BOSS_CC;
     this.lastImmuneS = -Infinity;
@@ -311,6 +357,7 @@ export class Boss extends Enemy {
     const wasFlashing = this.flashing;
     const before = this.cycle.phase;
     const from = { x: this.x, y: this.y };
+    this.heroAt = { x: target.x, y: target.y };
     if (this.forcedSkill) {
       const { skill, target: aim } = this.forcedSkill;
       this.forcedSkill = null;
@@ -334,8 +381,15 @@ export class Boss extends Enemy {
     if (windupBegan) this.lockSummonSpots(from);
     if (this.cycle.phase === 'charge' && before !== 'charge') this.charges += 1;
     if (this.flashing !== wasFlashing) this.refreshTint();
+    for (const lock of step.locks)
+      this.chainLog.push({
+        ...lock,
+        enraged: this.enraged,
+        from,
+        target: { x: target.x, y: target.y },
+      });
     if (this.cycle.phase !== before) {
-      const payload: BossPhasePayload = { phase: this.cycle.phase };
+      const payload: BossPhasePayload = { phase: this.cycle.phase, chained: this.cycle.link > 0 };
       this.scene.events.emit(BOSS_EVENT.phase, payload);
     }
     // The slam lands where the boss stood at the frame's start: it holds still

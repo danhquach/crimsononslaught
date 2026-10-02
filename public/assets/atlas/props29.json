@@ -1,0 +1,173 @@
+{
+  "frames": {
+    "boss.chainFlash.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 148,
+        "h": 140
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 148,
+        "h": 140
+      },
+      "sourceSize": {
+        "w": 148,
+        "h": 140
+      }
+    },
+    "boss.chainFlash.1": {
+      "frame": {
+        "x": 150,
+        "y": 1,
+        "w": 148,
+        "h": 140
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 148,
+        "h": 140
+      },
+      "sourceSize": {
+        "w": 148,
+        "h": 140
+      }
+    },
+    "boss.chainFlash.2": {
+      "frame": {
+        "x": 299,
+        "y": 1,
+        "w": 148,
+        "h": 140
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 148,
+        "h": 140
+      },
+      "sourceSize": {
+        "w": 148,
+        "h": 140
+      }
+    },
+    "boss.chainFlash.3": {
+      "frame": {
+        "x": 448,
+        "y": 1,
+        "w": 148,
+        "h": 140
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 148,
+        "h": 140
+      },
+      "sourceSize": {
+        "w": 148,
+        "h": 140
+      }
+    },
+    "boss.chainTrail.0": {
+      "frame": {
+        "x": 597,
+        "y": 1,
+        "w": 146,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 146,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 146,
+        "h": 46
+      }
+    },
+    "boss.chainTrail.1": {
+      "frame": {
+        "x": 744,
+        "y": 1,
+        "w": 146,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 146,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 146,
+        "h": 46
+      }
+    },
+    "boss.chainTrail.2": {
+      "frame": {
+        "x": 891,
+        "y": 1,
+        "w": 146,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 146,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 146,
+        "h": 46
+      }
+    },
+    "boss.chainTrail.3": {
+      "frame": {
+        "x": 1038,
+        "y": 1,
+        "w": 146,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 146,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 146,
+        "h": 46
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 256
+    },
+    "scale": "1"
+  }
+}

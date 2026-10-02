@@ -202,7 +202,7 @@ import { rosterBaseStats } from '../config/rosterBaseStats';
 import { rosterCards } from '../config/rosterCards';
 import type { ShieldSpellId } from '../config/shields';
 import type { SpellStatBlock } from '../config/spellFields';
-import { Boss } from '../entities/Boss';
+import { Boss, type BossChainLogEntry } from '../entities/Boss';
 import { Enemy } from '../entities/Enemy';
 import type { EnemyShot } from '../entities/EnemyShot';
 import { Player } from '../entities/Player';
@@ -244,6 +244,7 @@ import { FxPool } from '../systems/FxPool';
 import { GemPool } from '../systems/GemPool';
 import { PickupPool } from '../systems/PickupPool';
 import { OverlayPool } from '../systems/OverlayPool';
+import { BossChainFx } from '../systems/BossChainFx';
 import { BossEnrageFx } from '../systems/BossEnrageFx';
 import { BossSlamFx } from '../systems/BossSlamFx';
 import { BossSummonFx } from '../systems/BossSummonFx';
@@ -477,6 +478,8 @@ export class GameScene extends Phaser.Scene {
   private overlays!: OverlayPool;
   /** #126: the mark under every live elite. */
   private eliteMarks!: EliteMarkPool;
+  /** CO-225: the enraged boss's charge trail and chained-telegraph glint. */
+  private bossChainFx!: BossChainFx;
   /** #388: the enraged boss's ember ring and burst. */
   private bossEnrageFx!: BossEnrageFx;
   private bossSlamFx!: BossSlamFx;
@@ -742,6 +745,15 @@ export class GameScene extends Phaser.Scene {
       circlesVisible: number;
       points: { x: number; y: number }[];
     };
+    chain: {
+      log: BossChainLogEntry[];
+      trailVisible: boolean;
+      trailClip: string | null;
+      trailRotation: number;
+      flashPlays: number;
+      chargeDir: { x: number; y: number };
+      chained: boolean;
+    };
     auraVisible: boolean;
     auraClip: string | null;
     burstPlays: number;
@@ -780,6 +792,15 @@ export class GameScene extends Phaser.Scene {
         readyInS: boss.readyInS('summon'),
         circlesVisible: this.bossSummonFx.circlesVisible,
         points: boss.lockedSummonPoints.map(({ x, y }) => ({ x, y })),
+      },
+      chain: {
+        log: boss.chainLogForTest,
+        trailVisible: this.bossChainFx.trailVisible,
+        trailClip: this.bossChainFx.trailClip,
+        trailRotation: this.bossChainFx.trailRotation,
+        flashPlays: this.bossChainFx.flashPlays,
+        chargeDir: { x: boss.chargeDir.x, y: boss.chargeDir.y },
+        chained: boss.isChainedTelegraph,
       },
       auraVisible: this.bossEnrageFx.auraVisible,
       auraClip: this.bossEnrageFx.auraClip,
@@ -1548,6 +1569,7 @@ export class GameScene extends Phaser.Scene {
     this.numbers = new DamageNumberPool(this);
     this.overlays = new OverlayPool(this);
     this.eliteMarks = new EliteMarkPool(this);
+    this.bossChainFx = new BossChainFx(this);
     this.bossEnrageFx = new BossEnrageFx(this);
     this.bossSlamFx = new BossSlamFx(this);
     this.bossSummonFx = new BossSummonFx(this);
@@ -1611,13 +1633,19 @@ export class GameScene extends Phaser.Scene {
     };
     this.events.on(RUN_EVENT.phase, onPhase);
     // The boss's wind-up and charge cues (CO-102) follow its cycle events.
-    const onBossPhase = ({ phase }: BossPhasePayload): void => {
+    const onBossPhase = ({ phase, chained }: BossPhasePayload): void => {
       // CO-222: a skill's windup is the same warning cue as the charge's telegraph.
       if (phase === 'telegraph' || phase === 'windup') this.audio.play('boss.telegraph');
       else if (phase === 'charge') {
         this.audio.play('boss.charge');
         this.shakeFor('bossCharge');
       }
+
+      // CO-225: a chained telegraph also flashes a glint over the boss. Its cue is the same
+      // one: chained telegraphs come 1.0 s apart, so the 300 ms cue throttle drops none at
+      // timeScale 1 (at ?timeScale=4 they are 250 ms apart in real time, and some are dropped).
+      if (phase === 'telegraph' && chained && this.enemies.boss)
+        this.bossChainFx.flash(this.enemies.boss);
     };
     this.events.on(BOSS_EVENT.phase, onBossPhase);
     // CO-222: the boss's skill landing: the cue and shake, then the hero takes it if in reach.
@@ -1890,6 +1918,7 @@ export class GameScene extends Phaser.Scene {
     // drawn this frame; one not in the live set — status over, host dead — is freed.
     this.overlays.update(this.enemies.live);
     this.eliteMarks.update(this.enemies.live);
+    this.bossChainFx.update(this.enemies.boss);
     this.bossEnrageFx.update(this.enemies.boss);
     this.bossSlamFx.update(this.enemies.boss);
     this.bossSummonFx.update(this.enemies.boss);

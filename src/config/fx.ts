@@ -225,6 +225,24 @@ export const BOSS_SUMMON_FX = {
 } as const;
 
 /**
+ * CO-225: the enraged boss's chain charge. A red streak trails behind every
+ * enraged charge (the art is drawn heading right, so it is turned to the
+ * charge's direction); its head sits `trailBackPx` behind the boss's centre
+ * along the line it charges on and the sprite is drawn `trailLengthPx` long.
+ * A four-spike glint plays once over the boss on each chained telegraph, drawn
+ * `flashPx` wide. The trail lies over the aura and the slam warning and under
+ * the dash and every entity.
+ */
+export const BOSS_CHAIN_FX = {
+  trail: 'boss.chainTrail',
+  flash: 'boss.chainFlash',
+  trailLengthPx: 140,
+  trailBackPx: 60,
+  flashPx: 90,
+} as const;
+export const BOSS_TRAIL_DEPTH = -0.12;
+
+/**
  * The dash's afterimages and wisps (#384) lie just under the hero, over the
  * ground areas and the elite marks and under the entities drawn at depth 0, so
  * the trail never covers the hero it follows.

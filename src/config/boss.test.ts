@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BOSS,
   BOSS_CC_DR,
+  BOSS_CHAIN,
   BOSS_ENRAGE,
   BOSS_SKILL_RANGE,
   BOSS_SKILL_ROTATION,
@@ -120,5 +121,14 @@ describe('boss ground slam (CO-222)', () => {
     const row = [...WAVES].reverse().find((wave) => wave.types.length > 0);
     expect(BOSS_SUMMON.scale).toEqual({ hpMul: row?.hpMul, damageMul: row?.damageMul });
     expect(BOSS_SUMMON.scale.hpMul).toBeGreaterThan(1);
+  });
+});
+
+describe('boss chain charge (CO-225)', () => {
+  it('chains two charges for now, the second warned for less than the first telegraph', () => {
+    expect(BOSS_CHAIN.minCharges).toBe(2);
+    expect(BOSS_CHAIN.maxCharges).toBe(2);
+    expect(BOSS_CHAIN.telegraphS).toBeGreaterThan(0.25);
+    expect(BOSS_CHAIN.telegraphS).toBeLessThan(BOSS.telegraphS);
   });
 });

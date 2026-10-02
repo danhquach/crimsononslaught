@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRng } from './rng';
 import {
   BOSS,
+  BOSS_CHAIN,
   BOSS_ENRAGE,
   BOSS_SLAM,
   BOSS_SUMMON,
@@ -10,10 +11,12 @@ import {
 } from '../config/boss';
 import {
   BOSS_EVENT,
+  beginWindup,
   bossEnraged,
   bossMods,
   bossRangeBand,
   bossSkillsFor,
+  chainChargeCount,
   enrageThresholdHp,
   enterEnrage,
   phaseLengthS,
@@ -53,6 +56,9 @@ describe('startBossCycle (CO-050)', () => {
       skillDir: { x: 0, y: 0 },
       clockS: 0,
       readyAtS: {},
+      chainLength: 1,
+      link: 0,
+      telegraphAtS: 0,
     });
     expect(CHASE_S).toBeCloseTo(2.6, 9);
   });
@@ -115,6 +121,7 @@ describe('stepBossCycle phases', () => {
         cycle: start,
         velocity: { x: 0, y: 0 },
         impacts: [],
+        locks: [],
       });
     }
   });
@@ -254,12 +261,15 @@ describe('boss enrage (#388)', () => {
     expect(phaseLengthS('charge', true)).toBe(BOSS.chargeS);
   });
 
-  it('keeps a 2.8 s period across a long frame', () => {
+  it('keeps the chain-leg period across a long frame: 1.4 s chase, then the chain', () => {
     const cycle: BossCycle = { ...startBossCycle(), remainingS: ENRAGED_CHASE_S };
-    // Ten whole enraged cycles and 0.5 s: back to chase, 0.5 s in.
+    // The default rand (0) draws two charges: 1.4 + 0.8 + 0.6 + (0.4 + 0.6) = 3.8 s a leg.
+    const period = ENRAGED_CHASE_S + 0.8 + 0.6 + (BOSS_CHAIN.telegraphS + 0.6);
+    expect(period).toBeCloseTo(3.8, 9);
+    // The skill leg between them is empty (`skills = []`), so every leg is a charge leg.
     const { cycle: after } = stepBossCycle(
       cycle,
-      2.8 * 10 + 0.5,
+      period * 10 + 0.5,
       ORIGIN,
       { x: 100, y: 0 },
       1,
@@ -789,4 +799,249 @@ describe('boss summon (CO-224)', () => {
       expect(impacts.length).toBeGreaterThanOrEqual(2);
     });
   }
+});
+
+describe('calm cycle is unchanged (CO-225)', () => {
+  const ALL: readonly BossSkillId[] = ['slam', 'volley', 'summon'];
+
+  /**
+   * Calm boss, 180 s, `createRng(11)`, all skills: a readable summary of the
+   * whole run. Pinned on the code before the chain charge existed, so a calm
+   * boss provably still behaves as it did. To regenerate (only for a change
+   * meant to alter calm behaviour): log `summary(...)` and paste it below.
+   */
+  function summary(stepS: number, heroX: number) {
+    const rng = createRng(11);
+    const hero = { x: heroX, y: 0 };
+    let cycle = startBossCycle();
+    let transitions = 0;
+    let vx = 0;
+    let vy = 0;
+    const impacts: string[] = [];
+    for (let t = 0; t < 180 - 1e-9; t += stepS) {
+      const step = stepBossCycle(cycle, stepS, ORIGIN, hero, 1, false, ALL, () => rng.next());
+      if (step.cycle.phase !== cycle.phase) transitions += 1;
+      cycle = step.cycle;
+      vx += step.velocity.x * stepS;
+      vy += step.velocity.y * stepS;
+      for (const hit of step.impacts) impacts.push(`${hit.skill}@${hit.atS.toFixed(3)}`);
+    }
+    return {
+      transitions,
+      dist: `${vx.toFixed(3)},${vy.toFixed(3)}`,
+      end: `${cycle.phase} ${cycle.remainingS.toFixed(9)} ${cycle.next} ${cycle.clockS.toFixed(3)}`,
+      impacts: impacts.slice(0, 8),
+      impactCount: impacts.length,
+    };
+  }
+
+  const PINNED = {
+    a: {
+      transitions: 133,
+      dist: '13470.000,0.000',
+      end: 'telegraph 0.700000000 charge 180.000',
+      impacts: [
+        'slam@7.600',
+        'slam@15.600',
+        'volley@23.800',
+        'slam@31.900',
+        'summon@39.900',
+        'slam@48.100',
+        'slam@56.100',
+        'slam@64.100',
+      ],
+      impactCount: 22,
+    },
+    b: {
+      transitions: 130,
+      dist: '13288.000,0.000',
+      end: 'windup 0.200000000 skill 180.000',
+      impacts: [
+        'volley@7.800',
+        'summon@15.900',
+        'volley@24.300',
+        'summon@32.400',
+        'volley@40.800',
+        'summon@48.900',
+        'slam@57.100',
+        'volley@65.300',
+      ],
+      impactCount: 21,
+    },
+  };
+
+  it('matches the pinned run at 1/60 s frames, hero 100 and 400 px out', () => {
+    expect(summary(1 / 60, 100)).toEqual(PINNED.a);
+    expect(summary(1 / 60, 400)).toEqual(PINNED.b);
+  });
+
+  it('matches the same pinned run at 3 s frames, transitions aside', () => {
+    expect(summary(3, 100)).toEqual({ ...PINNED.a, transitions: 41 });
+    expect(summary(3, 400)).toEqual({ ...PINNED.b, transitions: 40 });
+  });
+
+  it('draws nothing from rand when calm with no skills', () => {
+    let draws = 0;
+    let cycle = startBossCycle();
+    for (let t = 0; t < 60; t += 0.05)
+      cycle = stepBossCycle(cycle, 0.05, ORIGIN, { x: 100, y: 0 }, 1, false, [], () => {
+        draws += 1;
+        return 0.5;
+      }).cycle;
+    expect(draws).toBe(0);
+  });
+});
+
+describe('chain charge (CO-225)', () => {
+  const ENRAGED_CHASE_S = 1.4;
+  const unit = (dx: number, dy: number) => {
+    const d = Math.hypot(dx, dy);
+    return { x: dx / d, y: dy / d };
+  };
+
+  /** An enraged cycle at the start of a chase, stepped in `stepS` slices; `rand` is counted. */
+  function run(
+    totalS: number,
+    stepS: number,
+    draw: number,
+    targetAt: (t: number) => { x: number; y: number } = () => ({ x: 100, y: 0 }),
+  ) {
+    let cycle: BossCycle = { ...startBossCycle(), remainingS: ENRAGED_CHASE_S };
+    const phases: string[] = [];
+    const locks: ReturnType<typeof stepBossCycle>['locks'][number][] = [];
+    const targets: { x: number; y: number }[] = [];
+    let draws = 0;
+    let dist = 0;
+    for (let t = 0; t < totalS - 1e-9; t += stepS) {
+      const target = targetAt(t);
+      const step = stepBossCycle(cycle, stepS, ORIGIN, target, 1, true, [], () => {
+        draws += 1;
+        return draw;
+      });
+      for (const lock of step.locks) {
+        locks.push(lock);
+        targets.push(target);
+      }
+      dist += Math.hypot(step.velocity.x, step.velocity.y) * stepS;
+      cycle = step.cycle;
+      if (phases[phases.length - 1] !== cycle.phase) phases.push(cycle.phase);
+    }
+    return { phases, locks, targets, draws, dist, cycle };
+  }
+
+  it('counts BOSS_CHAIN.maxCharges (2) whatever rand draws, with one draw', () => {
+    let draws = 0;
+    const count = (value: number) =>
+      chainChargeCount(() => {
+        draws += 1;
+        return value;
+      });
+    expect([0, 0.4999, 0.5, 0.99999, 1].map(count)).toEqual([2, 2, 2, 2, 2]);
+    expect(draws).toBe(5);
+  });
+
+  it('runs chase, telegraph, charge, telegraph, charge, chase for two charges', () => {
+    const { phases, locks } = run(3.8 + 0.2, 0.01, 0);
+    expect(phases).toEqual(['chase', 'telegraph', 'charge', 'telegraph', 'charge', 'chase']);
+    expect(locks).toHaveLength(2);
+  });
+
+  it('never chains past maxCharges when rand draws high', () => {
+    const { phases, locks } = run(3.8 + 0.2, 0.01, 0.9);
+    expect(phases).toEqual(['chase', 'telegraph', 'charge', 'telegraph', 'charge', 'chase']);
+    expect(locks.map((l) => [l.link, l.chainLength])).toEqual([
+      [0, BOSS_CHAIN.maxCharges],
+      [1, BOSS_CHAIN.maxCharges],
+    ]);
+  });
+
+  it('warns 0.8 s before the first charge and 0.4 s before each chained one', () => {
+    const { locks } = run(5, 0.01, 0.9);
+    expect(locks.map((l) => l.chained)).toEqual([false, true]);
+    for (const lock of locks) {
+      const warn = lock.link === 0 ? BOSS.telegraphS : BOSS_CHAIN.telegraphS;
+      expect(lock.atS - lock.telegraphAtS).toBeCloseTo(warn, 9);
+    }
+    // The next telegraph begins as the charge before it ends, 0.6 s after its lock.
+    expect((locks[1] as { telegraphAtS: number }).telegraphAtS).toBeCloseTo(
+      (locks[0] as { atS: number }).atS + BOSS.chargeS,
+      9,
+    );
+  });
+
+  it('draws once per chain from rand, and never when calm', () => {
+    expect(run(ENRAGED_CHASE_S + 0.8 + 0.6 + 1.0 + 0.1, 0.01, 0).draws).toBe(1);
+    // Three full chains of two: 3 x 3.8 s, 1.4 s chase in.
+    expect(run(3.8 * 3 + 0.1, 0.01, 0).draws).toBe(3);
+    let calmDraws = 0;
+    let cycle = startBossCycle();
+    for (let t = 0; t < 30; t += 0.05)
+      cycle = stepBossCycle(cycle, 0.05, ORIGIN, { x: 100, y: 0 }, 1, false, [], () => {
+        calmDraws += 1;
+        return 0.5;
+      }).cycle;
+    expect(calmDraws).toBe(0);
+  });
+
+  it('re-aims each chained charge at where the hero stands as its telegraph ends', () => {
+    // The hero walks along +y: every lock must follow it, so no two directions repeat.
+    const { locks, targets } = run(5, 0.01, 0.9, (t) => ({ x: 100, y: 60 * t }));
+    expect(locks).toHaveLength(2);
+    locks.forEach((lock, i) => {
+      const t = targets[i] as { x: number; y: number };
+      const want = unit(t.x, t.y);
+      expect(lock.dir.x).toBeCloseTo(want.x, 9);
+      expect(lock.dir.y).toBeCloseTo(want.y, 9);
+    });
+    expect(locks[1]?.dir.y).toBeGreaterThan(locks[0]?.dir.y as number);
+  });
+
+  it('a long frame reports every lock once and moves the boss as the small frames do', () => {
+    const small = run(10, 1 / 60, 0.9);
+    const long = run(10, 10, 0.9);
+    expect(long.locks).toHaveLength(small.locks.length);
+    expect(long.locks.map((l) => [l.link, l.chainLength])).toEqual(
+      small.locks.map((l) => [l.link, l.chainLength]),
+    );
+    expect(long.draws).toBe(small.draws);
+    // 520 px/s for 0.6 s per charge, plus the chase legs: a single 10 s frame averages the
+    // velocity, so compare the straight-line distance the whole frame asks for.
+    const charges = small.locks.length;
+    expect(long.dist).toBeCloseTo(small.dist, 3);
+    expect(charges).toBeGreaterThanOrEqual(2);
+  });
+
+  it('an enrage mid-telegraph leaves that charge single, then a chain starts the leg after', () => {
+    let cycle: BossCycle = startBossCycle();
+    // Calm: into the first telegraph.
+    for (let t = 0; t < 2.7; t += 0.05)
+      cycle = stepBossCycle(cycle, 0.05, ORIGIN, { x: 100, y: 0 }, 1, false).cycle;
+    expect(cycle.phase).toBe('telegraph');
+    const enraged = enterEnrage(cycle);
+    expect(enraged).toBe(cycle);
+    expect(enraged.chainLength).toBe(1);
+    const phases: string[] = [];
+    for (let t = 0; t < 1.6; t += 0.05) {
+      cycle = stepBossCycle(cycle, 0.05, ORIGIN, { x: 100, y: 0 }, 1, true).cycle;
+      if (phases[phases.length - 1] !== cycle.phase) phases.push(cycle.phase);
+    }
+    expect(phases).toEqual(['telegraph', 'charge', 'chase']);
+  });
+
+  it('a forced wind-up mid-chain drops the rest of the chain', () => {
+    let cycle: BossCycle = { ...startBossCycle(), remainingS: ENRAGED_CHASE_S };
+    for (let t = 0; t < 2.9; t += 0.05)
+      cycle = stepBossCycle(cycle, 0.05, ORIGIN, { x: 100, y: 0 }, 1, true, [], () => 0.9).cycle;
+    expect(cycle.chainLength).toBe(BOSS_CHAIN.maxCharges);
+    expect(cycle.link).toBeGreaterThan(0);
+    const forced = beginWindup(cycle, 'slam', cycle.clockS, ORIGIN, { x: 100, y: 0 });
+    expect(forced.chainLength).toBe(1);
+    expect(forced.link).toBe(0);
+  });
+
+  it('phaseLengthS gives the chained telegraph only when asked', () => {
+    expect(phaseLengthS('telegraph', true, null, true)).toBe(BOSS_CHAIN.telegraphS);
+    expect(phaseLengthS('telegraph', true)).toBe(BOSS.telegraphS);
+    expect(phaseLengthS('charge', true, null, true)).toBe(BOSS.chargeS);
+  });
 });
