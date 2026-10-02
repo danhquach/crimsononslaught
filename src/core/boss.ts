@@ -7,6 +7,7 @@ import {
   type BossRangeBand,
   BOSS_SKILLS,
   BOSS_SLAM,
+  BOSS_SUMMON,
   BOSS_VOLLEY,
   type BossSkillId,
 } from '../config/boss';
@@ -85,7 +86,17 @@ export interface BossVolleyPayload extends BossSkillPayloadBase {
   readonly aimRad: number;
 }
 
-export type BossSkillPayload = BossSlamPayload | BossVolleyPayload;
+/**
+ * Summon (CO-224): a Swarm enemy at each of `points`, the ring locked as the
+ * wind-up began so the circles showed where the pack lands. How many of them
+ * spawn is the scene's call when it lands (`summonCount`).
+ */
+export interface BossSummonPayload extends BossSkillPayloadBase {
+  readonly skill: 'summon';
+  readonly points: readonly Vec2[];
+}
+
+export type BossSkillPayload = BossSlamPayload | BossVolleyPayload | BossSummonPayload;
 
 export interface BossCycle {
   readonly phase: BossPhase;
@@ -135,6 +146,8 @@ export interface BossStep {
 }
 
 const NO_DIRECTION: Vec2 = { x: 0, y: 0 };
+/** No skill blocked (CO-224): the default for `pickBossSkill` and `stepBossCycle`. */
+export const NO_SKILLS: ReadonlySet<BossSkillId> = new Set();
 
 /** Seconds of plain chase between a charge ending and the next telegraph. */
 const CHASE_S = BOSS.cycleS - BOSS.telegraphS - BOSS.chargeS;
@@ -217,7 +230,9 @@ export function bossRangeBand(distancePx: number): BossRangeBand {
  * The skill a list gives next (CO-222, CO-223): at random from those whose
  * cooldown is over at `nowS`, each weighted by `BOSS_SKILL_WEIGHTS` for the
  * band of `distancePx`. `rand` is drawn from once, and not at all when none is
- * ready (or the list is empty): the leg is a charge instead, so null.
+ * ready (or the list is empty): the leg is a charge instead, so null. A skill in
+ * `blocked` is out of the roll whatever its cooldown (CO-224: summon while the
+ * pack is at its cap), so a capped boss slams or volleys instead.
  */
 export function pickBossSkill(
   list: readonly BossSkillId[],
@@ -225,8 +240,11 @@ export function pickBossSkill(
   nowS: number,
   distancePx: number,
   rand: () => number,
+  blocked: ReadonlySet<BossSkillId> = NO_SKILLS,
 ): BossSkillId | null {
-  const ready = list.filter((skill) => (readyAtS[skill] ?? -Infinity) <= nowS);
+  const ready = list.filter(
+    (skill) => !blocked.has(skill) && (readyAtS[skill] ?? -Infinity) <= nowS,
+  );
   if (ready.length === 0) return null;
   const band = bossRangeBand(distancePx);
   const weights = ready.map((skill) => BOSS_SKILL_WEIGHTS[skill][band]);
@@ -268,6 +286,42 @@ export function volleyBoltDirections(aimRad: number): Vec2[] {
     out.push({ x: Math.cos(angle), y: Math.sin(angle) });
   }
   return out;
+}
+
+/**
+ * Where a summon's pack lands (CO-224): `count` points evenly round `center` at
+ * `radius` px, the first along `aimRad`, each pulled inside `bounds` by `margin`
+ * px so a circle never sits on the arena wall. No RNG.
+ */
+export function summonPoints(
+  center: Readonly<Vec2>,
+  aimRad: number,
+  count = BOSS_SUMMON.packSize,
+  radius = BOSS_SUMMON.ringRadius,
+  bounds: { readonly width: number; readonly height: number } = {
+    width: Infinity,
+    height: Infinity,
+  },
+  margin = BOSS_SUMMON.circleRadius,
+): Vec2[] {
+  const out: Vec2[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const angle = aimRad + (i * 2 * Math.PI) / count;
+    out.push({
+      x: Math.min(bounds.width - margin, Math.max(margin, center.x + Math.cos(angle) * radius)),
+      y: Math.min(bounds.height - margin, Math.max(margin, center.y + Math.sin(angle) * radius)),
+    });
+  }
+  return out;
+}
+
+/**
+ * How many of a summon's pack spawn as it lands (CO-224): the pack size, less
+ * what the cap leaves (`maxLive` minus those alive) and what the enemy pool has
+ * room for. Read at landing, not at the wind-up, so kills during the warning count.
+ */
+export function summonCount(liveSummoned: number, poolRoom: number): number {
+  return Math.max(0, Math.min(BOSS_SUMMON.packSize, BOSS_SUMMON.maxLive - liveSummoned, poolRoom));
 }
 
 /** Scale that makes a warning sprite `artW` px wide span the slam's diameter (CO-222). */
@@ -330,7 +384,7 @@ export function beginWindup(
  *
  * `skills` (CO-222) is the list the current bar draws from. Empty, the boss
  * only charges. A chase that ends with a skill due enters a windup that picks
- * the skill at random from the ready ones, weighted by how far `target` is
+ * the skill at random from the ready ones (not those in `blocked`, CO-224), weighted by how far `target` is
  * (`pickBossSkill`), drawing from `rand` once per pick (CO-223; the entity owns
  * a seeded stream, so a seed repeats its picks), and keeps it if the list
  * changes mid-windup; the windup's end is
@@ -346,6 +400,7 @@ export function stepBossCycle(
   enraged = false,
   skills: readonly BossSkillId[] = [],
   rand: () => number = () => 0,
+  blocked: ReadonlySet<BossSkillId> = NO_SKILLS,
 ): BossStep {
   if (!(deltaS > 0) || !Number.isFinite(deltaS))
     return { cycle, velocity: NO_DIRECTION, impacts: [] };
@@ -370,7 +425,7 @@ export function stepBossCycle(
       // A skill leg whose skills are all cooling down is a charge instead (CO-223).
       const picked =
         next === 'skill'
-          ? pickBossSkill(skills, readyAtS, cycle.clockS + deltaS - left, distance, rand)
+          ? pickBossSkill(skills, readyAtS, cycle.clockS + deltaS - left, distance, rand, blocked)
           : null;
       if (picked) {
         const begun = beginWindup(

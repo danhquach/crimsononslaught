@@ -1,0 +1,493 @@
+{
+  "frames": {
+    "boss.summon.down.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 106,
+        "h": 135
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 106,
+        "h": 135
+      },
+      "sourceSize": {
+        "w": 106,
+        "h": 135
+      }
+    },
+    "boss.summon.left.0": {
+      "frame": {
+        "x": 863,
+        "y": 1,
+        "w": 73,
+        "h": 123
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 73,
+        "h": 123
+      },
+      "sourceSize": {
+        "w": 73,
+        "h": 123
+      }
+    },
+    "boss.summon.right.0": {
+      "frame": {
+        "x": 937,
+        "y": 1,
+        "w": 73,
+        "h": 122
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 73,
+        "h": 122
+      },
+      "sourceSize": {
+        "w": 73,
+        "h": 122
+      }
+    },
+    "boss.summon.up.0": {
+      "frame": {
+        "x": 432,
+        "y": 1,
+        "w": 106,
+        "h": 133
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 106,
+        "h": 133
+      },
+      "sourceSize": {
+        "w": 106,
+        "h": 133
+      }
+    },
+    "boss.summonBurst.0": {
+      "frame": {
+        "x": 1488,
+        "y": 1,
+        "w": 50,
+        "h": 72
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 72
+      },
+      "sourceSize": {
+        "w": 50,
+        "h": 72
+      }
+    },
+    "boss.summonBurst.1": {
+      "frame": {
+        "x": 1539,
+        "y": 1,
+        "w": 50,
+        "h": 72
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 72
+      },
+      "sourceSize": {
+        "w": 50,
+        "h": 72
+      }
+    },
+    "boss.summonBurst.2": {
+      "frame": {
+        "x": 1590,
+        "y": 1,
+        "w": 50,
+        "h": 72
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 72
+      },
+      "sourceSize": {
+        "w": 50,
+        "h": 72
+      }
+    },
+    "boss.summonBurst.3": {
+      "frame": {
+        "x": 1641,
+        "y": 1,
+        "w": 50,
+        "h": 72
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 72
+      },
+      "sourceSize": {
+        "w": 50,
+        "h": 72
+      }
+    },
+    "boss.summonCircle.0": {
+      "frame": {
+        "x": 1692,
+        "y": 1,
+        "w": 50,
+        "h": 30
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 30
+      },
+      "sourceSize": {
+        "w": 50,
+        "h": 30
+      }
+    },
+    "boss.summonCircle.1": {
+      "frame": {
+        "x": 1743,
+        "y": 1,
+        "w": 50,
+        "h": 30
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 30
+      },
+      "sourceSize": {
+        "w": 50,
+        "h": 30
+      }
+    },
+    "boss.summonCircle.2": {
+      "frame": {
+        "x": 1794,
+        "y": 1,
+        "w": 50,
+        "h": 30
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 30
+      },
+      "sourceSize": {
+        "w": 50,
+        "h": 30
+      }
+    },
+    "boss.summonCircle.3": {
+      "frame": {
+        "x": 1845,
+        "y": 1,
+        "w": 50,
+        "h": 30
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 50,
+        "h": 30
+      },
+      "sourceSize": {
+        "w": 50,
+        "h": 30
+      }
+    },
+    "boss.summonWindup.down.0": {
+      "frame": {
+        "x": 108,
+        "y": 1,
+        "w": 107,
+        "h": 134
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 107,
+        "h": 134
+      },
+      "sourceSize": {
+        "w": 107,
+        "h": 134
+      }
+    },
+    "boss.summonWindup.down.1": {
+      "frame": {
+        "x": 216,
+        "y": 1,
+        "w": 107,
+        "h": 134
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 107,
+        "h": 134
+      },
+      "sourceSize": {
+        "w": 107,
+        "h": 134
+      }
+    },
+    "boss.summonWindup.down.2": {
+      "frame": {
+        "x": 324,
+        "y": 1,
+        "w": 107,
+        "h": 134
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 107,
+        "h": 134
+      },
+      "sourceSize": {
+        "w": 107,
+        "h": 134
+      }
+    },
+    "boss.summonWindup.left.0": {
+      "frame": {
+        "x": 1011,
+        "y": 1,
+        "w": 75,
+        "h": 122
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 75,
+        "h": 122
+      },
+      "sourceSize": {
+        "w": 75,
+        "h": 122
+      }
+    },
+    "boss.summonWindup.left.1": {
+      "frame": {
+        "x": 1087,
+        "y": 1,
+        "w": 75,
+        "h": 122
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 75,
+        "h": 122
+      },
+      "sourceSize": {
+        "w": 75,
+        "h": 122
+      }
+    },
+    "boss.summonWindup.left.2": {
+      "frame": {
+        "x": 1163,
+        "y": 1,
+        "w": 75,
+        "h": 122
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 75,
+        "h": 122
+      },
+      "sourceSize": {
+        "w": 75,
+        "h": 122
+      }
+    },
+    "boss.summonWindup.right.0": {
+      "frame": {
+        "x": 1239,
+        "y": 1,
+        "w": 82,
+        "h": 122
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 122
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 122
+      }
+    },
+    "boss.summonWindup.right.1": {
+      "frame": {
+        "x": 1322,
+        "y": 1,
+        "w": 82,
+        "h": 122
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 122
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 122
+      }
+    },
+    "boss.summonWindup.right.2": {
+      "frame": {
+        "x": 1405,
+        "y": 1,
+        "w": 82,
+        "h": 122
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 122
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 122
+      }
+    },
+    "boss.summonWindup.up.0": {
+      "frame": {
+        "x": 539,
+        "y": 1,
+        "w": 107,
+        "h": 133
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 107,
+        "h": 133
+      },
+      "sourceSize": {
+        "w": 107,
+        "h": 133
+      }
+    },
+    "boss.summonWindup.up.1": {
+      "frame": {
+        "x": 647,
+        "y": 1,
+        "w": 107,
+        "h": 133
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 107,
+        "h": 133
+      },
+      "sourceSize": {
+        "w": 107,
+        "h": 133
+      }
+    },
+    "boss.summonWindup.up.2": {
+      "frame": {
+        "x": 755,
+        "y": 1,
+        "w": 107,
+        "h": 133
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 107,
+        "h": 133
+      },
+      "sourceSize": {
+        "w": 107,
+        "h": 133
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 256
+    },
+    "scale": "1"
+  }
+}

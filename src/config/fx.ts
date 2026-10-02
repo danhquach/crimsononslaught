@@ -213,6 +213,18 @@ export const BOSS_SLAM_FX = {
 export const BOSS_SLAM_WARN_DEPTH = -0.15;
 
 /**
+ * CO-224: Summon's floor cue. A circle loops where each pack member will appear
+ * through the wind-up (drawn at game size, about 44 px wide, the circle's
+ * radius in `BOSS_SUMMON`), and a burst plays once where one lands. Both lie at
+ * the slam warning's depth, under every entity.
+ */
+export const BOSS_SUMMON_FX = {
+  circle: 'boss.summonCircle',
+  burst: 'boss.summonBurst',
+  circleAlpha: 0.9,
+} as const;
+
+/**
  * The dash's afterimages and wisps (#384) lie just under the hero, over the
  * ground areas and the elite marks and under the entities drawn at depth 0, so
  * the trail never covers the hero it follows.

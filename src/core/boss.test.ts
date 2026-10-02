@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from './rng';
-import { BOSS, BOSS_ENRAGE, BOSS_SLAM, BOSS_VOLLEY, type BossSkillId } from '../config/boss';
+import {
+  BOSS,
+  BOSS_ENRAGE,
+  BOSS_SLAM,
+  BOSS_SUMMON,
+  BOSS_VOLLEY,
+  type BossSkillId,
+} from '../config/boss';
 import {
   BOSS_EVENT,
   bossEnraged,
@@ -15,6 +22,8 @@ import {
   slamDamage,
   startBossCycle,
   stepBossCycle,
+  summonCount,
+  summonPoints,
   type BossCycle,
   volleyBoltDirections,
   volleyDamage,
@@ -430,7 +439,7 @@ describe('skill rotation (CO-222)', () => {
     expect(pickBossSkill(['slam'], {}, 0, 0, () => 0.99)).toBe('slam');
     expect(pickBossSkill(['slam'], {}, 0, 999, () => 0)).toBe('slam');
     expect(bossSkillsFor(0)).toEqual(['slam']);
-    expect(bossSkillsFor(1)).toEqual(['slam', 'volley']);
+    expect(bossSkillsFor(1)).toEqual(['slam', 'volley', 'summon']);
     expect(bossSkillsFor(9)).toEqual(bossSkillsFor(BOSS.bars - 1));
     expect(bossSkillsFor(-1)).toEqual(bossSkillsFor(0));
   });
@@ -641,4 +650,143 @@ describe('boss bolt volley (CO-223)', () => {
     expect(volleyDamage(false)).toBe(20);
     expect(volleyDamage(true)).toBe(30);
   });
+});
+
+describe('boss summon (CO-224)', () => {
+  const ALL: readonly BossSkillId[] = ['slam', 'volley', 'summon'];
+  const TARGET = { x: 100, y: 0 };
+  const BLOCKED = new Set<BossSkillId>(['summon']);
+  const ARENA = { width: 3000, height: 3000 };
+
+  it('is on the second bar only', () => {
+    expect(bossSkillsFor(0)).not.toContain('summon');
+    expect(bossSkillsFor(1)).toContain('summon');
+    let cycle = startBossCycle();
+    const seen = new Set<string>();
+    for (let t = 0; t < 120; t += 0.05) {
+      const step = stepBossCycle(cycle, 0.05, ORIGIN, TARGET, 1, false, bossSkillsFor(0));
+      step.impacts.forEach((i) => seen.add(i.skill));
+      cycle = step.cycle;
+    }
+    expect(seen.has('summon')).toBe(false);
+  });
+
+  it('weights it 1:2:2 near, mid, far against the others at one each', () => {
+    const rng = createRng(3);
+    const share = (d: number) => {
+      let n = 0;
+      for (let i = 0; i < 6000; i += 1)
+        if (pickBossSkill(ALL, {}, 0, d, () => rng.next()) === 'summon') n += 1;
+      return n / 6000;
+    };
+    // Near 1/(3+1+1), mid 2/(1+1+2), far 2/(1+3+2).
+    expect(share(100)).toBeCloseTo(1 / 5, 1);
+    expect(share(220)).toBeCloseTo(2 / 4, 1);
+    expect(share(400)).toBeCloseTo(2 / 6, 1);
+  });
+
+  it('never picks a blocked skill, and charges instead when it was the only one left', () => {
+    for (const d of [0, 100, 220, 400])
+      for (const roll of [0, 0.3, 0.6, 0.999])
+        expect(pickBossSkill(ALL, {}, 0, d, () => roll, BLOCKED)).not.toBe('summon');
+    // Capped, the others cooling: no skill, so the leg is a charge.
+    expect(pickBossSkill(ALL, { slam: 99, volley: 99 }, 1, 100, () => 0, BLOCKED)).toBeNull();
+    expect(pickBossSkill(ALL, { slam: 99 }, 1, 100, () => 0.999, BLOCKED)).toBe('volley');
+    expect(pickBossSkill(['summon'], {}, 1, 100, () => 0, BLOCKED)).toBeNull();
+    const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 0 };
+    const step = stepBossCycle(chase, 0.01, ORIGIN, TARGET, 1, false, ['summon'], () => 0, BLOCKED);
+    expect(step.cycle.phase).toBe('telegraph');
+    expect(
+      stepBossCycle(chase, 0.01, ORIGIN, TARGET, 1, false, ['summon'], () => 0).cycle.skill,
+    ).toBe('summon');
+  });
+
+  it('stamps the cooldown as the wind-up starts', () => {
+    const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 0, clockS: 20 };
+    const step = stepBossCycle(chase, 0.01, ORIGIN, TARGET, 1, false, ['summon']);
+    expect(step.cycle.readyAtS.summon).toBeCloseTo(20 + BOSS_SUMMON.cooldownS, 9);
+  });
+
+  it('winds up for 1 s and lands 0.6 s of pose after', () => {
+    expect(phaseLengthS('windup', false, 'summon')).toBe(BOSS_SUMMON.windupS);
+    expect(phaseLengthS('skill', true, 'summon')).toBe(BOSS_SUMMON.activeS);
+  });
+
+  it('places the pack on a ring of 110 px, the first on the aim, evenly', () => {
+    const c = { x: 1500, y: 1500 };
+    const pts = summonPoints(c, 0.7, undefined, undefined, ARENA);
+    expect(pts).toHaveLength(BOSS_SUMMON.packSize);
+    for (const p of pts) expect(Math.hypot(p.x - c.x, p.y - c.y)).toBeCloseTo(110, 6);
+    expect(pts[0]?.x).toBeCloseTo(c.x + Math.cos(0.7) * 110, 6);
+    expect(pts[0]?.y).toBeCloseTo(c.y + Math.sin(0.7) * 110, 6);
+    const angle = (p: { x: number; y: number }) => Math.atan2(p.y - c.y, p.x - c.x);
+    const gap = (angle(pts[1] as never) - angle(pts[0] as never) + 2 * Math.PI) % (2 * Math.PI);
+    expect(gap).toBeCloseTo((2 * Math.PI) / 5, 6);
+    expect(summonPoints(c, 0.7, undefined, undefined, ARENA)).toEqual(pts);
+  });
+
+  it('keeps every circle inside the arena by the circle radius', () => {
+    for (const c of [
+      { x: 5, y: 5 },
+      { x: 2995, y: 1500 },
+      { x: 1500, y: 2999 },
+      { x: 0, y: 3000 },
+    ])
+      for (const aim of [0, 1.5, 3, -2]) {
+        for (const p of summonPoints(c, aim, undefined, undefined, ARENA)) {
+          expect(p.x).toBeGreaterThanOrEqual(BOSS_SUMMON.circleRadius);
+          expect(p.x).toBeLessThanOrEqual(ARENA.width - BOSS_SUMMON.circleRadius);
+          expect(p.y).toBeGreaterThanOrEqual(BOSS_SUMMON.circleRadius);
+          expect(p.y).toBeLessThanOrEqual(ARENA.height - BOSS_SUMMON.circleRadius);
+        }
+      }
+  });
+
+  it('counts the pack as the cap and the pool allow', () => {
+    expect(summonCount(0, 999)).toBe(5);
+    expect(summonCount(5, 999)).toBe(5);
+    expect(summonCount(7, 999)).toBe(3);
+    expect(summonCount(10, 999)).toBe(0);
+    expect(summonCount(14, 999)).toBe(0);
+    expect(summonCount(0, 2)).toBe(2);
+    expect(summonCount(0, 0)).toBe(0);
+    expect(summonCount(0, -3)).toBe(0);
+  });
+
+  it('keeps the pack under the cap whatever the kills: two summons on a full cap add nothing', () => {
+    let live = 0;
+    for (let i = 0; i < 6; i += 1) live += summonCount(live, 999);
+    expect(live).toBe(BOSS_SUMMON.maxLive);
+  });
+
+  for (const [label, stepS, enraged] of [
+    ['1/60 s frames', 1 / 60, false],
+    ['3 s frames', 3, false],
+    ['1/60 s frames, enraged', 1 / 60, true],
+    ['3 s frames, enraged', 3, true],
+  ] as const) {
+    it(`keeps summon wind-ups 14 s apart and still summons over 180 s (${label})`, () => {
+      const rng = createRng(11);
+      const hero = { x: 400, y: 0 };
+      let cycle = startBossCycle();
+      const starts: number[] = [];
+      const impacts: number[] = [];
+      for (let t = 0; t < 180 - 1e-9; t += stepS) {
+        const step = stepBossCycle(cycle, stepS, ORIGIN, hero, 1, enraged, ALL, () => rng.next());
+        cycle = step.cycle;
+        for (const hit of step.impacts) if (hit.skill === 'summon') impacts.push(hit.atS);
+        const after = cycle.readyAtS.summon;
+        if (after !== undefined && starts[starts.length - 1] !== after) starts.push(after);
+      }
+      for (let i = 1; i < starts.length; i += 1)
+        expect((starts[i] as number) - (starts[i - 1] as number)).toBeGreaterThanOrEqual(
+          BOSS_SUMMON.cooldownS - 1e-6,
+        );
+      for (let i = 1; i < impacts.length; i += 1)
+        expect((impacts[i] as number) - (impacts[i - 1] as number)).toBeGreaterThanOrEqual(
+          BOSS_SUMMON.cooldownS - 1e-6,
+        );
+      expect(impacts.length).toBeGreaterThanOrEqual(2);
+    });
+  }
 });

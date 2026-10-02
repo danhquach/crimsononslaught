@@ -102,6 +102,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private wave: Readonly<WaveScale> = UNSCALED;
   /** #126: a champion of its type, spawned at `eliteScale` of its wave. */
   private elite = false;
+  /** CO-224: called up by the boss's Summon; drops XP and no pickups. */
+  private summoned = false;
   private contactCooldownMs = 0;
   /** #126, ranged only: a shot's damage as the spawning wave scaled it, and the time to the next. */
   private shot = RANGED_ATTACK.shotDamage;
@@ -166,6 +168,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
    */
   get hitScale(): Readonly<WaveScale> {
     return this.elite ? eliteScale(this.wave) : this.wave;
+  }
+
+  /** CO-224: a boss's pack member; pays XP only, no Embers or consumables, and counts towards the pack cap. */
+  get isSummoned(): boolean {
+    return this.summoned;
   }
 
   /** #126: what one of its shots deals, scaled by the wave that spawned it. */
@@ -249,6 +256,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     y: number,
     scale: Readonly<WaveScale> = UNSCALED,
     elite = false,
+    summoned = false,
   ): void {
     this.kind = type;
     this.wave = scale;
@@ -258,6 +266,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.shot = scaleDamage(RANGED_ATTACK.shotDamage, hit.damageMul);
     this.arise(stats, x, y);
     this.elite = elite;
+    this.summoned = summoned;
     // A full interval before the first shot; it drains on the walk in.
     this.fireCooldownMs = RANGED_ATTACK.fireIntervalMs;
   }
@@ -269,6 +278,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   protected arise(stats: Readonly<EnemyStats>, x: number, y: number): void {
     this.hp = stats.hp;
     this.elite = false;
+    this.summoned = false;
     this.contactCooldownMs = 0;
     this.shotOwed = false;
     this.heading = Number.NaN;

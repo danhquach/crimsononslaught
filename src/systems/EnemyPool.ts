@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import type { BossSkillId } from '../config/boss';
 import { MAX_LIVE_ENEMIES, type EnemyType } from '../config/enemies';
 import { UNSCALED, canSpawn, type Vec2, type WaveScale } from '../core/enemy';
 import type { Rng } from '../core/rng';
@@ -52,7 +53,8 @@ export class EnemyPool {
   /**
    * Spawn one enemy, or `null` when the live cap is already reached. `scale` is
    * the spawning wave's multipliers (#127); the archetype row as written by
-   * default. `elite` spawns it as its type's champion (#126).
+   * default. `elite` spawns it as its type's champion (#126); `summoned` marks a
+   * boss's pack member (CO-224).
    */
   spawn(
     type: EnemyType,
@@ -60,6 +62,7 @@ export class EnemyPool {
     y: number,
     scale: Readonly<WaveScale> = UNSCALED,
     elite = false,
+    summoned = false,
   ): Enemy | null {
     // A boss killed since the last update walk is still a dead member here,
     // and `group.get` hands out the first dead member whatever its class.
@@ -67,7 +70,7 @@ export class EnemyPool {
     if (!canSpawn(this.liveCount)) return null;
     const enemy = this.group.get(x, y) as Enemy | null;
     if (!enemy) return null;
-    enemy.spawn(type, x, y, scale, elite);
+    enemy.spawn(type, x, y, scale, elite, summoned);
     return enemy;
   }
 
@@ -76,13 +79,18 @@ export class EnemyPool {
    * when none is in the group and appended to it; a call while one lives puts
    * that sprite back at full HP where asked.
    */
-  spawnBoss(x: number, y: number, skillRng: Rng): Boss {
+  spawnBoss(
+    x: number,
+    y: number,
+    skillRng: Rng,
+    blockedSkills?: () => ReadonlySet<BossSkillId>,
+  ): Boss {
     this.releaseDeadBoss();
     if (!this.bossSprite) {
       this.bossSprite = new Boss(this.group.scene);
       this.group.add(this.bossSprite, true);
     }
-    this.bossSprite.spawnBoss(x, y, skillRng);
+    this.bossSprite.spawnBoss(x, y, skillRng, blockedSkills);
     return this.bossSprite;
   }
 
@@ -97,6 +105,15 @@ export class EnemyPool {
       if (child instanceof Enemy && child.active && !child.isDying) live.push(child);
     }
     return live;
+  }
+
+  /** CO-224: summoned enemies alive and not dying; what the boss's pack cap counts. */
+  get liveSummoned(): number {
+    let n = 0;
+    for (const child of this.group.getChildren()) {
+      if (child instanceof Enemy && child.active && !child.isDying && child.isSummoned) n += 1;
+    }
+    return n;
   }
 
   /** The boss while it fights: in the world and not playing its death clip (CO-207: the minimap's marker). */

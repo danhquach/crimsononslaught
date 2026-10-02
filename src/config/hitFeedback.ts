@@ -89,7 +89,13 @@ export interface Shake {
 }
 
 export type ShakeKind =
-  'playerHurt' | 'bossCharge' | 'bossEnrage' | 'bossSlam' | 'bossVolley' | 'explosion';
+  | 'playerHurt'
+  | 'bossCharge'
+  | 'bossEnrage'
+  | 'bossSlam'
+  | 'bossVolley'
+  | 'bossSummon'
+  | 'explosion';
 
 export const SHAKES: Readonly<Record<ShakeKind, Shake>> = {
   playerHurt: { durationMs: 160, intensity: 0.006 },
@@ -97,6 +103,7 @@ export const SHAKES: Readonly<Record<ShakeKind, Shake>> = {
   bossEnrage: { durationMs: 400, intensity: 0.01 },
   bossSlam: { durationMs: 300, intensity: 0.01 },
   bossVolley: { durationMs: 200, intensity: 0.004 },
+  bossSummon: { durationMs: 150, intensity: 0.003 },
   explosion: { durationMs: 140, intensity: 0.004 },
 };
 

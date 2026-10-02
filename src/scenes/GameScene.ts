@@ -28,12 +28,15 @@ import { watchPadButton, type StartButtonWatch } from './input';
 import { artFrame } from '../core/animation';
 import {
   BOSS_EVENT,
+  NO_SKILLS,
   phaseLengthS,
+  summonCount,
   volleyBoltDirections,
   type BossImmunePayload,
   type BossPhasePayload,
   type BossSkillPayload,
   type BossSlamPayload,
+  type BossSummonPayload,
   type BossVolleyPayload,
 } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor, consumableSoundFor } from '../config/sounds';
@@ -152,12 +155,19 @@ import {
   ARENA_SIZE,
 } from '../config/arena';
 import { FRAMES } from '../config/frames';
-import { BOSS_BOLT, BOSS_IMMUNE_FRAME, BOSS_VOLLEY, type BossSkillId } from '../config/boss';
+import {
+  BOSS_BOLT,
+  BOSS_IMMUNE_FRAME,
+  BOSS_SUMMON,
+  BOSS_VOLLEY,
+  type BossSkillId,
+} from '../config/boss';
 import { ARENA_DEPTH, NUMBER_DEPTH, PROP_DEPTH } from '../config/fx';
 import {
   ENEMY_ARCHETYPES,
   EXPLODER_BLAST,
   MAX_LIVE_ENEMY_SHOTS,
+  MAX_LIVE_ENEMIES,
   SPLITTER_SPLIT,
   isEnemyType,
   type EnemyType,
@@ -236,6 +246,7 @@ import { PickupPool } from '../systems/PickupPool';
 import { OverlayPool } from '../systems/OverlayPool';
 import { BossEnrageFx } from '../systems/BossEnrageFx';
 import { BossSlamFx } from '../systems/BossSlamFx';
+import { BossSummonFx } from '../systems/BossSummonFx';
 import { EliteMarkPool } from '../systems/EliteMarkPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
 
@@ -373,6 +384,8 @@ const QUAKE_LEVEL_STREAM = 'quakeLevelPicks';
  */
 const BOSS_SKILL_STREAM = 'bossSkills';
 
+const SUMMON_BLOCKED: ReadonlySet<BossSkillId> = new Set(['summon']);
+
 /**
  * Where a death's Ember and consumable land, from the death spot, so neither
  * hides under the gem that lands on the spot itself. Well inside the pickup
@@ -438,6 +451,15 @@ export class GameScene extends Phaser.Scene {
     hpLost: number;
     log: { atS: number; enraged: boolean; bolts: number; aimRad: number }[];
   } = { volleys: 0, boltHits: 0, hpLost: 0, log: [] };
+  /** Test hook (CO-224): summons landed, enemies they spawned and the pack members dropped by the cap, and a line per summon. */
+  private summonTally: {
+    summons: number;
+    spawned: number;
+    dropped: number;
+    log: { atS: number; enraged: boolean; liveBefore: number; spawned: number }[];
+  } = { summons: 0, spawned: 0, dropped: 0, log: [] };
+  /** CO-224: summons landed this step, spawned after the physics step like splits. */
+  private pendingSummons: BossSummonPayload[] = [];
   /** #126: splits owed by splitters killed this step; spawned after the physics step. */
   private splits: Split[] = [];
   /** Test hook (#126): blasts set off, blasts that reached the player and the HP they took, children spawned and dropped. */
@@ -458,6 +480,7 @@ export class GameScene extends Phaser.Scene {
   /** #388: the enraged boss's ember ring and burst. */
   private bossEnrageFx!: BossEnrageFx;
   private bossSlamFx!: BossSlamFx;
+  private bossSummonFx!: BossSummonFx;
   /** Persistent ground areas (#135): every patch on the ground, whichever spell placed it. */
   private areas!: AreaPool;
   /** Sky strikes in the air (#138): every telegraph counting down, whichever spell cast it. */
@@ -709,6 +732,16 @@ export class GameScene extends Phaser.Scene {
       aimRad: number;
       clockS: number;
     };
+    summon: {
+      summons: number;
+      spawned: number;
+      dropped: number;
+      log: { atS: number; enraged: boolean; liveBefore: number; spawned: number }[];
+      liveSummoned: number;
+      readyInS: number;
+      circlesVisible: number;
+      points: { x: number; y: number }[];
+    };
     auraVisible: boolean;
     auraClip: string | null;
     burstPlays: number;
@@ -739,6 +772,14 @@ export class GameScene extends Phaser.Scene {
         boltsAlive: this.bossBolts.liveCount,
         aimRad: boss.skillAimRad,
         clockS: boss.clockForTest, // the cycle steps the same deltas, so it equals the log's atS clock
+      },
+      summon: {
+        ...this.summonTally,
+        log: [...this.summonTally.log],
+        liveSummoned: this.enemies.liveSummoned,
+        readyInS: boss.readyInS('summon'),
+        circlesVisible: this.bossSummonFx.circlesVisible,
+        points: boss.lockedSummonPoints.map(({ x, y }) => ({ x, y })),
       },
       auraVisible: this.bossEnrageFx.auraVisible,
       auraClip: this.bossEnrageFx.auraClip,
@@ -1287,6 +1328,16 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
+  /**
+   * Test hook (CO-224): every live summoned enemy dies through the real damage
+   * path, gems and all. Returns how many were killed.
+   */
+  killSummonedForTest(): number {
+    const pack = this.enemies.live.filter((enemy) => enemy.isSummoned);
+    for (const enemy of pack) this.damageEnemy(enemy, enemy.remainingHp, 'tick');
+    return pack.length;
+  }
+
   /** Test hook (CO-207): the boss is brought in now if the run has not reached it; whether it lives. */
   spawnBossForTest(): boolean {
     return this.bossForTest() !== undefined;
@@ -1473,6 +1524,8 @@ export class GameScene extends Phaser.Scene {
     this.shotHpLost = 0;
     this.slamTally = { slams: 0, hits: 0, hpLost: 0, log: [] };
     this.volleyTally = { volleys: 0, boltHits: 0, hpLost: 0, log: [] };
+    this.summonTally = { summons: 0, spawned: 0, dropped: 0, log: [] };
+    this.pendingSummons = [];
     this.splits = [];
     this.blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
     this.guardTally = { blocked: 0, full: 0, blockedRaw: 0, blockedDealt: 0 };
@@ -1497,6 +1550,7 @@ export class GameScene extends Phaser.Scene {
     this.eliteMarks = new EliteMarkPool(this);
     this.bossEnrageFx = new BossEnrageFx(this);
     this.bossSlamFx = new BossSlamFx(this);
+    this.bossSummonFx = new BossSummonFx(this);
     this.areas = new AreaPool(this, createRng(deriveSeed(seed, AREA_FX_STREAM)));
     this.telegraphs = new TelegraphPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
@@ -1831,12 +1885,14 @@ export class GameScene extends Phaser.Scene {
     // #126: a splitter killed this step leaves its children now — never inside
     // the enemy walk or an overlap callback, which iterate the group it joins.
     this.releaseSplits();
+    this.releaseSummons();
     // After the bodies have settled, so an overlay sits on where its host is
     // drawn this frame; one not in the live set — status over, host dead — is freed.
     this.overlays.update(this.enemies.live);
     this.eliteMarks.update(this.enemies.live);
     this.bossEnrageFx.update(this.enemies.boss);
     this.bossSlamFx.update(this.enemies.boss);
+    this.bossSummonFx.update(this.enemies.boss);
     this.numbers.update(step.deltaMs);
   }
 
@@ -2393,7 +2449,7 @@ export class GameScene extends Phaser.Scene {
     from?: Readonly<Vec2>,
   ): void {
     if (!enemy.active) return;
-    const { x, y, enemyType, isElite } = enemy;
+    const { x, y, enemyType, isElite, isSummoned } = enemy;
     const boss = enemy instanceof Boss;
     const { critChance, critMultiplier } = this.spells.profile;
     const crit = kind === 'hit' && rollCrit(this.critRng, critChance);
@@ -2430,6 +2486,8 @@ export class GameScene extends Phaser.Scene {
     if (ENEMY_ARCHETYPES[enemyType].loot === false) return;
     // #126: an elite drops `ELITE.gemMul` times its type's gems, and a chest.
     this.gems.dropFor(enemyType, x, y, isElite ? eliteGemCount(enemyType) : undefined);
+    // CO-224: a boss's pack pays XP alone, so no drop roll is made (pickupRng stays put).
+    if (isSummoned) return;
     this.dropPickups(enemyType, x, y, isElite);
   }
 
@@ -2479,6 +2537,7 @@ export class GameScene extends Phaser.Scene {
    */
   private onBossSkill(payload: BossSkillPayload): void {
     if (payload.skill === 'volley') this.onBossVolley(payload);
+    else if (payload.skill === 'summon') this.onBossSummon(payload);
     else this.onBossSlam(payload);
   }
 
@@ -2493,6 +2552,52 @@ export class GameScene extends Phaser.Scene {
     const tally = this.volleyTally;
     tally.volleys += 1;
     tally.log.push({ atS, enraged: this.enemies.boss?.isEnraged ?? false, bolts: fired, aimRad });
+  }
+
+  /** CO-224: the cue and shake play now; the pack spawns after the physics step (`releaseSummons`). */
+  private onBossSummon(payload: BossSummonPayload): void {
+    this.audio.play('boss.summon');
+    this.shakeFor('bossSummon');
+    this.pendingSummons.push(payload);
+  }
+
+  /**
+   * CO-224: spawn the pack every summon this step landed. The cap and the pool's
+   * room are read now, after the step's kills, and the pack fills the circles in
+   * ring order; members the cap leaves out are dropped, never queued.
+   */
+  private releaseSummons(): void {
+    if (this.pendingSummons.length === 0) return;
+    const landed = this.pendingSummons;
+    this.pendingSummons = [];
+    const tally = this.summonTally;
+    for (const { points, atS } of landed) {
+      const liveBefore = this.enemies.liveSummoned;
+      const count = summonCount(liveBefore, MAX_LIVE_ENEMIES - this.enemies.liveCount);
+      let spawned = 0;
+      for (const at of points.slice(0, count)) {
+        const enemy = this.enemies.spawn(
+          BOSS_SUMMON.type,
+          at.x,
+          at.y,
+          BOSS_SUMMON.scale,
+          false,
+          true,
+        );
+        if (!enemy) break;
+        this.bossSummonFx.burst(at, spawned);
+        spawned += 1;
+      }
+      tally.summons += 1;
+      tally.spawned += spawned;
+      tally.dropped += points.length - spawned;
+      tally.log.push({
+        atS,
+        enraged: this.enemies.boss?.isEnraged ?? false,
+        liveBefore,
+        spawned,
+      });
+    }
   }
 
   /** CO-222: the slam hits the hero if the ring reaches them, through the immunity window. */
@@ -2583,7 +2688,10 @@ export class GameScene extends Phaser.Scene {
       { width: WORLD_WIDTH, height: WORLD_HEIGHT },
       this.rng.next() * Math.PI * 2,
     );
-    this.enemies.spawnBoss(point.x, point.y, this.bossSkillRng);
+    this.enemies.spawnBoss(point.x, point.y, this.bossSkillRng, () =>
+      // CO-224: a pack at its cap leaves summon out of the pick, so the boss slams or volleys.
+      this.enemies.liveSummoned >= BOSS_SUMMON.maxLive ? SUMMON_BLOCKED : NO_SKILLS,
+    );
     this.audio.play('boss.spawn');
     this.audio.startBossMusic();
   }

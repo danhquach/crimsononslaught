@@ -99,6 +99,7 @@ describe('magenta fringe (CO-171)', () => {
     'boss.walk.down',
     'boss.slamWindup.down',
     'boss.volleyWindup.down',
+    'boss.summonWindup.down',
     'pickupBomb.idle',
     'pickupHealth.idle',
     'ice.slow',
