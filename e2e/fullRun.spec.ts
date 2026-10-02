@@ -1,10 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+import { BOSS } from '../src/config/boss';
 import { BOSS_EMBERS } from '../src/config/pickups';
 import { SPELL_IDS, type SpellId } from '../src/config/spells';
 import type { RunPhase } from '../src/core/runEvents';
 import { BOSS_START_MS, MAX_TIME_SCALE } from '../src/core/runState';
 import type { Save } from '../src/core/save';
 import { SCENE, type ResultPayload } from '../src/core/scenePayloads';
+import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
 import type { ResultScene } from '../src/scenes/ResultScene';
 import type { UpgradesScene } from '../src/scenes/UpgradesScene';
@@ -51,7 +53,8 @@ const FRAME_MS = 100;
  * The ticket's ceiling per run: each check, boot included, must fit in CI's 90 s.
  *
  * The boss fight is what spends it: the check starts 10 s short of the boss
- * (`START_AT_S`), so the cost is the fresh build wearing the boss down.
+ * (`START_AT_S`), so the cost is the fresh build wearing one bar of the boss
+ * down (#387).
  */
 const TEST_BUDGET_MS = 90_000;
 
@@ -114,6 +117,21 @@ function readSave(page: Page): Promise<Save> {
 }
 
 /**
+ * #387: the boss has `BOSS.bars` bars, and the budget below was set when it had
+ * one. The check takes all but the last off the moment the boss phase starts,
+ * so it still fights a single bar's worth of HP, as it did at 7200.
+ */
+function skipBossBars(page: Page): Promise<unknown> {
+  return page.evaluate(
+    async ({ scene, amount }) => {
+      const { game } = await import('/src/main.ts');
+      return (game.scene.getScene(scene.game) as GameScene).damageBossForTest(amount);
+    },
+    { scene: SCENE, amount: BOSS.hp - BOSS.hp / BOSS.bars },
+  );
+}
+
+/**
  * Drives the run to Result: every level-up overlay is answered with its first
  * card (`1`), so the run never sits paused. A press that lands before the
  * overlay listens is harmless — the overlay is still up on the next poll.
@@ -123,7 +141,10 @@ async function playToResult(page: Page, deadline: number): Promise<boolean> {
   let sawBoss = false;
   for (;;) {
     const snap = await snapshot(page);
-    sawBoss ||= snap.phase === 'boss';
+    if (snap.phase === 'boss' && !sawBoss) {
+      sawBoss = true;
+      if (!snap.result) await skipBossBars(page);
+    }
     if (snap.result) return sawBoss;
     if (Date.now() > deadline) {
       throw new Error(`no Result by the deadline; last seen ${JSON.stringify(snap)}`);

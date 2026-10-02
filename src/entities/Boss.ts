@@ -5,6 +5,7 @@ import {
   BOSS_EVENT,
   startBossCycle,
   stepBossCycle,
+  type BossBarBreakPayload,
   type BossCycle,
   type BossPhase,
   type BossPhasePayload,
@@ -18,6 +19,7 @@ import {
 } from '../core/bossCrowdControl';
 import type { Vec2 } from '../core/enemy';
 import type { FrostHit } from '../core/frostNova';
+import { bossBarBroke, bossBarLayers } from '../core/hudModel';
 import { emitRunEvent } from '../core/runEvents';
 import { Enemy } from './Enemy';
 
@@ -63,6 +65,8 @@ export class Boss extends Enemy {
   /** Seconds this boss has been alive, run time; the clock its crowd-control windows are read on (#315). */
   private clockS = 0;
   private cc: BossCcState = NO_BOSS_CC;
+  /** #387: bars still alive as of the last hit, so a hit that takes one off can be told. */
+  private barsLeft = BOSS.bars;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y);
@@ -87,6 +91,7 @@ export class Boss extends Enemy {
     this.cycle = startBossCycle();
     this.clockS = 0;
     this.cc = NO_BOSS_CC;
+    this.barsLeft = BOSS.bars;
     this.arise(BOSS, x, y);
     this.emitHp();
   }
@@ -119,10 +124,20 @@ export class Boss extends Enemy {
     return applied.durationS;
   }
 
-  /** Every hit redraws the boss bar; the killing blow shows it empty. */
+  /**
+   * Every hit redraws the boss bar; the killing blow shows it empty. A hit that
+   * takes a bar off and leaves some tells the run (#387), once however many
+   * bars it skips; the killing blow does not, the death cue is its own.
+   */
   override takeDamage(amount: number): boolean {
     const died = super.takeDamage(amount);
     this.emitHp();
+    const { left } = bossBarLayers(this.remainingHp, BOSS.hp, BOSS.bars);
+    if (bossBarBroke(this.barsLeft, left)) {
+      const payload: BossBarBreakPayload = { left };
+      this.scene.events.emit(BOSS_EVENT.barBreak, payload);
+    }
+    this.barsLeft = left;
     return died;
   }
 

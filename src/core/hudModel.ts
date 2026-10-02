@@ -1,3 +1,4 @@
+import { BOSS_BAR_COLORS } from '../config/hud';
 import { SLOT_UNLOCK_LEVELS } from '../config/loadout';
 import { MAX_SPELL_LEVEL } from '../config/spellLevels';
 import { badgeText } from './maxRank';
@@ -225,6 +226,43 @@ export function hpBarView(model: Readonly<HudModel>): HpBarView {
 /** The boss bar exists only during the boss phase (ticket CO-012). */
 export function bossBarVisible(model: Readonly<HudModel>): boolean {
   return model.phase === 'boss';
+}
+
+/**
+ * #387: the boss bar as stacked layers. `maxHp` is split into `bars` equal
+ * bars; `left` is how many are still alive (the one being worn down included),
+ * `fill01` is how full that one is, and `bar` is its place in the order shown,
+ * 0 first. No HP left reads left 0, an empty last bar and no count.
+ */
+export interface BossBarLayers {
+  bar: number;
+  fill01: number;
+  left: number;
+  countText: string;
+}
+
+/** Float noise below this, in bar units, is not part of a bar: 7200 + 1e-9 HP still reads one full bar. */
+const BAR_UNIT_EPSILON = 1e-6;
+
+export function bossBarLayers(hp: number, maxHp: number, bars: number): BossBarLayers {
+  const count = Number.isFinite(bars) && bars >= 1 ? Math.floor(bars) : 1;
+  const spent: BossBarLayers = { bar: count - 1, fill01: 0, left: 0, countText: '' };
+  if (!Number.isFinite(maxHp) || maxHp <= 0 || !Number.isFinite(hp) || hp <= 0) return spent;
+  const units = (Math.min(hp, maxHp) * count) / maxHp;
+  const left = Math.max(1, Math.ceil(units - BAR_UNIT_EPSILON));
+  const fill01 = Math.min(1, Math.max(0, units - (left - 1)));
+  return { bar: count - left, fill01, left, countText: `\u00d7${left}` };
+}
+
+/** #387: whether a hit took a bar off the boss: fewer bars left than before, and still some left (the killing blow is the death cue's). */
+export function bossBarBroke(prevLeft: number | null, nextLeft: number): boolean {
+  return prevLeft !== null && nextLeft < prevLeft && nextLeft > 0;
+}
+
+/** #387: the fill colour of bar `bar` (0 first) of `bars`: violet, then amber for any between, red last. */
+export function bossBarColor(bar: number, bars: number): number {
+  if (bar >= bars - 1) return BOSS_BAR_COLORS.last;
+  return bar <= 0 ? BOSS_BAR_COLORS.first : BOSS_BAR_COLORS.middle;
 }
 
 /** `m:ss`, floored to whole seconds; anything negative or non-finite reads 0:00. */

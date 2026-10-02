@@ -214,6 +214,13 @@ export const RECIPES = {
   'boss.telegraph': () => envelope(sweep(0.42, 200, 620), 0.05),
   'boss.charge': () =>
     mix([envelope(noise(0.3, 42, 1500), 0.01), 0.8], [envelope(sweep(0.3, 160, 80), 0.01), 0.6]),
+  // #387: a glassy crack over a low thump (a bar of the boss's life shattering), 0.4 s.
+  'boss.barBreak': () =>
+    mix(
+      [envelope(noise(0.4, 63, 7000), 0.002), 0.7],
+      [ping(0.35, 2400, 800), 0.35],
+      [envelope(sweep(0.4, 140, 45), 0.004), 0.8],
+    ),
   'boss.death': () =>
     mix([envelope(sweep(1.0, 300, 35), 0.02), 0.9], [envelope(noise(1.0, 43, 700), 0.02), 0.4]),
 

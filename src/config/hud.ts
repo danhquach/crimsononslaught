@@ -1,3 +1,4 @@
+import { PLACEHOLDERS } from './colors';
 import type { FrameName } from './frames';
 
 /**
@@ -61,3 +62,13 @@ export const DASH_ICON = { x: 792, y: 506, radius: 18 } as const;
 
 /** The icon art for it (`icon.<name>.0`, like the spell icons); a run without the atlas draws a ring and a glyph. */
 export const DASH_ICON_FRAME: FrameName = 'icon.dash.0';
+
+/**
+ * #387: the boss bar's fill colour by layer. The first bar is the boss's own
+ * violet, the last is red (one hit from dead), and any bar between is amber.
+ */
+export const BOSS_BAR_COLORS = {
+  first: PLACEHOLDERS.boss.color,
+  middle: 0xffb300,
+  last: 0xe53935,
+} as const;

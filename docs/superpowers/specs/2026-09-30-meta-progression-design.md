@@ -361,5 +361,5 @@ coordinates).
   for most players.
 - **Pace** of §3.2 is a guess; ticket 1 logs account XP per run from the bot
   sweeps and tunes the curve.
-- **Harder maps and the 45–90 s boss window** (`docs/tuning/phase2-balance.md`):
+- **Harder maps and the 90–180 s boss window** (#387; `docs/tuning/phase2-balance.md`):
   the multipliers of §6.2 are starting values for a sweep in tickets 5–6.

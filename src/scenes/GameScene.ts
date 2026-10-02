@@ -1139,6 +1139,19 @@ export class GameScene extends Phaser.Scene {
     return boss.isDying;
   }
 
+  /**
+   * Test hook (#387): `amount` damage lands on the boss through the run's one
+   * damage path, so a test can step it across a bar. The boss is brought in
+   * first when the run has not reached it. Returns its HP left and whether it
+   * is dying.
+   */
+  damageBossForTest(amount: number): { hp: number; dying: boolean } | null {
+    const boss = this.bossForTest();
+    if (!boss) return null;
+    this.damageEnemy(boss, amount, 'tick');
+    return { hp: boss.remainingHp, dying: boss.isDying };
+  }
+
   /** Test hook (CO-207): the boss is brought in now if the run has not reached it; whether it lives. */
   spawnBossForTest(): boolean {
     return this.bossForTest() !== undefined;
@@ -1393,6 +1406,11 @@ export class GameScene extends Phaser.Scene {
       }
     };
     this.events.on(BOSS_EVENT.phase, onBossPhase);
+    // #387: a bar of the boss's life breaking has its own cue; the HUD flashes from its own diff.
+    const onBossBarBreak = (): void => {
+      this.audio.play('boss.barBreak');
+    };
+    this.events.on(BOSS_EVENT.barBreak, onBossBarBreak);
     // #252: Esc or pad Start pauses, and the pause screen sends back the way
     // out it confirmed. The keyboard plugin drops its own listener on shutdown.
     const onChoose = ({ action }: PauseChoosePayload): void => this.leaveFromPause(action);
@@ -1461,6 +1479,7 @@ export class GameScene extends Phaser.Scene {
       this.events.off(BOSS_EVENT.died, onBossDied);
       this.events.off(RUN_EVENT.phase, onPhase);
       this.events.off(BOSS_EVENT.phase, onBossPhase);
+      this.events.off(BOSS_EVENT.barBreak, onBossBarBreak);
     });
 
     this.scene.launch(SCENE.hud);

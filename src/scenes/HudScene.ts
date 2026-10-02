@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { BOSS } from '../config/boss';
 import { PLACEHOLDERS } from '../config/colors';
 import { ART_BOXES, FRAMES, type FrameName } from '../config/frames';
 import { DASH_TRAIL } from '../config/dash';
@@ -14,6 +15,9 @@ import {
 import {
   INITIAL_HUD,
   applyRunEvent,
+  bossBarBroke,
+  bossBarColor,
+  bossBarLayers,
   bossBarVisible,
   formatTimer,
   fraction,
@@ -185,6 +189,16 @@ class Segment {
   }
 }
 
+/** #387: the boss bar as last drawn, and how many bars have broken since the bar appeared; the browser suite reads it. */
+export interface BossBarShown {
+  bar: number;
+  color: number;
+  fill01: number;
+  countText: string;
+  breaks: number;
+  look: 'art' | 'flat';
+}
+
 /**
  * A segment as last drawn: where it starts and how long it is, as shares of
  * the trough; its label's text, left edge and centre line; and the bar's own
@@ -208,12 +222,142 @@ function segmentLabel(scene: Phaser.Scene, color: number): Phaser.GameObjects.Te
   return scene.add.text(0, 0, '', { ...LABEL_STYLE, color: css }).setOrigin(0, 0.5);
 }
 
+/** #387: how long the break flash takes to fade, and its starting strength. */
+const BREAK_FLASH_MS = 180;
+const BREAK_FLASH_ALPHA = 0.9;
+/**
+ * The break art (CO-219 sheet): cracks laid end to end across the trough, a
+ * crack about every `BREAK_CRACK_PITCH` px, and a burst of shards at each of
+ * `BREAK_SHARD_AT`, as fractions of the trough's width. The shards are pale
+ * glass, tinted the colour of the bar that broke.
+ */
+const BREAK_CRACK = 'hud.bossCrack';
+const BREAK_SHARDS = 'hud.bossShards';
+const BREAK_CRACK_PITCH = 60;
+const BREAK_SHARD_AT = [1 / 6, 1 / 2, 5 / 6] as const;
+
+/** Where a bar's trough sits on screen, for what is drawn over it. */
+interface TroughBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * #387: what the boss bar wears beyond its fill: the `\u00d7N` count after the
+ * "Boss" label, in the colour of the bar showing, and the flash over the trough
+ * when a bar breaks. The flash is always a white rectangle that fades; in the
+ * framed look the glass also cracks across the trough and shards burst off it.
+ */
+class BossFx {
+  private readonly count: Phaser.GameObjects.Text;
+  private readonly flash: Phaser.GameObjects.Rectangle;
+  /** The break art's sprites, none without the atlas; `shards` are the ones tinted. */
+  private readonly sprites: { sprite: Phaser.GameObjects.Sprite; anim: string }[] = [];
+  private readonly shards: { sprite: Phaser.GameObjects.Sprite; anim: string }[] = [];
+  private readonly scene: Phaser.Scene;
+  private readonly label: Phaser.GameObjects.Text;
+  private shownText: string | null = null;
+  private shownColor = -1;
+
+  constructor(
+    scene: Phaser.Scene,
+    label: Phaser.GameObjects.Text,
+    trough: TroughBox,
+    art: boolean,
+  ) {
+    this.scene = scene;
+    this.label = label;
+    this.count = scene.add.text(0, 0, '', LABEL_STYLE).setOrigin(0, 0.5);
+    this.flash = scene.add
+      .rectangle(trough.x, trough.y, trough.w, trough.h, 0xffffff)
+      .setOrigin(0, 0)
+      .setAlpha(0);
+    const crack = artFrame(`${BREAK_CRACK}.0` as FrameName);
+    const shards = artFrame(`${BREAK_SHARDS}.0` as FrameName);
+    // The framed look only: the flat bars stay plain, flash and all.
+    if (art && hasFrameArt(scene, `${BREAK_CRACK}.0`) && hasFrameArt(scene, `${BREAK_SHARDS}.0`)) {
+      const midY = trough.y + trough.h / 2;
+      const cracks = Math.max(1, Math.round(trough.w / BREAK_CRACK_PITCH));
+      for (let i = 0; i < cracks; i++) {
+        const x = trough.x + ((i + 0.5) * trough.w) / cracks;
+        this.sprites.push(
+          this.breakSprite(scene, x, midY, FRAMES[`${BREAK_CRACK}.0`].page, crack, BREAK_CRACK),
+        );
+      }
+      for (const at of BREAK_SHARD_AT) {
+        const x = trough.x + at * trough.w;
+        const sprite = this.breakSprite(
+          scene,
+          x,
+          midY,
+          FRAMES[`${BREAK_SHARDS}.0`].page,
+          shards,
+          BREAK_SHARDS,
+        );
+        this.shards.push(sprite);
+        this.sprites.push(sprite);
+      }
+    }
+  }
+
+  private breakSprite(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    page: string,
+    frame: string | number,
+    anim: string,
+  ): { sprite: Phaser.GameObjects.Sprite; anim: string } {
+    const sprite = scene.add.sprite(x, y, page, frame).setVisible(false);
+    sprite.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sprite.setVisible(false));
+    return { sprite, anim };
+  }
+
+  /** The count beside the label, which `set` has just redrawn; '' draws nothing. */
+  set(text: string, color: number): void {
+    // Redrawing a Text re-uploads its texture, and the HUD renders on every run event.
+    if (text === this.shownText && color === this.shownColor) return;
+    this.shownText = text;
+    this.shownColor = color;
+    this.count
+      .setText(text)
+      .setColor(`#${color.toString(16).padStart(6, '0')}`)
+      .setPosition(this.label.x + this.label.width + SEGMENT_LABEL_GAP, this.label.y);
+  }
+
+  setVisible(visible: boolean): void {
+    this.count.setVisible(visible);
+    if (!visible) {
+      this.scene.tweens.killTweensOf(this.flash);
+      this.flash.setAlpha(0);
+      for (const { sprite } of this.sprites) sprite.stop().setVisible(false);
+    }
+  }
+
+  /** A bar just broke; `color` is the broken bar's fill, which tints the shards. */
+  breakFlash(color: number): void {
+    this.scene.tweens.killTweensOf(this.flash);
+    this.flash.setAlpha(BREAK_FLASH_ALPHA);
+    this.scene.tweens.add({
+      targets: this.flash,
+      alpha: 0,
+      duration: BREAK_FLASH_MS,
+    });
+    for (const { sprite, anim } of this.sprites) sprite.setVisible(true).play(anim);
+    for (const { sprite } of this.shards) sprite.setTint(color);
+  }
+}
+
 /** Background + fill + label; `set` drives the fill by fraction so callers never touch pixels. */
 class Bar {
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly fill: Phaser.GameObjects.Rectangle;
-  private readonly label: Phaser.GameObjects.Text;
+  readonly label: Phaser.GameObjects.Text;
   private readonly segment: Segment | null = null;
+  /** The fill's box, for what `BossFx` draws over it. */
+  readonly trough: TroughBox;
 
   constructor(
     scene: Phaser.Scene,
@@ -229,6 +373,7 @@ class Bar {
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0x555555);
     this.fill = scene.add.rectangle(x, y, width, height, color).setOrigin(0, 0);
+    this.trough = { x, y, w: width, h: height };
     if (segmentColor !== undefined) {
       const rect = scene.add.rectangle(x, y, width, height, segmentColor).setOrigin(0, 0);
       this.segment = new Segment([rect], x, width, segmentLabel(scene, segmentColor));
@@ -286,8 +431,10 @@ class FramedBar {
   private readonly parts: (Phaser.GameObjects.Components.Visible & Phaser.GameObjects.GameObject)[];
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly glint: Phaser.GameObjects.Rectangle;
-  private readonly label: Phaser.GameObjects.Text;
+  readonly label: Phaser.GameObjects.Text;
   private readonly segment: Segment | null = null;
+  /** The trough's box, for what `BossFx` draws over it. */
+  readonly trough: TroughBox;
   /** The frame's pieces and its mark: what shows of the bar with an empty fill. */
   readonly solid: readonly Phaser.GameObjects.GameObject[];
 
@@ -306,6 +453,7 @@ class FramedBar {
     const troughY = y + top;
     const troughW = width - left - right;
     const troughH = box.h - top - bottom;
+    this.trough = { x: troughX, y: troughY, w: troughW, h: troughH };
     const bg = scene.add.rectangle(troughX, troughY, troughW, troughH, BAR_BG).setOrigin(0, 0);
     this.fill = scene.add.rectangle(troughX, troughY, troughW, troughH, color).setOrigin(0, 0);
     // The concept's glass tube: one lighter row along the top of what is filled.
@@ -356,6 +504,12 @@ class FramedBar {
     this.fill.setScale(fraction01, 1);
     this.glint.setScale(fraction01, 1);
     this.label.setText(text);
+  }
+
+  /** #387: the boss bar changes colour from one layer to the next; the glint row follows. */
+  setFillColor(color: number): void {
+    this.fill.setFillStyle(color);
+    this.glint.setFillStyle(towardWhite(color, FILL_GLINT));
   }
 
   /** As `Bar.setSegment`: the HP bar's shield, never hidden. */
@@ -687,6 +841,16 @@ export class HudScene extends Phaser.Scene {
   private hpBar!: Bar | FramedBar;
   private xpBar!: Bar | FramedBar;
   private bossBar!: Bar | FramedBar;
+  private bossFx!: BossFx;
+  /** #387: bars the boss had as last drawn; null while the bar is hidden, so a fresh fight shows no break. */
+  private shownBossLeft: number | null = null;
+  private bossBreaks = 0;
+  private bossBarDrawn: Omit<BossBarShown, 'breaks' | 'look'> = {
+    bar: -1,
+    color: 0,
+    fill01: 0,
+    countText: '',
+  };
   private look: 'art' | 'flat' = 'flat';
   private slotIcons: SlotIcon[] = [];
   /** CO-193: whether the corner wears its art (the plate and icons) or is plain text. */
@@ -733,6 +897,11 @@ export class HudScene extends Phaser.Scene {
   /** CO-195: the HP bar's red and shield segment, and both labels, as last drawn; the browser suite reads it. */
   get hpBarShown(): SegmentShown | null {
     return this.hpBar.segmentShown;
+  }
+
+  /** #387: the boss bar as drawn: its layer, colour, fill and count, and the breaks seen; the browser suite reads it. */
+  get bossBarShown(): BossBarShown {
+    return { ...this.bossBarDrawn, breaks: this.bossBreaks, look: this.look };
   }
 
   /** The passive tiles on screen, in the order taken; the browser suite reads them. */
@@ -815,6 +984,10 @@ export class HudScene extends Phaser.Scene {
       this.xpBar = new Bar(this, MARGIN, MARGIN + 22, BAR_WIDTH, 10, XP_COLOR);
       this.bossBar = new Bar(this, width / 2 - 200, 56, 400, 14, BOSS_COLOR);
     }
+    this.bossFx = new BossFx(this, this.bossBar.label, this.bossBar.trough, art);
+    this.shownBossLeft = null;
+    this.bossBreaks = 0;
+    this.bossBarDrawn = { bar: -1, color: 0, fill01: 0, countText: '' };
     this.timerText = this.add
       .text(width / 2, MARGIN - 4, '', { ...LABEL_STYLE, fontSize: '28px' })
       .setOrigin(0.5, 0);
@@ -917,10 +1090,35 @@ export class HudScene extends Phaser.Scene {
     const counts = cornerCounts(m, this.iconed);
     this.killsText.setText(counts.kills);
     this.embersText.setText(counts.embers);
-    this.bossBar.setVisible(bossBarVisible(m));
-    this.bossBar.set(fraction(m.bossHp, m.bossMaxHp), 'Boss');
+    this.renderBossBar(m);
     this.renderSlots(slotRows(m));
     this.renderPassives(m.passives);
+  }
+
+  /**
+   * #387: the boss bar, one layer of `BOSS.bars` at a time: the fill is the
+   * bar being worn down, its colour and the `\u00d7N` count follow the layer, and
+   * a layer lost flashes. The first draw of a fight only sets the baseline.
+   */
+  private renderBossBar(m: Readonly<HudModel>): void {
+    const visible = bossBarVisible(m);
+    this.bossBar.setVisible(visible);
+    this.bossFx.setVisible(visible);
+    if (!visible) {
+      this.shownBossLeft = null;
+      return;
+    }
+    const v = bossBarLayers(m.bossHp, m.bossMaxHp, BOSS.bars);
+    const color = bossBarColor(v.bar, BOSS.bars);
+    this.bossBar.set(v.fill01, 'Boss');
+    if (color !== this.bossBarDrawn.color) this.bossBar.setFillColor(color);
+    this.bossFx.set(v.countText, color);
+    if (bossBarBroke(this.shownBossLeft, v.left)) {
+      this.bossBreaks += 1;
+      this.bossFx.breakFlash(this.bossBarDrawn.color);
+    }
+    this.shownBossLeft = v.left;
+    this.bossBarDrawn = { bar: v.bar, color, fill01: v.fill01, countText: v.countText };
   }
 
   /**

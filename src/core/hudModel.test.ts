@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { BOSS_BAR_COLORS } from '../config/hud';
 import {
   INITIAL_HUD,
   applyRunEvent,
+  bossBarBroke,
+  bossBarColor,
+  bossBarLayers,
   bossBarVisible,
   formatTimer,
   fraction,
@@ -285,6 +289,105 @@ describe('bossBarVisible', () => {
     expect(bossBarVisible(boss)).toBe(true);
     const over = applyRunEvent(boss, { name: 'phase', payload: { phase: 'over' } });
     expect(bossBarVisible(over)).toBe(false);
+  });
+});
+
+describe('bossBarLayers (#387)', () => {
+  it('reads a full boss as the first bar, full', () => {
+    expect(bossBarLayers(14400, 14400, 2)).toEqual({
+      bar: 0,
+      fill01: 1,
+      left: 2,
+      countText: '\u00d72',
+    });
+  });
+
+  it('reads one HP past the break as two bars with the first nearly empty', () => {
+    const v = bossBarLayers(7201, 14400, 2);
+    expect(v).toMatchObject({ bar: 0, left: 2, countText: '\u00d72' });
+    expect(v.fill01).toBeCloseTo(1 / 7200, 9);
+  });
+
+  it('reads exactly one bar of HP as the last bar, full', () => {
+    expect(bossBarLayers(7200, 14400, 2)).toEqual({
+      bar: 1,
+      fill01: 1,
+      left: 1,
+      countText: '\u00d71',
+    });
+  });
+
+  it('is not moved by float noise at the edge of a bar', () => {
+    expect(bossBarLayers(7200 + 1e-9, 14400, 2)).toMatchObject({ bar: 1, left: 1, fill01: 1 });
+  });
+
+  it('reads the last HP as the last bar, nearly empty', () => {
+    const v = bossBarLayers(1, 14400, 2);
+    expect(v).toMatchObject({ bar: 1, left: 1 });
+    expect(v.fill01).toBeCloseTo(1 / 7200, 9);
+  });
+
+  it('reads no HP, a negative HP and a NaN HP as spent', () => {
+    for (const hp of [0, -5, Number.NaN]) {
+      expect(bossBarLayers(hp, 14400, 2)).toEqual({ bar: 1, fill01: 0, left: 0, countText: '' });
+    }
+  });
+
+  it('clamps an HP over the max to full', () => {
+    expect(bossBarLayers(99999, 14400, 2)).toMatchObject({ bar: 0, left: 2, fill01: 1 });
+  });
+
+  it('reads an unusable max as spent', () => {
+    for (const maxHp of [0, -1, Number.NaN, Infinity]) {
+      expect(bossBarLayers(10, maxHp, 2)).toEqual({ bar: 1, fill01: 0, left: 0, countText: '' });
+    }
+  });
+
+  it('treats fewer than one bar as one bar', () => {
+    expect(bossBarLayers(50, 100, 1)).toEqual({
+      bar: 0,
+      fill01: 0.5,
+      left: 1,
+      countText: '\u00d71',
+    });
+    expect(bossBarLayers(50, 100, 0)).toMatchObject({ bar: 0, left: 1, fill01: 0.5 });
+  });
+
+  it('splits any max into equal bars', () => {
+    expect(bossBarLayers(100, 100, 3)).toMatchObject({ bar: 0, left: 3, fill01: 1 });
+    expect(bossBarLayers(50, 100, 3)).toMatchObject({ bar: 1, left: 2 });
+    expect(bossBarLayers(50, 100, 3).fill01).toBeCloseTo(0.5, 9);
+  });
+});
+
+describe('bossBarBroke (#387)', () => {
+  it('is true when bars were lost and some are left', () => {
+    expect(bossBarBroke(2, 1)).toBe(true);
+    expect(bossBarBroke(3, 1)).toBe(true);
+  });
+
+  it('is false with no baseline, no change, a rise, or the killing blow', () => {
+    expect(bossBarBroke(null, 2)).toBe(false);
+    expect(bossBarBroke(2, 2)).toBe(false);
+    expect(bossBarBroke(1, 2)).toBe(false);
+    expect(bossBarBroke(1, 0)).toBe(false);
+    expect(bossBarBroke(2, 0)).toBe(false);
+  });
+});
+
+describe('bossBarColor (#387)', () => {
+  it('runs violet to red with two bars', () => {
+    expect(bossBarColor(0, 2)).toBe(BOSS_BAR_COLORS.first);
+    expect(bossBarColor(1, 2)).toBe(BOSS_BAR_COLORS.last);
+  });
+
+  it('puts amber on any bar between', () => {
+    expect(bossBarColor(1, 3)).toBe(BOSS_BAR_COLORS.middle);
+    expect(bossBarColor(2, 3)).toBe(BOSS_BAR_COLORS.last);
+  });
+
+  it('is red for a lone bar', () => {
+    expect(bossBarColor(0, 1)).toBe(BOSS_BAR_COLORS.last);
   });
 });
 
