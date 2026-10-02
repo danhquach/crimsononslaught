@@ -2263,6 +2263,45 @@
       "rows": 1,
       "sheetCell": 224,
       "rowSpecs": [[{ "anim": "immune", "cols": [1, 1], "centred": true }]]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-222",
+      "file": "CO-222/boss_slam.png",
+      "page": 26,
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 480,
+      "recolour": { "gamma": 0.8, "rim": "#ff8a3d" },
+      "rowSpecs": [
+        [{ "anim": "slamWindup", "facing": "down", "cols": [1, 2] }, { "anim": "slam", "facing": "down", "cols": [3, 4] }],
+        [{ "anim": "slamWindup", "facing": "up", "cols": [1, 2] }, { "anim": "slam", "facing": "up", "cols": [3, 4] }],
+        [{ "anim": "slamWindup", "facing": "left", "cols": [1, 2] }, { "anim": "slam", "facing": "left", "cols": [3, 4] }],
+        [{ "anim": "slamWindup", "facing": "right", "cols": [1, 2] }, { "anim": "slam", "facing": "right", "cols": [3, 4] }]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-222",
+      "file": "CO-222/boss_slam_fx.png",
+      "page": 26,
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 384,
+      "rowSpecs": [
+        [{ "anim": "slamWarnRim", "cols": [1, 4], "centred": true }],
+        [{ "anim": "slamWarnFill", "cols": [1, 4], "centred": true }]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-222",
+      "file": "CO-222/boss_slam_shock.png",
+      "page": 26,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 384,
+      "rowSpecs": [[{ "anim": "slamShock", "cols": [1, 4], "centred": true }]]
     }
   ]
 }

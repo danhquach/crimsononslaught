@@ -1,0 +1,573 @@
+{
+  "frames": {
+    "boss.slam.down.0": {
+      "frame": {
+        "x": 1689,
+        "y": 1,
+        "w": 99,
+        "h": 70
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 99,
+        "h": 70
+      },
+      "sourceSize": {
+        "w": 99,
+        "h": 70
+      }
+    },
+    "boss.slam.down.1": {
+      "frame": {
+        "x": 1789,
+        "y": 1,
+        "w": 99,
+        "h": 70
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 99,
+        "h": 70
+      },
+      "sourceSize": {
+        "w": 99,
+        "h": 70
+      }
+    },
+    "boss.slam.left.0": {
+      "frame": {
+        "x": 1889,
+        "y": 1,
+        "w": 83,
+        "h": 63
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 83,
+        "h": 63
+      },
+      "sourceSize": {
+        "w": 83,
+        "h": 63
+      }
+    },
+    "boss.slam.left.1": {
+      "frame": {
+        "x": 1,
+        "y": 101,
+        "w": 83,
+        "h": 63
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 83,
+        "h": 63
+      },
+      "sourceSize": {
+        "w": 83,
+        "h": 63
+      }
+    },
+    "boss.slam.right.0": {
+      "frame": {
+        "x": 85,
+        "y": 101,
+        "w": 82,
+        "h": 63
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 63
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 63
+      }
+    },
+    "boss.slam.right.1": {
+      "frame": {
+        "x": 168,
+        "y": 101,
+        "w": 82,
+        "h": 63
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 63
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 63
+      }
+    },
+    "boss.slam.up.0": {
+      "frame": {
+        "x": 251,
+        "y": 101,
+        "w": 96,
+        "h": 60
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 96,
+        "h": 60
+      },
+      "sourceSize": {
+        "w": 96,
+        "h": 60
+      }
+    },
+    "boss.slam.up.1": {
+      "frame": {
+        "x": 348,
+        "y": 101,
+        "w": 96,
+        "h": 60
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 96,
+        "h": 60
+      },
+      "sourceSize": {
+        "w": 96,
+        "h": 60
+      }
+    },
+    "boss.slamShock.0": {
+      "frame": {
+        "x": 741,
+        "y": 1,
+        "w": 80,
+        "h": 80
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 80,
+        "h": 80
+      },
+      "sourceSize": {
+        "w": 80,
+        "h": 80
+      }
+    },
+    "boss.slamShock.1": {
+      "frame": {
+        "x": 822,
+        "y": 1,
+        "w": 80,
+        "h": 80
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 80,
+        "h": 80
+      },
+      "sourceSize": {
+        "w": 80,
+        "h": 80
+      }
+    },
+    "boss.slamShock.2": {
+      "frame": {
+        "x": 903,
+        "y": 1,
+        "w": 80,
+        "h": 80
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 80,
+        "h": 80
+      },
+      "sourceSize": {
+        "w": 80,
+        "h": 80
+      }
+    },
+    "boss.slamShock.3": {
+      "frame": {
+        "x": 984,
+        "y": 1,
+        "w": 80,
+        "h": 80
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 80,
+        "h": 80
+      },
+      "sourceSize": {
+        "w": 80,
+        "h": 80
+      }
+    },
+    "boss.slamWarnFill.0": {
+      "frame": {
+        "x": 1065,
+        "y": 1,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
+      }
+    },
+    "boss.slamWarnFill.1": {
+      "frame": {
+        "x": 1142,
+        "y": 1,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
+      }
+    },
+    "boss.slamWarnFill.2": {
+      "frame": {
+        "x": 1219,
+        "y": 1,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
+      }
+    },
+    "boss.slamWarnFill.3": {
+      "frame": {
+        "x": 1296,
+        "y": 1,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
+      }
+    },
+    "boss.slamWarnRim.0": {
+      "frame": {
+        "x": 1373,
+        "y": 1,
+        "w": 78,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 76
+      }
+    },
+    "boss.slamWarnRim.1": {
+      "frame": {
+        "x": 1452,
+        "y": 1,
+        "w": 78,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 76
+      }
+    },
+    "boss.slamWarnRim.2": {
+      "frame": {
+        "x": 1531,
+        "y": 1,
+        "w": 78,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 76
+      }
+    },
+    "boss.slamWarnRim.3": {
+      "frame": {
+        "x": 1610,
+        "y": 1,
+        "w": 78,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 76
+      }
+    },
+    "boss.slamWindup.down.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 105,
+        "h": 99
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 105,
+        "h": 99
+      },
+      "sourceSize": {
+        "w": 105,
+        "h": 99
+      }
+    },
+    "boss.slamWindup.down.1": {
+      "frame": {
+        "x": 107,
+        "y": 1,
+        "w": 105,
+        "h": 99
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 105,
+        "h": 99
+      },
+      "sourceSize": {
+        "w": 105,
+        "h": 99
+      }
+    },
+    "boss.slamWindup.left.0": {
+      "frame": {
+        "x": 425,
+        "y": 1,
+        "w": 78,
+        "h": 92
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 92
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 92
+      }
+    },
+    "boss.slamWindup.left.1": {
+      "frame": {
+        "x": 504,
+        "y": 1,
+        "w": 78,
+        "h": 92
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 92
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 92
+      }
+    },
+    "boss.slamWindup.right.0": {
+      "frame": {
+        "x": 583,
+        "y": 1,
+        "w": 78,
+        "h": 91
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 91
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 91
+      }
+    },
+    "boss.slamWindup.right.1": {
+      "frame": {
+        "x": 662,
+        "y": 1,
+        "w": 78,
+        "h": 91
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 91
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 91
+      }
+    },
+    "boss.slamWindup.up.0": {
+      "frame": {
+        "x": 213,
+        "y": 1,
+        "w": 105,
+        "h": 95
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 105,
+        "h": 95
+      },
+      "sourceSize": {
+        "w": 105,
+        "h": 95
+      }
+    },
+    "boss.slamWindup.up.1": {
+      "frame": {
+        "x": 319,
+        "y": 1,
+        "w": 105,
+        "h": 95
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 105,
+        "h": 95
+      },
+      "sourceSize": {
+        "w": 105,
+        "h": 95
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 256
+    },
+    "scale": "1"
+  }
+}

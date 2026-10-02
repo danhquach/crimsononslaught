@@ -224,6 +224,12 @@ export const RECIPES = {
   // #388: a low roar swell, a rising 60 -> 180 Hz sweep under a noise swell, 0.8 s.
   'boss.enrage': () =>
     mix([envelope(sweep(0.8, 60, 180), 0.25), 0.9], [envelope(noise(0.8, 64, 900), 0.3), 0.5]),
+  // CO-222: a low ground thump over a short noise crack, 0.45 s.
+  'boss.slam': () =>
+    mix(
+      [envelope(sweep(0.45, 110, 38), 0.004), 0.9],
+      [envelope(noise(0.45, 65, 1800), 0.004), 0.6],
+    ),
   'boss.death': () =>
     mix([envelope(sweep(1.0, 300, 35), 0.02), 0.9], [envelope(noise(1.0, 43, 700), 0.02), 0.4]),
 

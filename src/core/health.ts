@@ -52,15 +52,19 @@ export function isInvulnerable(state: Readonly<HealthState>): boolean {
  * invulnerability window, so it shrinks the number the player sees rather than
  * how often they are hit). Hits during the window are ignored outright — they
  * neither damage nor refresh the window — so a swarm standing on the player
- * still only lands one hit per 0.5 s.
+ * still only lands one hit per 0.5 s. `ignoreWindow` (CO-222) lets a hit through
+ * a window already running — the boss's ground slam, which a hero hugged by
+ * contact bites would otherwise always land inside — and still opens a fresh one.
+ * A dead player and a non-positive amount stay blocked.
  */
 export function takeDamage(
   state: Readonly<HealthState>,
   amount: number,
   reduction = 0,
+  ignoreWindow = false,
 ): DamageResult {
   const taken = reduceDamage(amount, reduction);
-  const blocked = !(taken > 0) || isInvulnerable(state) || isDead(state);
+  const blocked = !(taken > 0) || (!ignoreWindow && isInvulnerable(state)) || isDead(state);
   if (blocked) return { state: { ...state }, damaged: false, died: false };
 
   const hp = Math.max(0, state.hp - taken);

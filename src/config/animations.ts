@@ -143,6 +143,14 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // #388: the enrage ember ring loops under the boss; the burst plays once as it turns.
   spec('boss.enrageAura', 4, 8, LOOP),
   spec('boss.enrageBurst', 4, 12, ONCE),
+  // CO-222: the Ground slam, paced to its 1.0 s wind-up and 0.4 s impact; the
+  // poses hold their last frame. The warning disc and rim loop under the boss
+  // through the wind-up, and the shockwave plays once on the slam.
+  ...facings('boss.slamWindup', 2, 2, ONCE),
+  ...facings('boss.slam', 2, 5, ONCE),
+  spec('boss.slamWarnRim', 4, 8, LOOP),
+  spec('boss.slamWarnFill', 4, 8, LOOP),
+  spec('boss.slamShock', 4, 10, ONCE),
 
   // XP gem (CO-075).
   spec('gem.idle', 4, 6, LOOP),

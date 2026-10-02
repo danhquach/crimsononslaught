@@ -196,6 +196,23 @@ export const BOSS_BURST = { clip: 'boss.enrageBurst', span: 3 } as const;
 export const BOSS_AURA_DEPTH = -0.2;
 
 /**
+ * CO-222: the Ground slam's floor warning, a translucent red disc under a
+ * bright rim, scaled so the rim's outer edge sits on the slam's radius; it lies
+ * over the enrage ring and under every entity. The shockwave plays once at the
+ * same depth and scale, a ring of fire on the floor round the boss and the hero.
+ */
+export const BOSS_SLAM_FX = {
+  rim: 'boss.slamWarnRim',
+  fill: 'boss.slamWarnFill',
+  shock: 'boss.slamShock',
+  // Toned down after the first in-game look read too bright on the dark floor.
+  rimAlpha: 0.55,
+  fillAlpha: 0.2,
+  shockAlpha: 1,
+} as const;
+export const BOSS_SLAM_WARN_DEPTH = -0.15;
+
+/**
  * The dash's afterimages and wisps (#384) lie just under the hero, over the
  * ground areas and the elite marks and under the entities drawn at depth 0, so
  * the trail never covers the hero it follows.

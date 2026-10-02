@@ -1,3 +1,4 @@
+import type { BossSkillId } from '../config/boss';
 import { ANIMATIONS, type Facing } from '../config/animations';
 import { DASH_POSE_CLIP } from '../config/dash';
 import type { EnemyType } from '../config/enemies';
@@ -149,14 +150,22 @@ export interface BossPose {
   /** Inside the hurt flash after a hit. */
   readonly hurt: boolean;
   readonly dead: boolean;
+  /** The skill in its windup or landing (CO-222); picks the clip's prefix. */
+  readonly skill?: BossSkillId | null;
 }
 
 /**
  * The telegraph and charge always show — the warning is the point of them
- * (spec §5) — so the hurt frame only interrupts the walk.
+ * (spec §5) — so the hurt frame only interrupts the walk. The same goes for a
+ * skill's windup and landing (CO-222), `boss.slamWindup.<facing>` and
+ * `boss.slam.<facing>`.
  */
 export function bossAnimation(pose: Readonly<BossPose>): string {
   if (pose.dead) return 'boss.death';
+  if (pose.phase === 'windup' || pose.phase === 'skill') {
+    const skill = pose.skill ?? 'slam';
+    return `boss.${skill}${pose.phase === 'windup' ? 'Windup' : ''}.${pose.facing}`;
+  }
   if (pose.phase !== 'chase') return `boss.${pose.phase}.${pose.facing}`;
   if (pose.hurt) return `boss.hurt.${pose.facing}`;
   return `boss.walk.${pose.facing}`;

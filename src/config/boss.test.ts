@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS, BOSS_CC_DR, BOSS_ENRAGE } from './boss';
+import { BOSS, BOSS_CC_DR, BOSS_ENRAGE, BOSS_SKILL_ROTATION, BOSS_SKILLS, BOSS_SLAM } from './boss';
 import { TEXTURE_KEYS } from './colors';
 
 describe('boss stats (CO-050)', () => {
@@ -47,5 +47,28 @@ describe('boss enrage (#388)', () => {
     expect(BOSS_ENRAGE.damageMul).toBeGreaterThan(1);
     expect(BOSS_ENRAGE.speedMul).toBeGreaterThan(1);
     expect(BOSS_ENRAGE.damageTakenMul).toBeGreaterThan(1);
+  });
+});
+
+describe('boss ground slam (CO-222)', () => {
+  it('has the ticket values: 1 s warning, 0.4 s landing, 120 px, 30 damage', () => {
+    expect(BOSS_SLAM).toEqual({ windupS: 1.0, activeS: 0.4, radius: 120, damage: 30 });
+    expect(BOSS_SKILLS.slam).toBe(BOSS_SLAM);
+  });
+
+  it('is escapable: a walking hero leaves the ring inside the warning', () => {
+    const heroSpeed = 180;
+    const heroRadius = 14;
+    const escapePx = BOSS_SLAM.radius + heroRadius - BOSS.radius;
+    expect(escapePx / heroSpeed).toBeLessThan(BOSS_SLAM.windupS);
+  });
+
+  it('is as long as the charge leg, so it fits where the charge does', () => {
+    expect(BOSS_SLAM.windupS + BOSS_SLAM.activeS).toBeCloseTo(BOSS.telegraphS + BOSS.chargeS, 9);
+  });
+
+  it('has a rotation list per bar, the first holding the slam', () => {
+    expect(BOSS_SKILL_ROTATION).toHaveLength(BOSS.bars);
+    expect(BOSS_SKILL_ROTATION[0]).toEqual(['slam']);
   });
 });
