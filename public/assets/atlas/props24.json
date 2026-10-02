@@ -1,0 +1,333 @@
+{
+  "frames": {
+    "boss.enrageAura.0": {
+      "frame": {
+        "x": 301,
+        "y": 1,
+        "w": 66,
+        "h": 52
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 52
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 52
+      }
+    },
+    "boss.enrageAura.1": {
+      "frame": {
+        "x": 368,
+        "y": 1,
+        "w": 66,
+        "h": 52
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 52
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 52
+      }
+    },
+    "boss.enrageAura.2": {
+      "frame": {
+        "x": 435,
+        "y": 1,
+        "w": 66,
+        "h": 52
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 52
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 52
+      }
+    },
+    "boss.enrageAura.3": {
+      "frame": {
+        "x": 502,
+        "y": 1,
+        "w": 66,
+        "h": 52
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 52
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 52
+      }
+    },
+    "boss.enrageBurst.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 74,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 74,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 74,
+        "h": 64
+      }
+    },
+    "boss.enrageBurst.1": {
+      "frame": {
+        "x": 76,
+        "y": 1,
+        "w": 74,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 74,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 74,
+        "h": 64
+      }
+    },
+    "boss.enrageBurst.2": {
+      "frame": {
+        "x": 151,
+        "y": 1,
+        "w": 74,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 74,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 74,
+        "h": 64
+      }
+    },
+    "boss.enrageBurst.3": {
+      "frame": {
+        "x": 226,
+        "y": 1,
+        "w": 74,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 74,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 74,
+        "h": 64
+      }
+    },
+    "hud.bossFlames.0": {
+      "frame": {
+        "x": 569,
+        "y": 1,
+        "w": 66,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 50
+      }
+    },
+    "hud.bossFlames.1": {
+      "frame": {
+        "x": 636,
+        "y": 1,
+        "w": 66,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 50
+      }
+    },
+    "hud.bossFlames.2": {
+      "frame": {
+        "x": 703,
+        "y": 1,
+        "w": 66,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 50
+      }
+    },
+    "hud.bossFlames.3": {
+      "frame": {
+        "x": 770,
+        "y": 1,
+        "w": 66,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 50
+      }
+    },
+    "hud.bossFlames.4": {
+      "frame": {
+        "x": 837,
+        "y": 1,
+        "w": 66,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 50
+      }
+    },
+    "hud.bossFlames.5": {
+      "frame": {
+        "x": 904,
+        "y": 1,
+        "w": 66,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 50
+      }
+    },
+    "hud.bossFlames.6": {
+      "frame": {
+        "x": 971,
+        "y": 1,
+        "w": 66,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 50
+      }
+    },
+    "hud.bossFlames.7": {
+      "frame": {
+        "x": 1038,
+        "y": 1,
+        "w": 66,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 66,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 66,
+        "h": 50
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 128
+    },
+    "scale": "1"
+  }
+}

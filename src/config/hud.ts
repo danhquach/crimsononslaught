@@ -72,3 +72,22 @@ export const BOSS_BAR_COLORS = {
   middle: 0xffb300,
   last: 0xe53935,
 } as const;
+
+/**
+ * #388: the flames along the top of the boss bar while it is enraged (CO-220
+ * `hud.bossFlames`, an 8-frame loop). `count` tiles are spread evenly over the
+ * frame's full width, each starting its loop on a different frame so the repeat
+ * does not show; `sink` is how far the flames' flat base dips below the frame's
+ * top edge, so they sit on the rim instead of floating above it. `scale` and
+ * `alpha` keep them low and a little see-through (the PM asked to tone the
+ * full-size row down), with enough tiles that the smaller flames still join up.
+ */
+export const BOSS_BAR_FLAMES = {
+  frame: 'hud.bossFlames',
+  count: 12,
+  scale: 0.6,
+  alpha: 0.8,
+  sink: 2,
+  /** Frames between one tile's start and the next's; coprime with the loop's 8, so no two neighbouring tiles start together. */
+  startStep: 3,
+} as const;

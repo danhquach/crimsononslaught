@@ -1,4 +1,4 @@
-import { BOSS } from '../config/boss';
+import { BOSS, BOSS_ENRAGE } from '../config/boss';
 import type { Vec2 } from './enemy';
 
 /**
@@ -20,12 +20,14 @@ export type BossPhase = 'chase' | 'telegraph' | 'charge';
  * blow (CO-081): the win waits for it. `phase` fires with `{ phase }` each
  * time the charge cycle moves on (CO-102: the telegraph and charge cues).
  * `barBreak` fires with `{ left }` when a hit takes a bar off the boss and some
- * are left (#387); the killing blow fires none, `died` is its cue.
+ * are left (#387); the killing blow fires none, `died` is its cue. `enrage`
+ * fires once, when a hit takes the boss to its enrage threshold (#388).
  */
 export const BOSS_EVENT = {
   died: 'boss:died',
   phase: 'boss:phase',
   barBreak: 'boss:barBreak',
+  enrage: 'boss:enrage',
 } as const;
 
 export interface BossPhasePayload {
@@ -73,11 +75,63 @@ const NO_DIRECTION: Vec2 = { x: 0, y: 0 };
 /** Seconds of plain chase between a charge ending and the next telegraph. */
 const CHASE_S = BOSS.cycleS - BOSS.telegraphS - BOSS.chargeS;
 
-const PHASE_LENGTH_S: Readonly<Record<BossPhase, number>> = {
-  chase: CHASE_S,
-  telegraph: BOSS.telegraphS,
-  charge: BOSS.chargeS,
-};
+/** Seconds of chase once enraged: the cycle's period scaled by `attackGapMul`, the telegraph and charge kept (#388). */
+const ENRAGED_CHASE_S = BOSS.cycleS * BOSS_ENRAGE.attackGapMul - BOSS.telegraphS - BOSS.chargeS;
+
+/**
+ * How long `phase` lasts (#388). Enrage shortens only the chase: the telegraph
+ * is the player's warning and the charge is a fixed length.
+ */
+export function phaseLengthS(phase: BossPhase, enraged = false): number {
+  switch (phase) {
+    case 'chase':
+      return enraged ? ENRAGED_CHASE_S : CHASE_S;
+    case 'telegraph':
+      return BOSS.telegraphS;
+    case 'charge':
+      return BOSS.chargeS;
+  }
+}
+
+/** HP at or under which the boss is enraged (#388): half the last bar. */
+export function enrageThresholdHp(): number {
+  return (BOSS.hp / BOSS.bars) * BOSS_ENRAGE.atLastBarFraction;
+}
+
+/**
+ * Whether `hp` is in the enrage range: above 0 and at or under the threshold.
+ * The one rule the boss's latch and the HUD both read, so they cannot disagree;
+ * a dead boss (0) is not enraged.
+ */
+export function bossEnraged(hp: number): boolean {
+  return hp > 0 && hp <= enrageThresholdHp();
+}
+
+/** Whether a hit leaving the boss at `hp` turns it enraged now: not already, and in range. */
+export function shouldEnrage(already: boolean, hp: number): boolean {
+  return !already && bossEnraged(hp);
+}
+
+/** What enrage changes about the boss's stats; calm is all ones. */
+export function bossMods(enraged: boolean): { damage: number; speed: number; damageTaken: number } {
+  return enraged
+    ? {
+        damage: BOSS_ENRAGE.damageMul,
+        speed: BOSS_ENRAGE.speedMul,
+        damageTaken: BOSS_ENRAGE.damageTakenMul,
+      }
+    : { damage: 1, speed: 1, damageTaken: 1 };
+}
+
+/**
+ * Enraging mid-chase (#388): a chase already running longer than the enraged
+ * one is cut to it, so the next telegraph comes at the new pace. A telegraph or
+ * charge under way is left alone, never cut short.
+ */
+export function enterEnrage(cycle: BossCycle): BossCycle {
+  if (cycle.phase !== 'chase') return cycle;
+  return { ...cycle, remainingS: Math.min(cycle.remainingS, ENRAGED_CHASE_S) };
+}
 
 const NEXT_PHASE: Readonly<Record<BossPhase, BossPhase>> = {
   chase: 'telegraph',
@@ -102,6 +156,8 @@ export function startBossCycle(): BossCycle {
  * included; the cycle keeps time regardless, so a frozen boss simply charges
  * nowhere. The chase legs all aim where the target stood at the start of the
  * frame, as a regular enemy's chase does (`chaseVelocity`).
+ *
+ * `enraged` (#388) speeds the chase and charge and shortens the chase leg.
  */
 export function stepBossCycle(
   cycle: BossCycle,
@@ -109,6 +165,7 @@ export function stepBossCycle(
   from: Readonly<Vec2>,
   target: Readonly<Vec2>,
   speedFactor = 1,
+  enraged = false,
 ): BossStep {
   if (!(deltaS > 0) || !Number.isFinite(deltaS)) return { cycle, velocity: NO_DIRECTION };
   let { phase, remainingS, chargeDir } = cycle;
@@ -117,7 +174,7 @@ export function stepBossCycle(
   let moveY = 0;
   let left = deltaS;
   const travel = (seconds: number): void => {
-    const step = phaseSpeed(phase) * seconds;
+    const step = phaseSpeed(phase, enraged) * seconds;
     const direction = phase === 'charge' ? chargeDir : chaseDir;
     moveX += direction.x * step;
     moveY += direction.y * step;
@@ -127,7 +184,7 @@ export function stepBossCycle(
     left -= remainingS;
     if (phase === 'telegraph') chargeDir = unitToward(from, target);
     phase = NEXT_PHASE[phase];
-    remainingS = PHASE_LENGTH_S[phase];
+    remainingS = phaseLengthS(phase, enraged);
   }
   travel(left);
   const scale = speedFactor / deltaS;
@@ -138,14 +195,15 @@ export function stepBossCycle(
 }
 
 /** How fast the boss moves in `phase`, px/s: it stands still to telegraph (spec §5). */
-function phaseSpeed(phase: BossPhase): number {
+function phaseSpeed(phase: BossPhase, enraged: boolean): number {
+  const { speed } = bossMods(enraged);
   switch (phase) {
     case 'chase':
-      return BOSS.speed;
+      return BOSS.speed * speed;
     case 'telegraph':
       return 0;
     case 'charge':
-      return BOSS.chargeSpeed;
+      return BOSS.chargeSpeed * speed;
   }
 }
 

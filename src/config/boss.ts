@@ -68,3 +68,35 @@ export const BOSS_CC_DR: Readonly<BossCcDr> = {
   factor: 0.5,
   resetS: 4,
 };
+
+/**
+ * Boss enrage (#388): once the boss is down to the last `atLastBarFraction` of
+ * its final bar it turns on the player for good. Values are the ticket's, a
+ * starting point to tune.
+ *
+ * "Time between attacks 30% shorter" is read as the charge cycle's period, 4 s
+ * to 2.8 s (`attackGapMul` 0.7), got by shortening only the chase leg (2.6 s to
+ * 1.4 s). The telegraph (0.8 s) is the player's warning and the clip is paced to
+ * it, and the charge (0.6 s) is its length, so both stay. The charge's speed
+ * grows with `speedMul`, so it reaches 312 px against 240.
+ */
+export interface BossEnrage {
+  /** Enrages at or under this fraction of one bar's HP (of the last bar: the HP total less the others). */
+  atLastBarFraction: number;
+  /** Contact damage multiplier. */
+  damageMul: number;
+  /** Chase and charge speed multiplier. */
+  speedMul: number;
+  /** Multiplier on the cycle's period, taken off the chase leg alone. */
+  attackGapMul: number;
+  /** Multiplier on the damage the boss takes, so the last stretch is a race. */
+  damageTakenMul: number;
+}
+
+export const BOSS_ENRAGE: Readonly<BossEnrage> = {
+  atLastBarFraction: 0.5,
+  damageMul: 1.5,
+  speedMul: 1.3,
+  attackGapMul: 0.7,
+  damageTakenMul: 1.5,
+};

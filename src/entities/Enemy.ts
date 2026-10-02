@@ -144,6 +144,11 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return this.contact;
   }
 
+  /** #388: the multiplier on damage this enemy takes; 1 for all but an enraged boss. */
+  get damageTakenFactor(): number {
+    return 1;
+  }
+
   /** #126: the multipliers of the wave that spawned it. */
   get waveScale(): Readonly<WaveScale> {
     return this.wave;

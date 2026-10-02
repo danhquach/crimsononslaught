@@ -88,11 +88,12 @@ export interface Shake {
   readonly intensity: number;
 }
 
-export type ShakeKind = 'playerHurt' | 'bossCharge' | 'explosion';
+export type ShakeKind = 'playerHurt' | 'bossCharge' | 'bossEnrage' | 'explosion';
 
 export const SHAKES: Readonly<Record<ShakeKind, Shake>> = {
   playerHurt: { durationMs: 160, intensity: 0.006 },
   bossCharge: { durationMs: 260, intensity: 0.008 },
+  bossEnrage: { durationMs: 400, intensity: 0.01 },
   explosion: { durationMs: 140, intensity: 0.004 },
 };
 
