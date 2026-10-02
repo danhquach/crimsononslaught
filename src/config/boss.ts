@@ -1,5 +1,6 @@
 import type { TextureKey } from './colors';
 import type { FrameName } from './frames';
+import { WAVES } from './waves';
 
 /**
  * The boss (spec §5 "Boss"): its stats and the timings of its charge cycle.
@@ -132,7 +133,7 @@ export const BOSS_ENRAGE: Readonly<BossEnrage> = {
 };
 
 /** A boss skill (CO-222): its wind-up warning and the beat it lands in. Later skills append here. */
-export type BossSkillId = 'slam' | 'volley';
+export type BossSkillId = 'slam' | 'volley' | 'summon';
 
 export interface BossSkillTiming {
   /** Seconds the boss stands and the warning shows before the skill lands. */
@@ -183,9 +184,37 @@ export const BOSS_VOLLEY = {
  */
 export const BOSS_BOLT = { clip: 'boss.bolt', hitClip: 'boss.boltHit', maxLive: 32 } as const;
 
+/** The last wave row that spawns anything: the pack's HP and damage are this row's (CO-224). */
+const LAST_FIGHT_WAVE = [...WAVES].reverse().find((wave) => wave.types.length > 0) ?? WAVES[0];
+
+/**
+ * Summon (CO-224): the boss stops for `windupS`, and `circleRadius`-px circles
+ * show on the floor in a ring of `ringRadius` px round it, `packSize` of them,
+ * the first along the aim locked as the wind-up began. As it lands a Swarm
+ * enemy spawns at each circle. The pack is capped: at most `maxLive` summoned
+ * enemies alive at once, so a landing tops the pack up to the cap rather than
+ * past it, and while the cap is full the boss draws another skill. Summoned
+ * enemies drop XP gems only, no Embers or consumables. They are scaled as the
+ * last wave row of the schedule scales its enemies (`scale`), read from
+ * `WAVES` so the pack keeps pace with the table. No RNG. `cooldownS` keeps the
+ * next summon 14 s from the wind-up's start.
+ */
+export const BOSS_SUMMON = {
+  windupS: 1.0,
+  activeS: 0.6,
+  cooldownS: 14,
+  packSize: 5,
+  maxLive: 10,
+  ringRadius: 110,
+  circleRadius: 22,
+  type: 'swarm',
+  scale: { hpMul: LAST_FIGHT_WAVE.hpMul, damageMul: LAST_FIGHT_WAVE.damageMul },
+} as const;
+
 export const BOSS_SKILLS: Readonly<Record<BossSkillId, BossSkillTiming>> = {
   slam: BOSS_SLAM,
   volley: BOSS_VOLLEY,
+  summon: BOSS_SUMMON,
 };
 
 /**
@@ -195,7 +224,7 @@ export const BOSS_SKILLS: Readonly<Record<BossSkillId, BossSkillTiming>> = {
  */
 export const BOSS_SKILL_ROTATION: readonly (readonly BossSkillId[])[] = [
   ['slam'],
-  ['slam', 'volley'],
+  ['slam', 'volley', 'summon'],
 ];
 
 /**
@@ -218,4 +247,5 @@ export const BOSS_SKILL_WEIGHTS: Readonly<
 > = {
   slam: { near: 3, mid: 1, far: 1 },
   volley: { near: 1, mid: 1, far: 3 },
+  summon: { near: 1, mid: 2, far: 2 },
 };

@@ -8,7 +8,9 @@ import {
   BOSS_SKILL_WEIGHTS,
   BOSS_SKILLS,
   BOSS_SLAM,
+  BOSS_SUMMON,
 } from './boss';
+import { WAVES } from './waves';
 import { TEXTURE_KEYS } from './colors';
 
 describe('boss stats (CO-050)', () => {
@@ -79,7 +81,7 @@ describe('boss ground slam (CO-222)', () => {
   it('has a rotation list per bar, the first holding the slam', () => {
     expect(BOSS_SKILL_ROTATION).toHaveLength(BOSS.bars);
     expect(BOSS_SKILL_ROTATION[0]).toEqual(['slam']);
-    expect(BOSS_SKILL_ROTATION[1]).toEqual(['slam', 'volley']);
+    expect(BOSS_SKILL_ROTATION[1]).toEqual(['slam', 'volley', 'summon']);
   });
 
   it('weights every skill by how far the hero is: the slam up close, the volley far off', () => {
@@ -89,5 +91,34 @@ describe('boss ground slam (CO-222)', () => {
       for (const w of Object.values(row)) expect(w).toBeGreaterThan(0);
     expect(BOSS_SKILL_WEIGHTS.slam).toEqual({ near: 3, mid: 1, far: 1 });
     expect(BOSS_SKILL_WEIGHTS.volley).toEqual({ near: 1, mid: 1, far: 3 });
+    expect(BOSS_SKILL_WEIGHTS.summon).toEqual({ near: 1, mid: 2, far: 2 });
+  });
+
+  it('has a timing row for every skill id the rotation names', () => {
+    for (const list of BOSS_SKILL_ROTATION)
+      for (const id of list) {
+        expect(BOSS_SKILLS[id].windupS).toBeGreaterThan(0);
+        expect(BOSS_SKILLS[id].activeS).toBeGreaterThan(0);
+      }
+  });
+
+  it('summon (CO-224): a pack of 5, capped at 10, on a 14 s cooldown', () => {
+    expect(BOSS_SUMMON).toMatchObject({
+      windupS: 1,
+      activeS: 0.6,
+      cooldownS: 14,
+      packSize: 5,
+      maxLive: 10,
+      ringRadius: 110,
+      circleRadius: 22,
+      type: 'swarm',
+    });
+    expect(BOSS_SUMMON.packSize).toBeLessThanOrEqual(BOSS_SUMMON.maxLive);
+  });
+
+  it('summon scales the pack as the last fighting wave row does', () => {
+    const row = [...WAVES].reverse().find((wave) => wave.types.length > 0);
+    expect(BOSS_SUMMON.scale).toEqual({ hpMul: row?.hpMul, damageMul: row?.damageMul });
+    expect(BOSS_SUMMON.scale.hpMul).toBeGreaterThan(1);
   });
 });

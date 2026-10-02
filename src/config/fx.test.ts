@@ -139,3 +139,20 @@ describe('Bolt volley fx (CO-223)', () => {
     expect(names.has(BOSS_BOLT.hitClip)).toBe(true);
   });
 });
+
+describe('Boss summon art (CO-224)', () => {
+  it('draws the circle about 44 px wide, with the burst on the same scale, and every clip exists', () => {
+    const circle = ART_BOXES['boss.summonCircle'];
+    expect(circle.w).toBeGreaterThanOrEqual(44);
+    expect(circle.w).toBeLessThanOrEqual(50);
+    expect(circle.h).toBeLessThan(circle.w);
+    expect(ART_BOXES['boss.summonBurst'].w).toBeGreaterThanOrEqual(circle.w - 4);
+    const names = new Set(ANIMATIONS.map((anim) => anim.name));
+    for (const facing of ['down', 'up', 'left', 'right']) {
+      expect(names.has(`boss.summonWindup.${facing}`)).toBe(true);
+      expect(names.has(`boss.summon.${facing}`)).toBe(true);
+    }
+    expect(names.has('boss.summonCircle')).toBe(true);
+    expect(names.has('boss.summonBurst')).toBe(true);
+  });
+});

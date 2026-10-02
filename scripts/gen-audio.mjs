@@ -233,6 +233,13 @@ export const RECIPES = {
   // CO-223: a rising airy whoosh over a short noise burst as the bolts leave, 0.5 s.
   'boss.volley': () =>
     mix([envelope(sweep(0.5, 220, 640), 0.05), 0.7], [envelope(noise(0.5, 71, 2600), 0.03), 0.6]),
+  // CO-224: a low chant swelling upward (a rising 90 -> 180 Hz sweep and its fifth above) under a dark noise breath, 0.7 s.
+  'boss.summon': () =>
+    mix(
+      [envelope(sweep(0.7, 90, 180), 0.25), 0.8],
+      [envelope(sweep(0.7, 135, 270), 0.3), 0.45],
+      [envelope(noise(0.7, 73, 700), 0.25), 0.35],
+    ),
   'boss.death': () =>
     mix([envelope(sweep(1.0, 300, 35), 0.02), 0.9], [envelope(noise(1.0, 43, 700), 0.02), 0.4]),
 

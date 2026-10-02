@@ -2331,6 +2331,35 @@
         [{ "anim": "bolt", "cols": [1, 4] }],
         [{ "anim": "boltHit", "cols": [1, 4], "centred": true }]
       ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-224",
+      "file": "CO-224/boss_summon.png",
+      "page": 28,
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 800,
+      "recolour": { "gamma": 0.8, "rim": "#ff8a3d" },
+      "rowSpecs": [
+        [{ "anim": "summonWindup", "facing": "down", "cols": [1, 3] }, { "anim": "summon", "facing": "down", "cols": [4, 4] }],
+        [{ "anim": "summonWindup", "facing": "up", "cols": [1, 3] }, { "anim": "summon", "facing": "up", "cols": [4, 4] }],
+        [{ "anim": "summonWindup", "facing": "left", "cols": [1, 3] }, { "anim": "summon", "facing": "left", "cols": [4, 4] }],
+        [{ "anim": "summonWindup", "facing": "right", "cols": [1, 3] }, { "anim": "summon", "facing": "right", "cols": [4, 4] }]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-224",
+      "file": "CO-224/boss_summon_fx.png",
+      "page": 28,
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 352,
+      "rowSpecs": [
+        [{ "anim": "summonCircle", "cols": [1, 4], "centred": true }],
+        [{ "anim": "summonBurst", "cols": [1, 4], "centred": true }]
+      ]
     }
   ]
 }

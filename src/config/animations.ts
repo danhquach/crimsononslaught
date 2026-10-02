@@ -158,6 +158,13 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...facings('boss.volley', 1, 2, ONCE),
   spec('boss.bolt', 4, 10, LOOP),
   spec('boss.boltHit', 4, 14, ONCE),
+  // CO-224: the Summon, paced to its 1.0 s wind-up (3 frames at 3 fps, holding the last,
+  // the sigil at its brightest) and a held flaring frame for the release. The circle
+  // loops under each pack spawn point and its burst plays once as the pack appears.
+  ...facings('boss.summonWindup', 3, 3, ONCE),
+  ...facings('boss.summon', 1, 2, ONCE),
+  spec('boss.summonCircle', 4, 6, LOOP),
+  spec('boss.summonBurst', 4, 10, ONCE),
 
   // XP gem (CO-075).
   spec('gem.idle', 4, 6, LOOP),

@@ -103,6 +103,8 @@ const moving = [
   ...facings('boss.slam'),
   ...facings('boss.volleyWindup'),
   ...facings('boss.volley'),
+  ...facings('boss.summonWindup'),
+  ...facings('boss.summon'),
   'boss.hurt.left',
   'boss.hurt.right',
   'splitter.move',

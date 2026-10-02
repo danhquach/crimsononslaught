@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { BOSS, BOSS_SLAM, type BossSkillId } from '../config/boss';
+import { ARENA_SIZE } from '../config/arena';
+import { BOSS, BOSS_SLAM, BOSS_SUMMON, type BossSkillId } from '../config/boss';
 import {
   bossAnimation,
   facingFromVector,
@@ -16,7 +17,9 @@ import {
   shouldEnrage,
   slamDamage,
   startBossCycle,
+  NO_SKILLS,
   stepBossCycle,
+  summonPoints,
   volleyDamage,
   type BossBarBreakPayload,
   type BossCycle,
@@ -46,6 +49,14 @@ import { Enemy } from './Enemy';
  * (CO-222). With the atlas the clip is the warning (CO-081) and the tint stays off.
  */
 const TELEGRAPH_TINT = 0xffffff;
+
+/** CO-224: the summon ring's size and the arena it is kept inside, as `summonPoints` takes them. */
+const SUMMON_RING = [
+  BOSS_SUMMON.packSize,
+  BOSS_SUMMON.ringRadius,
+  ARENA_SIZE,
+  BOSS_SUMMON.circleRadius,
+] as const;
 
 /** #388: the red an enraged placeholder ring is multiplied by; with the atlas the aura says it instead. */
 const ENRAGE_TINT = 0xff6a6a;
@@ -94,6 +105,10 @@ export class Boss extends Enemy {
   private cycle: BossCycle = startBossCycle();
   /** The stream the skill rolls draw from (CO-223); the run hands one in at spawn. */
   private skillRng: Rng = createRng(0);
+  /** CO-224: the skills the pick leaves out right now (summon at the pack cap); asked each leg. */
+  private blockedSkills: () => ReadonlySet<BossSkillId> = () => NO_SKILLS;
+  /** CO-224: where a summon's pack will land, locked as its wind-up began; null outside one. */
+  private summonSpots: Vec2[] | null = null;
   /** Whether the atlas is drawing the telegraph, so the tint fallback can stand down. */
   private animated = false;
   /** Seconds this boss has been alive, run time; the clock its crowd-control windows are read on (#315). */
@@ -148,9 +163,21 @@ export class Boss extends Enemy {
     return this.charges;
   }
 
+  /** CO-223: seconds until `skill` may begin its wind-up, on the boss clock; 0 when ready. */
+  readyInS(skill: BossSkillId): number {
+    return Math.max(0, (this.cycle.readyAtS[skill] ?? 0) - this.cycle.clockS);
+  }
+
   /** CO-223: seconds until a volley may begin its wind-up, on the boss clock; 0 when ready. */
   get volleyReadyInS(): number {
-    return Math.max(0, (this.cycle.readyAtS.volley ?? 0) - this.cycle.clockS);
+    return this.readyInS('volley');
+  }
+
+  /** CO-224: where the pack of a summon in its wind-up will land; empty outside one. */
+  get lockedSummonPoints(): readonly Vec2[] {
+    return this.cycle.phase === 'windup' && this.cycle.skill === 'summon'
+      ? (this.summonSpots ?? [])
+      : [];
   }
 
   /**
@@ -169,10 +196,10 @@ export class Boss extends Enemy {
     return Math.atan2(this.cycle.skillDir.y, this.cycle.skillDir.x);
   }
 
-  /** CO-223: the volley's aim faces the boss through its wind-up and landing; otherwise its last move. */
+  /** CO-223: a skill's aim faces the boss through its wind-up and landing; otherwise its last move. */
   protected override get facingDir(): Facing {
     const { phase, skill, skillDir } = this.cycle;
-    if (skill === 'volley' && (phase === 'windup' || phase === 'skill'))
+    if (skill !== null && (phase === 'windup' || phase === 'skill'))
       return facingFromVector(skillDir, super.facingDir);
     return super.facingDir;
   }
@@ -183,9 +210,16 @@ export class Boss extends Enemy {
   }
 
   /** Come alive at (x, y) at full HP with the cycle at its start. */
-  spawnBoss(x: number, y: number, skillRng: Rng): void {
+  spawnBoss(
+    x: number,
+    y: number,
+    skillRng: Rng,
+    blockedSkills: () => ReadonlySet<BossSkillId> = () => NO_SKILLS,
+  ): void {
     this.cycle = startBossCycle();
     this.skillRng = skillRng;
+    this.blockedSkills = blockedSkills;
+    this.summonSpots = null;
     this.charges = 0;
     this.forcedSkill = null;
     this.clockS = 0;
@@ -281,6 +315,7 @@ export class Boss extends Enemy {
       const { skill, target: aim } = this.forcedSkill;
       this.forcedSkill = null;
       this.cycle = beginWindup(this.cycle, skill, this.cycle.clockS, from, aim);
+      this.lockSummonSpots(from);
     }
     const skills = bossSkillsFor(BOSS.bars - this.barsLeft);
     const step = stepBossCycle(
@@ -292,8 +327,11 @@ export class Boss extends Enemy {
       this.enraged,
       skills,
       () => this.skillRng.next(),
+      this.blockedSkills(),
     );
+    const windupBegan = before !== 'windup' && step.cycle.phase === 'windup';
     this.cycle = step.cycle;
+    if (windupBegan) this.lockSummonSpots(from);
     if (this.cycle.phase === 'charge' && before !== 'charge') this.charges += 1;
     if (this.flashing !== wasFlashing) this.refreshTint();
     if (this.cycle.phase !== before) {
@@ -305,13 +343,28 @@ export class Boss extends Enemy {
     // before it (a scaled clock) lands it short of where the boss ends up.
     for (const { skill, aim, atS } of step.impacts) {
       const base = { x: from.x, y: from.y, atS };
-      const payload: BossSkillPayload =
-        skill === 'volley'
-          ? { ...base, skill, aimRad: Math.atan2(aim.y, aim.x), damage: volleyDamage(this.enraged) }
-          : { ...base, skill, radius: BOSS_SLAM.radius, damage: slamDamage(this.enraged) };
+      const aimRad = Math.atan2(aim.y, aim.x);
+      let payload: BossSkillPayload;
+      if (skill === 'volley')
+        payload = { ...base, skill, aimRad, damage: volleyDamage(this.enraged) };
+      else if (skill === 'summon') {
+        // A frame that spanned the whole wind-up never saw it begin: the ring is made now.
+        const points = this.summonSpots ?? summonPoints(from, aimRad, ...SUMMON_RING);
+        payload = { ...base, skill, points, damage: 0 };
+      } else
+        payload = { ...base, skill, radius: BOSS_SLAM.radius, damage: slamDamage(this.enraged) };
       this.scene.events.emit(BOSS_EVENT.skill, payload);
     }
     return step.velocity;
+  }
+
+  /** CO-224: lock the pack's landing ring if a summon's wind-up is the one that just began. */
+  private lockSummonSpots(from: Readonly<Vec2>): void {
+    const { phase, skill, skillDir } = this.cycle;
+    this.summonSpots =
+      phase === 'windup' && skill === 'summon'
+        ? summonPoints(from, Math.atan2(skillDir.y, skillDir.x), ...SUMMON_RING)
+        : null;
   }
 
   override get bodyRadius(): number {
