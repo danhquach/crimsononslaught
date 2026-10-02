@@ -14,6 +14,8 @@ import {
   FX_ALPHA,
   DASH_DEPTH,
   BOSS_AURA_DEPTH,
+  BOSS_SLAM_FX,
+  BOSS_SLAM_WARN_DEPTH,
   ELITE_MARK_DEPTH,
   FX_DEPTH,
   MAX_LIVE_AREAS,
@@ -26,6 +28,7 @@ import {
   TELEGRAPH_SCALE_RADIUS,
 } from './fx';
 import { PLACEHOLDERS } from './colors';
+import { ART_BOXES } from './frames';
 import { BASE_EARTH_SHIELD_STATS } from './shields';
 
 describe('fx config (CO-082)', () => {
@@ -110,5 +113,17 @@ describe('fx config (CO-082)', () => {
       expect(alpha, clip).toBeGreaterThanOrEqual(0.6);
       expect(alpha, clip).toBeLessThan(1);
     }
+  });
+});
+
+describe('Ground slam fx (CO-222)', () => {
+  it('draws the warning rim round, so its scaled edge is the circular hit edge all the way round', () => {
+    const { w, h } = ART_BOXES[BOSS_SLAM_FX.rim];
+    expect(Math.abs(w - h)).toBeLessThanOrEqual(3);
+  });
+
+  it('lays the warning and the fire ring on the floor: over the enrage ring, under every entity', () => {
+    expect(BOSS_SLAM_WARN_DEPTH).toBeGreaterThan(BOSS_AURA_DEPTH);
+    expect(BOSS_SLAM_WARN_DEPTH).toBeLessThan(0);
   });
 });

@@ -130,3 +130,30 @@ export const BOSS_ENRAGE: Readonly<BossEnrage> = {
   attackGapMul: 0.7,
   damageTakenMul: 1.5,
 };
+
+/** A boss skill (CO-222): its wind-up warning and the beat it lands in. Later skills append here. */
+export type BossSkillId = 'slam';
+
+export interface BossSkillTiming {
+  /** Seconds the boss stands and the warning shows before the skill lands. */
+  windupS: number;
+  /** Seconds the skill's clip plays out after it lands. */
+  activeS: number;
+}
+
+/**
+ * Ground slam (CO-222): the boss stops, a ring of `radius` px shows for
+ * `windupS`, then the ground hits everything in it for `damage`, times the
+ * enrage damage multiplier. Radius 120 (140 read as too big in game): a hero at
+ * 180 px/s clears the ring from the boss's side in about 0.4 s of the 1 s
+ * warning, and a dash clears it at once.
+ */
+export const BOSS_SLAM = { windupS: 1.0, activeS: 0.4, radius: 120, damage: 30 } as const;
+
+export const BOSS_SKILLS: Readonly<Record<BossSkillId, BossSkillTiming>> = { slam: BOSS_SLAM };
+
+/**
+ * Which skills the boss draws from, by bars broken (index 0 = first bar; past
+ * the end, the last list). One skill leg runs between charges, picked in turn.
+ */
+export const BOSS_SKILL_ROTATION: readonly (readonly BossSkillId[])[] = [['slam'], ['slam']];

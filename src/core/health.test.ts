@@ -41,6 +41,20 @@ describe('takeDamage', () => {
     expect(second.state.invulnMs).toBe(1);
   });
 
+  it('lands a hit inside the window when told to ignore it, and opens a fresh one (CO-222)', () => {
+    const first = takeDamage(createHealth(), 5);
+    const mid = tickHealth(first.state, INVULN_MS - 1);
+    const slam = takeDamage(mid, 30, 0, true);
+    expect(slam.damaged).toBe(true);
+    expect(slam.state).toEqual({ hp: 65, maxHp: 100, invulnMs: INVULN_MS });
+  });
+
+  it('still ignores a dead player or a zero hit when told to ignore the window', () => {
+    const dead = { hp: 0, maxHp: 100, invulnMs: 0 };
+    expect(takeDamage(dead, 30, 0, true).damaged).toBe(false);
+    expect(takeDamage(createHealth(), 0, 0, true).damaged).toBe(false);
+  });
+
   it('lands the next hit once the window has run out', () => {
     const first = takeDamage(createHealth(), 5);
     const after = tickHealth(first.state, INVULN_MS);

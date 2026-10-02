@@ -1,10 +1,18 @@
-import { BOSS, BOSS_ENRAGE } from '../config/boss';
+import {
+  BOSS,
+  BOSS_ENRAGE,
+  BOSS_SKILL_ROTATION,
+  BOSS_SKILLS,
+  BOSS_SLAM,
+  type BossSkillId,
+} from '../config/boss';
 import type { Vec2 } from './enemy';
 
 /**
  * Boss rules that do not need an engine (spec §5 "Boss"): the charge cycle —
  * chase, 0.8 s telegraph, 0.6 s charge, every 4 s — and the movement each frame
- * of it asks for.
+ * of it asks for. Between charges the boss uses one skill (CO-222): a windup
+ * with a warning, then the skill landing; the legs alternate charge, skill.
  *
  * `entities/Boss.ts` is the Phaser side; everything decidable without Phaser
  * lives here so it is Vitest-covered.
@@ -12,7 +20,7 @@ import type { Vec2 } from './enemy';
  * Pure TS, no Phaser import.
  */
 
-export type BossPhase = 'chase' | 'telegraph' | 'charge';
+export type BossPhase = 'chase' | 'telegraph' | 'charge' | 'windup' | 'skill';
 
 /**
  * Emitter event names for the boss -> Game direction, namespaced like `run:*`.
@@ -23,7 +31,8 @@ export type BossPhase = 'chase' | 'telegraph' | 'charge';
  * are left (#387); the killing blow fires none, `died` is its cue. `enrage`
  * fires once, when a hit takes the boss to its enrage threshold (#388). `immune`
  * fires with `{ x, y }` over the boss when a stun or freeze is shrugged off
- * (CO-221), throttled by the entity.
+ * (CO-221), throttled by the entity. `skill` fires once with a
+ * `BossSkillPayload` when a skill lands (CO-222), at the boss's spot then.
  */
 export const BOSS_EVENT = {
   died: 'boss:died',
@@ -31,6 +40,7 @@ export const BOSS_EVENT = {
   barBreak: 'boss:barBreak',
   enrage: 'boss:enrage',
   immune: 'boss:immune',
+  skill: 'boss:skill',
 } as const;
 
 export interface BossPhasePayload {
@@ -48,6 +58,16 @@ export interface BossImmunePayload {
   readonly y: number;
 }
 
+export interface BossSkillPayload {
+  readonly skill: BossSkillId;
+  /** Where the boss stood as the skill landed. */
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  /** Damage to a player in reach, enrage included. */
+  readonly damage: number;
+}
+
 export interface BossCycle {
   readonly phase: BossPhase;
   /** Seconds left in `phase`. */
@@ -58,6 +78,12 @@ export interface BossCycle {
    * stood on the boss at that instant — nowhere to charge.
    */
   readonly chargeDir: Vec2;
+  /** Which attack leg the next chase ends in (CO-222): the charge or a skill. */
+  readonly next: 'charge' | 'skill';
+  /** Skills begun so far; picks the next from the bar's list. Never resets. */
+  readonly skillTurn: number;
+  /** The skill in its windup or landing; null outside both. */
+  readonly skill: BossSkillId | null;
 }
 
 /** What one frame came to: the cycle after it, and the movement it asks for. */
@@ -77,6 +103,8 @@ export interface BossStep {
    * drift on a frame that also charges.
    */
   readonly velocity: Vec2;
+  /** One per windup that ended this frame, so a long frame lands each skill exactly once. */
+  readonly impacts: readonly { readonly skill: BossSkillId }[];
 }
 
 const NO_DIRECTION: Vec2 = { x: 0, y: 0 };
@@ -89,9 +117,14 @@ const ENRAGED_CHASE_S = BOSS.cycleS * BOSS_ENRAGE.attackGapMul - BOSS.telegraphS
 
 /**
  * How long `phase` lasts (#388). Enrage shortens only the chase: the telegraph
- * is the player's warning and the charge is a fixed length.
+ * is the player's warning and the charge is a fixed length. A skill's windup
+ * and landing (CO-222) are its own timings, enraged or not.
  */
-export function phaseLengthS(phase: BossPhase, enraged = false): number {
+export function phaseLengthS(
+  phase: BossPhase,
+  enraged = false,
+  skill?: BossSkillId | null,
+): number {
   switch (phase) {
     case 'chase':
       return enraged ? ENRAGED_CHASE_S : CHASE_S;
@@ -99,6 +132,10 @@ export function phaseLengthS(phase: BossPhase, enraged = false): number {
       return BOSS.telegraphS;
     case 'charge':
       return BOSS.chargeS;
+    case 'windup':
+      return BOSS_SKILLS[skill ?? 'slam'].windupS;
+    case 'skill':
+      return BOSS_SKILLS[skill ?? 'slam'].activeS;
   }
 }
 
@@ -142,15 +179,37 @@ export function enterEnrage(cycle: BossCycle): BossCycle {
   return { ...cycle, remainingS: Math.min(cycle.remainingS, ENRAGED_CHASE_S) };
 }
 
-const NEXT_PHASE: Readonly<Record<BossPhase, BossPhase>> = {
-  chase: 'telegraph',
-  telegraph: 'charge',
-  charge: 'chase',
-};
+/** The skill a list gives on turn `turn` (CO-222): round-robin, turn counted from 0. */
+export function pickBossSkill(list: readonly BossSkillId[], turn: number): BossSkillId {
+  return list[turn % list.length] as BossSkillId;
+}
+
+/** The skills the boss draws from after `barsBroken` bars: the list for that bar, the last past the end. */
+export function bossSkillsFor(barsBroken: number): readonly BossSkillId[] {
+  const last = BOSS_SKILL_ROTATION.length - 1;
+  return BOSS_SKILL_ROTATION[Math.min(Math.max(0, barsBroken), last)] ?? [];
+}
+
+/** Ground slam damage to a player in reach (CO-222), enrage included. */
+export function slamDamage(enraged: boolean): number {
+  return BOSS_SLAM.damage * bossMods(enraged).damage;
+}
+
+/** Scale that makes a warning sprite `artW` px wide span the slam's diameter (CO-222). */
+export function slamArtScale(artW: number): number {
+  return (2 * BOSS_SLAM.radius) / artW;
+}
 
 /** A fresh boss opens with a chase; the first telegraph comes `cycleS - telegraphS - chargeS` s in. */
 export function startBossCycle(): BossCycle {
-  return { phase: 'chase', remainingS: CHASE_S, chargeDir: NO_DIRECTION };
+  return {
+    phase: 'chase',
+    remainingS: CHASE_S,
+    chargeDir: NO_DIRECTION,
+    next: 'charge',
+    skillTurn: 0,
+    skill: null,
+  };
 }
 
 /**
@@ -167,6 +226,12 @@ export function startBossCycle(): BossCycle {
  * frame, as a regular enemy's chase does (`chaseVelocity`).
  *
  * `enraged` (#388) speeds the chase and charge and shortens the chase leg.
+ *
+ * `skills` (CO-222) is the list the current bar draws from. Empty, the boss
+ * only charges. A chase that ends with a skill due enters a windup that picks
+ * the skill (and keeps it if the list changes mid-windup); the windup's end is
+ * the impact, reported once in `impacts` whatever the frame's length. The boss
+ * stands still in both.
  */
 export function stepBossCycle(
   cycle: BossCycle,
@@ -175,9 +240,12 @@ export function stepBossCycle(
   target: Readonly<Vec2>,
   speedFactor = 1,
   enraged = false,
+  skills: readonly BossSkillId[] = [],
 ): BossStep {
-  if (!(deltaS > 0) || !Number.isFinite(deltaS)) return { cycle, velocity: NO_DIRECTION };
-  let { phase, remainingS, chargeDir } = cycle;
+  if (!(deltaS > 0) || !Number.isFinite(deltaS))
+    return { cycle, velocity: NO_DIRECTION, impacts: [] };
+  let { phase, remainingS, chargeDir, next, skillTurn, skill } = cycle;
+  const impacts: { skill: BossSkillId }[] = [];
   const chaseDir = unitToward(from, target);
   let moveX = 0;
   let moveY = 0;
@@ -192,24 +260,45 @@ export function stepBossCycle(
     travel(remainingS);
     left -= remainingS;
     if (phase === 'telegraph') chargeDir = unitToward(from, target);
-    phase = NEXT_PHASE[phase];
-    remainingS = phaseLengthS(phase, enraged);
+    if (phase === 'chase') {
+      if (next === 'skill' && skills.length > 0) {
+        phase = 'windup';
+        skill = pickBossSkill(skills, skillTurn);
+        skillTurn += 1;
+      } else phase = 'telegraph';
+    } else if (phase === 'telegraph') {
+      phase = 'charge';
+    } else if (phase === 'charge') {
+      phase = 'chase';
+      next = 'skill';
+    } else if (phase === 'windup') {
+      phase = 'skill';
+      if (skill) impacts.push({ skill });
+    } else {
+      phase = 'chase';
+      next = 'charge';
+      skill = null;
+    }
+    remainingS = phaseLengthS(phase, enraged, skill);
   }
   travel(left);
   const scale = speedFactor / deltaS;
   return {
-    cycle: { phase, remainingS: remainingS - left, chargeDir },
+    cycle: { phase, remainingS: remainingS - left, chargeDir, next, skillTurn, skill },
     velocity: { x: moveX * scale, y: moveY * scale },
+    impacts,
   };
 }
 
-/** How fast the boss moves in `phase`, px/s: it stands still to telegraph (spec §5). */
+/** How fast the boss moves in `phase`, px/s: it stands still to telegraph (spec §5) and in a skill (CO-222). */
 function phaseSpeed(phase: BossPhase, enraged: boolean): number {
   const { speed } = bossMods(enraged);
   switch (phase) {
     case 'chase':
       return BOSS.speed * speed;
     case 'telegraph':
+    case 'windup':
+    case 'skill':
       return 0;
     case 'charge':
       return BOSS.chargeSpeed * speed;

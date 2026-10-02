@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
-import { BOSS } from '../config/boss';
+import { BOSS, BOSS_SLAM, type BossSkillId } from '../config/boss';
 import { bossAnimation, type Clip, type EnemyPhase } from '../core/animation';
 import {
   BOSS_EVENT,
   bossMods,
+  bossSkillsFor,
   enterEnrage,
   shouldEnrage,
+  slamDamage,
   startBossCycle,
   stepBossCycle,
   type BossBarBreakPayload,
@@ -13,6 +15,7 @@ import {
   type BossImmunePayload,
   type BossPhase,
   type BossPhasePayload,
+  type BossSkillPayload,
 } from '../core/boss';
 import {
   NO_BOSS_CC,
@@ -30,8 +33,8 @@ import { Enemy } from './Enemy';
 
 /**
  * The telegraph flash for the placeholder ring: it fills white for the wind-up
- * so the charge reads before it lands. With the atlas the telegraph clip is
- * the warning (CO-081) and the tint stays off.
+ * so the charge reads before it lands; a skill's windup flashes the same way
+ * (CO-222). With the atlas the clip is the warning (CO-081) and the tint stays off.
  */
 const TELEGRAPH_TINT = 0xffffff;
 
@@ -67,6 +70,10 @@ const ENRAGE_TINT = 0xff6a6a;
  * a fraction of the last (`core/bossCrowdControl.ts`), so Persistence can
  * interrupt the boss but never lock it down.
  *
+ * Between charges it uses a skill (CO-222): a 1 s windup standing still, then
+ * the skill lands once (`BOSS_EVENT.skill`, at the boss's spot) and plays out
+ * 0.4 s; which skill comes from the list for the bars broken so far.
+ *
  * Enrage (#388): a hit that leaves it at or under half its last bar latches
  * it enraged for the rest of the fight (`BOSS_ENRAGE`): harder contact, faster,
  * a shorter chase between charges, and it takes more damage. It tells the run
@@ -87,6 +94,8 @@ export class Boss extends Enemy {
   private barsLeft = BOSS.bars;
   /** #388: latched once the boss has crossed its enrage threshold; reset on spawn. */
   private enraged = false;
+  /** Test hook (CO-222): charges begun since spawn. */
+  private charges = 0;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y);
@@ -106,9 +115,29 @@ export class Boss extends Enemy {
     return this.enraged;
   }
 
-  /** Where the boss is in its cycle: chasing, telegraphing or charging. */
+  /** Where the boss is in its cycle: chasing, telegraphing, charging, or winding up or landing a skill. */
   get phase(): BossPhase {
     return this.cycle.phase;
+  }
+
+  /** CO-222: the skill in its windup or landing, or null. */
+  get skill(): BossSkillId | null {
+    return this.cycle.skill;
+  }
+
+  /** CO-222: seconds of the wind-up left on the boss clock, 0 outside one. */
+  get windupLeftS(): number {
+    return this.cycle.phase === 'windup' ? this.cycle.remainingS : 0;
+  }
+
+  /** Test hook (CO-222): charges begun since spawn. */
+  get chargesForTest(): number {
+    return this.charges;
+  }
+
+  /** Test hook (CO-222): end the chase now with a skill due, so the windup starts on the next step. */
+  skipToSkillForTest(): void {
+    this.cycle = { ...this.cycle, phase: 'chase', remainingS: 0, next: 'skill', skill: null };
   }
 
   /** Test hook (CO-221): the boss clock, which advances only as the boss steers. */
@@ -116,14 +145,10 @@ export class Boss extends Enemy {
     return this.clockS;
   }
 
-  /** Standing still and flashing: the 0.8 s warning before a charge (spec §5). */
-  get telegraphing(): boolean {
-    return this.cycle.phase === 'telegraph';
-  }
-
   /** Come alive at (x, y) at full HP with the cycle at its start. */
   spawnBoss(x: number, y: number): void {
     this.cycle = startBossCycle();
+    this.charges = 0;
     this.clockS = 0;
     this.cc = NO_BOSS_CC;
     this.lastImmuneS = -Infinity;
@@ -210,14 +235,30 @@ export class Boss extends Enemy {
   /** Advance the cycle by the frame and move as the current phase asks. */
   protected override steer(deltaS: number, target: Readonly<Vec2>, speedFactor: number): Vec2 {
     this.clockS += deltaS;
-    const wasTelegraphing = this.telegraphing;
+    const wasFlashing = this.flashing;
     const before = this.cycle.phase;
-    const step = stepBossCycle(this.cycle, deltaS, this, target, speedFactor, this.enraged);
+    const from = { x: this.x, y: this.y };
+    const skills = bossSkillsFor(BOSS.bars - this.barsLeft);
+    const step = stepBossCycle(this.cycle, deltaS, this, target, speedFactor, this.enraged, skills);
     this.cycle = step.cycle;
-    if (this.telegraphing !== wasTelegraphing) this.refreshTint();
+    if (this.cycle.phase === 'charge' && before !== 'charge') this.charges += 1;
+    if (this.flashing !== wasFlashing) this.refreshTint();
     if (this.cycle.phase !== before) {
       const payload: BossPhasePayload = { phase: this.cycle.phase };
       this.scene.events.emit(BOSS_EVENT.phase, payload);
+    }
+    // The slam lands where the boss stood at the frame's start: it holds still
+    // through a wind-up, so only a frame long enough to also span the chase
+    // before it (a scaled clock) lands it short of where the boss ends up.
+    for (const { skill } of step.impacts) {
+      const payload: BossSkillPayload = {
+        skill,
+        x: from.x,
+        y: from.y,
+        radius: BOSS_SLAM.radius,
+        damage: slamDamage(this.enraged),
+      };
+      this.scene.events.emit(BOSS_EVENT.skill, payload);
     }
     return step.velocity;
   }
@@ -245,13 +286,19 @@ export class Boss extends Enemy {
       facing: this.facingDir,
       hurt: phase === 'hurt',
       dead: phase === 'death',
+      skill: this.cycle.skill,
     });
     return { name, flipX: false };
   }
 
+  /** The telegraph or a skill's windup: the placeholder ring's white flash (CO-222). */
+  private get flashing(): boolean {
+    return this.cycle.phase === 'telegraph' || this.cycle.phase === 'windup';
+  }
+
   /** The telegraph flash outranks the status tints: the warning must always show. */
   protected override refreshTint(): void {
-    if (this.telegraphing && !this.animated) this.setTintFill(TELEGRAPH_TINT);
+    if (this.flashing && !this.animated) this.setTintFill(TELEGRAPH_TINT);
     else {
       super.refreshTint();
       // #388: the ring's enrage red, under any status tint; the atlas has its aura instead.

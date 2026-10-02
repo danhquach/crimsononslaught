@@ -97,6 +97,7 @@ describe('magenta fringe (CO-171)', () => {
   // Purple on purpose, and on the same pages the fix re-quantised.
   for (const clip of [
     'boss.walk.down',
+    'boss.slamWindup.down',
     'pickupBomb.idle',
     'pickupHealth.idle',
     'ice.slow',

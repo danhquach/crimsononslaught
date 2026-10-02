@@ -289,9 +289,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (ready) this.scene.events.emit(DASH_EVENT.ready);
   }
 
-  /** Spec §5: a hit costs HP, less the profile's damage reduction (#139), and grants 0.5 s of invulnerability; hits inside it are ignored. */
-  takeDamage(amount: number): void {
-    const { state, damaged, died } = takeDamage(this.health, amount, this.damageReduction);
+  /** Spec §5: a hit costs HP, less the profile's damage reduction (#139), and grants 0.5 s of invulnerability; hits inside it are ignored unless `ignoreWindow` (CO-222, the boss slam). */
+  takeDamage(amount: number, ignoreWindow = false): void {
+    const { state, damaged, died } = takeDamage(
+      this.health,
+      amount,
+      this.damageReduction,
+      ignoreWindow,
+    );
     this.setHealth(state);
     if (!damaged) return;
     emitRunEvent(this.scene.events, 'hp', { hp: state.hp, maxHp: state.maxHp });

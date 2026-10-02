@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS, BOSS_ENRAGE } from '../config/boss';
+import { BOSS, BOSS_ENRAGE, BOSS_SLAM } from '../config/boss';
 import {
   BOSS_EVENT,
   bossEnraged,
   bossMods,
+  bossSkillsFor,
   enrageThresholdHp,
   enterEnrage,
   phaseLengthS,
+  pickBossSkill,
   shouldEnrage,
+  slamDamage,
   startBossCycle,
   stepBossCycle,
   type BossCycle,
@@ -32,6 +35,9 @@ describe('startBossCycle (CO-050)', () => {
       phase: 'chase',
       remainingS: CHASE_S,
       chargeDir: { x: 0, y: 0 },
+      next: 'charge',
+      skillTurn: 0,
+      skill: null,
     });
     expect(CHASE_S).toBeCloseTo(2.6, 9);
   });
@@ -93,6 +99,7 @@ describe('stepBossCycle phases', () => {
       expect(stepBossCycle(start, bad, ORIGIN, { x: 100, y: 0 }), String(bad)).toEqual({
         cycle: start,
         velocity: { x: 0, y: 0 },
+        impacts: [],
       });
     }
   });
@@ -233,11 +240,7 @@ describe('boss enrage (#388)', () => {
   });
 
   it('keeps a 2.8 s period across a long frame', () => {
-    const cycle: BossCycle = {
-      phase: 'chase',
-      remainingS: ENRAGED_CHASE_S,
-      chargeDir: { x: 0, y: 0 },
-    };
+    const cycle: BossCycle = { ...startBossCycle(), remainingS: ENRAGED_CHASE_S };
     // Ten whole enraged cycles and 0.5 s: back to chase, 0.5 s in.
     const { cycle: after } = stepBossCycle(
       cycle,
@@ -254,7 +257,7 @@ describe('boss enrage (#388)', () => {
   it('moves at 91 px/s chasing, 520 charging and 0 telegraphing', () => {
     const target = { x: 100, y: 0 };
     const chase = stepBossCycle(
-      { phase: 'chase', remainingS: 1, chargeDir: { x: 0, y: 0 } },
+      { ...startBossCycle(), phase: 'chase', remainingS: 1, chargeDir: { x: 0, y: 0 } },
       0.5,
       ORIGIN,
       target,
@@ -263,7 +266,7 @@ describe('boss enrage (#388)', () => {
     );
     expect(chase.velocity.x).toBeCloseTo(91, 6);
     const telegraph = stepBossCycle(
-      { phase: 'telegraph', remainingS: 0.8, chargeDir: { x: 0, y: 0 } },
+      { ...startBossCycle(), phase: 'telegraph', remainingS: 0.8, chargeDir: { x: 0, y: 0 } },
       0.5,
       ORIGIN,
       target,
@@ -272,7 +275,7 @@ describe('boss enrage (#388)', () => {
     );
     expect(telegraph.velocity).toEqual({ x: 0, y: 0 });
     const charge = stepBossCycle(
-      { phase: 'charge', remainingS: 0.6, chargeDir: { x: 1, y: 0 } },
+      { ...startBossCycle(), phase: 'charge', remainingS: 0.6, chargeDir: { x: 1, y: 0 } },
       0.3,
       ORIGIN,
       target,
@@ -294,13 +297,174 @@ describe('boss enrage (#388)', () => {
   });
 
   it('cuts a running chase to the enraged one and leaves other phases alone', () => {
-    const chasing: BossCycle = { phase: 'chase', remainingS: 2.5, chargeDir: { x: 0, y: 0 } };
+    const chasing: BossCycle = {
+      ...startBossCycle(),
+      phase: 'chase',
+      remainingS: 2.5,
+      chargeDir: { x: 0, y: 0 },
+    };
     expect(enterEnrage(chasing).remainingS).toBeCloseTo(ENRAGED_CHASE_S, 9);
     const nearlyDone = { ...chasing, remainingS: 0.3 };
     expect(enterEnrage(nearlyDone).remainingS).toBe(0.3);
-    const telegraph: BossCycle = { phase: 'telegraph', remainingS: 0.7, chargeDir: { x: 0, y: 0 } };
+    const telegraph: BossCycle = {
+      ...startBossCycle(),
+      phase: 'telegraph',
+      remainingS: 0.7,
+      chargeDir: { x: 0, y: 0 },
+    };
     expect(enterEnrage(telegraph)).toBe(telegraph);
-    const charge: BossCycle = { phase: 'charge', remainingS: 0.5, chargeDir: { x: 1, y: 0 } };
+    const charge: BossCycle = {
+      ...startBossCycle(),
+      phase: 'charge',
+      remainingS: 0.5,
+      chargeDir: { x: 1, y: 0 },
+    };
     expect(enterEnrage(charge)).toBe(charge);
+  });
+});
+
+describe('skill rotation (CO-222)', () => {
+  const SLAM = ['slam' as const];
+  const TARGET = { x: 100, y: 0 };
+
+  /** Step in `stepS` slices, collecting each frame's phase and impacts. */
+  function run(totalS: number, stepS: number, enraged = false) {
+    let cycle = startBossCycle();
+    const phases: string[] = [];
+    let impacts = 0;
+    for (let t = 0; t < totalS - 1e-9; t += stepS) {
+      const step = stepBossCycle(cycle, stepS, ORIGIN, TARGET, 1, enraged, SLAM);
+      impacts += step.impacts.length;
+      cycle = step.cycle;
+      if (phases[phases.length - 1] !== cycle.phase) phases.push(cycle.phase);
+    }
+    return { phases, impacts, cycle };
+  }
+
+  it('runs charge, then a skill: chase, telegraph, charge, chase, windup, skill, chase, telegraph', () => {
+    const { phases } = run(14, 0.05);
+    expect(phases.slice(0, 8)).toEqual([
+      'chase',
+      'telegraph',
+      'charge',
+      'chase',
+      'windup',
+      'skill',
+      'chase',
+      'telegraph',
+    ]);
+  });
+
+  it('keeps the old charge-only cycle when given no skills', () => {
+    let cycle = startBossCycle();
+    for (let t = 0; t < 30; t += 0.05) {
+      cycle = stepBossCycle(cycle, 0.05, ORIGIN, TARGET).cycle;
+      expect(['chase', 'telegraph', 'charge']).toContain(cycle.phase);
+    }
+  });
+
+  it('opens with the charge: first windup at 6.6 s, impact at 7.6 s', () => {
+    const before = stepBossCycle(startBossCycle(), 7.5, ORIGIN, TARGET, 1, false, SLAM);
+    expect(before.cycle.phase).toBe('windup');
+    expect(before.impacts).toEqual([]);
+    const after = stepBossCycle(startBossCycle(), 7.7, ORIGIN, TARGET, 1, false, SLAM);
+    expect(after.cycle.phase).toBe('skill');
+    expect(after.impacts).toEqual([{ skill: 'slam' }]);
+  });
+
+  it('alternates charge and skill legs over a minute: charges 8 s apart', () => {
+    let cycle = startBossCycle();
+    let charges = 0;
+    let slams = 0;
+    for (let t = 0; t < 60; t += 0.05) {
+      const previous = cycle.phase;
+      const step = stepBossCycle(cycle, 0.05, ORIGIN, TARGET, 1, false, SLAM);
+      cycle = step.cycle;
+      if (previous !== 'charge' && cycle.phase === 'charge') charges += 1;
+      slams += step.impacts.length;
+    }
+    // Charges at 3.4 s, 11.4 s, ... 59.4 s; slams land at 7.6 s, 15.6 s, ... 55.6 s.
+    expect(charges).toBe(8);
+    expect(slams).toBe(7);
+  });
+
+  it('holds still in the windup and the landing', () => {
+    for (const phase of ['windup', 'skill'] as const) {
+      const cycle = { ...startBossCycle(), phase, remainingS: 0.5, skill: 'slam' as const };
+      expect(stepBossCycle(cycle, 0.3, ORIGIN, TARGET, 1, false, SLAM).velocity).toEqual({
+        x: 0,
+        y: 0,
+      });
+    }
+  });
+
+  it('lands each slam exactly once, whatever the frame length', () => {
+    // Landings at 7.6 s, 15.6 s, ... 55.6 s: seven in a minute.
+    for (const stepS of [1 / 60, 0.37, 5]) expect(run(60, stepS).impacts, String(stepS)).toBe(7);
+    // One frame covering many cycles still reports every landing.
+    expect(
+      stepBossCycle(startBossCycle(), 60, ORIGIN, TARGET, 1, false, SLAM).impacts,
+    ).toHaveLength(7);
+  });
+
+  it('lands on the exact boundary of the windup, once', () => {
+    const windup = {
+      ...startBossCycle(),
+      phase: 'windup' as const,
+      remainingS: 1,
+      skill: 'slam' as const,
+    };
+    const step = stepBossCycle(windup, 1, ORIGIN, TARGET, 1, false, SLAM);
+    expect(step.impacts).toEqual([{ skill: 'slam' }]);
+    expect(step.cycle.phase).toBe('skill');
+    expect(stepBossCycle(step.cycle, 0.1, ORIGIN, TARGET, 1, false, SLAM).impacts).toEqual([]);
+  });
+
+  it('picks round-robin from a list, and clamps the list to the last bar', () => {
+    expect(pickBossSkill(['slam'], 0)).toBe('slam');
+    expect(pickBossSkill(['slam'], 5)).toBe('slam');
+    expect(bossSkillsFor(0)).toEqual(['slam']);
+    expect(bossSkillsFor(1)).toEqual(['slam']);
+    expect(bossSkillsFor(9)).toEqual(bossSkillsFor(BOSS.bars - 1));
+    expect(bossSkillsFor(-1)).toEqual(bossSkillsFor(0));
+  });
+
+  it('keeps the chosen skill when the list changes mid-windup, and counts the turn once', () => {
+    const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 0.1 };
+    const windup = stepBossCycle(chase, 0.2, ORIGIN, TARGET, 1, false, SLAM).cycle;
+    expect(windup).toMatchObject({ phase: 'windup', skill: 'slam', skillTurn: 1 });
+    const step = stepBossCycle(windup, 2, ORIGIN, TARGET, 1, false, []);
+    expect(step.impacts).toEqual([{ skill: 'slam' }]);
+    expect(step.cycle.skillTurn).toBe(1);
+  });
+
+  it('does not shorten a windup or landing when enrage starts', () => {
+    const windup = {
+      ...startBossCycle(),
+      phase: 'windup' as const,
+      remainingS: 0.7,
+      skill: 'slam' as const,
+    };
+    expect(enterEnrage(windup)).toBe(windup);
+    const skill = { ...windup, phase: 'skill' as const };
+    expect(enterEnrage(skill)).toBe(skill);
+    expect(phaseLengthS('windup', true, 'slam')).toBe(BOSS_SLAM.windupS);
+    expect(phaseLengthS('skill', true, 'slam')).toBe(BOSS_SLAM.activeS);
+  });
+
+  it('enraged, the chase before a windup is 1.4 s', () => {
+    const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 1.4 };
+    expect(stepBossCycle(chase, 1.39, ORIGIN, TARGET, 1, true, SLAM).cycle.phase).toBe('chase');
+    expect(stepBossCycle(chase, 1.41, ORIGIN, TARGET, 1, true, SLAM).cycle.phase).toBe('windup');
+    expect(phaseLengthS('chase', true)).toBeCloseTo(1.4, 9);
+  });
+
+  it('deals 30, or 45 enraged', () => {
+    expect(slamDamage(false)).toBe(30);
+    expect(slamDamage(true)).toBe(45);
+  });
+
+  it('has an event name for the landing', () => {
+    expect(BOSS_EVENT.skill).toBe('boss:skill');
   });
 });

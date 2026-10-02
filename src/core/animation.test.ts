@@ -192,6 +192,15 @@ describe('bossAnimation', () => {
     );
   });
 
+  it("shows a skill's windup and landing per facing, hurt or not (CO-222)", () => {
+    // The clips themselves are checked once animations.ts declares them.
+    for (const facing of FACINGS) {
+      const base = { facing, hurt: true, dead: false, skill: 'slam' as const };
+      expect(bossAnimation({ ...base, phase: 'windup' })).toBe(`boss.slamWindup.${facing}`);
+      expect(bossAnimation({ ...base, phase: 'skill' })).toBe(`boss.slam.${facing}`);
+    }
+  });
+
   it('dies over anything else', () => {
     expect(bossAnimation({ phase: 'telegraph', facing: 'up', hurt: true, dead: true })).toBe(
       'boss.death',

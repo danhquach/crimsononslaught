@@ -31,6 +31,7 @@ import {
   phaseLengthS,
   type BossImmunePayload,
   type BossPhasePayload,
+  type BossSkillPayload,
 } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor, consumableSoundFor } from '../config/sounds';
 import { hasFrameArt } from '../render/atlas';
@@ -231,6 +232,7 @@ import { GemPool } from '../systems/GemPool';
 import { PickupPool } from '../systems/PickupPool';
 import { OverlayPool } from '../systems/OverlayPool';
 import { BossEnrageFx } from '../systems/BossEnrageFx';
+import { BossSlamFx } from '../systems/BossSlamFx';
 import { EliteMarkPool } from '../systems/EliteMarkPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
 
@@ -411,6 +413,13 @@ export class GameScene extends Phaser.Scene {
   /** Test hook (#126): shots that have touched the player, and the HP they took. */
   private shotHits = 0;
   private shotHpLost = 0;
+  /** Test hook (CO-222): ground slams landed, those that hit the hero, the HP they took and a line per slam. */
+  private slamTally: {
+    slams: number;
+    hits: number;
+    hpLost: number;
+    log: { chargesBefore: number; hit: boolean; hpLost: number }[];
+  } = { slams: 0, hits: 0, hpLost: 0, log: [] };
   /** #126: splits owed by splitters killed this step; spawned after the physics step. */
   private splits: Split[] = [];
   /** Test hook (#126): blasts set off, blasts that reached the player and the HP they took, children spawned and dropped. */
@@ -430,6 +439,7 @@ export class GameScene extends Phaser.Scene {
   private eliteMarks!: EliteMarkPool;
   /** #388: the enraged boss's ember ring and burst. */
   private bossEnrageFx!: BossEnrageFx;
+  private bossSlamFx!: BossSlamFx;
   /** Persistent ground areas (#135): every patch on the ground, whichever spell placed it. */
   private areas!: AreaPool;
   /** Sky strikes in the air (#138): every telegraph counting down, whichever spell cast it. */
@@ -658,9 +668,25 @@ export class GameScene extends Phaser.Scene {
     damageTakenFactor: number;
     phase: string;
     chaseS: number;
+    skill: string | null;
+    windupLeftS: number;
+    clip: string | null;
+    x: number;
+    y: number;
+    slam: {
+      slams: number;
+      hits: number;
+      hpLost: number;
+      log: { chargesBefore: number; hit: boolean; hpLost: number }[];
+    };
     auraVisible: boolean;
     auraClip: string | null;
     burstPlays: number;
+    warnVisible: boolean;
+    warnRadiusPx: number;
+    rimClip: string | null;
+    fillClip: string | null;
+    shockPlays: number;
   } | null {
     const boss = this.enemies.boss;
     if (!boss) return null;
@@ -670,9 +696,20 @@ export class GameScene extends Phaser.Scene {
       damageTakenFactor: boss.damageTakenFactor,
       phase: boss.phase,
       chaseS: phaseLengthS('chase', boss.isEnraged),
+      skill: boss.skill,
+      windupLeftS: boss.windupLeftS,
+      clip: boss.anims.currentAnim?.key ?? null,
+      x: boss.x,
+      y: boss.y,
+      slam: { ...this.slamTally, log: [...this.slamTally.log] },
       auraVisible: this.bossEnrageFx.auraVisible,
       auraClip: this.bossEnrageFx.auraClip,
       burstPlays: this.bossEnrageFx.burstPlays,
+      warnVisible: this.bossSlamFx.warnVisible,
+      warnRadiusPx: this.bossSlamFx.warnRadiusPx,
+      rimClip: this.bossSlamFx.rimClip,
+      fillClip: this.bossSlamFx.fillClip,
+      shockPlays: this.bossSlamFx.shockPlays,
     };
   }
 
@@ -1199,6 +1236,17 @@ export class GameScene extends Phaser.Scene {
     return { hp: boss.remainingHp, dying: boss.isDying };
   }
 
+  /**
+   * Test hook (CO-222): the boss ends its chase now with a skill due, so its
+   * windup starts on the next step. The boss is brought in first. Returns whether it lives.
+   */
+  skipBossToSkillForTest(): boolean {
+    const boss = this.bossForTest();
+    if (!boss) return false;
+    boss.skipToSkillForTest();
+    return true;
+  }
+
   /** Test hook (CO-207): the boss is brought in now if the run has not reached it; whether it lives. */
   spawnBossForTest(): boolean {
     return this.bossForTest() !== undefined;
@@ -1374,6 +1422,7 @@ export class GameScene extends Phaser.Scene {
     this.enemyShots = new EnemyShotPool(this);
     this.shotHits = 0;
     this.shotHpLost = 0;
+    this.slamTally = { slams: 0, hits: 0, hpLost: 0, log: [] };
     this.splits = [];
     this.blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
     this.guardTally = { blocked: 0, full: 0, blockedRaw: 0, blockedDealt: 0 };
@@ -1397,6 +1446,7 @@ export class GameScene extends Phaser.Scene {
     this.overlays = new OverlayPool(this);
     this.eliteMarks = new EliteMarkPool(this);
     this.bossEnrageFx = new BossEnrageFx(this);
+    this.bossSlamFx = new BossSlamFx(this);
     this.areas = new AreaPool(this, createRng(deriveSeed(seed, AREA_FX_STREAM)));
     this.telegraphs = new TelegraphPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
@@ -1456,13 +1506,17 @@ export class GameScene extends Phaser.Scene {
     this.events.on(RUN_EVENT.phase, onPhase);
     // The boss's wind-up and charge cues (CO-102) follow its cycle events.
     const onBossPhase = ({ phase }: BossPhasePayload): void => {
-      if (phase === 'telegraph') this.audio.play('boss.telegraph');
+      // CO-222: a skill's windup is the same warning cue as the charge's telegraph.
+      if (phase === 'telegraph' || phase === 'windup') this.audio.play('boss.telegraph');
       else if (phase === 'charge') {
         this.audio.play('boss.charge');
         this.shakeFor('bossCharge');
       }
     };
     this.events.on(BOSS_EVENT.phase, onBossPhase);
+    // CO-222: the boss's skill landing: the cue and shake, then the hero takes it if in reach.
+    const onBossSkill = (payload: BossSkillPayload): void => this.onBossSkill(payload);
+    this.events.on(BOSS_EVENT.skill, onBossSkill);
     // #387: a bar of the boss's life breaking has its own cue; the HUD flashes from its own diff.
     const onBossBarBreak = (): void => {
       this.audio.play('boss.barBreak');
@@ -1547,6 +1601,7 @@ export class GameScene extends Phaser.Scene {
       this.events.off(BOSS_EVENT.died, onBossDied);
       this.events.off(RUN_EVENT.phase, onPhase);
       this.events.off(BOSS_EVENT.phase, onBossPhase);
+      this.events.off(BOSS_EVENT.skill, onBossSkill);
       this.events.off(BOSS_EVENT.barBreak, onBossBarBreak);
       this.events.off(BOSS_EVENT.enrage, onBossEnrage);
       this.events.off(BOSS_EVENT.immune, onBossImmune);
@@ -1728,6 +1783,7 @@ export class GameScene extends Phaser.Scene {
     this.overlays.update(this.enemies.live);
     this.eliteMarks.update(this.enemies.live);
     this.bossEnrageFx.update(this.enemies.boss);
+    this.bossSlamFx.update(this.enemies.boss);
     this.numbers.update(step.deltaMs);
   }
 
@@ -2039,9 +2095,11 @@ export class GameScene extends Phaser.Scene {
   /**
    * Every hit the player takes, whatever dealt it (#126): `?invulnerable=1`,
    * the immunity window, the shields, then HP, with the cues on what landed.
+   * `ignoreImmunity` (CO-222) lets the boss's slam through the 0.5 s window a
+   * hugging boss's contact bites keep open; the dash, shields and the rest hold.
    * Returns the HP it took off.
    */
-  private hurtPlayer(amount: number): number {
+  private hurtPlayer(amount: number, options: { ignoreImmunity?: boolean } = {}): number {
     if (this.invulnerable) return 0;
     // #384: the dash's own window drops contact, enemy shots, the boss and
     // exploder blasts alike, ahead of the shields: it must not spend their pool.
@@ -2058,11 +2116,11 @@ export class GameScene extends Phaser.Scene {
     // refills inside that window, and the next contact would then shatter a
     // shield holding a point or two and re-arm its whole delay, for a hit the
     // player never felt.
-    if (this.player.immune) return 0;
+    if (this.player.immune && !options.ignoreImmunity) return 0;
     const throughShields = this.absorbOnShields(amount);
     if (throughShields <= 0) return 0;
     const before = this.player.hp;
-    this.player.takeDamage(throughShields);
+    this.player.takeDamage(throughShields, options.ignoreImmunity);
     // Cues (CO-102) read the outcome; they never decide it. The death cue
     // plays on the killing hit rather than at the end of the death clip.
     const hp = this.player.hp;
@@ -2348,6 +2406,25 @@ export class GameScene extends Phaser.Scene {
     if (!blastReaches({ x, y }, this.player, radius)) return;
     tally.blastHits += 1;
     tally.blastHpLost += this.hurtPlayer(scaleDamage(damage, scale.damageMul));
+  }
+
+  /**
+   * CO-222: a boss skill lands. The cue and shake play wherever the hero is; the
+   * hero takes `damage` if the ring reaches them, through the immunity window.
+   */
+  private onBossSkill({ x, y, radius, damage }: BossSkillPayload): void {
+    this.audio.play('boss.slam');
+    this.shakeFor('bossSlam');
+    this.bossSlamFx.impact(x, y);
+    const tally = this.slamTally;
+    tally.slams += 1;
+    const hit = blastReaches({ x, y }, this.player, radius);
+    const hpLost = hit ? this.hurtPlayer(damage, { ignoreImmunity: true }) : 0;
+    if (hit) {
+      tally.hits += 1;
+      tally.hpLost += hpLost;
+    }
+    tally.log.push({ chargesBefore: this.enemies.boss?.chargesForTest ?? 0, hit, hpLost });
   }
 
   /** #126: spawn the children every split this step owes; one past the live cap is dropped. */

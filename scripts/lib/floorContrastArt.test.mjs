@@ -99,6 +99,8 @@ const moving = [
   ...facings('boss.walk'),
   ...facings('boss.charge'),
   ...facings('boss.telegraph'),
+  ...facings('boss.slamWindup'),
+  ...facings('boss.slam'),
   'boss.hurt.left',
   'boss.hurt.right',
   'splitter.move',
