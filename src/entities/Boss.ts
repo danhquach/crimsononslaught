@@ -3,6 +3,9 @@ import { BOSS } from '../config/boss';
 import { bossAnimation, type Clip, type EnemyPhase } from '../core/animation';
 import {
   BOSS_EVENT,
+  bossMods,
+  enterEnrage,
+  shouldEnrage,
   startBossCycle,
   stepBossCycle,
   type BossBarBreakPayload,
@@ -30,6 +33,9 @@ import { Enemy } from './Enemy';
  */
 const TELEGRAPH_TINT = 0xffffff;
 
+/** #388: the red an enraged placeholder ring is multiplied by; with the atlas the aura says it instead. */
+const ENRAGE_TINT = 0xff6a6a;
+
 /**
  * The boss (spec §5 "Boss"): an enemy with its own stats and a charge cycle.
  * Between charges it chases like any enemy, at 70 px/s. Every 4 s it stops and
@@ -56,6 +62,11 @@ const TELEGRAPH_TINT = 0xffffff;
  * within a few seconds lasts a fraction of the last (`core/bossCrowdControl.ts`),
  * so Persistence can interrupt the boss but never lock it down.
  *
+ * Enrage (#388): a hit that leaves it at or under half its last bar latches
+ * it enraged for the rest of the fight (`BOSS_ENRAGE`): harder contact, faster,
+ * a shorter chase between charges, and it takes more damage. It tells the run
+ * once through `BOSS_EVENT.enrage`; the crossing hit itself is not amplified.
+ *
  * All the decisions live in `core/boss.ts`; this class only moves the sprite.
  */
 export class Boss extends Enemy {
@@ -67,13 +78,25 @@ export class Boss extends Enemy {
   private cc: BossCcState = NO_BOSS_CC;
   /** #387: bars still alive as of the last hit, so a hit that takes one off can be told. */
   private barsLeft = BOSS.bars;
+  /** #388: latched once the boss has crossed its enrage threshold; reset on spawn. */
+  private enraged = false;
 
   constructor(scene: Phaser.Scene, x = 0, y = 0) {
     super(scene, x, y);
   }
 
   override get contactDamage(): number {
-    return BOSS.contactDamage;
+    return BOSS.contactDamage * bossMods(this.enraged).damage;
+  }
+
+  /** #388: an enraged boss takes `BOSS_ENRAGE.damageTakenMul` times the damage. */
+  override get damageTakenFactor(): number {
+    return bossMods(this.enraged).damageTaken;
+  }
+
+  /** #388: whether the boss has enraged. */
+  get isEnraged(): boolean {
+    return this.enraged;
   }
 
   /** Where the boss is in its cycle: chasing, telegraphing or charging. */
@@ -92,6 +115,7 @@ export class Boss extends Enemy {
     this.clockS = 0;
     this.cc = NO_BOSS_CC;
     this.barsLeft = BOSS.bars;
+    this.enraged = false;
     this.arise(BOSS, x, y);
     this.emitHp();
   }
@@ -138,7 +162,16 @@ export class Boss extends Enemy {
       this.scene.events.emit(BOSS_EVENT.barBreak, payload);
     }
     this.barsLeft = left;
+    if (!died && shouldEnrage(this.enraged, this.remainingHp)) this.enrage();
     return died;
+  }
+
+  /** Latch the enrage: a running chase is cut to the enraged pace, then the run is told (#388). */
+  private enrage(): void {
+    this.enraged = true;
+    this.cycle = enterEnrage(this.cycle);
+    this.refreshTint();
+    this.scene.events.emit(BOSS_EVENT.enrage);
   }
 
   /** The end of the death clip is the win (spec §4 step 4), not the killing blow. */
@@ -157,7 +190,7 @@ export class Boss extends Enemy {
     this.clockS += deltaS;
     const wasTelegraphing = this.telegraphing;
     const before = this.cycle.phase;
-    const step = stepBossCycle(this.cycle, deltaS, this, target, speedFactor);
+    const step = stepBossCycle(this.cycle, deltaS, this, target, speedFactor, this.enraged);
     this.cycle = step.cycle;
     if (this.telegraphing !== wasTelegraphing) this.refreshTint();
     if (this.cycle.phase !== before) {
@@ -197,6 +230,10 @@ export class Boss extends Enemy {
   /** The telegraph flash outranks the status tints: the warning must always show. */
   protected override refreshTint(): void {
     if (this.telegraphing && !this.animated) this.setTintFill(TELEGRAPH_TINT);
-    else super.refreshTint();
+    else {
+      super.refreshTint();
+      // #388: the ring's enrage red, under any status tint; the atlas has its aura instead.
+      if (this.enraged && !this.animated && !this.isTinted) this.setTint(ENRAGE_TINT);
+    }
   }
 }

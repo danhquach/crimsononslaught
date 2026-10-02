@@ -13,6 +13,7 @@ import {
   LARGE_BURN_MIN_RADIUS,
   FX_ALPHA,
   DASH_DEPTH,
+  BOSS_AURA_DEPTH,
   ELITE_MARK_DEPTH,
   FX_DEPTH,
   MAX_LIVE_AREAS,
@@ -88,6 +89,11 @@ describe('fx config (CO-082)', () => {
     expect(DASH_DEPTH).toBeLessThan(0);
     expect(DASH_DEPTH).toBeGreaterThan(AREA_DEPTH);
     expect(DASH_DEPTH).toBeGreaterThan(ELITE_MARK_DEPTH);
+  });
+
+  it('lays the enraged boss aura over the elite marks and under the entities (#388)', () => {
+    expect(BOSS_AURA_DEPTH).toBeGreaterThan(ELITE_MARK_DEPTH);
+    expect(BOSS_AURA_DEPTH).toBeLessThan(0);
   });
 
   it('reads the chain clip from the atlas animations', () => {

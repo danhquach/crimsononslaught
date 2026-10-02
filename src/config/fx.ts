@@ -185,6 +185,17 @@ export const ELITE_MARK_DEPTH = -0.5;
 export const ELITE_MARK = { clip: 'status.elite', span: 2.4 } as const;
 
 /**
+ * #388: the enraged boss's ember ring loops under it and its one-off burst
+ * plays as it enrages; each is drawn `span` times the boss's body diameter
+ * wide. The ring lies over the elite marks and under every entity at depth 0,
+ * so it never covers the boss's own sprite; the burst is a one-off drawn at
+ * `FX_DEPTH`, over the crowd.
+ */
+export const BOSS_AURA = { clip: 'boss.enrageAura', span: 2.4 } as const;
+export const BOSS_BURST = { clip: 'boss.enrageBurst', span: 3 } as const;
+export const BOSS_AURA_DEPTH = -0.2;
+
+/**
  * The dash's afterimages and wisps (#384) lie just under the hero, over the
  * ground areas and the elite marks and under the entities drawn at depth 0, so
  * the trail never covers the hero it follows.

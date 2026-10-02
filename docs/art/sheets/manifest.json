@@ -2227,6 +2227,32 @@
         [{ "anim": "bossCrack", "cols": [1, 4], "centred": true }],
         [{ "anim": "bossShards", "cols": [1, 4], "centred": true }]
       ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-220",
+      "file": "CO-220/boss_enrage.png",
+      "page": 24,
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 288,
+      "rowSpecs": [
+        [{ "anim": "enrageAura", "cols": [1, 4], "centred": true }],
+        [{ "anim": "enrageBurst", "cols": [1, 4], "centred": true }]
+      ]
+    },
+    {
+      "key": "hud",
+      "ticket": "CO-220",
+      "file": "CO-220/boss_bar_flames.png",
+      "page": 24,
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 288,
+      "rowSpecs": [
+        [{ "anim": "bossFlames", "cols": [1, 4], "centred": true }],
+        [{ "anim": "bossFlames", "cols": [1, 4], "centred": true }]
+      ]
     }
   ]
 }

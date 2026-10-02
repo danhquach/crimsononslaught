@@ -3,8 +3,16 @@ import { BOSS } from '../config/boss';
 import { PLACEHOLDERS } from '../config/colors';
 import { ART_BOXES, FRAMES, type FrameName } from '../config/frames';
 import { DASH_TRAIL } from '../config/dash';
-import { BAR_ART, DASH_ICON, DASH_ICON_FRAME, type BarArt } from '../config/hud';
+import {
+  BAR_ART,
+  BOSS_BAR_COLORS,
+  BOSS_BAR_FLAMES,
+  DASH_ICON,
+  DASH_ICON_FRAME,
+  type BarArt,
+} from '../config/hud';
 import { artFrame } from '../core/animation';
+import { bossEnraged } from '../core/boss';
 import {
   cornerCounts,
   passiveTileLayout,
@@ -195,6 +203,10 @@ export interface BossBarShown {
   color: number;
   fill01: number;
   countText: string;
+  /** #388: whether the enrage pulse is running over the bar. */
+  enraged: boolean;
+  /** #388: how many of the flames along the bar's top are showing and playing. */
+  flames: number;
   breaks: number;
   look: 'art' | 'flat';
 }
@@ -236,6 +248,10 @@ const BREAK_SHARDS = 'hud.bossShards';
 const BREAK_CRACK_PITCH = 60;
 const BREAK_SHARD_AT = [1 / 6, 1 / 2, 5 / 6] as const;
 
+/** #388: the enrage pulse over the boss bar: the last bar's red fading in and out, at this strength and pace. */
+const ENRAGE_PULSE_ALPHA = 0.45;
+const ENRAGE_PULSE_MS = 450;
+
 /** Where a bar's trough sits on screen, for what is drawn over it. */
 interface TroughBox {
   x: number;
@@ -249,10 +265,16 @@ interface TroughBox {
  * "Boss" label, in the colour of the bar showing, and the flash over the trough
  * when a bar breaks. The flash is always a white rectangle that fades; in the
  * framed look the glass also cracks across the trough and shards burst off it.
+ * #388: once the boss is enraged the trough also pulses red, looping until the
+ * bar is hidden, and in the framed look a row of flames burns along the frame's top.
  */
 class BossFx {
   private readonly count: Phaser.GameObjects.Text;
   private readonly flash: Phaser.GameObjects.Rectangle;
+  private readonly pulse: Phaser.GameObjects.Rectangle;
+  private pulsing = false;
+  /** #388: the flame tiles along the bar's top, none without the atlas or the framed look. */
+  private readonly flames: Phaser.GameObjects.Sprite[] = [];
   /** The break art's sprites, none without the atlas; `shards` are the ones tinted. */
   private readonly sprites: { sprite: Phaser.GameObjects.Sprite; anim: string }[] = [];
   private readonly shards: { sprite: Phaser.GameObjects.Sprite; anim: string }[] = [];
@@ -274,8 +296,33 @@ class BossFx {
       .rectangle(trough.x, trough.y, trough.w, trough.h, 0xffffff)
       .setOrigin(0, 0)
       .setAlpha(0);
+    this.pulse = scene.add
+      .rectangle(trough.x, trough.y, trough.w, trough.h, BOSS_BAR_COLORS.last)
+      .setOrigin(0, 0)
+      .setAlpha(0);
     const crack = artFrame(`${BREAK_CRACK}.0` as FrameName);
     const shards = artFrame(`${BREAK_SHARDS}.0` as FrameName);
+    // The flames sit on the framed bar's rim (the flat bar is too close under the timer).
+    const flame0 = `${BOSS_BAR_FLAMES.frame}.0` as FrameName;
+    if (art && hasFrameArt(scene, flame0)) {
+      const box = FRAMES[flame0];
+      const { left, right, top } = BAR_ART.boss.trough;
+      const barX = trough.x - left;
+      const barW = trough.w + left + right;
+      const rimY = trough.y - top;
+      const base = ART_BOXES[BOSS_BAR_FLAMES.frame];
+      for (let i = 0; i < BOSS_BAR_FLAMES.count; i++) {
+        const x = barX + ((i + 0.5) * barW) / BOSS_BAR_FLAMES.count;
+        this.flames.push(
+          scene.add
+            .sprite(x, rimY + BOSS_BAR_FLAMES.sink, box.page, artFrame(flame0))
+            .setOrigin(0.5, (base.y + base.h) / box.h)
+            .setScale(BOSS_BAR_FLAMES.scale)
+            .setAlpha(BOSS_BAR_FLAMES.alpha)
+            .setVisible(false),
+        );
+      }
+    }
     // The framed look only: the flat bars stay plain, flash and all.
     if (art && hasFrameArt(scene, `${BREAK_CRACK}.0`) && hasFrameArt(scene, `${BREAK_SHARDS}.0`)) {
       const midY = trough.y + trough.h / 2;
@@ -330,10 +377,43 @@ class BossFx {
   setVisible(visible: boolean): void {
     this.count.setVisible(visible);
     if (!visible) {
+      this.setEnraged(false);
       this.scene.tweens.killTweensOf(this.flash);
       this.flash.setAlpha(0);
       for (const { sprite } of this.sprites) sprite.stop().setVisible(false);
     }
+  }
+
+  /** #388: start or stop the looping red pulse; asking for what is already so changes nothing. */
+  setEnraged(on: boolean): void {
+    if (on === this.pulsing) return;
+    this.pulsing = on;
+    this.scene.tweens.killTweensOf(this.pulse);
+    this.pulse.setAlpha(0);
+    const loop = this.scene.anims.get(BOSS_BAR_FLAMES.frame)?.frames.length ?? 1;
+    this.flames.forEach((flame, i) => {
+      if (!on) {
+        flame.stop().setVisible(false);
+        return;
+      }
+      const startFrame = (i * BOSS_BAR_FLAMES.startStep) % loop;
+      flame.setVisible(true).play({ key: BOSS_BAR_FLAMES.frame, startFrame });
+    });
+    if (!on) return;
+    this.scene.tweens.add({
+      targets: this.pulse,
+      alpha: ENRAGE_PULSE_ALPHA,
+      duration: ENRAGE_PULSE_MS,
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  /** #388: how many flames are showing and playing; the browser suite reads it. */
+  get flamesPlaying(): number {
+    return this.flames.filter(
+      (f) => f.visible && f.anims.isPlaying && f.anims.currentAnim?.key === BOSS_BAR_FLAMES.frame,
+    ).length;
   }
 
   /** A bar just broke; `color` is the broken bar's fill, which tints the shards. */
@@ -850,6 +930,8 @@ export class HudScene extends Phaser.Scene {
     color: 0,
     fill01: 0,
     countText: '',
+    enraged: false,
+    flames: 0,
   };
   private look: 'art' | 'flat' = 'flat';
   private slotIcons: SlotIcon[] = [];
@@ -987,7 +1069,7 @@ export class HudScene extends Phaser.Scene {
     this.bossFx = new BossFx(this, this.bossBar.label, this.bossBar.trough, art);
     this.shownBossLeft = null;
     this.bossBreaks = 0;
-    this.bossBarDrawn = { bar: -1, color: 0, fill01: 0, countText: '' };
+    this.bossBarDrawn = { bar: -1, color: 0, fill01: 0, countText: '', enraged: false, flames: 0 };
     this.timerText = this.add
       .text(width / 2, MARGIN - 4, '', { ...LABEL_STYLE, fontSize: '28px' })
       .setOrigin(0.5, 0);
@@ -1106,6 +1188,7 @@ export class HudScene extends Phaser.Scene {
     this.bossFx.setVisible(visible);
     if (!visible) {
       this.shownBossLeft = null;
+      this.bossBarDrawn = { ...this.bossBarDrawn, enraged: false, flames: 0 };
       return;
     }
     const v = bossBarLayers(m.bossHp, m.bossMaxHp, BOSS.bars);
@@ -1113,12 +1196,22 @@ export class HudScene extends Phaser.Scene {
     this.bossBar.set(v.fill01, 'Boss');
     if (color !== this.bossBarDrawn.color) this.bossBar.setFillColor(color);
     this.bossFx.set(v.countText, color);
+    // #388: the same range the boss latches on, so a dead boss (0 HP) never pulses.
+    const enraged = bossEnraged(m.bossHp);
+    this.bossFx.setEnraged(enraged);
     if (bossBarBroke(this.shownBossLeft, v.left)) {
       this.bossBreaks += 1;
       this.bossFx.breakFlash(this.bossBarDrawn.color);
     }
     this.shownBossLeft = v.left;
-    this.bossBarDrawn = { bar: v.bar, color, fill01: v.fill01, countText: v.countText };
+    this.bossBarDrawn = {
+      bar: v.bar,
+      color,
+      fill01: v.fill01,
+      countText: v.countText,
+      enraged,
+      flames: this.bossFx.flamesPlaying,
+    };
   }
 
   /**

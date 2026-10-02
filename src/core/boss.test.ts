@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS } from '../config/boss';
-import { startBossCycle, stepBossCycle, type BossCycle } from './boss';
+import { BOSS, BOSS_ENRAGE } from '../config/boss';
+import {
+  BOSS_EVENT,
+  bossEnraged,
+  bossMods,
+  enrageThresholdHp,
+  enterEnrage,
+  phaseLengthS,
+  shouldEnrage,
+  startBossCycle,
+  stepBossCycle,
+  type BossCycle,
+} from './boss';
 
 const ORIGIN = { x: 0, y: 0 };
 const CHASE_S = BOSS.cycleS - BOSS.telegraphS - BOSS.chargeS;
@@ -180,5 +191,116 @@ describe('the velocity a frame asks for', () => {
     expect(cycle.phase).toBe('chase');
     expect(cycle.remainingS).toBeCloseTo(CHASE_S - 1, 9);
     expect(velocity.x * deltaS).toBeCloseTo(CYCLE_DISTANCE * 3 + BOSS.speed, 9);
+  });
+});
+
+describe('boss enrage (#388)', () => {
+  const ENRAGED_CHASE_S = 1.4;
+
+  it('has a 3600 HP threshold, and one rule for "enraged" at its edges', () => {
+    expect(enrageThresholdHp()).toBe(3600);
+    expect(bossEnraged(0)).toBe(false);
+    expect(bossEnraged(1)).toBe(true);
+    expect(bossEnraged(3600)).toBe(true);
+    expect(bossEnraged(3601)).toBe(false);
+  });
+
+  it('latches once: a hit in range enrages a calm boss, never an enraged one', () => {
+    expect(shouldEnrage(false, 3601)).toBe(false);
+    expect(shouldEnrage(false, 3600)).toBe(true);
+    expect(shouldEnrage(true, 3000)).toBe(false);
+    expect(shouldEnrage(false, 0)).toBe(false);
+  });
+
+  it('names its event', () => {
+    expect(BOSS_EVENT.enrage).toBe('boss:enrage');
+  });
+
+  it('mods are all ones when calm and the config when enraged', () => {
+    expect(bossMods(false)).toEqual({ damage: 1, speed: 1, damageTaken: 1 });
+    expect(bossMods(true)).toEqual({
+      damage: BOSS_ENRAGE.damageMul,
+      speed: BOSS_ENRAGE.speedMul,
+      damageTaken: BOSS_ENRAGE.damageTakenMul,
+    });
+  });
+
+  it('shortens only the chase leg: 1.4 s, telegraph and charge untouched', () => {
+    expect(phaseLengthS('chase', true)).toBeCloseTo(ENRAGED_CHASE_S, 9);
+    expect(phaseLengthS('chase')).toBeCloseTo(CHASE_S, 9);
+    expect(phaseLengthS('telegraph', true)).toBe(BOSS.telegraphS);
+    expect(phaseLengthS('charge', true)).toBe(BOSS.chargeS);
+  });
+
+  it('keeps a 2.8 s period across a long frame', () => {
+    const cycle: BossCycle = {
+      phase: 'chase',
+      remainingS: ENRAGED_CHASE_S,
+      chargeDir: { x: 0, y: 0 },
+    };
+    // Ten whole enraged cycles and 0.5 s: back to chase, 0.5 s in.
+    const { cycle: after } = stepBossCycle(
+      cycle,
+      2.8 * 10 + 0.5,
+      ORIGIN,
+      { x: 100, y: 0 },
+      1,
+      true,
+    );
+    expect(after.phase).toBe('chase');
+    expect(after.remainingS).toBeCloseTo(ENRAGED_CHASE_S - 0.5, 6);
+  });
+
+  it('moves at 91 px/s chasing, 520 charging and 0 telegraphing', () => {
+    const target = { x: 100, y: 0 };
+    const chase = stepBossCycle(
+      { phase: 'chase', remainingS: 1, chargeDir: { x: 0, y: 0 } },
+      0.5,
+      ORIGIN,
+      target,
+      1,
+      true,
+    );
+    expect(chase.velocity.x).toBeCloseTo(91, 6);
+    const telegraph = stepBossCycle(
+      { phase: 'telegraph', remainingS: 0.8, chargeDir: { x: 0, y: 0 } },
+      0.5,
+      ORIGIN,
+      target,
+      1,
+      true,
+    );
+    expect(telegraph.velocity).toEqual({ x: 0, y: 0 });
+    const charge = stepBossCycle(
+      { phase: 'charge', remainingS: 0.6, chargeDir: { x: 1, y: 0 } },
+      0.3,
+      ORIGIN,
+      target,
+      1,
+      true,
+    );
+    expect(charge.velocity.x).toBeCloseTo(520, 6);
+  });
+
+  it('a stun (speed factor 0) still holds an enraged boss still', () => {
+    const { velocity } = stepBossCycle(startBossCycle(), 0.5, ORIGIN, { x: 100, y: 0 }, 0, true);
+    expect(velocity.x).toBe(0);
+    expect(velocity.y).toBe(0);
+  });
+
+  it('calm stepping is unchanged by the new parameter', () => {
+    const calm = stepBossCycle(startBossCycle(), 0.5, ORIGIN, { x: 100, y: 0 });
+    expect(calm.velocity.x).toBeCloseTo(BOSS.speed, 9);
+  });
+
+  it('cuts a running chase to the enraged one and leaves other phases alone', () => {
+    const chasing: BossCycle = { phase: 'chase', remainingS: 2.5, chargeDir: { x: 0, y: 0 } };
+    expect(enterEnrage(chasing).remainingS).toBeCloseTo(ENRAGED_CHASE_S, 9);
+    const nearlyDone = { ...chasing, remainingS: 0.3 };
+    expect(enterEnrage(nearlyDone).remainingS).toBe(0.3);
+    const telegraph: BossCycle = { phase: 'telegraph', remainingS: 0.7, chargeDir: { x: 0, y: 0 } };
+    expect(enterEnrage(telegraph)).toBe(telegraph);
+    const charge: BossCycle = { phase: 'charge', remainingS: 0.5, chargeDir: { x: 1, y: 0 } };
+    expect(enterEnrage(charge)).toBe(charge);
   });
 });

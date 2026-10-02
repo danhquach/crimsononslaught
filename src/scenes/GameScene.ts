@@ -26,7 +26,7 @@ import {
 import { controlsOf } from './controls';
 import { watchPadButton, type StartButtonWatch } from './input';
 import { artFrame } from '../core/animation';
-import { BOSS_EVENT, type BossPhasePayload } from '../core/boss';
+import { BOSS_EVENT, phaseLengthS, type BossPhasePayload } from '../core/boss';
 import { LOW_HEALTH_RATIO, castSoundFor, consumableSoundFor } from '../config/sounds';
 import { hasFrameArt } from '../render/atlas';
 import { audioOf, type Audio } from '../render/audio';
@@ -218,6 +218,7 @@ import { FxPool } from '../systems/FxPool';
 import { GemPool } from '../systems/GemPool';
 import { PickupPool } from '../systems/PickupPool';
 import { OverlayPool } from '../systems/OverlayPool';
+import { BossEnrageFx } from '../systems/BossEnrageFx';
 import { EliteMarkPool } from '../systems/EliteMarkPool';
 import { SpawnDirector } from '../systems/SpawnDirector';
 
@@ -415,6 +416,8 @@ export class GameScene extends Phaser.Scene {
   private overlays!: OverlayPool;
   /** #126: the mark under every live elite. */
   private eliteMarks!: EliteMarkPool;
+  /** #388: the enraged boss's ember ring and burst. */
+  private bossEnrageFx!: BossEnrageFx;
   /** Persistent ground areas (#135): every patch on the ground, whichever spell placed it. */
   private areas!: AreaPool;
   /** Sky strikes in the air (#138): every telegraph counting down, whichever spell cast it. */
@@ -626,6 +629,36 @@ export class GameScene extends Phaser.Scene {
       killed: this.elitesKilled,
       marks: this.eliteMarks.count,
       markClips: this.eliteMarks.clips,
+    };
+  }
+
+  /**
+   * Test hook (#388): the boss's enrage as it stands: whether it is enraged, its
+   * contact damage and damage-taken factor, its phase, the chase leg's length
+   * from the config (not timed), and the aura and burst the player would see.
+   * `null` while no boss fights.
+   */
+  get bossReport(): {
+    enraged: boolean;
+    contactDamage: number;
+    damageTakenFactor: number;
+    phase: string;
+    chaseS: number;
+    auraVisible: boolean;
+    auraClip: string | null;
+    burstPlays: number;
+  } | null {
+    const boss = this.enemies.boss;
+    if (!boss) return null;
+    return {
+      enraged: boss.isEnraged,
+      contactDamage: boss.contactDamage,
+      damageTakenFactor: boss.damageTakenFactor,
+      phase: boss.phase,
+      chaseS: phaseLengthS('chase', boss.isEnraged),
+      auraVisible: this.bossEnrageFx.auraVisible,
+      auraClip: this.bossEnrageFx.auraClip,
+      burstPlays: this.bossEnrageFx.burstPlays,
     };
   }
 
@@ -1340,6 +1373,7 @@ export class GameScene extends Phaser.Scene {
     this.numbers = new DamageNumberPool(this);
     this.overlays = new OverlayPool(this);
     this.eliteMarks = new EliteMarkPool(this);
+    this.bossEnrageFx = new BossEnrageFx(this);
     this.areas = new AreaPool(this, createRng(deriveSeed(seed, AREA_FX_STREAM)));
     this.telegraphs = new TelegraphPool(this);
     // Every overlap in the run is registered here and nowhere else (CO-032).
@@ -1411,6 +1445,14 @@ export class GameScene extends Phaser.Scene {
       this.audio.play('boss.barBreak');
     };
     this.events.on(BOSS_EVENT.barBreak, onBossBarBreak);
+    // #388: the boss turning enraged has a roar, a shake and a burst of embers; the ring and HUD follow its state.
+    const onBossEnrage = (): void => {
+      this.audio.play('boss.enrage');
+      this.shakeFor('bossEnrage');
+      const boss = this.enemies.boss;
+      if (boss) this.bossEnrageFx.play(boss);
+    };
+    this.events.on(BOSS_EVENT.enrage, onBossEnrage);
     // #252: Esc or pad Start pauses, and the pause screen sends back the way
     // out it confirmed. The keyboard plugin drops its own listener on shutdown.
     const onChoose = ({ action }: PauseChoosePayload): void => this.leaveFromPause(action);
@@ -1480,6 +1522,7 @@ export class GameScene extends Phaser.Scene {
       this.events.off(RUN_EVENT.phase, onPhase);
       this.events.off(BOSS_EVENT.phase, onBossPhase);
       this.events.off(BOSS_EVENT.barBreak, onBossBarBreak);
+      this.events.off(BOSS_EVENT.enrage, onBossEnrage);
     });
 
     this.scene.launch(SCENE.hud);
@@ -1657,6 +1700,7 @@ export class GameScene extends Phaser.Scene {
     // drawn this frame; one not in the live set — status over, host dead — is freed.
     this.overlays.update(this.enemies.live);
     this.eliteMarks.update(this.enemies.live);
+    this.bossEnrageFx.update(this.enemies.boss);
     this.numbers.update(step.deltaMs);
   }
 
@@ -2205,7 +2249,9 @@ export class GameScene extends Phaser.Scene {
     const crit = kind === 'hit' && rollCrit(this.critRng, critChance);
     const struck = crit ? critDamage(amount, critMultiplier) : amount;
     const guard = kind === 'dot' ? 1 : enemy.guardFactor(from);
-    const dealt = struck * guard;
+    // #388: an enraged boss takes more. Applied here, so the number shown and
+    // the tallies count what landed, not what was swung.
+    const dealt = struck * guard * enemy.damageTakenFactor;
     if (enemyType === 'shielded' && kind !== 'dot' && !enemy.isDying)
       this.tallyGuard(struck, dealt, guard);
     // A dying enemy takes nothing, so it shows nothing.

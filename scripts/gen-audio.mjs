@@ -221,6 +221,9 @@ export const RECIPES = {
       [ping(0.35, 2400, 800), 0.35],
       [envelope(sweep(0.4, 140, 45), 0.004), 0.8],
     ),
+  // #388: a low roar swell, a rising 60 -> 180 Hz sweep under a noise swell, 0.8 s.
+  'boss.enrage': () =>
+    mix([envelope(sweep(0.8, 60, 180), 0.25), 0.9], [envelope(noise(0.8, 64, 900), 0.3), 0.5]),
   'boss.death': () =>
     mix([envelope(sweep(1.0, 300, 35), 0.02), 0.9], [envelope(noise(1.0, 43, 700), 0.02), 0.4]),
 

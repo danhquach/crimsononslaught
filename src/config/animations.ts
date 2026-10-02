@@ -140,6 +140,9 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...facings('boss.charge', 2, 3.3, LOOP),
   ...facings('boss.hurt', 1, 10, ONCE),
   spec('boss.death', 8, 8, ONCE),
+  // #388: the enrage ember ring loops under the boss; the burst plays once as it turns.
+  spec('boss.enrageAura', 4, 8, LOOP),
+  spec('boss.enrageBurst', 4, 12, ONCE),
 
   // XP gem (CO-075).
   spec('gem.idle', 4, 6, LOOP),
@@ -329,6 +332,8 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   // burst off it, each played once by HudScene's BossFx over the code flash.
   spec('hud.bossCrack', 4, 16, ONCE),
   spec('hud.bossShards', 4, 14, ONCE),
+  // #388: the flames along the top of the boss bar while it is enraged; one 8-frame loop.
+  spec('hud.bossFlames', 8, 10, LOOP),
 ];
 
 /**
