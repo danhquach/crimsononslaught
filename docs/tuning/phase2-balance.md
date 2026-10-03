@@ -1071,3 +1071,47 @@ Limits: n = 4 per element per round; per-active win rates rest on 2–7 runs eac
 pooled 40-run sweep on the final values is still owed before the next balance pass.
 The shipped Ice Shield values (12/50) were checked on Ice seeds 5–12 only, not in a
 full 16-run round. Final values are in `src/config/` and the Phase 2 spec tables.
+
+# Cap the four scaling passives (#410, 2026-10-03)
+
+Power, Haste, Expanse and Persistence now cap at 8, 8, 6 and 6 ranks (×2.14 damage,
+×0.51 cooldown, ×1.97 area, ×2.31 duration), near the median rank a winning run
+reached before. Every passive now has a `maxRank`.
+
+Measured with `npm run sweep`: 4 elements × seeds 1–5, `timeScale=8`, mortal, no
+dash, one run at a time. The baseline is `main` (b37f6a5), two sweeps (40 runs),
+which is also the pooled re-measure #406 owed. The capped run was stopped after its
+first sweep at the PM's request (20 runs), so the comparison below is sweep 1 against
+sweep 1: the same 20 element-seed jobs.
+
+| | Baseline, 40 runs | Baseline, sweep 1 | Caps, sweep 1 |
+|---|---|---|---|
+| Wins | 28/40 | 15/20 | 15/20 |
+| Fire · Ice · Lightning · Earth | 5 · 9 · 5 · 9 | 4 · 5 · 2 · 4 | 3 · 5 · 3 · 4 |
+| Median boss kill | 105 s | 105 s | 110 s |
+| Boss kills inside 90–180 s | 23 of 28 | 13 of 15 | 10 of 15 |
+| Power · Haste · Expanse · Persistence share of win ranks | 20 · 19 · 17 · 12 % | 19 · 19 · 18 · 13 % | 18 · 17 · 13 · 13 % |
+| The four together | 68 % | 70 % | 61 % |
+| Highest single passive | Power 20 % | Power 19 % | Power 18 % |
+| Passive ranks per win | 39.4 | 38.4 | 39.7 |
+
+- **The ranks moved to the other ten.** With the four capped, a win still takes
+  about 40 passive ranks; Regeneration, Ward, Precision, Vitality and Avarice each
+  roughly doubled their share (2–3 % to 4–5 %). No passive is above 25 %.
+- **Win rate held:** 15/20 both sides. Fire lost one win (seed 3 died at 7:00,
+  level 11, before any cap can be reached, so that run diverged by offer draws, not by
+  the caps) and Lightning gained one.
+- **Boss kill time held overall** (110 s median) **but not for Earth.** Three of
+  Earth's four capped wins took 317–338 s at the boss, all with Earthquake; on
+  baseline Earth's Earthquake wins took 129–171 s, and 2 of its 9 wins ran past
+  180 s (290 and 400 s). Earth's many small hits sit under the boss damage cap, so
+  losing late Power, Expanse and Persistence ranks slows it where the burst builds,
+  already held near 100 s by the cap, do not slow. The other two kills outside the
+  window are fast Ice ones (81 and 89 s, Frost Nova Bomb). Boss HP 21000 and the cap
+  are unchanged here.
+- **The cooldown floor is now out of a passive's reach:** Haste at 8 is ×0.51,
+  above the 0.35 clamp. Relics can still reach it.
+
+Limits: 20 runs a side, n = 5 per element; the ticket asked for a pooled 40. The
+Earth boss-kill signal rests on 3 runs, but every one was slow; it needs its own
+check (Earth seeds 6–15 with the caps) before Earth is tuned: [#417](https://github.com/danhquach/crimsononslaught/issues/417).

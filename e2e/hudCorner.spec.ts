@@ -16,8 +16,6 @@ import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from
  */
 const POWER = 'passive_power';
 const HASTE = 'passive_haste';
-/** A count badge's crimson; a MAX badge wears `MAX_RANK_CSS` (`buildStrips.ts`). */
-const CRIMSON_CSS = '#dc143c';
 
 async function startRun(page: Page): Promise<void> {
   await page.goto('/?seed=1&invulnerable=1');
@@ -153,63 +151,51 @@ test('the largest build stays inside the right margin, its tiles apart', async (
   const errors = collectErrors(page);
   await startRun(page);
 
-  // Every passive once, then Power up to a two-digit rank for the widest badge, and
-  // every capped passive up to its cap, so each wears a MAX badge (CO-197).
+  // Every passive once, then up to its cap, so each wears a MAX badge (CO-197). Every
+  // passive caps since CO-229, so MAX is the widest badge a run can show.
   const capped = PASSIVES.filter((p) => p.maxRank !== undefined);
+  expect(capped).toHaveLength(PASSIVES.length);
   await takePassives(page, [
     ...PASSIVES.map(({ id }) => id),
-    ...Array.from({ length: 11 }, () => POWER),
     ...capped.flatMap(({ id, maxRank = 1 }) => Array.from({ length: maxRank - 1 }, () => id)),
   ]);
   await expect.poll(async () => (await tiles(page)).length).toBe(PASSIVES.length);
-  await expect.poll(async () => (await tiles(page)).find((t) => t.id === POWER)?.count).toBe(12);
   await expect
     .poll(async () => (await tiles(page)).filter((t) => t.maxed).length)
     .toBe(capped.length);
 
-  const { bounds, tilePositions, timerRight, power, badges, maxBadges, maxedTiles, tenBadges } =
-    await page.evaluate(
-      async ([hudKey, powerId]) => {
-        const { game } = await import('/src/main.ts');
-        const hud = game.scene.getScene(hudKey) as HudScene;
-        const timer = hud.children.list.find(
-          (child) =>
-            child.type === 'Text' && /^\d+:\d\d$/.test((child as { text?: string }).text ?? ''),
-        );
-        // A badge is a Text carrying its `badgeFill`; Kills and Embers are bare Texts.
-        const badgesReading = (text: string) =>
-          hud.children.list
-            .filter((child) => child.type === 'Text' && (child as { text?: string }).text === text)
-            .map((child) => {
-              const { x, y, width, height } = child as unknown as {
-                x: number;
-                y: number;
-                width: number;
-                height: number;
-              };
-              return { x, y, width, height, bg: child.getData('badgeFill') as string | undefined };
-            })
-            .filter(({ bg }) => bg !== undefined);
-        return {
-          bounds: hud.cornerBounds,
-          tilePositions: hud.passiveTiles.map(({ x, y }) => ({ x, y })),
-          timerRight: (timer as unknown as { getBounds(): { right: number } }).getBounds().right,
-          power: hud.passiveTiles.find((tile) => tile.id === powerId),
-          badges: badgesReading('12'),
-          tenBadges: badgesReading('10').length,
-          maxBadges: badgesReading('MAX'),
-          maxedTiles: hud.passiveTiles.filter((t) => t.maxed).map(({ x, y }) => ({ x, y })),
-        };
-      },
-      [SCENE.hud, POWER] as const,
-    );
+  const { bounds, tilePositions, timerRight, maxBadges, maxedTiles, tenBadges } =
+    await page.evaluate(async (hudKey) => {
+      const { game } = await import('/src/main.ts');
+      const hud = game.scene.getScene(hudKey) as HudScene;
+      const timer = hud.children.list.find(
+        (child) =>
+          child.type === 'Text' && /^\d+:\d\d$/.test((child as { text?: string }).text ?? ''),
+      );
+      // A badge is a Text carrying its `badgeFill`; Kills and Embers are bare Texts.
+      const badgesReading = (text: string) =>
+        hud.children.list
+          .filter((child) => child.type === 'Text' && (child as { text?: string }).text === text)
+          .map((child) => {
+            const { x, y, width, height } = child as unknown as {
+              x: number;
+              y: number;
+              width: number;
+              height: number;
+            };
+            return { x, y, width, height, bg: child.getData('badgeFill') as string | undefined };
+          })
+          .filter(({ bg }) => bg !== undefined);
+      return {
+        bounds: hud.cornerBounds,
+        tilePositions: hud.passiveTiles.map(({ x, y }) => ({ x, y })),
+        timerRight: (timer as unknown as { getBounds(): { right: number } }).getBounds().right,
+        tenBadges: badgesReading('10').length,
+        maxBadges: badgesReading('MAX'),
+        maxedTiles: hud.passiveTiles.filter((t) => t.maxed).map(({ x, y }) => ({ x, y })),
+      };
+    }, SCENE.hud);
 
-  // The "12" is Power's badge, not a count elsewhere that happens to read 12: one Text
-  // reads it, on the tile's bottom-right corner (the art tile's badge sits at +14, +14).
-  expect(power).toBeDefined();
-  expect(badges.map(({ x, y }) => ({ x: x - (power?.x ?? 0), y: y - (power?.y ?? 0) }))).toEqual([
-    { x: 14, y: 14 },
-  ]);
   // Every capped passive is at its cap: one gold MAX badge on each such tile's corner, no
   // "10" left (Precision's cap reads MAX, not 10).
   expect(maxBadges).toHaveLength(capped.length);
@@ -217,11 +203,10 @@ test('the largest build stays inside the right margin, its tiles apart', async (
     maxedTiles.map(({ x, y }) => ({ x: x + 14, y: y + 14 })).sort((a, b) => a.y - b.y || a.x - b.x),
   );
   for (const badge of maxBadges) expect(badge.bg).toBe(MAX_RANK_CSS);
-  for (const badge of badges) expect(badge.bg).toBe(CRIMSON_CSS);
   expect(tenBadges).toBe(0);
   // A badge stays clear of the next tile's disc (radius 18) by 1 px at least (its width
   // follows the font), of the row below's by 2, and inside the canvas's right margin by 8.
-  for (const badge of [...badges, ...maxBadges]) {
+  for (const badge of maxBadges) {
     const right = badge.x + badge.width / 2;
     const bottom = badge.y + badge.height / 2;
     expect(right).toBeLessThanOrEqual(badge.x - 14 + PASSIVE_TILE_PITCH_X - 18 - 1);

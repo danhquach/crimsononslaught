@@ -102,7 +102,7 @@ describe('pauseView', () => {
     ]);
   });
 
-  it("carries a capped passive's cap and whether it is maxed, never on an uncapped one or a relic (CO-197)", () => {
+  it("carries a passive's cap and whether it is maxed, never on a relic (CO-197)", () => {
     const view = pauseView({
       ...empty,
       passives: new Map<PassiveId, number>([
@@ -115,9 +115,8 @@ describe('pauseView', () => {
     expect(view.passives.map(({ id, maxRank, maxed }) => ({ id, maxRank, maxed }))).toEqual([
       { id: 'passive_swift', maxRank: 5, maxed: true },
       { id: 'passive_avarice', maxRank: 5, maxed: false },
-      { id: 'passive_power', maxRank: undefined, maxed: false },
+      { id: 'passive_power', maxRank: 8, maxed: false },
     ]);
-    expect('maxRank' in (view.passives[2] ?? {})).toBe(false);
     expect(view.relics[0]).toMatchObject({ maxed: false });
     expect('maxRank' in (view.relics[0] ?? {})).toBe(false);
     expect(isPauseView(view)).toBe(true);
