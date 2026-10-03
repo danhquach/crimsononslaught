@@ -17,6 +17,8 @@ unit tests that had hard-coded those values now read them from the config.
 
 ## Method
 
+> The scratch bot described here is now the committed sweep tool: see "The sweep tool (#407)" in `phase2-balance.md` for the command, options and output.
+
 The ticket asks for three hand-played runs per spell at `timeScale=1`. Twelve
 five-minute runs per tuning round is an hour of play per round, so the runs were
 driven instead by a scratch Playwright script (not committed) against the dev

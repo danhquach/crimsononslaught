@@ -19,7 +19,9 @@
     "art:menu": "node scripts/prep-menu-art.mjs",
     "art:strip": "node scripts/strip-provenance.mjs",
     "audio:gen": "node scripts/gen-audio.mjs",
-    "audio:cut": "node scripts/cut-audio.mjs"
+    "audio:cut": "node scripts/cut-audio.mjs",
+    "sweep": "node scripts/sweep/run.mjs",
+    "sweep:summary": "node scripts/sweep/summary.mjs"
   },
   "dependencies": {
     "phaser": "~3.88.2"

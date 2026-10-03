@@ -5,6 +5,7 @@ dist-csp/
 .vite/
 
 # Test output
+sweep-results/
 coverage/
 playwright-report/
 test-results/
