@@ -1,11 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import {
-  FROST_ORB,
-  MAX_LIVE_MINI_URCHINS,
-  MAX_LIVE_SHARDS,
-  MAX_LIVE_SHIELD_ICICLES,
-  SHATTER_RING,
-} from '../src/config/iceLevels';
+import { FROST_ORB, MAX_LIVE_SHARDS } from '../src/config/iceLevels';
+import { BASE_ICE_SHIELD_STATS } from '../src/config/shields';
 import { MAX_COMPANION_SHOTS } from '../src/config/companions';
 import { MAX_LIVE_AREAS, MAX_LIVE_FX } from '../src/config/fx';
 import type { RosterSpellId } from '../src/config/loadout';
@@ -40,10 +35,13 @@ import { cardCenter, collectErrors, MIN_FPS, waitForScene } from './game';
  * - No sample-count floors: a check samples until its thing is seen, bounded by
  *   the run clock and the wall clock.
  * - `?invulnerable=1` (the default of `startIceRun`) returns before the shield
- *   absorbs anything, so a shield never breaks under it: the aura checks use it,
- *   the break checks do not (`invulnerable = false`: real contact, `startAt=120`
- *   for a crowd).
+ *   absorbs anything, so a shield never breaks under it: the ring checks use it,
+ *   so every burst is a timed vanish (`invulnerable = false`: real contact,
+ *   `startAt=120` for a crowd, breaks the pool).
  */
+
+/** Level 2's add stays at level 3: the ring of 3 holds 4 diamonds from level 2 on. */
+const LEVEL_3_DIAMONDS = BASE_ICE_SHIELD_STATS.count + 1;
 
 export const SEED_QUERY = 'seed=1&timeScale=10';
 /** The window is read off the HUD's run clock, so a slow runner covers the same run (#187, #190). */
@@ -67,12 +65,6 @@ export interface Trace {
   maxShards: number;
   /** `clip@scale` of every shard drawn. */
   shardViews: string[];
-  /** The most small urchins alive in any one frame. */
-  maxMinis: number;
-  /** `clip@scale` of every small urchin drawn. */
-  miniViews: string[];
-  /** The most shield icicles alive in any one frame. */
-  maxShieldIcicles: number;
 }
 
 /** Everything a check reads, from one evaluate so the values come from one frame. */
@@ -159,7 +151,7 @@ export async function readRun(page: Page): Promise<Read | null> {
   );
 }
 
-export type Recorded = 'shards' | 'minis' | 'icicles';
+export type Recorded = 'shards';
 
 /**
  * Note in the page, every frame, what a sample every 100 ms would miss: the
@@ -173,9 +165,6 @@ export async function record(page: Page, what: readonly Recorded[]): Promise<voi
       const trace: Trace = {
         maxShards: 0,
         shardViews: [],
-        maxMinis: 0,
-        miniViews: [],
-        maxShieldIcicles: 0,
       };
       (window as unknown as { iceTrace: Trace }).iceTrace = trace;
       const note = (list: string[], key: string): void => {
@@ -188,15 +177,6 @@ export async function record(page: Page, what: readonly Recorded[]): Promise<voi
             trace.maxShards = Math.max(trace.maxShards, arrow.liveShards);
             for (const { clip, scale } of arrow.shardViews)
               note(trace.shardViews, `${clip}@${scale}`);
-          }
-          if (id === 'ice_nova_bomb' && wanted.includes('minis')) {
-            const nova = report as unknown as NovaLevelReport;
-            trace.maxMinis = Math.max(trace.maxMinis, nova.liveMinis);
-            for (const { clip, scale } of nova.miniViews) note(trace.miniViews, `${clip}@${scale}`);
-          }
-          if (id === 'ice_shield' && wanted.includes('icicles')) {
-            const shield = report as unknown as IceShieldLevelReport;
-            trace.maxShieldIcicles = Math.max(trace.maxShieldIcicles, shield.liveIcicles);
           }
         }
       });
@@ -319,144 +299,126 @@ test('Frost Nova Bomb level 2 sprays four icicles a throw', async ({ page }) => 
   expect(errors).toEqual([]);
 });
 
-test('Frost Nova Bomb level 3 rolls out three small urchins that burst at half the radius, inside the pool cap', async ({
+test('Frost Nova Bomb level 1 vanishes where its roll ends, with no wave and no damage', async ({
   page,
 }) => {
   const errors = collectErrors(page);
-  // startAt=300: a crowd thick enough that the urchins' small bursts catch something (at 120 the first
-  // catch came 23 s into the run, a quarter of the cap; at 300 it comes at 11 s).
+  await startIceRun(page, 'ice_nova_bomb');
+  const seen = await until(page, 'three bombs that rolled out', (read) => {
+    const nova = reportOf<NovaLevelReport>(read, 'ice_nova_bomb');
+    return nova.rolls.length >= 3;
+  });
+  const nova = reportOf<NovaLevelReport>(seen, 'ice_nova_bomb');
+  console.log(`nova lv1: rolls ${nova.rolls.length}, waves ${nova.wavesDone}`);
+  // No wave is released, drawn or counted; the damage side is `iceRoster.spec.ts`'s waveHits and hits.
+  expect(nova.rolls.every((roll) => roll.level === 1 && !roll.wave)).toBe(true);
+  expect(nova.wavesDone, 'waves finished at level 1').toBe(0);
+  expect(nova.liveWaves, 'waves in the air at level 1').toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('Frost Nova Bomb level 3 ends its roll in a full-circle wave that hits, drawn to its rim', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  // startAt=300: a crowd thick enough that a wave catches something soon after the first roll.
   await startIceRun(page, 'ice_nova_bomb:3', 'startAt=300');
-  await record(page, ['minis']);
-  // The cause: a level 3 burst that rolled out three. The effect: small bursts
-  // at half the bomb's radius, each set off where its urchin had rolled to
-  // (geometry, so it does not wait on a crowd), the urchins drawn at half size,
-  // and one real behavioural check: a small burst that caught an enemy.
+  // The cause: a level 3 roll that released a wave. The effect: a finished wave
+  // that hit an enemy, a ring drawn on every frame from the core burst to the
+  // widest ring with its outer edge on the rim, fading near the end.
   const seen = await until(
     page,
-    'a cluster of 3 urchins, half-radius urchin bursts out past the bomb, one that caught enemies, urchins drawn in flight',
+    'a level 3 wave that hit, drawn from its first frame to its last',
     (read) => {
       const nova = reportOf<NovaLevelReport>(read, 'ice_nova_bomb');
-      // "Has happened" facts are the report's running counts; a 16-entry log window can lose them.
       return (
-        nova.fullClusters > 0 &&
-        nova.minisAtRange > 0 &&
-        nova.minisCaught > 0 &&
-        (read.trace?.miniViews.length ?? 0) > 0
+        nova.wavesHit > 0 &&
+        nova.ring.frames.includes('ice.wave.0') &&
+        nova.ring.frames.includes('ice.wave.3') &&
+        nova.ring.minAlpha < 1
       );
     },
     (read) => {
       const nova = reportOf<NovaLevelReport>(read, 'ice_nova_bomb');
-      for (const c of nova.clusters)
-        expect(c.urchins, 'urchins from one burst').toBeLessThanOrEqual(3);
-      // Shape, per entry: every level 3 urchin burst is at half the bomb's radius.
-      for (const b of nova.miniBursts.filter((burst) => burst.level === 3))
-        expect(b.radius, 'urchin burst radius').toBe(b.bombRadius * 0.5);
-      expect(nova.liveMinis, 'urchins alive').toBeLessThanOrEqual(MAX_LIVE_MINI_URCHINS);
-      expect(read.trace?.maxMinis ?? 0, 'most urchins alive in a frame').toBeLessThanOrEqual(
-        MAX_LIVE_MINI_URCHINS,
-      );
+      expect(nova.liveWaves, 'waves alive').toBeLessThanOrEqual(MAX_LIVE_BOMBS);
     },
   );
   const nova = reportOf<NovaLevelReport>(seen, 'ice_nova_bomb');
   console.log(
-    `nova lv3 at run ${((seen.elapsedMs - 300_000) / 1000).toFixed(1)} s: clusters ${nova.clusters.length}, mini bursts ${nova.miniBursts.length} (caught>0: ${nova.miniBursts.filter((b) => b.caught > 0).length}, distances ${nova.miniBursts.map((b) => b.distance.toFixed(0)).join(',')}, radii ${[...new Set(nova.miniBursts.map((b) => b.radius))].join('/')}), dropped ${nova.minisDropped}, peak minis ${seen.trace?.maxMinis}`,
+    `nova lv3 at run ${((seen.elapsedMs - 300_000) / 1000).toFixed(1)} s: rolls ${nova.rolls.length} (waves ${nova.rolls.filter((r) => r.wave).length}), waves done ${nova.wavesDone} (hit ${nova.wavesHit}), caught ${nova.waves.map((w) => w.caught).join(',')}, frames ${nova.ring.frames.join('/')}, edge error ${nova.ring.edgeError.toFixed(4)}, min alpha ${nova.ring.minAlpha.toFixed(2)}`,
   );
-  expect(seen.trace?.miniViews).toEqual(['ice.urchin@0.5']);
+  expect(nova.rolls.every((roll) => roll.level === 3 && roll.wave)).toBe(true);
+  expect(nova.ring.edgeError, 'ring edge against the rim, px').toBeLessThan(0.01);
+  expect(nova.ring.minAlpha, 'lowest ring opacity').toBeLessThan(1);
   expect(errors).toEqual([]);
 });
 
-test('Ice Shield level 2 slows every enemy touching it, only while it is up', async ({ page }) => {
+test('Ice Shield level 2 has four diamonds on the ring while they are out', async ({ page }) => {
   const errors = collectErrors(page);
-  // Invulnerable, so the shield stands for the whole run and the pulses have a
-  // crowd to chill; startAt=120 fills the arena round the player.
   await startIceRun(page, 'ice_shield:2', 'startAt=120');
-  // The cause: a pulse that caught enemies. The effect, in the same entry: every
-  // one of them slowed after it.
   const seen = await until(
     page,
-    'an aura pulse that caught enemies and left them all slowed',
-    (read) =>
-      reportOf<IceShieldLevelReport>(read, 'ice_shield').auraPulses.some(
-        (p) => p.level === 2 && p.caught > 0 && p.slowedAfter === p.caught,
-      ),
+    'a ring of 4 diamonds',
+    (read) => reportOf<IceShieldLevelReport>(read, 'ice_shield').diamonds === 4,
     (read) => {
-      for (const p of reportOf<IceShieldLevelReport>(read, 'ice_shield').auraPulses) {
-        expect(p.slowedAfter, 'enemies slowed by one pulse').toBe(p.caught);
-      }
+      const shield = reportOf<IceShieldLevelReport>(read, 'ice_shield');
+      expect(shield.diamonds, 'diamonds on the ring').toBeLessThanOrEqual(4);
+      // None while they recharge (#406).
+      if (shield.phase === 'recharge') expect(shield.diamonds, 'diamonds while recharging').toBe(0);
+      expect(shield.burstCount, 'bursts at level 2').toBe(0);
     },
   );
   const shield = reportOf<IceShieldLevelReport>(seen, 'ice_shield');
-  console.log(
-    `shield lv2 at run ${((seen.elapsedMs - 120_000) / 1000).toFixed(1)} s: pulses ${shield.pulseCount}, with catches ${shield.auraPulses.length}, caught ${shield.auraPulses.map((p) => p.caught).join(',')}`,
-  );
+  console.log(`shield lv2: diamonds ${shield.diamonds}, bursts ${shield.burstCount}`);
   expect(errors).toEqual([]);
 });
 
-test('Ice Shield level 3 freezes what its break catches and fires eight icicles, inside the pool cap', async ({
+test('Ice Shield level 3 bursts into small cold waves as the diamonds vanish, and the waves hit', async ({
   page,
 }) => {
   const errors = collectErrors(page);
-  // Real contact (no invulnerable) so the shield really breaks; startAt=120 for a
-  // crowd that presses the standing player within seconds.
-  await startIceRun(page, 'ice_shield:3', 'startAt=120', false);
-  await record(page, ['icicles']);
-  // The cause: a level 3 break that caught enemies. The effect, in the same
-  // entry: every one of them frozen after it, and eight icicles out.
+  // startAt=300: a crowd, so enemies stand within reach of the diamonds. Invulnerable,
+  // so every burst is a timed vanish, one a cycle.
+  await startIceRun(page, 'ice_shield:3', 'startAt=300');
+  // The cause: a burst of 4 diamonds at level 3. The effect: waves that hit enemies, drawn as
+  // the ring art from its core burst to its widest ring.
   const seen = await until(
     page,
-    'a level 3 break that caught enemies, froze them all and fired 8 icicles',
-    (read) =>
-      reportOf<IceShieldLevelReport>(read, 'ice_shield').breaks.some(
-        (b) =>
-          b.level === 3 &&
-          b.caught > 0 &&
-          b.frozenAfter === b.caught &&
-          b.icicles === SHATTER_RING.icicles,
-      ),
-    (read) => {
-      const shield = reportOf<IceShieldLevelReport>(read, 'ice_shield');
-      for (const b of shield.breaks) {
-        expect(b.frozenAfter, 'enemies frozen by one break').toBe(b.caught);
-        expect(b.icicles, 'icicles from one break').toBeLessThanOrEqual(SHATTER_RING.icicles);
-      }
-      expect(shield.liveIcicles, 'shield icicles alive').toBeLessThanOrEqual(
-        MAX_LIVE_SHIELD_ICICLES,
-      );
-      expect(
-        read.trace?.maxShieldIcicles ?? 0,
-        'most shield icicles alive in a frame',
-      ).toBeLessThanOrEqual(MAX_LIVE_SHIELD_ICICLES);
-    },
-  );
-  const shield = reportOf<IceShieldLevelReport>(seen, 'ice_shield');
-  console.log(
-    `shield lv3 at run ${((seen.elapsedMs - 120_000) / 1000).toFixed(1)} s: breaks ${shield.breaks.length} (caught ${shield.breaks.map((b) => b.caught).join(',')}), icicle hits ${shield.icicleHits}, dropped ${shield.iciclesDropped}, peak icicles ${seen.trace?.maxShieldIcicles}`,
-  );
-  expect(errors).toEqual([]);
-});
-
-test('Ice Shield level 3 icicles hit what the break leaves standing', async ({ page }) => {
-  const errors = collectErrors(page);
-  // Tanks (60 HP, from 5:00 on) outlast the break's 40 damage, so the ring has something to
-  // hit; against a swarm the break itself clears the crowd and the icicles fly
-  // through the space it emptied.
-  await startIceRun(page, 'ice_shield:3', 'startAt=300&enemies=tank', false);
-  // The cause: a level 3 break that caught tanks. The effect: an icicle broke on one.
-  const seen = await until(
-    page,
-    'a level 3 break that caught tanks and an icicle that broke on a survivor',
+    'a burst of 4 waves after a second one, a wave that hit and a wave drawn from core to widest ring',
     (read) => {
       const shield = reportOf<IceShieldLevelReport>(read, 'ice_shield');
       return (
-        shield.breaks.some((b) => b.level === 3 && b.caught > 0 && b.icicles === 8) &&
-        shield.icicleHits > 0
+        shield.burstCount >= 2 &&
+        shield.bursts.some((b) => b.level === 3 && b.diamonds === LEVEL_3_DIAMONDS) &&
+        shield.wavesHit > 0 &&
+        shield.ring.frames.includes('ice.wave.0') &&
+        shield.ring.frames.includes('ice.wave.3')
       );
+    },
+    (read) => {
+      const shield = reportOf<IceShieldLevelReport>(read, 'ice_shield');
+      expect(shield.diamonds, 'diamonds on the ring').toBeLessThanOrEqual(LEVEL_3_DIAMONDS);
+      if (shield.phase === 'recharge') expect(shield.diamonds, 'diamonds while recharging').toBe(0);
+      expect(shield.liveWaves, 'waves alive').toBeLessThanOrEqual(LEVEL_3_DIAMONDS);
+      // One burst a cycle: the uptime at the least (a passive only stretches it); `atS` is the
+      // frame it went off on, so a gap can read a frame (0.2 s at this time scale) short.
+      const at = shield.bursts.map((b) => b.atS);
+      for (let i = 1; i < at.length; i++) {
+        const gap = (at[i] ?? 0) - (at[i - 1] ?? 0);
+        expect(gap, 'seconds between bursts').toBeGreaterThanOrEqual(
+          BASE_ICE_SHIELD_STATS.uptime - 0.2,
+        );
+      }
+      for (const b of shield.bursts)
+        expect(b.diamonds, 'diamonds in a burst').toBeLessThanOrEqual(LEVEL_3_DIAMONDS);
     },
   );
   const shield = reportOf<IceShieldLevelReport>(seen, 'ice_shield');
   console.log(
-    `shield lv3 tanks at run ${((seen.elapsedMs - 300_000) / 1000).toFixed(1)} s: breaks ${shield.breaks.length} (caught ${shield.breaks.map((b) => b.caught).join(',')}), icicle hits ${shield.icicleHits}`,
+    `shield lv3: bursts ${shield.burstCount}, at ${shield.bursts.map((b) => b.atS.toFixed(2)).join(',')}, waves done ${shield.wavesDone} (hit ${shield.wavesHit}), caught ${shield.waves.map((w) => w.caught).join(',')}, frames ${shield.ring.frames.join('/')}, edge error ${shield.ring.edgeError.toFixed(4)}`,
   );
+  expect(shield.bursts.every((b) => b.level === 3)).toBe(true);
+  expect(shield.ring.edgeError, 'ring edge against the rim, px').toBeLessThan(0.01);
   expect(errors).toEqual([]);
 });
 
@@ -625,13 +587,13 @@ test('the whole Ice roster at level 3 holds every pool cap and the frame rate ov
         'shards alive',
       ).toBeLessThanOrEqual(MAX_LIVE_SHARDS);
       expect(
-        reportOf<NovaLevelReport>(read, 'ice_nova_bomb').liveMinis,
-        'small urchins alive',
-      ).toBeLessThanOrEqual(MAX_LIVE_MINI_URCHINS);
+        reportOf<NovaLevelReport>(read, 'ice_nova_bomb').liveWaves,
+        'nova waves alive',
+      ).toBeLessThanOrEqual(MAX_LIVE_BOMBS);
       expect(
-        reportOf<IceShieldLevelReport>(read, 'ice_shield').liveIcicles,
-        'shield icicles alive',
-      ).toBeLessThanOrEqual(MAX_LIVE_SHIELD_ICICLES);
+        reportOf<IceShieldLevelReport>(read, 'ice_shield').liveWaves,
+        'shield waves alive',
+      ).toBeLessThanOrEqual(LEVEL_3_DIAMONDS);
       expect(
         reportOf<CompanionLevelReport>(read, 'ice_companion').liveShots,
         'companion shots alive',

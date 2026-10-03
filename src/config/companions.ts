@@ -60,19 +60,19 @@ export const COMPANION_REACH = 24;
 
 /**
  * Shots one ranged companion's pool may ever hold. At the base blocks a bolt is
- * in the air about 0.8 s against a 1.2-1.4 s cadence, so one companion keeps
+ * in the air about 0.9 s against a 0.92-1.2 s cadence, so one companion keeps
  * roughly one alive; the cap is many times that because a stacked Haste and a
  * widened `targetRange` both raise the steady count, and a pooled sprite costs
  * nothing until it flies. `companions.test.ts` holds the margin at 4x.
  */
-export const MAX_COMPANION_SHOTS = 8;
+export const MAX_COMPANION_SHOTS = 10;
 
 /** Spec §9 base blocks, one per companion. */
 export const BASE_COMPANION_STATS: Readonly<Record<CompanionSpellId, Readonly<CompanionStats>>> = {
   fire_companion: {
     attackCooldown: 1.2,
-    damage: 8,
-    targetRange: 260,
+    damage: 10,
+    targetRange: 280,
     leashRadius: 60,
     chaseSpeed: RANGED_FOLLOW_SPEED,
     projectiles: 1,
@@ -81,9 +81,9 @@ export const BASE_COMPANION_STATS: Readonly<Record<CompanionSpellId, Readonly<Co
     burnDuration: 2,
   },
   ice_companion: {
-    attackCooldown: 1.4,
-    damage: 7,
-    targetRange: 260,
+    attackCooldown: 0.92,
+    damage: 20,
+    targetRange: 300,
     leashRadius: 60,
     chaseSpeed: RANGED_FOLLOW_SPEED,
     projectiles: 1,
@@ -93,17 +93,17 @@ export const BASE_COMPANION_STATS: Readonly<Record<CompanionSpellId, Readonly<Co
   },
   lightning_companion: {
     attackCooldown: 0.8,
-    damage: 9,
-    targetRange: 200,
-    leashRadius: 220,
+    damage: 14,
+    targetRange: 260,
+    leashRadius: 260,
     chaseSpeed: 240,
     staggerDuration: 0.3,
   },
   earth_companion: {
     attackCooldown: 1.6,
-    damage: 14,
-    targetRange: 200,
-    leashRadius: 200,
+    damage: 27,
+    targetRange: 280,
+    leashRadius: 280,
     chaseSpeed: 200,
     knockback: 80,
   },
@@ -173,8 +173,8 @@ export const COMPANION_CARDS: Readonly<Record<CompanionSpellId, SpellCard>> = {
     description: 'A burning ally follows you and shoots what comes close.',
     stats: [
       ['Attack every', '1.2 s'],
-      ['Damage', '8'],
-      ['Range', '260'],
+      ['Damage', '10'],
+      ['Range', '280'],
       ['Burn', '2 dps for 2 s'],
     ],
   },
@@ -183,9 +183,9 @@ export const COMPANION_CARDS: Readonly<Record<CompanionSpellId, SpellCard>> = {
     color: PLACEHOLDERS.fx_nova.color,
     description: 'A frozen ally follows you and chills what it shoots.',
     stats: [
-      ['Attack every', '1.4 s'],
-      ['Damage', '7'],
-      ['Range', '260'],
+      ['Attack every', '0.92 s'],
+      ['Damage', '20'],
+      ['Range', '300'],
       ['Slow', '25% for 1.5 s'],
     ],
   },
@@ -195,9 +195,9 @@ export const COMPANION_CARDS: Readonly<Record<CompanionSpellId, SpellCard>> = {
     description: 'A charged ally runs down nearby enemies and staggers them.',
     stats: [
       ['Attack every', '0.8 s'],
-      ['Damage', '9'],
-      ['Chase range', '200'],
-      ['Leash', '220'],
+      ['Damage', '14'],
+      ['Chase range', '260'],
+      ['Leash', '260'],
     ],
   },
   earth_companion: {
@@ -206,8 +206,8 @@ export const COMPANION_CARDS: Readonly<Record<CompanionSpellId, SpellCard>> = {
     description: 'A stone ally charges nearby enemies and hurls them back.',
     stats: [
       ['Attack every', '1.6 s'],
-      ['Damage', '14'],
-      ['Chase range', '200'],
+      ['Damage', '27'],
+      ['Chase range', '280'],
       ['Knockback', '80'],
     ],
   },

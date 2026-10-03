@@ -44,6 +44,18 @@ describe('waveHeading', () => {
 });
 
 describe('inArc', () => {
+  it('is true all round at a half arc of pi, a full circle', () => {
+    for (let deg = -180; deg < 180; deg += 7) {
+      for (const heading of [0, 1, -2.5, Math.PI]) {
+        expect(inArc(caster, heading, Math.PI, at(deg, 100), 0), `${deg} off ${heading}`).toBe(
+          true,
+        );
+      }
+    }
+    // The caster's own spot has no bearing, and still counts.
+    expect(inArc(caster, 0, Math.PI, caster, 0)).toBe(true);
+  });
+
   it('takes a centre inside the arc and refuses one well outside', () => {
     expect(inArc(caster, 0, HALF, at(0, 100), 0)).toBe(true);
     expect(inArc(caster, 0, HALF, at(30, 100), 0)).toBe(true);

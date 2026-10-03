@@ -39,12 +39,12 @@ export function isLightningRosterSpellId(value: unknown): value is LightningRost
 /** Spec §9.4 base block. */
 export const BASE_CHAIN_LIGHTNING_STATS: Readonly<ChainLightningStats> = {
   cooldown: 1.4,
-  damage: 12,
+  damage: 14,
   strikes: 1,
   chains: 2,
   chainRange: 120,
   chainFalloff: 0.8,
-  targetRange: 150,
+  targetRange: 180,
   staggerDuration: 0.5,
   stunChance: 0.08,
   stunDuration: 2,
@@ -85,12 +85,14 @@ export const BASE_TORNADO_STATS: Readonly<TornadoStats> = {
  */
 export const BASE_SWORD_STATS: Readonly<SwordStats> = {
   count: 3,
-  orbitRadius: 70,
+  orbitRadius: 110,
   orbitSpeed: 4.5,
-  damage: 16,
+  damage: 26,
   size: 18,
   hitCooldown: 0.35,
   staggerDuration: 0.3,
+  uptime: 5,
+  recharge: 3,
 };
 
 export const BASE_LIGHTNING_ROSTER_STATS = {
@@ -117,7 +119,7 @@ export const LIGHTNING_ROSTER_CARDS: Readonly<Record<LightningRosterSpellId, Spe
     description: 'A bolt arcs out from you to the nearest enemy and chains to others close by.',
     stats: [
       ['Cooldown', '1.4 s'],
-      ['Damage', '12'],
+      ['Damage', '14'],
       ['Chains', '2'],
       ['Chain range', '120'],
       ['Stun', '8% for 2 s'],
@@ -137,13 +139,14 @@ export const LIGHTNING_ROSTER_CARDS: Readonly<Record<LightningRosterSpellId, Spe
   lightning_sword: {
     name: 'Lightning Sword',
     color: 0xfff176,
-    description: 'Three charged blades circle you, cutting and staggering whatever they pass.',
+    description:
+      'Charged blades circle you for a while, cutting and staggering whatever they pass.',
     stats: [
       ['Blades', '3'],
-      ['Damage', '16'],
-      ['Orbit radius', '70'],
+      ['Out', '5 s, back in 3 s'],
+      ['Damage', '26'],
+      ['Orbit radius', '110'],
       ['Stagger', '0.3 s'],
-      ['Hits every', '0.35 s per enemy'],
     ],
   },
 };

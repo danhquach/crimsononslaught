@@ -16,7 +16,7 @@ const base: FireStats = { ...BASE_SPELL_STATS.fire };
 
 describe('explosionDamage (CO-044)', () => {
   it('is half the direct damage at base', () => {
-    expect(explosionDamage(base)).toBe(6);
+    expect(explosionDamage(base)).toBe(5);
   });
 
   it('follows +damage perks', () => {
@@ -24,7 +24,7 @@ describe('explosionDamage (CO-044)', () => {
   });
 
   it('is the full direct damage with Big Blast', () => {
-    expect(explosionDamage({ ...base, aoeDamageFactor: 1 })).toBe(12);
+    expect(explosionDamage({ ...base, aoeDamageFactor: 1 })).toBe(10);
   });
 });
 

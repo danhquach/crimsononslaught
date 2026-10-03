@@ -9,6 +9,8 @@ import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from
  * frames, and with the frames' atlas page missing every bar falls back to the
  * flat placeholder and the run still plays. CO-195: the shield is drawn on the
  * HP bar, so Ice Shield through `?loadout=` puts an ice segment and a `+N` on it.
+ * #406: its pool is full only while the diamonds are out (5 s, then 3 s gone), so
+ * the segment is there from the first frame and gone while they recharge.
  */
 async function startRun(page: Page, shield = true): Promise<void> {
   await page.goto(`/?seed=1&invulnerable=1${shield ? '&loadout=ice_shield' : ''}`);
@@ -108,6 +110,29 @@ test('a shield is an ice segment and a +N on the HP bar, which sits right on the
   expect(xpFrame!.top - hpFrame!.bottom).toBeGreaterThanOrEqual(0);
   expect(xpFrame!.top - hpFrame!.bottom).toBeLessThanOrEqual(4);
   expect(xpMark!.top).toBeGreaterThanOrEqual(hpMark!.bottom);
+
+  expect(errors).toEqual([]);
+});
+
+test('the shield segment is empty while the diamonds recharge, and back when they return (#406)', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const errors = collectErrors(page);
+  await startRun(page);
+
+  // The pool is the segment: 0 while the diamonds are gone, so the bar is HP alone then.
+  await expect.poll(async () => (await sampleHpBar(page)).shield, { timeout: 20_000 }).toBe(0);
+  const gone = await sampleHpBar(page);
+  expect(gone.drawn).toMatchObject({ width: 0, text: '' });
+  expect(gone.drawn!.start).toBeCloseTo(gone.hp / gone.maxHp, 5);
+
+  await expect
+    .poll(async () => (await sampleHpBar(page)).shield, { timeout: 20_000 })
+    .toBeGreaterThan(0);
+  const back = await sampleHpBar(page);
+  expect(back.drawn!.width).toBeGreaterThan(0);
+  expect(back.drawn!.text).toBe(`+${Math.ceil(back.shield)}`);
 
   expect(errors).toEqual([]);
 });

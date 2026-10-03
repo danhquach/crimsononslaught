@@ -1,51 +1,35 @@
-import Phaser from 'phaser';
+import type Phaser from 'phaser';
 import type { Vec2 } from '../core/input';
-import {
-  MAX_BOULDERS,
-  advanceOrbit,
-  boulderAngles,
-  boulderPosition,
-} from '../core/orbitingBoulders';
+import type { OrbitPhase } from '../core/orbitCycle';
 import { Spell } from '../core/spell';
 import type { SpellStatsBySpell, StattedSpellId } from '../core/spellStats';
-import { BOULDER_LOOK, Boulder, type BodyLook } from '../entities/Boulder';
+import { BOULDER_LOOK, type Boulder, type BodyLook } from '../entities/Boulder';
 import type { Enemy } from '../entities/Enemy';
 import type { CollisionSystem } from '../systems/CollisionSystem';
-
-/** The fields a ring needs from its block; every orbiting spell's stats carry them. */
-export interface OrbitStats {
-  count: number;
-  orbitRadius: number;
-  orbitSpeed: number;
-  size: number;
-}
+import { OrbitRing, type OrbitRingStats } from './OrbitRing';
 
 /**
- * A ring of bodies circling the caster (spec §5 "Earth — Orbiting Boulders",
- * Phase 2 spec §9.4 "Lightning Sword"): `count` of them at `orbitRadius`,
- * turning `orbitSpeed` rad/s, each `size` px across. What a body does to the
- * enemy it rolls over is the one thing left to a subclass — Lightning's blade
- * cuts and staggers — so #142 generalised this out of Phase 1's Earth ring
- * rather than copying it. #143 retired that ring's own spell: `earth` is Earth
- * Spike now, and the stones live on in `spells/EarthShieldSpell.ts`, which
- * carries a pool of its own instead of extending this.
+ * A ring of bodies circling the caster, out for `uptime` s and gone for
+ * `recharge` s (Phase 2 spec §9.4 "Lightning Sword", #406): `count` of them at
+ * `orbitRadius`, turning `orbitSpeed` rad/s, each `size` px across. What a body
+ * does to the enemy it rolls over, and what it does as the ring vanishes, is
+ * left to a subclass — Lightning's blade cuts and staggers, and ends in a chain
+ * burst. #142 generalised this out of Phase 1's Earth ring; #143 retired that
+ * ring's own spell, and the stones live on in `spells/EarthShieldSpell.ts`,
+ * which carries a pool of its own instead of extending this.
  *
- * The rules — spacing, the turn, the position — live in
- * `core/orbitingBoulders.ts`; this class owns the body pool, registers it with
- * `CollisionSystem` (the one place overlaps are wired, CO-032) and hands each
- * overlap to `onHit`.
+ * The ring itself — body pool, placement, the out-and-recharge cycle — is
+ * `OrbitRing`, shared with Earth Shield. This class registers nothing of its
+ * own: it ticks the ring, and hands each overlap to `onHit`.
  *
- * A ring has no cooldown, so it overrides `tick` and never sees the scheduler:
- * every frame the ring turns and each body is placed from the live stats, which
+ * A ring has no cooldown, so it overrides `tick` and never sees the scheduler.
+ * Every frame the ring turns and each body is placed from the live stats, which
  * is what makes a passive take effect on the next frame — a wider orbit moves
  * the ring out, a higher count joins a body and the others re-space.
  */
 export abstract class OrbitingBodySpell<S extends StattedSpellId> extends Spell<S> {
-  private readonly group: Phaser.Physics.Arcade.Group;
+  private readonly ring: OrbitRing;
   protected readonly caster: Readonly<Vec2>;
-  private readonly look: BodyLook;
-  /** Where body 0 is on the ring, in radians; the rest are spaced from it. */
-  private angle = 0;
 
   protected constructor(
     scene: Phaser.Scene,
@@ -57,80 +41,53 @@ export abstract class OrbitingBodySpell<S extends StattedSpellId> extends Spell<
   ) {
     super(id, stats);
     this.caster = caster;
-    this.look = look;
-    this.group = scene.physics.add.group({
-      classType: Boulder,
-      maxSize: MAX_BOULDERS,
-      // Bodies are placed from `tick`, which only runs while Game does, so a
-      // paused scene freezes the ring.
-      runChildUpdate: false,
-    });
-    collisions.addSpellGroup(this.group, (enemy, hitbox) => {
-      if (!(hitbox instanceof Boulder) || !hitbox.active || !enemy.active) return;
-      this.onHit(enemy, hitbox);
-    });
+    this.ring = new OrbitRing(
+      scene,
+      caster,
+      collisions,
+      (enemy, body) => this.onHit(enemy, body),
+      this.orbit,
+      look,
+    );
     // The ring is up from the first frame, not one tick later.
-    this.place();
+    this.ring.place(this.orbit, (body, angle) => this.orient(body, angle));
   }
 
-  /** Bodies on the ring right now. */
+  /** Bodies on the ring right now; 0 while it recharges. */
   get liveCount(): number {
-    return this.group.countActive(true);
+    return this.ring.liveCount;
+  }
+
+  /** Test hook (#406): whether the ring is out or recharging. */
+  get cyclePhase(): OrbitPhase {
+    return this.ring.phase;
   }
 
   protected override tick(deltaS: number): void {
-    this.angle = advanceOrbit(this.angle, this.orbit.orbitSpeed, deltaS);
-    this.place();
+    const { appeared, vanished } = this.ring.step(deltaS, this.orbit);
+    // The bodies are still where they were: the subclass reads them, then the ring is cleared.
+    if (vanished) this.onVanish(this.ring.bodies);
+    this.ring.place(this.orbit, (body, angle) => this.orient(body, angle));
+    if (appeared) this.onCast?.();
   }
 
-  /** Never called: a ring has no cast, it is always out. */
+  /** Never called: a ring has no cast, it is out and then recharging. */
   protected cast(): void {}
 
   /** The live block, as the ring reads it. */
-  protected get orbit(): Readonly<OrbitStats> {
-    return this.stats as Readonly<OrbitStats>;
+  protected get orbit(): Readonly<OrbitRingStats> {
+    return this.stats as Readonly<OrbitRingStats>;
   }
 
   /** One body rolled over one live enemy. */
   protected abstract onHit(enemy: Enemy, body: Boulder): void;
 
+  /** The ring's uptime ran out, with `bodies` still in place; they are gone right after. */
+  protected abstract onVanish(bodies: readonly Boulder[]): void;
+
   /**
-   * How a body is turned at `angle` on the ring, every frame: a boulder is a
-   * disc that only rolls; a blade points out along the radius.
+   * How a body is turned at `angle` on the ring, every frame: a blade points
+   * out along the radius.
    */
   protected abstract orient(body: Boulder, angle: number): void;
-
-  /**
-   * Put `count` bodies on the ring at the live radius and size. Bodies are
-   * taken from and returned to the pool as the count changes, and every one is
-   * repositioned from the same base angle, so the spacing is even every frame.
-   */
-  private place(): void {
-    const { count, orbitRadius, size } = this.orbit;
-    const angles = boulderAngles(this.angle, count);
-    const live = this.liveBodies();
-    while (live.length > angles.length) live.pop()?.despawn();
-    angles.forEach((angle, i) => {
-      const { x, y } = boulderPosition(this.caster, orbitRadius, angle);
-      let body = live[i];
-      if (body) {
-        body.setPosition(x, y);
-        body.resize(size);
-      } else {
-        // Pool exhausted: the ring is short a body until the pool frees one.
-        body = (this.group.get(x, y) as Boulder | null) ?? undefined;
-        body?.spawn(x, y, size, this.look);
-      }
-      if (body) this.orient(body, angle);
-    });
-  }
-
-  /** Live bodies in pool order, so the same object keeps the same slot frame to frame. */
-  private liveBodies(): Boulder[] {
-    const live: Boulder[] = [];
-    for (const child of this.group.getChildren()) {
-      if (child instanceof Boulder && child.active) live.push(child);
-    }
-    return live;
-  }
 }

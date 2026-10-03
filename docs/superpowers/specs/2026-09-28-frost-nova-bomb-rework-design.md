@@ -1,5 +1,18 @@
 # Frost Nova Bomb rework: a spinning ice urchin that sprays icicles and bursts in the pack
 
+> **Amended by #406 (2026-10-03).** The burst trigger (`BURST_ARM_DISTANCE`,
+> `BURST_TRIGGER_COUNT`, `shouldBurst`) and the level 3 Cluster urchins are gone.
+> The bomb always rolls its full `range` (`rolledOut(travelled, range)`). Levels 1
+> and 2: where the roll ends it vanishes, with no damage and no effect, so its
+> damage is the icicles'. Level 3, Frost wave: it releases a full-circle cold wave
+> (`core/fireWave.ts`'s wave with half arc pi) that grows from its core to `radius`
+> at `NOVA_WAVE.speed` (280 px/s), hitting each enemy once with `damage`, `bombFrost`
+> (slow plus a freeze roll). It is drawn by `spells/IceRingWave.ts` as `ice.wave`.
+> `ice.spikeRing` is no longer drawn by the bomb. Card: description "Rolls a
+> spinning ice bomb through the crowd, spraying icicles as it goes.", stats row
+> "Wave (Lv3)" "28 in 110". Sections 2, 3 and 6 below describe the original
+> burst; read them with this note.
+
 Design approved 2026-09-28. Ticket: CO-182 (#303). Supersedes the Frost Nova Bomb
 row and the `ice_nova_bomb` column of the Phase 2 spec (`2026-09-18-phase2-spells.md`
 §9.3); that spec gets a pointer here when this lands.

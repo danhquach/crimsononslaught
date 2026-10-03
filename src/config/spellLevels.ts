@@ -74,11 +74,11 @@ export const SPELL_LEVELS: SpellLevelTable = {
   },
   ice_nova_bomb: {
     2: 'Sprays 4 icicles per throw instead of 2.',
-    3: 'Cluster: the burst rolls out 3 small urchins.',
+    3: 'Frost wave: ends in an expanding cold ring.',
   },
   ice_shield: {
-    2: 'Frost aura: enemies touching it are slowed.',
-    3: 'Shatter ring: a break fires 8 icicles, freezes.',
+    2: 'Adds a 4th diamond to the ring.',
+    3: 'Each diamond bursts in a small cold wave.',
   },
   ice_companion: {
     2: 'Fires 2 projectiles per attack.',
@@ -106,7 +106,7 @@ export const SPELL_LEVELS: SpellLevelTable = {
   },
   lightning_sword: {
     2: 'Adds a 4th blade to the ring.',
-    3: '5 blades; each cut arcs to 1-2 enemies nearby.',
+    3: 'Each blade ends in a chain burst, up to 3 foes.',
   },
   earth: {
     2: 'Flings 2 spikes in a fan.',
@@ -118,7 +118,7 @@ export const SPELL_LEVELS: SpellLevelTable = {
   },
   earth_shield: {
     2: 'Adds a 4th stone to the ring.',
-    3: 'Tremor: every 2 s the ring shoves and staggers.',
+    3: 'Each stone ends in a staggering shockwave.',
   },
   earth_quake: {
     2: 'Opens 2 quakes, on the two densest groups.',
@@ -151,11 +151,12 @@ export const SPELL_LEVEL_STATS: SpellLevelStatTable = {
   fire_dragon: { 2: { projectiles: 1 }, 3: { projectiles: 1 } },
   ice: { 2: { projectiles: 1 } },
   ice_nova_bomb: { 2: { icicles: 2 } }, // 2 -> 4
+  ice_shield: { 2: { count: 1 } }, // 3 -> 4 diamonds; level 3 adds none (#406)
   ice_companion: { 2: { projectiles: 1 } },
   lightning: { 2: { strikes: 1 } },
   lightning_chain: { 2: { chains: 2 } }, // 2 -> 4
-  lightning_sword: { 2: { count: 1 }, 3: { count: 1 } }, // 3 -> 4 -> 5
-  earth_shield: { 2: { count: 1 } }, // 3 -> 4 stones
+  lightning_sword: { 2: { count: 1 } }, // 3 -> 4 blades; level 3 adds none (#406)
+  earth_shield: { 2: { count: 1 } }, // 3 -> 4 stones; level 3 adds none (#406)
 };
 
 /** The text for `level` of `id`, or `undefined` when the spell has no entry or the level is 1. */

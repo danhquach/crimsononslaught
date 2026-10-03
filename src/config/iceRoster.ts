@@ -29,7 +29,7 @@ export function isIceRosterSpellId(value: unknown): value is IceRosterSpellId {
  */
 export const BASE_NOVA_BOMB_STATS: Readonly<NovaBombStats> = {
   cooldown: 3.5,
-  damage: 24,
+  damage: 28,
   radius: 110,
   speed: 80,
   range: 240,
@@ -53,12 +53,11 @@ export const ICE_ROSTER_CARDS: Readonly<Record<IceRosterSpellId, SpellCard>> = {
   ice_nova_bomb: {
     name: 'Frost Nova Bomb',
     color: PLACEHOLDERS.fx_nova.color,
-    description:
-      'Rolls a spinning ice bomb through the crowd. It sprays icicles, then bursts into a freezing ring.',
+    description: 'Rolls a spinning ice bomb through the crowd, spraying icicles as it goes.',
     stats: [
       ['Cooldown', '3.5 s'],
       ['Icicles', '14 each'],
-      ['Burst', '24 in 110'],
+      ['Wave (Lv3)', '28 in 110'],
       ['Slow', '40% for 2 s'],
       ['Freeze', '15% for 1 s'],
     ],

@@ -1,78 +1,93 @@
-import Phaser from 'phaser';
-import { FROST_AURA, MAX_LIVE_SHIELD_ICICLES, SHATTER_RING } from '../config/iceLevels';
+import type Phaser from 'phaser';
+import { ICE_SHIELD_WAVE } from '../config/iceLevels';
+import { DIAMOND_CLIP, DIAMOND_TEXTURE } from '../config/shields';
 import type { SpellLevel } from '../config/spellLevels';
 import { recordCapped } from '../core/fireLevels';
+import { advanceWave, newWave, waveDone, type Wave } from '../core/fireWave';
 import { icicleFrost } from '../core/frostNova';
-import { novaScale } from '../core/fx';
-import { hasFrostAura, inAura, shatterRingFrost, shatterRingHeadings } from '../core/iceLevels';
-import { spawnsDue } from '../core/iceStorm';
+import { diamondWaveDamage, hasDiamondWave } from '../core/iceLevels';
 import type { Vec2 } from '../core/input';
-import { nearestEnemies } from '../core/spell';
+import type { OrbitPhase } from '../core/orbitCycle';
 import type { IceShieldStats } from '../core/spellStats';
+import type { Boulder } from '../entities/Boulder';
 import type { Enemy } from '../entities/Enemy';
-import { ShieldAura } from '../entities/ShieldAura';
-import { Projectile, type ProjectileLook } from '../entities/Projectile';
-import type { CollisionSystem, SpellHitbox } from '../systems/CollisionSystem';
+import type { CollisionSystem } from '../systems/CollisionSystem';
 import type { EnemyPool } from '../systems/EnemyPool';
 import type { FxPool } from '../systems/FxPool';
 import type { DamageSink } from './DamageSink';
+import { IceRingWave, newRingTrace, type RingTrace } from './IceRingWave';
+import { OrbitRing } from './OrbitRing';
 import { ShieldSpell } from './ShieldSpell';
 
-/** One shatter-ring icicle: the icicle placeholder the Frost Nova Bomb uses, so no new art (#328). */
-const RING_ICICLE_LOOK: ProjectileLook = { texture: 'proj_icicle' };
+/** One small cold wave in flight, with the diamond it left and the damage it was released with. */
+interface LiveWave {
+  readonly wave: Wave<Enemy>;
+  readonly level: SpellLevel;
+  readonly damage: number;
+  readonly view: IceRingWave;
+  caught: number;
+}
 
-/** Ice Shield's level record, what the test hook reads (#328): cause and effect in one entry. */
+/** Ice Shield's level record, what the test hook reads (#328, #406): cause and effect in one entry. */
 export interface IceShieldLevelReport {
-  /** Each aura pulse that caught an enemy, only ever while the shield was up. */
-  auraPulses: { level: SpellLevel; caught: number; slowedAfter: number }[];
-  /** Pulses fired in all, whether or not they caught anything. */
-  pulseCount: number;
-  /** Each break: the enemies it caught, how many of those were frozen after it, the icicles fired. */
-  breaks: { level: SpellLevel; caught: number; frozenAfter: number; icicles: number }[];
-  liveIcicles: number;
-  icicleHits: number;
-  iciclesDropped: number;
+  /** Each frost burst: the level the ring held, when it went off on the spell's own clock, the diamonds that each released a wave. */
+  bursts: { level: SpellLevel; atS: number; diamonds: number }[];
+  /** Bursts so far: a count the capped log cannot lose. */
+  burstCount: number;
+  /** Each wave that has finished: the level it came from and the enemies it hit. */
+  waves: { level: SpellLevel; caught: number }[];
+  /** Waves finished so far, and those that hit at least one enemy. */
+  wavesDone: number;
+  wavesHit: number;
+  /** Waves in the air right now. */
+  liveWaves: number;
+  /** How every wave ring so far was drawn, read off its sprite. */
+  ring: RingTrace;
+  /** Diamonds on the ring right now; 0 while recharging. */
+  diamonds: number;
+  /** Whether the diamonds are out or recharging right now. */
+  phase: OrbitPhase;
 }
 
 /**
- * Ice Shield (#134, Phase 2 spec §9.3): a layer of ice on the player that
- * absorbs `shieldHp` of damage before their HP is touched, regrows once it is
- * left alone for `rechargeDelay`, and shatters when a hit empties it — dealing
- * `breakDamage` and chilling everything within `breakRadius`.
+ * Ice Shield (#134, Phase 2 spec §9.3, #406): `count` ice diamonds circle the
+ * player, chilling and hurting what they cut, over a pool the whole ring
+ * shares: it absorbs `shieldHp` of the player's damage while the diamonds are
+ * out. They are out for `uptime` s and gone for `recharge` s; the pool is full
+ * each time they return and 0 while they are gone, and a pool broken at 0 ends
+ * the uptime early, so a hit that breaks it starts the recharge.
  *
- * The pool's rules are `core/shield.ts`, worn through `ShieldSpell`; this class
- * owns the layer on screen and the shatter. The layer follows the player every
- * frame and fades with the pool, so a shield about to break reads as one.
+ * The pool is `core/shield.ts` through `ShieldSpell`; the ring is `OrbitRing`,
+ * shared with Earth Shield and Lightning Sword. This class turns an overlap
+ * into damage and a slow, and the ring's vanishing into a frost burst.
  *
- * The shatter is a burst rather than a lingering area: it is the shield's last
- * act, and the frost it leaves is what buys the player the room to back off
- * while the pool regrows.
+ * Levels (#406): level 2's fourth diamond is a stat add (`count`), so the ring
+ * simply places one more. Level 3, frost burst: when the diamonds vanish, timed
+ * or broken, each one releases a small cold wave from where it hangs
+ * (`ICE_SHIELD_WAVE`): a `core/fireWave.ts` wave with a half arc of pi, drawn
+ * as `IceRingWave`. Each wave chills and hurts an enemy once.
  *
- * Levels (#328): level 2, Frost aura: while the shield is up, every
- * `FROST_AURA.tickEveryS` each enemy within `FROST_AURA.radius` of the player's
- * edge (plus its own body) is slowed; a shield that is down chills nothing and
- * its clock starts over when it returns. Level 3, Shatter ring: a break also
- * freezes what it chills (`SHATTER_RING.freezeS`, through `applyFrost` so the
- * boss's diminishing returns cap it) and fires `SHATTER_RING.icicles` icicles
- * round the player, out of a pool of their own. The level is read when the
- * break happens.
+ * The shield's cue plays as the diamonds return, never as they time out: the
+ * break cue is the player's intake path's, played only for a real break.
  */
 export class IceShieldSpell extends ShieldSpell<'ice_shield'> {
-  private readonly caster: Readonly<Vec2>;
-  private readonly enemies: EnemyPool;
+  private readonly ring: OrbitRing;
+  private readonly scene: Phaser.Scene;
   private readonly damage: DamageSink;
   private readonly fx: FxPool;
-  private readonly aura: ShieldAura;
-  private readonly icicles: Phaser.Physics.Arcade.Group;
-  /** Run-clock seconds the shield has stood, which the aura's pulses are counted off; 0 while it is down. */
-  private auraClockS = 0;
-  private pulses = 0;
-  private readonly pulseLog: IceShieldLevelReport['auraPulses'] = [];
-  private readonly breakLog: IceShieldLevelReport['breaks'] = [];
-  private icicleHitCount = 0;
-  private icicleDropCount = 0;
-  /** Test hook (#134): enemies the shatter has caught, across every break. */
-  private shattered = 0;
+  private readonly enemies: EnemyPool;
+  /** The spell's own clock, on the run clock: what a burst's time is read from. */
+  private clockS = 0;
+  private readonly waves: LiveWave[] = [];
+  private readonly burstLog: IceShieldLevelReport['bursts'] = [];
+  private readonly waveLog: IceShieldLevelReport['waves'] = [];
+  private readonly trace = newRingTrace();
+  private bursts = 0;
+  private wavesDone = 0;
+  private wavesHit = 0;
+  /** Test hook: enemies the diamonds have cut, and those the waves have caught. */
+  private cuts = 0;
+  private waveLanded = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -84,145 +99,141 @@ export class IceShieldSpell extends ShieldSpell<'ice_shield'> {
     fx: FxPool,
   ) {
     super('ice_shield', stats);
-    this.caster = caster;
+    this.scene = scene;
     this.enemies = enemies;
     this.damage = damage;
     this.fx = fx;
-    this.aura = new ShieldAura(scene, caster.x, caster.y);
-    // Drawn from the first frame, not one tick later.
-    this.aura.show(caster, this.fill);
-    // Icicles fly on Arcade velocity and expire from `tick`, which only runs
-    // while Game does, so a paused scene freezes them.
-    this.icicles = scene.physics.add.group({
-      classType: Projectile,
-      maxSize: MAX_LIVE_SHIELD_ICICLES,
-      runChildUpdate: false,
-    });
-    collisions.addSpellGroup(this.icicles, (enemy, hitbox) => this.onIcicleHit(enemy, hitbox));
+    this.ring = new OrbitRing(
+      scene,
+      caster,
+      collisions,
+      (enemy, diamond) => this.onHit(enemy, diamond),
+      this.stats,
+      { texture: DIAMOND_TEXTURE, clip: DIAMOND_CLIP },
+    );
+    // The ring is up from the first frame, not one tick later.
+    this.placeRing();
   }
 
-  /** Test hook (#328): the aura's pulses, the breaks and the icicles this shield has made. */
+  /** Diamonds on the ring right now; 0 while the diamonds are gone. */
+  get liveCount(): number {
+    return this.ring.liveCount;
+  }
+
+  /** Test hook: whether the diamonds are out or recharging. */
+  get cyclePhase(): OrbitPhase {
+    return this.ring.phase;
+  }
+
+  /** Enemies the diamonds have cut and the waves have caught: what the browser suite watches. */
+  get hits(): number {
+    return this.cuts + this.waveLanded;
+  }
+
+  /** Test hook (#406): the bursts, and the waves they released. */
   get levelReport(): IceShieldLevelReport {
     return {
-      auraPulses: [...this.pulseLog],
-      pulseCount: this.pulses,
-      breaks: [...this.breakLog],
-      liveIcicles: this.icicles.countActive(true),
-      icicleHits: this.icicleHitCount,
-      iciclesDropped: this.icicleDropCount,
+      bursts: [...this.burstLog],
+      burstCount: this.bursts,
+      waves: [...this.waveLog],
+      wavesDone: this.wavesDone,
+      wavesHit: this.wavesHit,
+      liveWaves: this.waves.length,
+      ring: { ...this.trace, frames: [...this.trace.frames] },
+      diamonds: this.liveCount,
+      phase: this.cyclePhase,
     };
   }
 
-  /** Enemies this shield's shatters have caught — what the browser suite reads. */
-  get shatterHits(): number {
-    return this.shattered;
-  }
-
   protected override tick(deltaS: number): void {
-    super.tick(deltaS);
-    this.aura.show(this.caster, this.fill);
-    this.frostAura(deltaS);
-    for (const child of this.icicles.getChildren()) {
-      if (child instanceof Projectile && child.active && child.spent) child.despawn();
+    // Waves first, so a wave born last step is drawn at its core before it first grows.
+    if (this.waves.length > 0) this.growWaves(deltaS);
+    const { appeared, vanished } = this.ring.step(deltaS, this.stats);
+    this.clockS += deltaS;
+    if (vanished) this.dismiss(false);
+    if (appeared) {
+      this.refillPool();
+      this.onCast?.();
     }
+    this.placeRing();
   }
 
-  /**
-   * Frost aura (level 2): while the shield is up, one pulse per
-   * `FROST_AURA.tickEveryS` slows every enemy touching it. Down, or below level
-   * 2, the clock does not run, so a shield that returns starts a fresh count.
-   */
-  private frostAura(deltaS: number): void {
-    const level = this.level;
-    if (!hasFrostAura(level) || !this.up) {
-      this.auraClockS = 0;
-      return;
-    }
-    const due = spawnsDue(this.auraClockS, deltaS, 1 / FROST_AURA.tickEveryS);
-    this.auraClockS += deltaS;
-    for (let i = 0; i < due; i += 1) this.pulse(level);
-  }
-
-  /** One pulse: every live enemy in reach is chilled; only a pulse that caught something is logged. */
-  private pulse(level: SpellLevel): void {
-    this.pulses += 1;
-    const { slowPct, slowDurationS } = FROST_AURA;
-    let caught = 0;
-    let slowedAfter = 0;
-    for (const enemy of this.enemies.live) {
-      if (!enemy.active || !inAura(this.caster, enemy, FROST_AURA.radius)) continue;
-      caught += 1;
-      enemy.applyFrost({ slowPct, slowDuration: slowDurationS, freeze: false });
-      if (enemy.slowed) slowedAfter += 1;
-    }
-    if (caught > 0) recordCapped(this.pulseLog, { level, caught, slowedAfter });
-  }
-
-  /**
-   * The shatter. Everything inside `breakRadius` is chilled and then hit, in
-   * that order, so a killing blow still leaves the arena marked where it fell
-   * rather than being applied to an enemy that is already gone.
-   */
+  /** A pool broken at 0: the diamonds vanish now and the recharge starts. */
   protected onBreak(): void {
-    const { breakDamage, breakRadius, slowPct, slowDuration } = this.stats;
-    const { x, y } = this.caster;
-    // Off the screen on the step it broke, the way Earth's stones fall in —
-    // waiting for the next `tick` would leave a layer drawn over a shatter.
-    this.aura.show(this.caster, this.fill);
-    // The ice nova is the only clip drawn to a radius, so the shatter is played
-    // at the reach the stat block promises; each enemy caught gets its own
-    // `ice.shatter` the way Frost Nova marks what it hits.
-    this.fx.burst('ice.nova', x, y, { scale: novaScale(breakRadius) });
-
-    // The break's level is taken as it happens; a fallen shield starts its aura count afresh.
-    const level = this.level;
-    this.auraClockS = 0;
-    const frost = shatterRingFrost({ slowPct, slowDuration }, level);
-    const live = this.enemies.live;
-    let caught = 0;
-    let frozenAfter = 0;
-    for (const enemy of nearestEnemies(this.caster, live, live.length, breakRadius)) {
-      if (!enemy.active) continue;
-      this.shattered += 1;
-      caught += 1;
-      this.fx.burst('ice.shatter', enemy.x, enemy.y);
-      enemy.applyFrost(frost);
-      if (enemy.isFrozen) frozenAfter += 1;
-      this.damage(enemy, breakDamage, 'hit', { x, y });
-    }
-    const icicles = level >= 3 ? this.fireIcicles(x, y) : 0;
-    recordCapped(this.breakLog, { level, caught, frozenAfter, icicles });
+    if (this.ring.endEarly(this.stats.recharge)) this.dismiss(true);
   }
 
-  /** Shatter ring (level 3): `SHATTER_RING.icicles` icicles leave the player, dropped when the pool is out. */
-  private fireIcicles(x: number, y: number): number {
-    let fired = 0;
-    for (const angle of shatterRingHeadings()) {
-      const icicle = this.icicles.get(x, y) as Projectile | null;
-      // Pool exhausted: the icicle is dropped, never queued.
-      if (!icicle) {
-        this.icicleDropCount += 1;
-        continue;
+  /**
+   * The diamonds go: at level 3 each releases its wave from where it is, the
+   * pool is emptied, and the ring is cleared. `broke` adds a shatter on each
+   * diamond; a timed vanish plays none.
+   */
+  private dismiss(broke: boolean): void {
+    const diamonds = this.ring.bodies;
+    if (broke) for (const d of diamonds) this.fx.burst('ice.shatter', d.x, d.y);
+    if (hasDiamondWave(this.level)) this.burst(this.level, diamonds);
+    this.emptyPool();
+    this.placeRing();
+  }
+
+  /** Frost burst (level 3): one wave per diamond, at the damage the ring holds now. */
+  private burst(level: SpellLevel, diamonds: readonly Boulder[]): void {
+    const damage = diamondWaveDamage(this.stats.damage);
+    for (const d of diamonds) {
+      const view = new IceRingWave(this.scene, d, this.trace);
+      view.update(0, ICE_SHIELD_WAVE.range);
+      this.waves.push({ wave: newWave<Enemy>(d, 0), level, damage, view, caught: 0 });
+    }
+    this.bursts += 1;
+    recordCapped(this.burstLog, { level, atS: this.clockS, diamonds: diamonds.length });
+  }
+
+  /** Grow every wave's rim; chill and hit what it sweeps over, once each; retire it at its range. */
+  private growWaves(deltaS: number): void {
+    const { range, speed } = ICE_SHIELD_WAVE;
+    for (const live of [...this.waves]) {
+      const { wave } = live;
+      const struck = advanceWave(
+        wave,
+        this.enemies.live,
+        speed * deltaS,
+        range,
+        Math.PI,
+        (enemy) => enemy.bodyRadius,
+      );
+      for (const enemy of struck) {
+        if (!enemy.active) continue;
+        live.caught += 1;
+        this.waveLanded += 1;
+        // Chill first, then damage, the way every Ice hit lands.
+        enemy.applyFrost(icicleFrost(ICE_SHIELD_WAVE));
+        this.damage(enemy, live.damage, 'hit', wave.origin);
       }
-      const to = {
-        x: x + Math.cos(angle) * SHATTER_RING.range,
-        y: y + Math.sin(angle) * SHATTER_RING.range,
-      };
-      icicle.fire(x, y, to, SHATTER_RING.speed, SHATTER_RING.range, RING_ICICLE_LOOK);
-      fired += 1;
+      if (waveDone(wave, range)) {
+        live.view.destroy();
+        this.waves.splice(this.waves.indexOf(live), 1);
+        this.wavesDone += 1;
+        if (live.caught > 0) this.wavesHit += 1;
+        recordCapped(this.waveLog, { level: live.level, caught: live.caught });
+      } else {
+        live.view.update(wave.r, range);
+      }
     }
-    return fired;
   }
 
-  /** A ring icicle breaks on its first enemy: the shield's slow, then a fraction of the break's damage. */
-  private onIcicleHit(enemy: Enemy, hitbox: SpellHitbox): void {
-    if (!(hitbox instanceof Projectile) || !hitbox.active || !enemy.active) return;
-    const from = { x: hitbox.x, y: hitbox.y };
-    hitbox.despawn();
-    this.icicleHitCount += 1;
+  private placeRing(): void {
+    this.ring.place(this.stats, (diamond) => diamond.spin(this.stats.orbitSpeed));
+  }
+
+  private onHit(enemy: Enemy, diamond: Boulder): void {
+    // The per-enemy window is claimed first: a second diamond on the same enemy
+    // this frame, or any diamond within `hitCooldown`, does nothing.
+    if (!enemy.tryBoulderHit()) return;
+
+    this.cuts += 1;
     this.fx.burst('ice.shatter', enemy.x, enemy.y);
     // Chill first, then damage, the way every Ice hit lands.
     enemy.applyFrost(icicleFrost(this.stats));
-    this.damage(enemy, this.stats.breakDamage * SHATTER_RING.damageFactor, 'hit', from);
+    this.damage(enemy, this.stats.damage, 'hit', diamond);
   }
 }

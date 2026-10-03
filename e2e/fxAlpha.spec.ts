@@ -33,7 +33,7 @@ function listed(clip: string): number {
 }
 
 /** The clips `FxPool` draws that the table lists. */
-const POOLED_CLIPS = ['fire.explode', 'ice.nova', 'ice.shatter', 'ice.spikeRing'] as const;
+const POOLED_CLIPS = ['fire.explode', 'ice.nova', 'ice.shatter'] as const;
 /** A clip the table leaves out, to burst after a listed one on the same pooled sprite. */
 const UNLISTED_CLIP = 'earth.impact';
 

@@ -6,9 +6,7 @@ import {
   createShield,
   EMPTY_TALLY,
   isUp,
-  reformed,
   tallyShield,
-  tickShield,
   type ShieldRule,
   type ShieldState,
   type ShieldTally,
@@ -16,20 +14,21 @@ import {
 
 /**
  * A spell that stands in front of the player's HP (#134, Phase 2 spec §9): it
- * holds an absorption pool, refills it when it is left alone, and fires its own
- * break effect the once when a hit empties it.
+ * holds an absorption pool and fires its own break effect the once when a hit
+ * empties it.
  *
  * Both shields share every rule of the pool (`core/shield.ts`) and differ only
  * in what they draw and what a break does, so a subclass brings a break effect
- * and a way to draw itself and nothing else. Like Earth's ring a shield is
- * always out rather than cast, so `tick` runs every frame and `cast` is never
+ * and a way to draw itself and nothing else. Both are rings on a timer (#406):
+ * their own cycle refills the pool when the ring returns and empties it when
+ * the ring goes (`refillPool`, `emptyPool`). A shield is out on its own rather
+ * than cast, so the subclass's `tick` runs every frame and `cast` is never
  * called; ticking from here rather than from `runChildUpdate` is what keeps a
- * paused Game — a level-up overlay — from recharging the shield for free.
+ * paused Game, a level-up overlay, from running the cycle for free.
  *
  * The rule is read from the live block every frame rather than stored, because
  * a shield lives as long as it is equipped and therefore feels a passive the
- * moment it is taken (spec §6.2): a Haste shortens the wait the player is
- * already in.
+ * moment it is taken (spec §6.2).
  */
 export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
   private state: ShieldState;
@@ -74,7 +73,7 @@ export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
    * which `core/health.ts` applies to what passes through — #139).
    */
   absorbDamage(amount: number): number {
-    const result = absorb(this.state, amount, this.rule);
+    const result = absorb(this.state, amount);
     this.tallied = tallyShield(this.tallied, this.state, result.state);
     this.state = result.state;
     // `broke` is true only on the transition to 0, so overlapping contacts in
@@ -89,20 +88,31 @@ export abstract class ShieldSpell<S extends ShieldSpellId> extends Spell<S> {
     return max > 0 ? Math.min(1, Math.max(0, this.pool / max)) : 0;
   }
 
-  /** The pool's numbers as the live block says them right now. */
+  /**
+   * The pool's numbers as the live block says them right now. No shield regrows
+   * (#406): each one's own cycle refills it.
+   */
   protected get rule(): ShieldRule {
-    const { shieldHp, rechargeDelay } = this.stats as { shieldHp: number; rechargeDelay: number };
-    return { max: shieldHp, rechargeDelayS: rechargeDelay };
+    const { shieldHp } = this.stats as { shieldHp: number };
+    return { max: shieldHp };
   }
 
-  protected override tick(deltaS: number): void {
-    const next = tickShield(this.state, deltaS, this.rule);
-    const cameUp = reformed(this.state, next);
+  /**
+   * The pool full at once, for a shield that comes and goes on a timer rather
+   * than regrowing (#406). Counted as regrown in the tally.
+   */
+  protected refillPool(): void {
+    const next = createShield(this.rule);
     this.tallied = tallyShield(this.tallied, this.state, next);
     this.state = next;
-    // The shield's cast cue (CO-158): it has no cast, so it cues as it comes
-    // back from empty. `GameScene` plays the one on equip.
-    if (cameUp) this.onCast?.();
+  }
+
+  /**
+   * The pool empty at once, with nothing to wait for: the timer brings it back.
+   * Not an absorption, so the tally is left alone.
+   */
+  protected emptyPool(): void {
+    this.state = { pool: 0 };
   }
 
   /** Never called: a shield has no cooldown, it is simply up or recharging. */

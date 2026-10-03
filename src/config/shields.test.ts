@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { ANIMATIONS } from './animations';
+import { TEXTURE_KEYS } from './colors';
 import { validateSpellFields } from '../core/playerProfile';
-import { rechargePerSecond } from '../core/shield';
 import { elementOf, isRosterSpellId, SPELLS_BY_ELEMENT } from './loadout';
 import {
   BASE_EARTH_SHIELD_STATS,
   BASE_ICE_SHIELD_STATS,
   BASE_SHIELD_STATS,
+  DIAMOND_CLIP,
+  DIAMOND_TEXTURE,
   SHIELD_CARDS,
   SHIELD_SPELL_IDS,
   isShieldSpellId,
@@ -32,37 +35,52 @@ describe('shield ids', () => {
 });
 
 describe('shield stat blocks', () => {
-  it('gives both shields a pool and a delay the mechanic can use', () => {
-    for (const id of SHIELD_SPELL_IDS) {
-      const { shieldHp, rechargeDelay } = BASE_SHIELD_STATS[id];
-      expect(shieldHp, id).toBeGreaterThan(0);
-      expect(rechargeDelay, id).toBeGreaterThan(0);
-      expect(rechargePerSecond({ max: shieldHp, rechargeDelayS: rechargeDelay }), id).toBe(10);
-    }
+  it('gives Ice Shield a pool and a cycle, and no regrow delay (#406)', () => {
+    const { shieldHp, uptime, recharge } = BASE_ICE_SHIELD_STATS;
+    expect(shieldHp).toBeGreaterThan(0);
+    expect(uptime).toBe(5);
+    expect(recharge).toBe(3);
+    expect(BASE_ICE_SHIELD_STATS).not.toHaveProperty('rechargeDelay');
+    expect(BASE_ICE_SHIELD_STATS).not.toHaveProperty('breakDamage');
+    expect(BASE_ICE_SHIELD_STATS).not.toHaveProperty('breakRadius');
   });
 
-  it('carries the spec §9.3 numbers for Ice Shield', () => {
+  it('gives Earth Shield a pool and a cycle, and no regrow delay (#406)', () => {
+    const { shieldHp, uptime, recharge } = BASE_EARTH_SHIELD_STATS;
+    expect(shieldHp).toBeGreaterThan(0);
+    expect(uptime).toBe(5);
+    expect(recharge).toBe(3);
+    expect(BASE_EARTH_SHIELD_STATS).not.toHaveProperty('rechargeDelay');
+  });
+
+  it('carries the spec §9.3 numbers for Ice Shield, with the #406 ring', () => {
     expect(BASE_ICE_SHIELD_STATS).toEqual({
-      shieldHp: 60,
-      rechargeDelay: 6,
-      breakDamage: 40,
-      breakRadius: 120,
+      count: 3,
+      orbitRadius: 70,
+      orbitSpeed: 3,
+      size: 14,
+      damage: 12,
+      hitCooldown: 0.4,
       slowPct: 0.4,
       slowDuration: 2,
+      shieldHp: 50,
+      uptime: 5,
+      recharge: 3,
     });
   });
 
-  it('carries the spec §9.5 numbers for Earth Shield', () => {
+  it('carries the spec §9.5 numbers for Earth Shield, with the #406 cycle', () => {
     expect(BASE_EARTH_SHIELD_STATS).toEqual({
       count: 3,
       orbitRadius: 80,
       orbitSpeed: 2.5,
       size: 14,
-      damage: 10,
+      damage: 20,
       knockback: 60,
       hitCooldown: 0.4,
       shieldHp: 80,
-      rechargeDelay: 8,
+      uptime: 5,
+      recharge: 3,
     });
   });
 
@@ -71,6 +89,7 @@ describe('shield stat blocks', () => {
     // runs on the global `BOULDER_HIT_COOLDOWN`; a per-spell one is #147's.
     // Until then a block promising a different window would be a lie.
     expect(BASE_EARTH_SHIELD_STATS.hitCooldown).toBe(BOULDER_HIT_COOLDOWN);
+    expect(BASE_ICE_SHIELD_STATS.hitCooldown).toBe(BOULDER_HIT_COOLDOWN);
   });
 
   it('routes every field through the category map, so passives reach them', () => {
@@ -79,6 +98,24 @@ describe('shield stat blocks', () => {
 });
 
 describe('shield presentation', () => {
+  it('draws a diamond with a clip the atlas defines (#406)', () => {
+    expect(ANIMATIONS.map((anim) => anim.name)).toContain(DIAMOND_CLIP);
+    expect(TEXTURE_KEYS).toContain(DIAMOND_TEXTURE);
+  });
+
+  it("keeps Ice Shield's card to the numbers the block holds (#406)", () => {
+    const { shieldHp, count, damage, uptime, recharge } = BASE_ICE_SHIELD_STATS;
+    const card = SHIELD_CARDS.ice_shield;
+    expect(card.stats).toEqual([
+      ['Absorbs', `${shieldHp} while out`],
+      ['Diamonds', `${count}`],
+      ['Damage', `${damage}`],
+      ['Out', `${uptime} s, back in ${recharge} s`],
+    ]);
+    expect(card.description).toContain(`${uptime} s`);
+    expect(card.stats.length).toBeLessThanOrEqual(5);
+  });
+
   it('gives every shield a one-line card', () => {
     for (const id of SHIELD_SPELL_IDS) {
       expect(SHIELD_CARDS[id].name, id).not.toBe('');

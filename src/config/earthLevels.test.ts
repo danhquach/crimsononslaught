@@ -21,7 +21,7 @@ import {
   SPIKES_PER_CAST,
   SPIKE_FAN,
   SPLINTER,
-  TREMOR,
+  STONE_SHOCK,
 } from './earthLevels';
 import { BASE_BOULDER_STATS } from './earthRoster';
 import { MAX_LIVE_AREAS } from './fx';
@@ -42,7 +42,7 @@ describe('Earth level tunables (#330)', () => {
       SPIKES_PER_CAST,
       SPLINTER,
       BOULDER_SPLIT,
-      TREMOR,
+      STONE_SHOCK,
       QUAKE_SPLIT,
       AFTERSHOCK,
       EARTH_COMPANION_SWEEP,
@@ -93,7 +93,7 @@ describe('Earth level tunables (#330)', () => {
   });
 
   it('keeps every new crowd-control time under the second the boss can be held for', () => {
-    for (const stagger of [TREMOR.staggerS, SEISMIC_SLAM.staggerS, LANDSLIDE.staggerS]) {
+    for (const stagger of [STONE_SHOCK.staggerS, SEISMIC_SLAM.staggerS, LANDSLIDE.staggerS]) {
       expect(stagger).toBeLessThan(1);
     }
     expect(AFTERSHOCK.bossMaxThrowPx).toBeLessThan(BASE_QUAKE_STATS.radius);

@@ -7,7 +7,6 @@ import {
   FX_ALPHA,
   LARGE_BURN_MIN_RADIUS,
   NOVA_SCALE_RADIUS,
-  SPIKE_RING_SCALE_RADIUS,
   SLOW_TINT,
   SPIN_BASE_ORBIT_SPEED,
   STUN_TINT,
@@ -32,11 +31,6 @@ export function explosionScale(aoeRadius: number): number {
 /** Spec §5 Ice: the pulse is drawn at `radius / 90`, so a Reach perk grows the ring on screen. */
 export function novaScale(radius: number): number {
   return radius / NOVA_SCALE_RADIUS;
-}
-
-/** CO-182: Frost Nova Bomb's burst is drawn at `radius / 61`, its ring's rim on the radius it reaches. */
-export function spikeRingScale(radius: number): number {
-  return radius / SPIKE_RING_SCALE_RADIUS;
 }
 
 /**

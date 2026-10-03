@@ -32,7 +32,7 @@ describe('ice roster stat blocks', () => {
   it('carries the CO-182 rework numbers for Frost Nova Bomb', () => {
     expect(BASE_NOVA_BOMB_STATS).toEqual({
       cooldown: 3.5,
-      damage: 24,
+      damage: 28,
       radius: 110,
       speed: 80,
       range: 240,
@@ -67,15 +67,15 @@ describe('ice roster presentation', () => {
     }
   });
 
-  it('says what the reworked bomb does, with its own numbers (CO-182)', () => {
+  it('says what the reworked bomb does, with its own numbers (CO-182, #406)', () => {
     const card = ICE_ROSTER_CARDS.ice_nova_bomb;
     expect(card.description).toBe(
-      'Rolls a spinning ice bomb through the crowd. It sprays icicles, then bursts into a freezing ring.',
+      'Rolls a spinning ice bomb through the crowd, spraying icicles as it goes.',
     );
     expect(card.stats).toEqual([
       ['Cooldown', '3.5 s'],
       ['Icicles', '14 each'],
-      ['Burst', '24 in 110'],
+      ['Wave (Lv3)', '28 in 110'],
       ['Slow', '40% for 2 s'],
       ['Freeze', '15% for 1 s'],
     ]);

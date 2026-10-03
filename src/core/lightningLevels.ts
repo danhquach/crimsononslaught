@@ -2,7 +2,7 @@ import {
   COMPANION_SWEEP,
   FORK,
   STORM_CELL,
-  SWORD_ARC,
+  SWORD_BURST,
   SWORD_HIT_WINDOW_S,
   THUNDERBOLT,
   THUNDERCLAP,
@@ -365,35 +365,31 @@ export function swordHitCooldown(
   return window === undefined ? base : Math.min(base, window);
 }
 
-/** Whether a Lightning Sword at `level` arcs from each cut. */
-export function hasSwordArc(level: SpellLevel): boolean {
+/** Whether a Lightning Sword at `level` ends its uptime in a chain burst. */
+export function hasSwordBurst(level: SpellLevel): boolean {
   return level >= 3;
 }
 
 /**
- * Who a blade's arc reaches after it cut `cutEnemy`: up to `jumps` enemies, the
- * first the nearest to the blade within `range`, each next the nearest to the
- * one before within `range`; never the cut enemy or one of `exclude`. Empty
- * with nothing in reach.
+ * Who a blade's burst reaches: the nearest enemy to the blade within `range`,
+ * then up to `jumps` more, each the nearest not yet reached to the one before
+ * within `range`. So at most `1 + jumps` enemies, none twice; empty with nothing
+ * in reach of the blade. Ties go to the earlier enemy in `enemies`.
  */
-export function swordArcPath<T extends Vec2>(
-  bladePos: Readonly<Vec2>,
-  cutEnemy: T,
+export function swordBurstPath<T extends Vec2>(
+  blade: Readonly<Vec2>,
   enemies: readonly T[],
-  range: number = SWORD_ARC.range,
-  jumps: number = SWORD_ARC.jumps,
-  exclude: ReadonlySet<T> | readonly T[] = [],
+  cfg: Readonly<{ jumps: number; range: number }> = SWORD_BURST,
 ): T[] {
-  const hit = new Set<T>(exclude);
-  hit.add(cutEnemy);
+  const hit = new Set<T>();
   const path: T[] = [];
-  let from: Readonly<Vec2> = bladePos;
-  for (let jump = 0; jump < Math.floor(jumps); jump += 1) {
+  let from: Readonly<Vec2> = blade;
+  for (let link = 0; link < Math.floor(cfg.jumps) + 1; link += 1) {
     const [next] = nearestEnemies(
       from,
       enemies.filter((enemy) => !hit.has(enemy)),
       1,
-      range,
+      cfg.range,
     );
     if (!next) break;
     path.push(next);
@@ -401,9 +397,4 @@ export function swordArcPath<T extends Vec2>(
     from = next;
   }
   return path;
-}
-
-/** Whether a blade whose arc window has `remainingS` left may arc again. */
-export function bladeArcReady(remainingS: number | undefined): boolean {
-  return !(remainingS !== undefined && remainingS > 0);
 }

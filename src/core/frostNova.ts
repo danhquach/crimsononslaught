@@ -9,8 +9,8 @@ import type { NovaBombStats } from './spellStats';
  * Frost rules that do not need an engine: how the slow and freeze any Ice
  * spell leaves on an enemy stack and run out (spec §5, kept by every Phase 2
  * Ice spell through `Enemy.applyFrost`), and the Frost Nova Bomb's own rules
- * (spec §9.3) — where a throw is aimed, who its pulse reaches and what each
- * enemy caught is left with.
+ * (spec §9.3) — where a throw is aimed, when its roll ends and what each
+ * enemy its level 3 wave catches is left with.
  *
  * `spells/NovaBombSpell.ts` is the Phaser side; everything decidable without
  * Phaser lives here so it is Vitest-covered.
@@ -30,17 +30,6 @@ export const BOMB_SPIN_DEG_PER_S = 540;
 
 /** How far the icicle set turns from one throw to the next, in degrees (CO-182): the spiral. */
 export const ICICLE_SPIRAL_STEP_DEG = 40;
-
-/** Live enemies inside an armed bomb's burst `radius` that set it off (CO-182). */
-export const BURST_TRIGGER_COUNT = 3;
-
-/**
- * How far, in px, a bomb rolls before a group can set it off (CO-182). Without
- * it a crowd round the player met the trigger on the throw's first frame and
- * every bomb burst at the player's feet with no icicle thrown; 120 px is 1.5 s
- * of roll at the base speed, 6 throws.
- */
-export const BURST_ARM_DISTANCE = 120;
 
 /**
  * Icicles in the air the pool may ever hold (CO-182). An icicle lives about
@@ -182,30 +171,12 @@ export function throwsDue(elapsedS: number, thrown: number, throwInterval: numbe
 }
 
 /**
- * Whether a rolling bomb goes off now (CO-182), having rolled `travelled` px of
- * its `range`: always once the range has run out; before that, only once it has
- * rolled `BURST_ARM_DISTANCE` and its burst would catch `BURST_TRIGGER_COUNT`
- * enemies — that many within `radius` of it, the radius counting as in — so a
- * lone runner cannot set it off and a crowd at the player's feet cannot either.
+ * Whether a rolling bomb has run out of road: it always rolls its full `range`,
+ * and nothing before that ends the roll (the old arm-and-crowd trigger went
+ * with the wave rework, #406).
  */
-export function shouldBurst(
-  at: Readonly<Vec2>,
-  enemies: readonly Readonly<Vec2>[],
-  travelled: number,
-  range: number,
-  radius: number,
-): boolean {
-  if (travelled >= range) return true;
-  if (travelled < BURST_ARM_DISTANCE) return false;
-  const radiusSq = radius * radius;
-  let near = 0;
-  for (const enemy of enemies) {
-    const dx = enemy.x - at.x;
-    const dy = enemy.y - at.y;
-    if (dx * dx + dy * dy <= radiusSq) near += 1;
-    if (near >= BURST_TRIGGER_COUNT) return true;
-  }
-  return false;
+export function rolledOut(travelled: number, range: number): boolean {
+  return travelled >= range;
 }
 
 /** What one icicle leaves on the enemy it breaks on (CO-182): the bomb's slow, never a freeze. */
@@ -214,7 +185,7 @@ export function icicleFrost(stats: Readonly<{ slowPct: number; slowDuration: num
 }
 
 /**
- * What the pulse leaves on one enemy it catches: the bomb's slow, and its
+ * What the wave leaves on one enemy it catches: the bomb's slow, and its
  * freeze if that enemy's roll came up. One roll per enemy, so a seed replays
  * the same freezes.
  */

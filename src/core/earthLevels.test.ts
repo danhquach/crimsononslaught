@@ -12,11 +12,12 @@ import {
   SEISMIC_SLAM,
   SPIKE_FAN,
   SPLINTER,
-  TREMOR,
+  STONE_SHOCK,
 } from '../config/earthLevels';
 import { BASE_BOULDER_STATS } from '../config/earthRoster';
 import { BASE_QUAKE_STATS } from '../config/areas';
-import { PASSIVES } from '../config/passives';
+import { PASSIVES, PROFILE_CLAMPS } from '../config/passives';
+import { BASE_EARTH_SHIELD_STATS } from '../config/shields';
 import type { SpellLevel } from '../config/spellLevels';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { startBossCycle, stepBossCycle } from './boss';
@@ -35,7 +36,7 @@ import {
   hasSeismicSlam,
   hasLandslide,
   hasSplinter,
-  hasTremor,
+  hasStoneShock,
   quakeSpots,
   quakesPerCast,
   onRut,
@@ -54,10 +55,8 @@ import {
   splinterDamage,
   splinterPush,
   splinterTargets,
-  tremorPush,
-  tremorReach,
-  tremorTargets,
-  tremorsDue,
+  stoneShockHits,
+  stoneShockPush,
   type RutTile,
 } from './earthLevels';
 import { advanceArea, areaStaggerS, createArea, densestSpot } from './groundArea';
@@ -71,6 +70,7 @@ import { applyStagger, staggerSpeedFactor, tickStagger } from './status';
 
 const LEVELS: readonly SpellLevel[] = [1, 2, 3];
 const DEG = Math.PI / 180;
+const HASTE = PROFILE_CLAMPS.cooldownMul?.min ?? 1;
 const PERSISTENCE = PASSIVES.find((p) => p.id === 'passive_persistence')?.amount ?? NaN;
 
 interface Body {
@@ -86,7 +86,7 @@ describe('level gates', () => {
   it('turns each behaviour on at its own level and keeps it on', () => {
     expect(LEVELS.map(hasSplinter)).toEqual([false, false, true]);
     expect(LEVELS.map(hasLandslide)).toEqual([false, false, true]);
-    expect(LEVELS.map(hasTremor)).toEqual([false, false, true]);
+    expect(LEVELS.map(hasStoneShock)).toEqual([false, false, true]);
     expect(LEVELS.map(hasAftershock)).toEqual([false, false, true]);
     expect(LEVELS.map(hasEarthSweep)).toEqual([false, true, true]);
     expect(LEVELS.map(hasSeismicSlam)).toEqual([false, false, true]);
@@ -460,65 +460,52 @@ describe('Landslide rut', () => {
   });
 });
 
-describe('Tremor', () => {
-  it('pays floor(life / 2 s) tremors over the ring’s life, on any frame split', () => {
-    const rng = createRng(5);
-    for (const life of [2, 3.9, 8, 15.5, 60]) {
-      for (const frame of [
-        () => 1 / 60,
-        () => 1 / 30,
-        () => 0.25,
-        () => 0.003 + rng.next() * 0.3,
-      ]) {
-        let clock = 0;
-        let due = 0;
-        while (clock < life - 1e-12) {
-          const delta = Math.min(frame(), life - clock);
-          due += tremorsDue(clock, delta);
-          clock += delta;
-        }
-        expect(due, `life ${life}`).toBe(Math.floor(life / TREMOR.everyS + 1e-9));
-      }
-    }
-  });
+describe('Stone shock', () => {
+  const stoneA = { x: 0, y: 0 };
+  const stoneB = { x: 100, y: 0 };
 
-  it('pays nothing for a paused step, a short one or an interval that pays nothing', () => {
-    expect(tremorsDue(1, 0)).toBe(0);
-    expect(tremorsDue(0, TREMOR.everyS - 0.01)).toBe(0);
-    expect(tremorsDue(0, 1, 0)).toBe(0);
-    expect(tremorsDue(0, 1, -2)).toBe(0);
-  });
-
-  it('pays every tremor a long frame crossed', () => {
-    expect(tremorsDue(0, 7)).toBe(3);
-  });
-
-  it('reaches the ring, a stone and the pad out', () => {
-    expect(tremorReach(80, 14)).toBe(80 + 14 + TREMOR.padPx);
-    expect(tremorReach(80, 14, 0)).toBe(94);
-  });
-
-  it('catches an enemy whose body edge is inside the reach, the reach counting as in', () => {
-    const centre = { x: 0, y: 0 };
-    const reach = tremorReach(80, 14);
-    const outside = at(reach + 10.01, 0, 10);
-    const edge = at(0, reach + 10, 10);
+  it('catches an enemy whose body edge is inside the radius, the radius counting as in', () => {
+    const outside = at(STONE_SHOCK.radius + 10.01, 0, 10);
+    const edge = at(0, STONE_SHOCK.radius + 10, 10);
     const inside = at(30, 0, 8);
-    expect(tremorTargets(centre, [outside, edge, inside], reach)).toEqual([edge, inside]);
+    const hits = stoneShockHits([stoneA], [outside, edge, inside]);
+    expect(hits.map((hit) => hit.enemy)).toEqual([edge, inside]);
     // With no body it is the centre that counts.
-    expect(tremorTargets(centre, [at(reach + 0.01, 0), at(reach, 0)], reach)).toEqual([
-      at(reach, 0),
-    ]);
-    expect(tremorTargets(centre, [], reach)).toEqual([]);
+    expect(
+      stoneShockHits([stoneA], [at(STONE_SHOCK.radius + 0.01, 0), at(STONE_SHOCK.radius, 0)]).map(
+        (hit) => hit.enemy,
+      ),
+    ).toEqual([at(STONE_SHOCK.radius, 0)]);
+    expect(stoneShockHits([stoneA], [])).toEqual([]);
+    expect(stoneShockHits([], [inside])).toEqual([]);
   });
 
-  it('shoves the set distance out from the player, and not at all from dead on them', () => {
-    const centre = { x: 10, y: 10 };
-    expect(len(tremorPush(centre, { x: 60, y: 90 }))).toBeCloseTo(TREMOR.knockbackPx, 9);
-    const push = tremorPush(centre, { x: 110, y: 10 });
-    expect(push.x).toBeCloseTo(TREMOR.knockbackPx, 9);
+  it('catches an enemy once, by its nearest stone, the earlier on a tie', () => {
+    const between = at(50, 0);
+    expect(stoneShockHits([stoneA, stoneB], [between])).toEqual([
+      { enemy: between, stone: stoneA },
+    ]);
+    const nearB = at(70, 10);
+    expect(stoneShockHits([stoneA, stoneB], [nearB])).toEqual([{ enemy: nearB, stone: stoneB }]);
+    // Out of reach of every stone.
+    expect(stoneShockHits([stoneA, stoneB], [at(50, 200)])).toEqual([]);
+  });
+
+  it('shoves the set distance out from the stone, and not at all from dead on it', () => {
+    const stone = { x: 10, y: 10 };
+    const centre = { x: 0, y: 0 };
+    expect(len(stoneShockPush(stone, { x: 60, y: 90 }, centre))).toBeCloseTo(
+      STONE_SHOCK.knockbackPx,
+      9,
+    );
+    const push = stoneShockPush(stone, { x: 110, y: 10 }, centre);
+    expect(push.x).toBeCloseTo(STONE_SHOCK.knockbackPx, 9);
     expect(push.y).toBeCloseTo(0, 9);
-    expect(tremorPush(centre, centre)).toEqual({ x: 0, y: 0 });
+    // Dead on the stone it is shoved out along the stone's own radius from the player.
+    const dead = stoneShockPush(stone, stone, centre);
+    expect(len(dead)).toBeCloseTo(STONE_SHOCK.knockbackPx, 9);
+    expect(Math.sign(dead.x)).toBe(1);
+    expect(stoneShockPush(centre, centre, centre)).toEqual({ x: 0, y: 0 });
   });
 });
 
@@ -701,7 +688,9 @@ describe('stagger caps', () => {
     expect(quake).toBeGreaterThan(0);
     expect(seismicStaggerS()).toBeLessThan(SEISMIC_SLAM.tickEveryS);
     expect(seismicStaggerS()).toBe(SEISMIC_SLAM.staggerS);
-    expect(TREMOR.staggerS).toBeLessThan(TREMOR.everyS);
+    expect(STONE_SHOCK.staggerS).toBeLessThan(
+      BASE_EARTH_SHIELD_STATS.uptime + BASE_EARTH_SHIELD_STATS.recharge,
+    );
   });
 
   /**
@@ -956,7 +945,7 @@ describe('no Earth level rule has a stun number', () => {
       SPIKE_FAN,
       SPLINTER,
       BOULDER_SPLIT,
-      TREMOR,
+      STONE_SHOCK,
       QUAKE_SPLIT,
       AFTERSHOCK,
       EARTH_COMPANION_SWEEP,
@@ -988,7 +977,11 @@ describe('boss crowd control, every Earth level 3 stagger at once', () => {
       staggerS: areaStaggerS(BASE_QUAKE_STATS.staggerDuration!, BASE_QUAKE_STATS.tickRate),
     },
     { name: 'seismic tick', period: SEISMIC_SLAM.tickEveryS, staggerS: seismicStaggerS() },
-    { name: 'tremor', period: TREMOR.everyS, staggerS: TREMOR.staggerS },
+    {
+      name: 'stone shock',
+      period: BASE_EARTH_SHIELD_STATS.uptime + BASE_EARTH_SHIELD_STATS.recharge * HASTE,
+      staggerS: STONE_SHOCK.staggerS,
+    },
     { name: 'rut tick', period: LANDSLIDE.tickEveryS, staggerS: rutStaggerS() },
   ];
 
@@ -1032,7 +1025,7 @@ describe('boss crowd control, every Earth level 3 stagger at once', () => {
     expect(all.map((s) => [Number(s.period.toFixed(3)), Number(s.staggerS.toFixed(3))])).toEqual([
       [0.5, 0.2],
       [0.3, 0.1],
-      [2, 0.4],
+      [6.05, 0.6],
       [0.3, 0.15],
     ]);
   });

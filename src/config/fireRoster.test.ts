@@ -36,12 +36,12 @@ describe('fire roster stat blocks', () => {
   it('carries the CO-143 numbers for Fire Wave, under the old id', () => {
     expect(BASE_FIRE_WAVE_STATS).toEqual({
       cooldown: 2.2,
-      damage: 18,
+      damage: 15,
       arc: 95,
       speed: 260,
       range: 180,
       knockback: 8,
-      burn: 8,
+      burn: 6,
       burnDuration: 3,
     });
     expect(BASE_FIRE_ROSTER_STATS.fire_column).toBe(BASE_FIRE_WAVE_STATS);
@@ -59,8 +59,8 @@ describe('fire roster stat blocks', () => {
 
   it('carries the spec §9.2 numbers for Fire Dragon', () => {
     expect(BASE_FIRE_DRAGON_STATS).toEqual({
-      cooldown: 2.5,
-      damage: 45,
+      cooldown: 3,
+      damage: 32,
       aoeRadius: 30,
       aoeDamageFactor: 0.4,
       projectiles: 1,

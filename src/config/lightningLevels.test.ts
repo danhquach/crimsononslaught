@@ -12,9 +12,9 @@ import {
   FORK,
   MAX_LIVE_COMPANION_STRIPS,
   MAX_LIVE_STORM_BOLTS,
-  MAX_LIVE_SWORD_ARC_STRIPS,
+  MAX_LIVE_SWORD_BURST_STRIPS,
   STORM_CELL,
-  SWORD_ARC,
+  SWORD_BURST,
   SWORD_HIT_WINDOW_S,
   THUNDERBOLT,
   THUNDERCLAP,
@@ -44,7 +44,7 @@ describe('Lightning level tunables (#329)', () => {
       STORM_CELL,
       COMPANION_SWEEP,
       THUNDERCLAP,
-      SWORD_ARC,
+      SWORD_BURST,
       SWORD_HIT_WINDOW_S,
     ]) {
       for (const value of Object.values(rule)) {
@@ -54,7 +54,7 @@ describe('Lightning level tunables (#329)', () => {
     for (const pool of [
       MAX_LIVE_STORM_BOLTS,
       MAX_LIVE_COMPANION_STRIPS,
-      MAX_LIVE_SWORD_ARC_STRIPS,
+      MAX_LIVE_SWORD_BURST_STRIPS,
     ]) {
       expect(pool).toBeGreaterThan(0);
     }
@@ -77,7 +77,7 @@ describe('Lightning level tunables (#329)', () => {
       TORNADO_SPLIT.count,
       COMPANION_SWEEP.maxTargets,
       THUNDERCLAP.jumps,
-      SWORD_ARC.jumps,
+      SWORD_BURST.jumps,
     ]) {
       expect(Number.isInteger(n)).toBe(true);
     }
@@ -137,14 +137,20 @@ describe('Lightning level tunables (#329)', () => {
     expect(MAX_LIVE_COMPANION_STRIPS).toBeGreaterThanOrEqual(((strips * CYCLE_S) / cadence) * 4);
   });
 
-  it('pools four times the sword arc strips level 3 keeps up, five blades at their cooldown', () => {
+  it('gives the sword and Earth Shield one stone or blade at level 2 and none at level 3 (#406)', () => {
+    for (const id of ['lightning_sword', 'earth_shield'] as const) {
+      expect(SPELL_LEVEL_STATS[id]).toEqual({ 2: { count: 1 } });
+    }
+  });
+
+  it('pools every strip of one sword burst, a blade to its first target and on, at the last blade count', () => {
     const blades =
       BASE_SWORD_STATS.count + (levelStatAdds(SPELL_LEVEL_STATS, 'lightning_sword', 3).count ?? 0);
-    const arcsPerS = blades / SWORD_ARC.perBladeCooldownS;
-    // An arc draws blade -> first -> second: one strip a jump.
-    expect(MAX_LIVE_SWORD_ARC_STRIPS).toBeGreaterThanOrEqual(
-      arcsPerS * SWORD_ARC.jumps * CYCLE_S * 4,
-    );
+    expect(blades).toBe(4);
+    // A burst draws blade -> first -> ... : one strip a link, `1 + jumps` a blade. Bursts are
+    // an uptime plus a recharge apart (8 s, well over the 0.2 s a strip is up), so one at a time.
+    expect(MAX_LIVE_SWORD_BURST_STRIPS).toBeGreaterThanOrEqual(blades * (1 + SWORD_BURST.jumps));
+    expect(BASE_SWORD_STATS.uptime + BASE_SWORD_STATS.recharge * HASTE).toBeGreaterThan(CYCLE_S);
   });
 
   it('keeps the chain segment pool four times a forked cast at the Haste clamp', () => {

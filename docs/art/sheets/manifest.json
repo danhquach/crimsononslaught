@@ -2373,6 +2373,26 @@
         [{ "anim": "chainTrail", "cols": [1, 4], "centred": true }],
         [{ "anim": "chainFlash", "cols": [1, 4], "centred": true }]
       ]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-227",
+      "file": "CO-227/ice_wave.png",
+      "page": 30,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 640,
+      "rowSpecs": [[{ "anim": "wave", "cols": [1, 4], "centred": true }]]
+    },
+    {
+      "key": "ice",
+      "ticket": "CO-227",
+      "file": "CO-227/ice_diamond.png",
+      "page": 30,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 224,
+      "rowSpecs": [[{ "anim": "diamond", "cols": [1, 4], "centred": true }]]
     }
   ]
 }

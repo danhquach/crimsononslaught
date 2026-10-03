@@ -173,12 +173,17 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
     expect(area.artAlpha, `tornado art alpha ${i}`).toBeCloseTo(TORNADO_LOOK.alpha ?? 1, 5);
   }
 
-  // The sword is always out: three blades on the ring from the first frame (spec §9.4 `count` 3, #305).
+  // The sword is out in full or gone (#406): three blades on the ring, or none while it
+  // recharges (spec §9.4 `count` 3, #305), and over the window both are seen. Which one the
+  // first sample lands on depends on the runner: at timeScale 10 an uptime is 0.5 s of wall
+  // clock, so a slow CI runner's first sample can already fall in a recharge (#409).
   const swordLive = trace.map((report) => report.find((s) => s.id === 'lightning_sword')?.live);
   expect(
-    swordLive.every((live) => live === BASE_SWORD_STATS.count),
-    'the full ring of blades throughout',
+    swordLive.every((live) => live === BASE_SWORD_STATS.count || live === 0),
+    'the full ring of blades or none',
   ).toBe(true);
+  expect(swordLive.includes(BASE_SWORD_STATS.count), 'the full ring is seen out').toBe(true);
+  expect(swordLive.includes(0), 'the blades vanish between cycles').toBe(true);
 
   const last = trace[trace.length - 1] ?? [];
   for (const id of [PICKED, ...LIGHTNING_ROSTER_SPELL_IDS]) {
@@ -188,7 +193,7 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
   }
 
   // CO-158: each spell asked for its own cast cue, held to its window in this
-  // scaled run. The sword never casts: it asked once, as it was equipped.
+  // scaled run. The sword never casts: it asked as it was equipped and each time its blades return (#406).
   const log = await readSounds(page);
   for (const id of [PICKED, ...EXTRA]) {
     const key = castSoundFor(id);
@@ -203,9 +208,9 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
     );
   }
   expect(
-    log.filter((r) => r.key === 'cast.lightning_sword'),
-    'the sword cues once, on equip',
-  ).toHaveLength(1);
+    log.filter((r) => r.key === 'cast.lightning_sword').length,
+    'the sword cues on equip and again as its blades return',
+  ).toBeGreaterThan(1);
 
   const hud = await readHud(page);
   expect(hud.kills, 'kills over the run').toBeGreaterThan(0);

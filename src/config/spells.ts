@@ -32,7 +32,7 @@ export const SPELL_CARDS: Readonly<Record<SpellId, SpellCard>> = {
     description: 'Fires a fast bolt at the nearest enemy; a small explosion on hit.',
     stats: [
       ['Cooldown', '1.0 s'],
-      ['Damage', '12'],
+      ['Damage', '10'],
       ['Blast radius', '65'],
       ['Projectiles', '1'],
     ],
@@ -94,7 +94,7 @@ export const BASE_SPELL_STATS: Readonly<{
 }> = {
   fire: {
     cooldown: 1,
-    damage: 12,
+    damage: 10,
     aoeRadius: 65,
     aoeDamageFactor: 0.5,
     projectiles: 1,

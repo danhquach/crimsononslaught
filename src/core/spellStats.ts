@@ -50,25 +50,25 @@ export interface IceStats {
 /**
  * Frost Nova Bomb (spec §9.3, reworked by CO-182): a slow spinning bomb rolls
  * toward the densest group within `range`, spraying icicles in a turning
- * spiral as it goes, and bursts in the pack or where its range runs out,
- * pulsing `radius` around that point.
+ * spiral as it goes. Where its range runs out it vanishes; from level 3 it
+ * first releases a cold wave that spreads `radius` out from that point (#406).
  */
 export interface NovaBombStats {
   /** Seconds between throws. */
   cooldown: number;
-  /** Damage the burst deals to every enemy inside `radius`. */
+  /** Damage the level 3 wave deals to every enemy it sweeps over, inside `radius`. */
   damage: number;
-  /** Burst radius in px, measured from where the bomb went off. */
+  /** The level 3 wave's reach in px, measured from where the bomb's roll ended. */
   radius: number;
   /** Rolling speed of the bomb in px/s. */
   speed: number;
-  /** How far the bomb rolls before it bursts on its own, in px; also the aiming range. */
+  /** How far the bomb rolls, in px; also the aiming range. */
   range: number;
   /** Speed cut applied to everything hit, 0–1. */
   slowPct: number;
   /** Seconds a slow lasts. */
   slowDuration: number;
-  /** Chance per enemy the burst catches of a full stop for `freezeDuration` s, 0–1. */
+  /** Chance per enemy the wave hits of a full stop for `freezeDuration` s, 0–1. */
   freezeChance: number;
   /** Seconds a freeze lasts. */
   freezeDuration: number;
@@ -168,6 +168,10 @@ export interface SwordStats {
   hitCooldown: number;
   /** Seconds a cut enemy is staggered (#139). */
   staggerDuration: number;
+  /** Seconds the blades stay out before they vanish (#406). */
+  uptime: number;
+  /** Seconds they stay gone before they return (#406). */
+  recharge: number;
 }
 
 /**
@@ -256,27 +260,39 @@ export interface CompanionStats {
 }
 
 /**
- * Ice Shield (#134, spec §9.3): an absorbing layer on the player that refills
- * on its own and shatters into the enemies around it.
+ * Ice Shield (#134, spec §9.3, #406): a ring of ice diamonds that chill what
+ * they cut and share a pool with the player's HP. The diamonds are out for
+ * `uptime` s and gone for `recharge` s; a pool broken at 0 ends the uptime early.
  */
 export interface IceShieldStats {
-  /** The pool a full shield holds, in points of damage absorbed. */
-  shieldHp: number;
-  /** Seconds unhit before the pool refills, and how long a full refill takes. */
-  rechargeDelay: number;
-  /** Damage the shatter deals to everything inside `breakRadius`. */
-  breakDamage: number;
-  /** How far the shatter reaches, in px from the player. */
-  breakRadius: number;
-  /** Speed cut the shatter applies, 0-1. */
+  /** Diamonds in the ring. */
+  count: number;
+  /** Orbit radius in px. */
+  orbitRadius: number;
+  /** Orbit angular speed in rad/s. */
+  orbitSpeed: number;
+  /** Diamond body radius in px. */
+  size: number;
+  /** Damage one diamond deals to an enemy it cuts. */
+  damage: number;
+  /** Seconds between two hits on the same enemy. */
+  hitCooldown: number;
+  /** Speed cut a diamond's hit applies, 0-1. */
   slowPct: number;
   /** Seconds that slow lasts. */
   slowDuration: number;
+  /** The pool the whole ring shares, in points of damage absorbed; full each time the diamonds return. */
+  shieldHp: number;
+  /** Seconds the diamonds stay out before they vanish. */
+  uptime: number;
+  /** Seconds they stay gone, whether they vanished or broke. */
+  recharge: number;
 }
 
 /**
  * Earth Shield (#134, spec §9.5): Phase 1's orbiting ring plus a shared pool —
- * the stones absorb the player's damage, break at 0 and return after a delay.
+ * the stones absorb the player's damage while they are out, and are out for
+ * `uptime` s and gone for `recharge` s; a pool broken at 0 ends the uptime early (#406).
  */
 export interface EarthShieldStats {
   /** Stones in the ring. */
@@ -293,10 +309,12 @@ export interface EarthShieldStats {
   knockback: number;
   /** Seconds between two hits on the same enemy. */
   hitCooldown: number;
-  /** The pool the whole ring shares, in points of damage absorbed. */
+  /** The pool the whole ring shares, in points of damage absorbed; full each time the stones return. */
   shieldHp: number;
-  /** Seconds the ring stays down after it breaks, and how long a refill takes. */
-  rechargeDelay: number;
+  /** Seconds the stones stay out before they vanish (#406). */
+  uptime: number;
+  /** Seconds they stay gone, whether they vanished or broke (#406). */
+  recharge: number;
 }
 
 /**

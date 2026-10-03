@@ -231,11 +231,11 @@ category decides which profile multiplier reaches it.
 
 | Category | Multiplier | Spell fields |
 |---|---|---|
-| damage | `damageMul` | `damage`, `tickDamage`, `breakDamage`, `burn`, `bleed` |
-| cooldown | `cooldownMul` | `cooldown`, `attackCooldown`, `rechargeDelay`, `fallDelay` |
-| area | `areaMul` | `aoeRadius`, `radius`, `breakRadius`, `chainRange`, `orbitRadius`, `leashRadius`, `targetRange`, `range`, `size`, `pullRadius` |
+| damage | `damageMul` | `damage`, `tickDamage`, `burn`, `bleed` |
+| cooldown | `cooldownMul` | `cooldown`, `attackCooldown`, `recharge`, `fallDelay` |
+| area | `areaMul` | `aoeRadius`, `radius`, `chainRange`, `orbitRadius`, `leashRadius`, `targetRange`, `range`, `size`, `pullRadius` |
 | speed | `projectileSpeedMul` | `speed`, `orbitSpeed`, `chaseSpeed` (companions) |
-| duration | `durationMul` | `duration`, `burnDuration`, `bleedDuration`, `slowDuration`, `freezeDuration`, `stunDuration`, `staggerDuration` |
+| duration | `durationMul` | `duration`, `burnDuration`, `bleedDuration`, `slowDuration`, `freezeDuration`, `stunDuration`, `staggerDuration`, `uptime` |
 | pierce | `+ pierceBonus` (added, not multiplied) | `pierce` |
 | unscaled | — | counts (`projectiles`, `strikes`, `chains`, `count`), fractions (`slowPct`, `freezeChance`, `stunChance`, `bleedChance`, `chainFalloff`, `aoeDamageFactor`), `knockback`, `pullForce`, `homingTurnRate`, `hitCooldown`, `tickRate`, `shieldHp` |
 
@@ -267,8 +267,8 @@ Pure, in `core/`, called where the value is used — not stored on the loadout:
   until it expires; the next one cast gets the new ones. This keeps an Ice Storm
   from growing under the player's feet mid-duration.
 - **Anything that lives as long as it is equipped reads live** — companions,
-  orbiting bodies and shields. A shield's `rechargeDelay`, `breakDamage` and
-  `breakRadius` therefore change the moment a passive is taken. `shieldHp` is
+  orbiting bodies and shields. A shield's `uptime`, `recharge` and `damage`
+  therefore change the moment a passive is taken. `shieldHp` is
   unscaled today (§6.1); should anything ever scale it, it resizes when the
   shield next reforms rather than mid-pool, so it can never refill a shield that
   is about to break.
@@ -419,8 +419,8 @@ type-specific damage.
 - Units: seconds, pixels, px/s, rad/s. `tickRate` is seconds between ticks.
 - Every player spell's `range` and `targetRange` was cut to about ×0.45 by
   [#212](https://github.com/danhquach/crimsononslaught/issues/212), so a new
-  run reaches only what is on screen and Expanse earns more reach. Fire Bolt,
-  Lightning Bolt and Chain Lightning are 150 and Fire Wave 180, set by hand.
+  run reaches only what is on screen and Expanse earns more reach. Fire Bolt and
+  Lightning Bolt are 150; Chain Lightning (#406) and Fire Wave 180, set by hand.
   Companion ranges, `chainRange` and every radius are unchanged.
 - A spell casts only with an enemy in its `range` or `targetRange`, and a
   companion attacks only with a target (#212). A cast that comes due with
@@ -440,22 +440,22 @@ type-specific damage.
 
 | Field | `fire` | `fire_meteor` | `fire_column` | `fire_companion` | `fire_dragon` |
 |---|---|---|---|---|---|
-| `cooldown` | 1.0 | 3.2 | 2.2 | — | 2.5 |
+| `cooldown` | 1.0 | 3.2 | 2.2 | — | 3.0 |
 | `attackCooldown` | — | — | — | 1.2 | — |
-| `damage` | 12 | 60 | 18 | 8 | 45 |
+| `damage` | 10 | 60 | 15 | 10 | 32 |
 | `aoeRadius` | 65 | 130 | — | — | 30 |
 | `aoeDamageFactor` | 0.5 | 1.0 | — | — | 0.4 |
 | `arc` | — | — | 95° | — | — |
 | `projectiles` | 1 | 1 | — | 1 | 1 |
 | `speed` | 350 | — | 260 | 320 | 260 |
 | `range` | 150 | — | 180 | — | — |
-| `targetRange` | — | 189 | — | 260 | 189 |
+| `targetRange` | — | 240 | — | 280 | 189 |
 | `fallDelay` | — | 1.0 | — | — | — |
 | `homingTurnRate` | — | — | — | — | 4.0 rad/s |
 | `duration` | — | — | — | — | 3.0 |
 | `leashRadius` | — | — | — | 60 | — |
 | `knockback` | — | — | 8 | — | — |
-| `burn` | — | — | 8 | 2 | — |
+| `burn` | — | — | 6 | 2 | — |
 | `burnDuration` | — | — | 3.0 | 2.0 | — |
 
 Fire Bolt is today's Fire block with `burn` removed — burn is Fire Wave's
@@ -502,22 +502,22 @@ enemy cap can bury is not a warning.
 | Spell | id | Behaviour | Needs |
 |---|---|---|---|
 | Ice Arrow (default) | `ice` | Fast single projectile, small slow on hit, no AoE so it fires faster than Fire Bolt | — |
-| Frost Nova Bomb | `ice_nova_bomb` | A spinning ice bomb rolls toward the densest group spraying icicles, then bursts into a freezing ring (reworked by CO-182, `2026-09-28-frost-nova-bomb-rework-design.md`) | — |
-| Ice Shield | `ice_shield` | Absorbing layer on the player; recharges; hurts and slows nearby enemies when it breaks | #134 |
+| Frost Nova Bomb | `ice_nova_bomb` | A spinning ice bomb rolls toward the densest group spraying icicles as it goes; at level 3 its roll ends in an expanding cold ring, below that it just vanishes (reworked by CO-182 and #406, `2026-09-28-frost-nova-bomb-rework-design.md`) | — |
+| Ice Shield | `ice_shield` | Ice diamonds circle the player for 5 s, hurting and slowing what they cut and soaking damage with their own HP, then are gone for 3 s and return with the HP full (#406) | #134 |
 | Ice Companion | `ice_companion` | Ranged ally, light slow on hit | #133 |
 | Ice Storm | `ice_blizzard` | Ground area, heavy slow, the element's crowd control (renamed from Blizzard, #219) | #135 |
 
 | Field | `ice` | `ice_nova_bomb` | `ice_shield` | `ice_companion` | `ice_blizzard` |
 |---|---|---|---|---|---|
-| `cooldown` | 0.8 | 3.5 | — | — | 12 |
-| `attackCooldown` | — | — | — | 1.4 | — |
-| `damage` | 10 | 24 | — | 7 | — |
-| `tickDamage` | — | — | — | — | 6 |
+| `cooldown` | 0.8 | 3.5 | — | — | 10.8 |
+| `attackCooldown` | — | — | — | 0.92 | — |
+| `damage` | 10 | 28 | 12 | 20 | — |
+| `tickDamage` | — | — | — | — | 7 |
 | `tickRate` | — | — | — | — | 0.5 |
-| `radius` | — | 110 | — | — | 120 |
+| `radius` | — | 110 | — | — | 156 |
 | `speed` | 380 | 80 | — | 320 | — |
 | `range` | 189 | 240 | — | — | — |
-| `targetRange` | — | — | — | 260 | 180 |
+| `targetRange` | — | — | — | 300 | 180 |
 | `leashRadius` | — | — | — | 60 | — |
 | `duration` | — | — | — | — | 4.0 |
 | `slowPct` | 0.2 | 0.4 | 0.4 | 0.25 | 0.5 |
@@ -529,14 +529,25 @@ enemy cap can bury is not a warning.
 | `icicleDamage` | — | 14 | — | — | — |
 | `icicleSpeed` | — | 320 | — | — | — |
 | `icicleRange` | — | 110 | — | — | — |
-| `shieldHp` | — | — | 60 | — | — |
-| `rechargeDelay` | — | — | 6.0 | — | — |
-| `breakDamage` | — | — | 40 | — | — |
-| `breakRadius` | — | — | 120 | — | — |
+| `count` | — | — | 3 | — | — |
+| `orbitRadius` | — | — | 70 | — | — |
+| `orbitSpeed` | — | — | 3 | — | — |
+| `size` | — | — | 14 | — | — |
+| `hitCooldown` | — | — | 0.4 | — | — |
+| `shieldHp` | — | — | 50 | — | — |
+| `uptime` | — | — | 5.0 | — | — |
+| `recharge` | — | — | 3.0 | — | — |
 
-Ice Shield recharges at `shieldHp / rechargeDelay` per second once
-`rechargeDelay` seconds have passed with no damage taken, and absorbs player
-damage before `damageReduction` applies. Ice Storm's area is placed on the
+Ice Shield (#406) is out for `uptime` s and gone for `recharge` s, from the
+moment it is equipped. While its diamonds are out they hit and slow what they
+cut, and its pool of `shieldHp` is full on the frame they appear, absorbing
+player damage before `damageReduction` applies; while they are gone the pool is 0, and
+a pool broken at 0 ends the uptime early, so a hit that breaks it starts the
+recharge. Level 2 adds a fourth diamond; level 3 adds none: when the diamonds
+vanish, at the end of the uptime or on a break, each releases a small cold wave
+from where it hangs (60 px at 240 px/s), slowing and dealing 1.5 x the shield's
+`damage` to every enemy it sweeps over once. A passive reaches it live:
+Persistence stretches `uptime`, Haste shortens `recharge`. Ice Storm's area is placed on the
 densest cluster within `targetRange`, chosen through the seeded RNG when two
 clusters tie.
 
@@ -578,35 +589,45 @@ block, and a stun still fills it yellow. Ice Storm is a slow and never freezes.
 | Chain Lightning | `lightning_chain` | Strikes and chains to nearby enemies with falloff | #139 |
 | Tornado | `lightning_tornado` | Drifting vortex pulls enemies in and damages them continuously | #135, #136 |
 | Lightning Companion | `lightning_companion` | Melee ally, charges nearby enemies, staggers | #133 |
-| Lightning Sword | `lightning_sword` | Three blades circle the player, staggering what they cut | — |
+| Lightning Sword | `lightning_sword` | Three blades circle the player for 5 s, staggering what they cut, then are gone for 3 s (#406) | — |
 
 | Field | `lightning` | `lightning_chain` | `lightning_tornado` | `lightning_companion` | `lightning_sword` |
 |---|---|---|---|---|---|
 | `cooldown` | 0.9 | 1.4 | 9.0 | — | — |
 | `attackCooldown` | — | — | — | 0.8 | — |
-| `damage` | 14 | 12 | — | 9 | 16 |
+| `damage` | 14 | 14 | — | 14 | 26 |
 | `tickDamage` | — | — | 5 | — | — |
 | `tickRate` | — | — | 0.4 | — | — |
 | `strikes` | 1 | 1 | — | — | — |
 | `chains` | — | 2 | — | — | — |
 | `chainRange` | — | 120 | — | — | — |
 | `chainFalloff` | — | 0.8 | — | — | — |
-| `targetRange` | 150 | 150 | 162 | 200 | — |
+| `targetRange` | 150 | 180 | 162 | 260 | — |
 | `radius` | — | — | 60 | — | — |
 | `pullRadius` | — | — | 80 | — | — |
 | `pullForce` | — | — | 90 | — | — |
 | `speed` | — | — | 60 | — | — |
 | `chaseSpeed` | — | — | — | 240 | — |
-| `leashRadius` | — | — | — | 220 | — |
-| `orbitRadius` | — | — | — | — | 70 |
+| `leashRadius` | — | — | — | 260 | — |
+| `orbitRadius` | — | — | — | — | 110 |
 | `orbitSpeed` | — | — | — | — | 4.5 rad/s |
 | `count` | — | — | — | — | 3 |
 | `size` | — | — | — | — | 18 |
 | `hitCooldown` | — | — | — | — | 0.35 |
+| `uptime` | — | — | — | — | 5.0 |
+| `recharge` | — | — | — | — | 3.0 |
 | `duration` | — | — | 5.0 | — | — |
 | `staggerDuration` | 0.5 | 0.5 | — | 0.3 | 0.3 |
 | `stunChance` | 0.08 | 0.08 | — | — | — |
 | `stunDuration` | 2.0 | 2.0 | — | — | — |
+
+Lightning Sword (#406) is out for `uptime` s and gone for `recharge` s, from the
+moment it is equipped, and hits nothing while it is gone. Level 2 adds a fourth
+blade; level 3 adds none: when the blades vanish at the end of the uptime each
+fires once, a chain burst to the nearest enemy within 60 px of the blade and on
+to two more within 60 px of the last (at most three enemies a blade, each
+staggered and dealt the sword's damage). A passive reaches it live: Persistence
+stretches `uptime`, Haste shortens `recharge`.
 
 Stagger is the new brief interrupt from #139 — it stops an enemy's movement for
 its duration without the full stop of a stun, and it does not stack: a second
@@ -618,24 +639,25 @@ stagger refreshes the timer.
 |---|---|---|---|
 | Earth Spike (default) | `earth` | Slow stone spike flung at the nearest enemy; strikes the first enemy it touches (`pierce` 1), a light shove, a 5% bleed chance per hit; can miss and flies on to its range (#205) | #139 |
 | Boulder | `earth_boulder` | Heavy rolling boulder, big damage and knockback, passes through a few enemies | — |
-| Earth Shield | `earth_shield` | Stones circle the player, knock back, have their own HP and return after a cooldown | #134 |
+| Earth Shield | `earth_shield` | Stones circle the player for 5 s, knock back and soak damage with their own HP, then are gone for 3 s and return with the HP full (#406) | #134 |
 | Earthquake | `earth_quake` | Ground area, continuous damage and a stagger every tick, long cooldown | #135 |
 | Earth Companion | `earth_companion` | Melee ally, heavy knockback | #133 |
 
 | Field | `earth` | `earth_boulder` | `earth_shield` | `earth_quake` | `earth_companion` |
 |---|---|---|---|---|---|
-| `cooldown` | 1.1 | 2.0 | — | 14 | — |
+| `cooldown` | 1.1 | 2.0 | — | 12 | — |
 | `attackCooldown` | — | — | — | — | 1.6 |
-| `rechargeDelay` | — | — | 8.0 | — | — |
-| `damage` | 16 | 40 | 10 | — | 14 |
-| `tickDamage` | — | — | — | 8 | — |
+| `uptime` | — | — | 5.0 | — | — |
+| `recharge` | — | — | 3.0 | — | — |
+| `damage` | 16 | 40 | 20 | — | 27 |
+| `tickDamage` | — | — | — | 10 | — |
 | `tickRate` | — | — | — | 0.5 | — |
 | `radius` | — | 36 | — | 80 | — |
 | `speed` | 260 | 280 | — | — | — |
 | `chaseSpeed` | — | — | — | — | 200 |
 | `range` | 144 | 207 | — | — | — |
-| `targetRange` | — | — | — | 162 | 200 |
-| `leashRadius` | — | — | — | — | 200 |
+| `targetRange` | — | — | — | 162 | 280 |
+| `leashRadius` | — | — | — | — | 280 |
 | `pierce` | 1 | 5 | — | — | — |
 | `count` | — | — | 3 | — | — |
 | `orbitRadius` | — | — | 80 | — | — |
@@ -662,9 +684,15 @@ CO-145). There is no ring: the crack tips reach the radius that ticks, so the
 broken ground itself says where the patch ends. Without the atlas the ring
 draws instead.
 
-Earth Shield is Phase 1's Orbiting Boulders block plus a shared HP pool: the
-ring absorbs `shieldHp` of player damage, breaks at 0, and returns after
-`rechargeDelay`. Knockback on every hit — the Phase 1 pass's ask for Earth — is
+Earth Shield is Phase 1's Orbiting Boulders block plus a shared HP pool: while
+the stones are out the ring absorbs `shieldHp` of player damage. The stones are
+out for `uptime` s and gone for `recharge` s (#406); the pool is full each time
+they return and 0 while they are gone, and a pool broken at 0 ends the uptime
+early, so the stones vanish and the recharge starts. A timed vanish plays no
+break cue, only a real break does. Level 2 adds a fourth stone; level 3 adds
+none: when the stones vanish, timed or broken, each stone sends a shockwave
+(radius 60, a 70 px shove, a 0.6 s stagger, the stone's damage) at the enemies
+near it. Knockback on every hit — the Phase 1 pass's ask for Earth — is
 now the element's baseline rather than a perk two tiers up a branch.
 
 ### 9.6 Coverage

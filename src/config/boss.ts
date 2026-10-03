@@ -34,8 +34,8 @@ export interface BossConfig {
 
 export const BOSS: Readonly<BossConfig> = {
   // #127: sized for a 20-minute build; a starting value, tuned later.
-  // #387: doubled, shown as two bars of 7200 so the fight reads as two rounds.
-  hp: 14400,
+  // #387: doubled (#406: 21000), shown as two bars of 10500 so the fight reads as two rounds.
+  hp: 21000,
   bars: 2,
   speed: 70,
   contactDamage: 30,
@@ -46,6 +46,13 @@ export const BOSS: Readonly<BossConfig> = {
   chargeS: 0.6,
   chargeSpeed: 400,
 };
+
+/**
+ * The boss's damage cap (#406), read by `core/bossDamageCap.ts`: up to `dpsCap`
+ * damage a second lands in full, and anything past it lands at `overflowFactor`,
+ * so a stacked build still wins faster but cannot delete the fight.
+ */
+export const BOSS_DAMAGE_CAP = { dpsCap: 200, overflowFactor: 0.1 } as const;
 
 /**
  * How the boss shrugs off crowd control (CO-221), on top of `BOSS_CC_DR`. A
@@ -181,17 +188,17 @@ export const BOSS_SLAM = { windupS: 1.0, activeS: 0.4, radius: 120, damage: 30 }
  * empty, so two 45° gaps open to the sides: 14 bolts, each flying `boltSpeed`
  * px/s for `boltRange` px, hitting a hero for `damage` times the enrage
  * multiplier. A hero 120 px out stands in a gap if they sidestep within the 1.2 s
- * warning. No RNG. `cooldownS` keeps the next volley 15 s from the wind-up's start.
+ * warning. No RNG. `cooldownS` keeps the next volley 10 s from the wind-up's start.
  */
 export const BOSS_VOLLEY = {
   windupS: 1.2,
   activeS: 0.5,
-  cooldownS: 15,
+  cooldownS: 10,
   slots: 16,
   gapSlots: [4, 12],
-  boltSpeed: 110,
+  boltSpeed: 160,
   boltRange: 520,
-  damage: 20,
+  damage: 25,
   boltRadius: 8,
 } as const;
 
