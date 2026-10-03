@@ -174,14 +174,15 @@ test('the Lightning roster lands hits on a live crowd and holds its caps', async
   }
 
   // The sword is out in full or gone (#406): three blades on the ring, or none while it
-  // recharges (spec §9.4 `count` 3, #305), the full ring from the first frame, and over the
-  // window both are seen.
+  // recharges (spec §9.4 `count` 3, #305), and over the window both are seen. Which one the
+  // first sample lands on depends on the runner: at timeScale 10 an uptime is 0.5 s of wall
+  // clock, so a slow CI runner's first sample can already fall in a recharge (#409).
   const swordLive = trace.map((report) => report.find((s) => s.id === 'lightning_sword')?.live);
   expect(
     swordLive.every((live) => live === BASE_SWORD_STATS.count || live === 0),
     'the full ring of blades or none',
   ).toBe(true);
-  expect(swordLive[0], 'the ring is up from the first frame').toBe(BASE_SWORD_STATS.count);
+  expect(swordLive.includes(BASE_SWORD_STATS.count), 'the full ring is seen out').toBe(true);
   expect(swordLive.includes(0), 'the blades vanish between cycles').toBe(true);
 
   const last = trace[trace.length - 1] ?? [];
