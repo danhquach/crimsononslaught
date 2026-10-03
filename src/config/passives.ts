@@ -117,10 +117,10 @@ export interface Passive {
 }
 
 /**
- * Spec §5. Four passives never cap — Power, Haste, Expanse and Persistence —
- * because they scale a build the player already has rather than open a new
- * behaviour. Everything that changes how survivable or how lucky the player is
- * caps.
+ * Spec §5. Every passive caps. Power, Haste, Expanse and Persistence were
+ * uncapped until CO-229 (#410): once the spell slots filled they took most
+ * level-ups and decided the late game, so they now cap near the median rank a
+ * winning run reached.
  */
 const PASSIVE_LIST = [
   {
@@ -130,6 +130,7 @@ const PASSIVE_LIST = [
     field: 'damageMul',
     op: 'mul',
     amount: 1.1,
+    maxRank: 8,
   },
   {
     id: 'passive_haste',
@@ -138,6 +139,7 @@ const PASSIVE_LIST = [
     field: 'cooldownMul',
     op: 'mul',
     amount: 0.92,
+    maxRank: 8,
   },
   {
     id: 'passive_expanse',
@@ -146,6 +148,7 @@ const PASSIVE_LIST = [
     field: 'areaMul',
     op: 'mul',
     amount: 1.12,
+    maxRank: 6,
   },
   {
     id: 'passive_velocity',
@@ -163,6 +166,7 @@ const PASSIVE_LIST = [
     field: 'durationMul',
     op: 'mul',
     amount: 1.15,
+    maxRank: 6,
   },
   {
     id: 'passive_precision',

@@ -6,6 +6,7 @@ import {
   PASSIVES,
   PROFILE_CLAMPS,
   type Passive,
+  type PassiveId,
   type PlayerProfile,
 } from '../config/passives';
 import { MAX_SPELL_LEVEL, type SpellLevelTable } from '../config/spellLevels';
@@ -183,9 +184,10 @@ describe('levelUpOffer — passives once the loadout is full (spec §7.1)', () =
       rank: 3,
       maxRank: 3,
     });
-    // Power never caps, so its card carries no maxRank at any rank.
-    expect(passiveCard(loadout, power).maxRank).toBeUndefined();
-    expect(passiveCard(loadout, power).rank).toBe(1);
+    expect(passiveCard(loadout, power)).toMatchObject({ rank: 1, maxRank: 8 });
+    // A passive with no maxRank (none ships since CO-229) carries none on its card.
+    const uncapped: Passive = { ...power, maxRank: undefined };
+    expect(passiveCard(loadout, uncapped).maxRank).toBeUndefined();
   });
 
   it('drops a passive that has reached its maxRank', () => {
@@ -199,10 +201,26 @@ describe('levelUpOffer — passives once the loadout is full (spec §7.1)', () =
     }
   });
 
-  it('keeps an uncapped passive eligible however many ranks it holds', () => {
-    let loadout = fullLoadout();
-    for (let rank = 0; rank < 20; rank++) loadout = takePassive(loadout, 'passive_power');
-    expect(eligiblePassives(loadout).map((p) => p.id)).toContain('passive_power');
+  it('drops each of the four scaling passives at its CO-229 cap', () => {
+    const caps: [PassiveId, number][] = [
+      ['passive_power', 8],
+      ['passive_haste', 8],
+      ['passive_expanse', 6],
+      ['passive_persistence', 6],
+    ];
+    for (const [id, cap] of caps) {
+      let loadout = fullLoadout();
+      for (let rank = 0; rank < cap - 1; rank++) loadout = takePassive(loadout, id);
+      expect(
+        eligiblePassives(loadout).map((p) => p.id),
+        id,
+      ).toContain(id);
+      loadout = takePassive(loadout, id);
+      expect(
+        eligiblePassives(loadout).map((p) => p.id),
+        id,
+      ).not.toContain(id);
+    }
   });
 });
 
@@ -313,9 +331,9 @@ describe('levelUpOffer — what the build can actually cast', () => {
   });
 
   it('offers nothing when neither pool has a card — the +10 HP fallback', () => {
-    // Unreachable with the shipped passives (four never cap), which is why the
-    // spec keeps this case: it is the defined behaviour for a config where
-    // every passive is capped.
+    // Every shipped passive caps (CO-229), but the charge cards never do, so a
+    // real run still never gets here; the spec keeps this case as the defined
+    // behaviour for a pool with no card left.
     const capped: Passive[] = [{ ...(PASSIVES[0] as Passive), id: 'passive_magnet', maxRank: 1 }];
     const loadout = takePassive(fullLoadout(), 'passive_magnet');
     expect(eligiblePassives(loadout, capped)).toEqual([]);

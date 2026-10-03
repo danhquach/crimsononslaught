@@ -14,7 +14,7 @@ spell's stat block. Phase 2 replaces both:
 - A run carries a **default spell plus two active spells**, each casting on its
   own cooldown.
 - Level-up fills those slots first, then hands out **passives** for the rest of
-  the run. Passives are uncapped in number and modify a **global player
+  the run. Passives take no slot, each caps its own rank, and they modify a **global player
   profile**, not one spell.
 - Each element grows from one spell to **five**, twenty in total.
 
@@ -70,7 +70,8 @@ editing pass over the Phase 1 spec, not a change to anything below.
   wave is holding its whole kit — see `docs/tuning/phase2-balance.md` round 1.
 - A slot that is unlocked and empty is **open**. A slot that has been filled is
   final for the rest of the run — no swap, no re-roll, no sell.
-- Passive slots are uncapped: a run can hold any number of passive ranks.
+- Passive slots are uncapped: a run can hold every passive at once, each up to
+  its `maxRank` (§5).
 
 ### 3.2 Element lock
 
@@ -188,11 +189,11 @@ interface Passive {
 
 | id | Name | Field | Op | Amount | maxRank |
 |---|---|---|---|---|---|
-| `passive_power` | Power | `damageMul` | mul | 1.10 | — |
-| `passive_haste` | Haste | `cooldownMul` | mul | 0.92 | — |
-| `passive_expanse` | Expanse | `areaMul` | mul | 1.12 | — |
+| `passive_power` | Power | `damageMul` | mul | 1.10 | 8 |
+| `passive_haste` | Haste | `cooldownMul` | mul | 0.92 | 8 |
+| `passive_expanse` | Expanse | `areaMul` | mul | 1.12 | 6 |
 | `passive_velocity` | Velocity | `projectileSpeedMul` | mul | 1.10 | 5 |
-| `passive_persistence` | Persistence | `durationMul` | mul | 1.15 | — |
+| `passive_persistence` | Persistence | `durationMul` | mul | 1.15 | 6 |
 | `passive_precision` | Precision | `critChance` | add | 0.05 | 10 |
 | `passive_savagery` | Savagery | `critMultiplier` | add | 0.25 | 6 |
 | `passive_ward` | Ward | `damageReduction` | add | 0.04 | 8 |
@@ -208,11 +209,14 @@ Notes:
 - Swift, Vitality and Magnet are the Phase 1 generic perks, renamed only where
   the old name was a tree node (§8). Vitality raises current HP by the same
   amount it raises the maximum, so taking it mid-fight is a heal.
-- Four passives never cap — Power, Haste, Expanse and Persistence. They are the
-  ones that scale a build the player already has rather than open a new
-  behaviour, so a long run can keep leaning on them. Everything that changes how
-  survivable or how lucky the player is caps, including Vitality, which Phase 1
-  capped at rank 3.
+- Every passive caps. Power, Haste, Expanse and Persistence never capped until
+  CO-229 ([#410](https://github.com/danhquach/crimsononslaught/issues/410)):
+  once the spell slots filled they took most level-ups (69% of the passive
+  ranks in winning runs) and stacked to ×3.45 damage and ×5.35 duration, so the
+  late game came from four multipliers rather than the spells. Their caps sit
+  near the median rank a winning run reached: Power 8 (×2.14), Haste 8 (×0.51),
+  Expanse 6 (×1.97), Persistence 6 (×2.31). Vitality caps at 8, where Phase 1
+  capped it at 3.
 - Passives never grant a behaviour a spell does not already have. A passive that
   adds projectiles or chains is out of scope here — see §13.
 - Pierce ([#206](https://github.com/danhquach/crimsononslaught/issues/206)) is
@@ -299,7 +303,7 @@ On each level-up, in order:
    state 3: the slot waits for a later level and the run still gets the upgrade
    it earned.
 2. **Otherwise** → offer 3 passives drawn from those with `rank < maxRank`, via
-   `rng.shuffle(pool).slice(0, 3)`. Uncapped passives are always eligible. A
+   `rng.shuffle(pool).slice(0, 3)`. A
    passive with a `requiresStat` is eligible only while a casting spell's base
    block carries that stat — slotted or not, so a `?loadout=` extra counts.
 3. **Nothing eligible** → no overlay; grant `EMPTY_OFFER_MAX_HP_BONUS` (+10 max
@@ -309,9 +313,10 @@ An offer is all actives or all passives, never mixed: a card the player will
 never see again (an active slot's last chance) should not compete against a card
 they can take at any later level.
 
-With the passive list in §5, four passives never cap, so state 3 is unreachable
-in a real run. It stays specified, and keeps its unit test, because it is the
-defined behaviour for a config where every passive is capped.
+Every passive in §5 caps, but once one does the level-up charge cards (+1
+Reroll, +1 Ban) join the passive pool and never cap, so state 3 is reached only
+by a run that has capped every eligible passive and banned both charge cards.
+It stays specified, and keeps its unit test, for that case.
 
 ### 7.2 Determinism
 
@@ -745,7 +750,7 @@ Unit (Vitest, `src/core/**`, no Phaser import):
 - `playerProfile`: adds sum, muls multiply, a shuffled pick order gives an
   identical profile, clamps hold at the caps in §4.3.
 - `loadout`: slots unlock at 3 and 7; a filled slot cannot be reassigned;
-  passives are uncapped; the element lock rejects a spell from another element.
+  passives take no slot; the element lock rejects a spell from another element.
 - `levelUpOffer`: three cards while nothing is capped, fewer near the end of a
   capped config, no duplicates in one offer, determinism under a seed; offers
   only unequipped actives of the run's element, exactly 3 for each of the two

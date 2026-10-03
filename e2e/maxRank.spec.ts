@@ -18,10 +18,11 @@ import { cardCenter, collectErrors, readHud, startFromIntro, waitForScene } from
  */
 const SWIFT = 'passive_swift';
 const AVARICE = 'passive_avarice';
-const POWER = 'passive_power'; // never caps
+const POWER = 'passive_power';
 /** The caps come from config, so a retune moves the test with it. */
 const SWIFT_CAP = passiveById(SWIFT)!.maxRank!;
 const AVARICE_CAP = passiveById(AVARICE)!.maxRank!;
+const POWER_CAP = passiveById(POWER)!.maxRank!;
 const GOLD = '#ffd700';
 const CRIMSON = '#dc143c';
 /** A card's text must sit this far inside its frame; Linux CI fonts run taller than the Mac's. */
@@ -144,7 +145,7 @@ test('the pause screen shows the same MAX badge, and its info line reads the cap
   expect(read.passives).toEqual([
     { id: SWIFT, count: SWIFT_CAP, maxRank: SWIFT_CAP, maxed: true },
     { id: AVARICE, count: 3, maxRank: AVARICE_CAP, maxed: false },
-    { id: POWER, count: 3, maxRank: undefined, maxed: false },
+    { id: POWER, count: 3, maxRank: POWER_CAP, maxed: false },
   ]);
   // The Spells strip is above the tiles, so its one level badge (#326) comes first.
   const [spellBadge, ...badges] = read.badges;
@@ -169,7 +170,12 @@ test('the pause screen shows the same MAX badge, and its info line reads the cap
       maxRank: AVARICE_CAP,
       head: new RegExp(`^Avarice {2}3/${AVARICE_CAP} {2}— `),
     },
-    { id: POWER, count: 3, maxRank: undefined, head: /^Power ×3 {2}— / },
+    {
+      id: POWER,
+      count: 3,
+      maxRank: POWER_CAP,
+      head: new RegExp(`^Power {2}3/${POWER_CAP} {2}— `),
+    },
   ];
   for (const [i, want] of expected.entries()) {
     const at = badges[i]!;
@@ -261,7 +267,7 @@ test('the level-up card that grants the last rank reads MAX in gold, and taking 
   expect(cards.map((c) => ({ text: c!.text, color: c!.color }))).toEqual([
     { text: `Rank ${SWIFT_CAP}/${SWIFT_CAP} · MAX`, color: GOLD },
     { text: `Rank 1/${AVARICE_CAP}`, color: '#aaaaaa' },
-    { text: 'Rank 1', color: '#aaaaaa' },
+    { text: `Rank 1/${POWER_CAP}`, color: '#aaaaaa' },
   ]);
   for (const { text, rank, frame } of cards as NonNullable<(typeof cards)[number]>[]) {
     expect(rank.left, text).toBeGreaterThanOrEqual(frame.left + SLACK);

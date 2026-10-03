@@ -120,13 +120,13 @@ describe('resolveProfile', () => {
   it('stays inside every cap on the shipped passive list at full rank', () => {
     const capped = resolveProfile(
       ranks([
-        ['passive_haste', 40], // 0.92^40 well below the 0.35 floor
+        ['passive_haste', 8], // 0.92^8 = 0.51, above the 0.35 floor (CO-229 cap)
         ['passive_precision', 10], // 10 x 0.05 = 0.50, under the 0.75 cap
         ['passive_ward', 8], // 8 x 0.04 = 0.32, under the 0.60 cap
         ['passive_swift', 5], // 180 x 1.08^5 = 264, under the 320 cap
       ]),
     );
-    expect(capped.cooldownMul).toBe(0.35);
+    expect(capped.cooldownMul).toBeCloseTo(0.92 ** 8, 10);
     expect(capped.critChance).toBeCloseTo(0.5, 10);
     expect(capped.damageReduction).toBeCloseTo(0.32, 10);
     expect(capped.moveSpeed).toBeLessThan(320);
@@ -149,8 +149,7 @@ describe('resolveProfile', () => {
     expect(() => resolveProfile(ranks([['passive_magnet', 4]]))).toThrow(RangeError);
     expect(() => resolveProfile(ranks([['passive_power', 0]]))).toThrow(RangeError);
     expect(() => resolveProfile(ranks([['passive_power', 1.5]]))).toThrow(RangeError);
-    // Uncapped passives take any positive integer rank.
-    expect(resolveProfile(ranks([['passive_power', 99]])).damageMul).toBeGreaterThan(1);
+    expect(() => resolveProfile(ranks([['passive_power', 9]]))).toThrow(RangeError);
   });
 });
 

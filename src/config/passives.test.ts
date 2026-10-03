@@ -8,13 +8,13 @@ import {
   type Passive,
 } from './passives';
 
-/** Spec §5, transcribed: id, field, op, amount, maxRank (`undefined` = uncapped). */
-const SPEC_TABLE: readonly [string, string, 'add' | 'mul', number, number | undefined][] = [
-  ['passive_power', 'damageMul', 'mul', 1.1, undefined],
-  ['passive_haste', 'cooldownMul', 'mul', 0.92, undefined],
-  ['passive_expanse', 'areaMul', 'mul', 1.12, undefined],
+/** Spec §5, transcribed: id, field, op, amount, maxRank. */
+const SPEC_TABLE: readonly [string, string, 'add' | 'mul', number, number][] = [
+  ['passive_power', 'damageMul', 'mul', 1.1, 8],
+  ['passive_haste', 'cooldownMul', 'mul', 0.92, 8],
+  ['passive_expanse', 'areaMul', 'mul', 1.12, 6],
   ['passive_velocity', 'projectileSpeedMul', 'mul', 1.1, 5],
-  ['passive_persistence', 'durationMul', 'mul', 1.15, undefined],
+  ['passive_persistence', 'durationMul', 'mul', 1.15, 6],
   ['passive_precision', 'critChance', 'add', 0.05, 10],
   ['passive_savagery', 'critMultiplier', 'add', 0.25, 6],
   ['passive_ward', 'damageReduction', 'add', 0.04, 8],
@@ -44,14 +44,8 @@ describe('passives config', () => {
     expect(passiveById('nope')).toBeUndefined();
   });
 
-  it('leaves exactly the four scaling passives uncapped (spec §5 notes)', () => {
-    const uncapped = PASSIVES.filter((passive) => passive.maxRank === undefined).map((p) => p.id);
-    expect(uncapped).toEqual([
-      'passive_power',
-      'passive_haste',
-      'passive_expanse',
-      'passive_persistence',
-    ]);
+  it('caps every passive (CO-229)', () => {
+    expect(PASSIVES.filter((passive) => passive.maxRank === undefined)).toEqual([]);
   });
 
   it('gates only Pierce on a stat, the one it raises (#206)', () => {

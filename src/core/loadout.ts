@@ -22,7 +22,7 @@ import { resolveProfile, validatePassives } from './playerProfile';
 /**
  * What a run is carrying (Phase 2 spec §3): one default spell that is always
  * equipped, two extra active slots that unlock at fixed levels and are final
- * once filled, and an uncapped stack of passive ranks.
+ * once filled, and the passive ranks taken, each up to its own cap.
  *
  * Every function here returns a new loadout rather than mutating one, so
  * whatever still holds the previous value keeps its numbers. The profile is
@@ -44,7 +44,7 @@ export interface Loadout {
   /** Chosen before the run, always equipped, never removable. */
   readonly defaultSpell: RosterSpellId;
   readonly slots: ActiveSlots;
-  /** Passive id -> ranks owned. Uncapped in count; a passive may cap its own rank. */
+  /** Passive id -> ranks owned. Takes no slot; each passive caps its own rank. */
   readonly passives: ReadonlyMap<PassiveId, number>;
   /**
    * Permanent upgrade id -> ranks bought before the run (CO-101). Fixed for the
@@ -110,7 +110,7 @@ export function openSlots(loadout: Loadout, level: number): number {
   return open;
 }
 
-/** Both extra slots filled. Passives are uncapped, so they never make a loadout full. */
+/** Both extra slots filled. Passives take no slot, so they never make a loadout full. */
 export function isFull(loadout: Loadout): boolean {
   return loadout.slots.every((id) => id !== null);
 }
@@ -157,7 +157,7 @@ export function passiveRank(loadout: Loadout, passiveId: PassiveId): number {
   return loadout.passives.get(passiveId) ?? 0;
 }
 
-/** False once a capped passive is at `maxRank`; uncapped passives are always true. */
+/** False once a capped passive is at `maxRank`; one with no `maxRank` (none ship since CO-229) always is. */
 export function canTakePassive(loadout: Loadout, passiveId: PassiveId): boolean {
   const passive = passiveById(passiveId);
   if (!passive) return false;
