@@ -9,12 +9,11 @@ import {
   SPIKES_PER_CAST,
   SPLINTER,
   SPIKE_FAN,
-  TREMOR,
+  STONE_SHOCK,
 } from '../config/earthLevels';
 import type { SpellLevel } from '../config/spellLevels';
 import { areaStaggerS, densestSpot, type AreaRule } from './groundArea';
 import { fanHeadings } from './iceLevels';
-import { spawnsDue } from './iceStorm';
 import type { Vec2 } from './input';
 import { rollsOnLevelStream, sweepTargets, tornadoHeadings } from './lightningLevels';
 import { knockbackVector } from './orbitingBoulders';
@@ -267,53 +266,54 @@ export function rutWindowOffset(
   return (Math.floor(tileIndex / variants) % windows) * windowPx;
 }
 
-/** Whether an Earth Shield at `level` strikes a Tremor. */
-export function hasTremor(level: SpellLevel): boolean {
+/** Whether an Earth Shield at `level` ends in a stone shock. */
+export function hasStoneShock(level: SpellLevel): boolean {
   return level >= 3;
 }
 
+/** One enemy a stone shock catches, and the stone that catches it. */
+export interface StoneShockHit<T, S> {
+  readonly enemy: T;
+  readonly stone: S;
+}
+
 /**
- * How many tremors fall due in the step from `elapsedS` to `elapsedS + deltaS`
- * of the ring's life, one every `everyS`: every whole one the step crossed.
- * Summed over a ring's life it is `floor(life / everyS)` however the frames
- * fall, and a paused step pays none. The spell applies at most one a frame.
+ * Everything a stone shock catches: every enemy whose body edge is within
+ * `radius` of some stone, the radius itself counting as in, paired with the
+ * nearest such stone (the earlier on a tie), once per enemy, in enemy order.
  */
-export function tremorsDue(
-  elapsedS: number,
-  deltaS: number,
-  everyS: number = TREMOR.everyS,
-): number {
-  return everyS > 0 ? spawnsDue(elapsedS, deltaS, 1 / everyS) : 0;
-}
-
-/** How far a tremor reaches from the player, to an enemy's edge: the ring's radius, a stone's size and `padPx`. */
-export function tremorReach(
-  orbitRadius: number,
-  size: number,
-  padPx: number = TREMOR.padPx,
-): number {
-  return orbitRadius + size + padPx;
-}
-
-/** Every enemy a tremor from `centre` catches: its body's edge within `reachPx`, the reach itself counting as in. */
-export function tremorTargets<T extends Body>(
-  centre: Readonly<Vec2>,
+export function stoneShockHits<T extends Body, S extends Vec2>(
+  stones: readonly S[],
   enemies: readonly T[],
-  reachPx: number,
-): T[] {
-  return enemies.filter(
-    (enemy) =>
-      Math.hypot(enemy.x - centre.x, enemy.y - centre.y) - (enemy.bodyRadius ?? 0) <= reachPx,
-  );
+  radius: number = STONE_SHOCK.radius,
+): StoneShockHit<T, S>[] {
+  const hits: StoneShockHit<T, S>[] = [];
+  for (const enemy of enemies) {
+    let nearest: S | undefined;
+    let nearestEdge = Infinity;
+    for (const stone of stones) {
+      const edge = Math.hypot(enemy.x - stone.x, enemy.y - stone.y) - (enemy.bodyRadius ?? 0);
+      if (edge <= radius && edge < nearestEdge) {
+        nearest = stone;
+        nearestEdge = edge;
+      }
+    }
+    if (nearest) hits.push({ enemy, stone: nearest });
+  }
+  return hits;
 }
 
-/** The shove a tremor gives `enemy`: `px` straight out from `centre`, none for an enemy dead on it. */
-export function tremorPush(
-  centre: Readonly<Vec2>,
+/**
+ * The shove a stone shock gives `enemy`: `px` straight out from `stone`, none
+ * for an enemy dead on it; `caster` breaks that tie.
+ */
+export function stoneShockPush(
+  stone: Readonly<Vec2>,
   enemy: Readonly<Vec2>,
-  px: number = TREMOR.knockbackPx,
+  caster: Readonly<Vec2>,
+  px: number = STONE_SHOCK.knockbackPx,
 ): Vec2 {
-  return knockbackVector(centre, enemy, px, centre);
+  return knockbackVector(stone, enemy, px, caster);
 }
 
 /** How many quakes an Earthquake cast at `level` opens. */

@@ -16,7 +16,8 @@ import type { SpellCard } from './spells';
  * mechanic plus a drift and a pull and belongs to that ticket.
  *
  * Ice Storm's block is the spec's §9.3 table, its radius cut to 80 (#219), then
- * raised to 120 with a 4 s storm (#304).
+ * raised to 120 with a 4 s storm (#304), then 156 with a 10.8 s cooldown and
+ * 7 a tick (#406).
  * Earthquake's §9.5 table gives its cooldown and tick but not its `duration`,
  * which is a tuning value here: a patch that lives longer than Ice Storm's on a
  * longer cooldown. #220 cut its radius to 80 and swapped the slow for a 0.2 s
@@ -35,16 +36,16 @@ export function isAreaSpellId(value: unknown): value is AreaSpellId {
 }
 
 /**
- * Spec §9.3 base block. The radius is 120 (#304): #219 cut it from 180 to 80,
- * where a patch caught only the middle of a crowd; at 180 it covered two thirds
- * of the view's height. The storm lasts 4 s, down from 6 (#304), so it is a
+ * Spec §9.3 base block. The radius is 156 (#406, up from 120 of #304): #219 cut
+ * it from 180 to 80, where a patch caught only the middle of a crowd; at 180 it
+ * covered two thirds of the view's height. The storm lasts 4 s, down from 6 (#304), so it is a
  * wide, quick burst. `targetRange` keeps its reach to the crowd.
  */
 export const BASE_ICE_STORM_STATS: Readonly<GroundAreaStats> = {
-  cooldown: 12,
-  tickDamage: 6,
+  cooldown: 10.8,
+  tickDamage: 7,
   tickRate: 0.5,
-  radius: 120,
+  radius: 156,
   duration: 4,
   targetRange: 180,
   slowPct: 0.5,
@@ -56,8 +57,8 @@ export const BASE_ICE_STORM_STATS: Readonly<GroundAreaStats> = {
  * fields: a 0 slow with nothing to raise it is dead weight (spec §9.2).
  */
 export const BASE_QUAKE_STATS: Readonly<GroundAreaStats> = {
-  cooldown: 14,
-  tickDamage: 8,
+  cooldown: 12,
+  tickDamage: 10,
   tickRate: 0.5,
   radius: 80,
   duration: 8,
@@ -170,7 +171,7 @@ export const AREA_LOOKS: Readonly<Record<AreaSpellId, AreaLook>> = {
         maxLive: 90,
       },
       // #219's scope change: at most 3 at once at radius 80 or they overlap;
-      // radius 120 (#304) has 2.25 times the room.
+      // radius 156 (#406) has 3.8 times the room.
       shards: { clip: 'ice.stormShard', perSecond: 5, maxLive: 5, reach: 0.85, scale: 0.6 },
       fade: { fadeInS: 0.4, fadeOutS: 0.6 },
     },
@@ -185,9 +186,9 @@ export const AREA_CARDS: Readonly<Record<AreaSpellId, SpellCard>> = {
     color: PLACEHOLDERS.fx_nova.color,
     description: 'An ice storm settles on the crowd, slowing and grinding down everything inside.',
     stats: [
-      ['Cooldown', '12 s'],
-      ['Damage', '6 every 0.5 s'],
-      ['Radius', '120'],
+      ['Cooldown', '10.8 s'],
+      ['Damage', '7 every 0.5 s'],
+      ['Radius', '156'],
       ['Slow', '50% for 1 s'],
       ['Lasts', '4 s'],
     ],
@@ -198,8 +199,8 @@ export const AREA_CARDS: Readonly<Record<AreaSpellId, SpellCard>> = {
     description:
       'The ground splits open and keeps shaking whatever stands on it, knocking it off its feet.',
     stats: [
-      ['Cooldown', '14 s'],
-      ['Damage', '8 every 0.5 s'],
+      ['Cooldown', '12 s'],
+      ['Damage', '10 every 0.5 s'],
       ['Radius', '80'],
       ['Stagger', '0.2 s per shake'],
       ['Lasts', '8 s'],

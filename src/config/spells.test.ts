@@ -53,7 +53,7 @@ describe('spell card stats match spec §5 base values', () => {
   it('fire', () => {
     expect(SPELL_CARDS.fire.stats).toEqual([
       ['Cooldown', '1.0 s'],
-      ['Damage', '12'],
+      ['Damage', '10'],
       ['Blast radius', '65'],
       ['Projectiles', '1'],
     ]);
@@ -118,7 +118,7 @@ describe('base stat blocks', () => {
   it('matches the spec base tables', () => {
     expect(BASE_SPELL_STATS.fire).toEqual({
       cooldown: 1,
-      damage: 12,
+      damage: 10,
       aoeRadius: 65,
       aoeDamageFactor: 0.5,
       projectiles: 1,

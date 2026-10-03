@@ -24,12 +24,12 @@ export function isFireRosterSpellId(value: unknown): value is FireRosterSpellId 
 /** Spec §9.2 base block, as Fire Wave (CO-143, #218). */
 export const BASE_FIRE_WAVE_STATS: Readonly<FireWaveStats> = {
   cooldown: 2.2,
-  damage: 18,
+  damage: 15,
   arc: 95,
   speed: 260,
   range: 180,
   knockback: 8,
-  burn: 8,
+  burn: 6,
   burnDuration: 3,
 };
 
@@ -46,8 +46,8 @@ export const FIRE_WAVE_ART = { radius: 88, tipX: -24.5, tipY: 73.5 } as const;
 
 /** Spec §9.2 base block. */
 export const BASE_FIRE_DRAGON_STATS: Readonly<FireDragonStats> = {
-  cooldown: 2.5,
-  damage: 45,
+  cooldown: 3,
+  damage: 32,
   aoeRadius: 30,
   aoeDamageFactor: 0.4,
   projectiles: 1,
@@ -80,8 +80,8 @@ export const FIRE_ROSTER_CARDS: Readonly<Record<FireRosterSpellId, SpellCard>> =
       'Sends an arc of flame out from you, burning and nudging every enemy it sweeps over.',
     stats: [
       ['Cooldown', '2.2 s'],
-      ['Damage', '18'],
-      ['Burn', '8 dps for 3.0 s'],
+      ['Damage', '15'],
+      ['Burn', '6 dps for 3.0 s'],
       ['Arc', '95°'],
       ['Range', '180'],
     ],
@@ -91,8 +91,8 @@ export const FIRE_ROSTER_CARDS: Readonly<Record<FireRosterSpellId, SpellCard>> =
     color: 0xd50000,
     description: 'Launches a homing missile that curves onto its target for heavy damage.',
     stats: [
-      ['Cooldown', '2.5 s'],
-      ['Damage', '45'],
+      ['Cooldown', '3.0 s'],
+      ['Damage', '32'],
       ['Blast radius', '30'],
       ['Target range', '189'],
     ],

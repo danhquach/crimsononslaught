@@ -44,12 +44,12 @@ describe('Lightning roster base blocks match spec §9.4', () => {
   it('Chain Lightning', () => {
     expect(BASE_CHAIN_LIGHTNING_STATS).toEqual({
       cooldown: 1.4,
-      damage: 12,
+      damage: 14,
       strikes: 1,
       chains: 2,
       chainRange: 120,
       chainFalloff: 0.8,
-      targetRange: 150,
+      targetRange: 180,
       staggerDuration: 0.5,
       stunChance: 0.08,
       stunDuration: 2,
@@ -73,12 +73,14 @@ describe('Lightning roster base blocks match spec §9.4', () => {
   it('Lightning Sword', () => {
     expect(BASE_SWORD_STATS).toEqual({
       count: 3,
-      orbitRadius: 70,
+      orbitRadius: 110,
       orbitSpeed: 4.5,
-      damage: 16,
+      damage: 26,
       size: 18,
       hitCooldown: 0.35,
       staggerDuration: 0.3,
+      uptime: 5,
+      recharge: 3,
     });
   });
 

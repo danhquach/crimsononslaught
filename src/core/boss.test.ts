@@ -226,17 +226,17 @@ describe('the velocity a frame asks for', () => {
 describe('boss enrage (#388)', () => {
   const ENRAGED_CHASE_S = 1.4;
 
-  it('has a 3600 HP threshold, and one rule for "enraged" at its edges', () => {
-    expect(enrageThresholdHp()).toBe(3600);
+  it('has a 5250 HP threshold, and one rule for "enraged" at its edges', () => {
+    expect(enrageThresholdHp()).toBe(5250);
     expect(bossEnraged(0)).toBe(false);
     expect(bossEnraged(1)).toBe(true);
-    expect(bossEnraged(3600)).toBe(true);
-    expect(bossEnraged(3601)).toBe(false);
+    expect(bossEnraged(5250)).toBe(true);
+    expect(bossEnraged(5251)).toBe(false);
   });
 
   it('latches once: a hit in range enrages a calm boss, never an enraged one', () => {
-    expect(shouldEnrage(false, 3601)).toBe(false);
-    expect(shouldEnrage(false, 3600)).toBe(true);
+    expect(shouldEnrage(false, 5251)).toBe(false);
+    expect(shouldEnrage(false, 5250)).toBe(true);
     expect(shouldEnrage(true, 3000)).toBe(false);
     expect(shouldEnrage(false, 0)).toBe(false);
   });
@@ -656,9 +656,9 @@ describe('boss bolt volley (CO-223)', () => {
     }
   });
 
-  it('deals 20, or 30 enraged', () => {
-    expect(volleyDamage(false)).toBe(20);
-    expect(volleyDamage(true)).toBe(30);
+  it('deals 25, or 37.5 enraged', () => {
+    expect(volleyDamage(false)).toBe(25);
+    expect(volleyDamage(true)).toBe(37.5);
   });
 });
 

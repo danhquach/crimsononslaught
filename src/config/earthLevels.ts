@@ -1,6 +1,6 @@
 /**
  * What the Earth spells' levels 2 and 3 do beyond their stat adds (#330). The
- * one stat add (the Earth Shield's fourth stone) is `SPELL_LEVEL_STATS` in
+ * one stat add (the Earth Shield's fourth stone, level 2 only) is `SPELL_LEVEL_STATS` in
  * `spellLevels.ts`; these are the other level 2 and level 3 behaviours and the
  * numbers they run on. First-cut values: the bot sweep tunes them (#147's pass).
  *
@@ -88,17 +88,17 @@ export const RUT_VARIANTS = 4;
 export const MAX_LIVE_RUT_TILES = 40;
 
 /**
- * Earth Shield level 3, Tremor: while the ring is up, every `everyS` (a fixed
- * cadence: Haste never touches it, and the clock restarts when the ring
- * reforms) every stone strikes the ground. Each enemy within `orbitRadius +
- * size + padPx` of the player, to its own edge, is shoved `knockbackPx` out
- * from the player and staggered `staggerS`. Stagger only.
+ * Earth Shield level 3, stone shock (#406): when the stones vanish at the end of
+ * their uptime, or the pool breaks, every stone sends a shockwave. Each enemy
+ * whose body edge is within `radius` of a stone is shoved `knockbackPx` out from
+ * that stone (the nearest one, once per enemy), staggered `staggerS` and dealt
+ * `damageFactor` x the stone's damage. Stagger only, no stun.
  */
-export const TREMOR = {
-  everyS: 2,
-  padPx: 24,
+export const STONE_SHOCK = {
+  radius: 60,
   knockbackPx: 70,
-  staggerS: 0.4,
+  staggerS: 0.6,
+  damageFactor: 1,
   impactScale: 0.8,
 } as const;
 

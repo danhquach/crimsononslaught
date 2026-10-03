@@ -1,14 +1,13 @@
 import {
-  CLUSTER,
   DEEP_FREEZE,
   FROST_ORB,
+  ICE_SHIELD_WAVE,
+  ICE_WAVE_ART,
   SHATTER,
-  SHATTER_RING,
   ICE_ARROW_FAN,
 } from '../config/iceLevels';
 import type { SpellLevel } from '../config/spellLevels';
 import type { FrostHit } from './frostNova';
-import type { Vec2 } from './input';
 
 /**
  * The Ice spells' level 2 and 3 rules that do not need an engine (#328): which
@@ -62,76 +61,50 @@ export function shardDamage(arrowDamage: number, factor: number = SHATTER.damage
   return arrowDamage * factor;
 }
 
-/** Whether a Frost Nova Bomb launched at `level` rolls out urchins when it bursts. */
-export function hasCluster(level: SpellLevel): boolean {
+/** Whether a Frost Nova Bomb launched at `level` ends its roll in a full-circle cold wave. */
+export function hasNovaWave(level: SpellLevel): boolean {
   return level >= 3;
 }
 
-/** The angle the first urchin leaves at, past the bomb's aim, so they do not ride the icicle spiral's first ray. */
-const CLUSTER_START_RAD = 60 * DEG;
-
-/** Where `count` urchins go: evenly spaced round the circle, the first 60 degrees past `aimRad`. */
-export function clusterHeadings(aimRad: number, count: number = CLUSTER.count): number[] {
-  const n = Math.max(0, Math.floor(count));
-  return Array.from({ length: n }, (_, i) => aimRad + CLUSTER_START_RAD + (i * Math.PI * 2) / n);
-}
-
-/** The bomb's own block, as far as an urchin's burst reads it. */
-export interface ClusterSource {
-  radius: number;
-  damage: number;
-  slowPct: number;
-  slowDuration: number;
-}
+/** The wave fades out over the last fifth of its reach. */
+const WAVE_FADE_FROM = 0.8;
 
 /**
- * One urchin's burst: half the bomb's radius and 40% of its damage, with its
- * slow. Slow only, no freeze roll, so a cluster draws nothing from the RNG.
+ * Which `ice.wave` frame (0-based) a ring at radius `r` of its `range` wears:
+ * frame 0, the core burst, as it starts, then one per quarter of the reach, so
+ * the last (the widest ring) shows near the end. Driven by the wave's own
+ * progress, not a free-running clock, so it pauses and scales with the run.
  */
-export function clusterBurst(
-  stats: Readonly<ClusterSource>,
-  rule: typeof CLUSTER = CLUSTER,
-): ClusterSource {
-  return {
-    radius: stats.radius * rule.radiusFactor,
-    damage: stats.damage * rule.damageFactor,
-    slowPct: stats.slowPct,
-    slowDuration: stats.slowDuration,
-  };
+export function iceWaveFrame(r: number, range: number): number {
+  const last = ICE_WAVE_ART.outerRadius.length - 1;
+  if (!(range > 0)) return last;
+  const progress = Math.min(1, Math.max(0, r / range));
+  return Math.min(last, Math.floor(progress * (last + 1)));
 }
 
-/** Whether an Ice Shield held at `level` chills what touches it while it is up. */
-export function hasFrostAura(level: SpellLevel): boolean {
-  return level >= 2;
+/** The sprite scale that puts frame `frame`'s drawn outer edge on radius `r`. */
+export function iceWaveScale(r: number, frame: number): number {
+  const outer = ICE_WAVE_ART.outerRadius[frame] ?? ICE_WAVE_ART.outerRadius[0];
+  return Math.max(0, r) / outer;
 }
 
-/** The aura reaches `radius` past the enemy's own body, so a big enemy is chilled as soon as it touches. */
-export function inAura(
-  centre: Readonly<Vec2>,
-  enemy: Readonly<Vec2 & { bodyRadius: number }>,
-  radius: number,
-): boolean {
-  return Math.hypot(enemy.x - centre.x, enemy.y - centre.y) <= radius + enemy.bodyRadius;
+/** 1 until the wave has covered 80% of its reach, then linearly to 0 at the end. */
+export function iceWaveFade(r: number, range: number): number {
+  if (!(range > 0)) return 0;
+  return Math.min(1, Math.max(0, (range - r) / (range * (1 - WAVE_FADE_FROM))));
 }
 
-/** Where a break's `count` icicles go: evenly spaced round the circle, the first at angle 0. */
-export function shatterRingHeadings(count: number = SHATTER_RING.icicles): number[] {
-  const n = Math.max(0, Math.floor(count));
-  return Array.from({ length: n }, (_, i) => (i * Math.PI * 2) / n);
+/** Whether an Ice Shield held at `level` ends in a small cold wave from each diamond. */
+export function hasDiamondWave(level: SpellLevel): boolean {
+  return level >= 3;
 }
 
-/**
- * What a shield's break leaves on each enemy inside `breakRadius`: its slow,
- * plus from level 3 a freeze of `SHATTER_RING.freezeS`. Below level 3 this is
- * exactly the hit the break has always applied.
- */
-export function shatterRingFrost(
-  stats: Readonly<{ slowPct: number; slowDuration: number }>,
-  level: SpellLevel,
-): FrostHit {
-  const hit: FrostHit = { slowPct: stats.slowPct, slowDuration: stats.slowDuration, freeze: false };
-  if (level < 3) return hit;
-  return { ...hit, freeze: true, freezeDuration: SHATTER_RING.freezeS };
+/** What one diamond's wave deals to each enemy it sweeps over: a multiple of the diamond's own damage. */
+export function diamondWaveDamage(
+  diamondDamage: number,
+  factor: number = ICE_SHIELD_WAVE.damageFactor,
+): number {
+  return diamondDamage * factor;
 }
 
 /** What a frost orb leaves on the enemy it lands on: the companion's own slow and a fixed freeze. */

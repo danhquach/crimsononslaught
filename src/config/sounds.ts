@@ -132,7 +132,8 @@ export const SOUNDS: Readonly<Record<SoundKey, SoundDef>> = {
   'cast.earth_quake': clip('cast.earth_quake', 0.5, 400),
   'cast.earth_companion': clip('cast.earth_companion', 0.4, 150),
   // Always-on spells cue when they come up: on equip, and a shield again each
-  // time it reforms from empty. An equip lands on the frame `progress.perk`
+  // time it reforms from empty; the sword and Earth Shield's stones also cue each
+  // time they return from their recharge (#406). An equip lands on the frame `progress.perk`
   // plays, so these sit under it.
   'cast.ice_shield': clip('cast.ice_shield', 0.35, 200),
   'cast.lightning_sword': clip('cast.lightning_sword', 0.35, 200),

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { BOSS } from '../src/config/boss';
+import { BOSS, BOSS_DAMAGE_CAP } from '../src/config/boss';
 import { BOSS_BAR_COLORS } from '../src/config/hud';
 import { SPELL_IDS } from '../src/config/spells';
 import { SCENE } from '../src/core/scenePayloads';
@@ -148,5 +148,49 @@ test('one hit deep into the last bar breaks once', async ({ page }) => {
   expect(near.countText).toBe('\u00d71');
   expect(near.fill01).toBeLessThan(0.2);
   expect(await breakCues(page)).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('the boss damage cap cuts hits through the real capped path (#406)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await startRun(page);
+  await waitForBossBar(page);
+  const { dpsCap, overflowFactor } = BOSS_DAMAGE_CAP;
+  const chunk = dpsCap * 5;
+
+  // One evaluate, so the run clock does not move: every hit lands in the same
+  // second. The first chunk fills the bucket whatever the running spell put in
+  // it; the second then lands wholly as overflow.
+  const read = await page.evaluate(
+    async ({ scene, chunk }) => {
+      const { game } = await import('/src/main.ts');
+      const g = game.scene.getScene(scene.game) as GameScene;
+      const start = g.damageBossCappedForTest(0);
+      const first = g.damageBossCappedForTest(chunk);
+      const second = g.damageBossCappedForTest(chunk);
+      const report = g.bossReport;
+      return {
+        start: start?.hp ?? null,
+        first: first?.hp ?? null,
+        second: second?.hp ?? null,
+        absorbed: report?.capAbsorbed ?? null,
+        factor: report?.damageTakenFactor ?? null,
+      };
+    },
+    { scene: SCENE, chunk },
+  );
+
+  expect(read.start, 'boss present').not.toBeNull();
+  const f = read.factor ?? 1;
+  const firstDrop = (read.start ?? 0) - (read.first ?? 0);
+  const secondDrop = (read.first ?? 0) - (read.second ?? 0);
+  // First chunk: between "bucket already full" and "bucket empty".
+  expect(firstDrop).toBeGreaterThanOrEqual(chunk * overflowFactor * f - 1e-6);
+  expect(firstDrop).toBeLessThanOrEqual((dpsCap + (chunk - dpsCap) * overflowFactor) * f + 1e-6);
+  // Second chunk, bucket full: all overflow.
+  expect(secondDrop).toBeCloseTo(chunk * overflowFactor * f, 3);
+  expect(read.absorbed ?? 0, 'the cap cut damage').toBeGreaterThan(0);
+  // Two chunks swung, so what the cap kept off the boss is the rest.
+  expect(read.absorbed ?? 0).toBeCloseTo(2 * chunk * f - firstDrop - secondDrop, 3);
   expect(errors).toEqual([]);
 });

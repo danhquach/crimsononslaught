@@ -710,6 +710,7 @@ export class GameScene extends Phaser.Scene {
    */
   get bossReport(): {
     enraged: boolean;
+    capAbsorbed: number;
     contactDamage: number;
     damageTakenFactor: number;
     phase: string;
@@ -767,6 +768,7 @@ export class GameScene extends Phaser.Scene {
     if (!boss) return null;
     return {
       enraged: boss.isEnraged,
+      capAbsorbed: boss.capAbsorbedForTest,
       contactDamage: boss.contactDamage,
       damageTakenFactor: boss.damageTakenFactor,
       phase: boss.phase,
@@ -1125,18 +1127,20 @@ export class GameScene extends Phaser.Scene {
    * hits each has landed and shots each has in the air right now. The browser
    * suite watches a run land hits with both and hold their pool caps.
    *
-   * CO-182: the bomb's entry also carries `icicleHits` (icicles that broke on
-   * an enemy), `burstCaught` (enemies each burst caught, in order) and
-   * `spunBursts` (bursts whose bomb turned in flight, CO-185), so the suite
-   * can tell the bomb spins, its icicles land and its bursts catch groups.
+   * CO-182, #406: the bomb's entry also carries `icicleHits` (icicles that
+   * broke on an enemy), `waveHits` (enemies its level 3 waves hit), `rollouts`
+   * (bombs whose roll ran out) and `spunRolls` (rolls whose bomb turned in
+   * flight, CO-185), so the suite can tell the bomb spins, its icicles land,
+   * and nothing but icicles and waves ever hurts.
    */
   get iceReport(): {
     id: RosterSpellId;
     hits: number;
     live: number;
     icicleHits?: number;
-    burstCaught?: number[];
-    spunBursts?: number;
+    waveHits?: number;
+    rollouts?: number;
+    spunRolls?: number;
   }[] {
     return this.spells.spells
       .filter(
@@ -1150,8 +1154,9 @@ export class GameScene extends Phaser.Scene {
               hits: spell.hits,
               live: spell.liveCount,
               icicleHits: spell.icicleHits,
-              burstCaught: [...spell.burstCaught],
-              spunBursts: spell.spunBursts,
+              waveHits: spell.waveHits,
+              rollouts: spell.rollouts,
+              spunRolls: spell.spunRolls,
             }
           : { id: spell.id, hits: spell.hits, live: spell.liveCount },
       );
@@ -1320,7 +1325,7 @@ export class GameScene extends Phaser.Scene {
   killBossForTest(): boolean {
     const boss = this.bossForTest();
     if (!boss) return false;
-    this.damageEnemy(boss, boss.remainingHp, 'tick');
+    this.damageEnemy(boss, boss.remainingHp, 'tick', undefined, false);
     return boss.isDying;
   }
 
@@ -1333,7 +1338,19 @@ export class GameScene extends Phaser.Scene {
   damageBossForTest(amount: number): { hp: number; dying: boolean } | null {
     const boss = this.bossForTest();
     if (!boss) return null;
-    this.damageEnemy(boss, amount, 'tick');
+    this.damageEnemy(boss, amount, 'tick', undefined, false);
+    return { hp: boss.remainingHp, dying: boss.isDying };
+  }
+
+  /**
+   * Test hook (#406): like `damageBossForTest`, but through the boss's damage
+   * cap, the path every real hit takes. Returns its HP left and whether it is
+   * dying; the cap's cut is in `bossReport.capAbsorbed`.
+   */
+  damageBossCappedForTest(amount: number): { hp: number; dying: boolean } | null {
+    const boss = this.bossForTest();
+    if (!boss) return null;
+    this.damageEnemy(boss, amount, 'tick', undefined, true);
     return { hp: boss.remainingHp, dying: boss.isDying };
   }
 
@@ -1355,7 +1372,7 @@ export class GameScene extends Phaser.Scene {
    */
   killSummonedForTest(): number {
     const pack = this.enemies.live.filter((enemy) => enemy.isSummoned);
-    for (const enemy of pack) this.damageEnemy(enemy, enemy.remainingHp, 'tick');
+    for (const enemy of pack) this.damageEnemy(enemy, enemy.remainingHp, 'tick', undefined, false);
     return pack.length;
   }
 
@@ -2213,7 +2230,7 @@ export class GameScene extends Phaser.Scene {
     // killed through the one damage path, its death sets off the blast. Even
     // under `?invulnerable=1`, so it does not sit on the player unexploded.
     if (enemy.enemyType === 'exploder') {
-      this.damageEnemy(enemy, enemy.remainingHp, 'tick');
+      this.damageEnemy(enemy, enemy.remainingHp, 'tick', undefined, false);
       return;
     }
     // #384: a dash is not a hit the enemy's own window should be spent on.
@@ -2470,12 +2487,17 @@ export class GameScene extends Phaser.Scene {
    *
    * A hit from `from` on a shielded enemy's front (#126) lands at the shield's
    * factor; a `dot` has no direction and always lands in full.
+   *
+   * The boss's damage cap (#406) is applied last, on the run clock, so it cuts
+   * what would land after crit, guard and enrage. A caller that must kill by
+   * `remainingHp` or step the boss by an exact amount passes `capped = false`.
    */
   private damageEnemy(
     enemy: Enemy,
     amount: number,
     kind: HitKind = 'hit',
     from?: Readonly<Vec2>,
+    capped = true,
   ): void {
     if (!enemy.active) return;
     const { x, y, enemyType, isElite, isSummoned } = enemy;
@@ -2486,7 +2508,10 @@ export class GameScene extends Phaser.Scene {
     const guard = kind === 'dot' ? 1 : enemy.guardFactor(from);
     // #388: an enraged boss takes more. Applied here, so the number shown and
     // the tallies count what landed, not what was swung.
-    const dealt = struck * guard * enemy.damageTakenFactor;
+    const landed = struck * guard * enemy.damageTakenFactor;
+    // The boss cap (#406) applies to every hit kind, dot ticks included, by design.
+    const dealt =
+      capped && enemy instanceof Boss ? enemy.capDamage(landed, this.run.elapsedMs / 1000) : landed;
     if (enemyType === 'shielded' && kind !== 'dot' && !enemy.isDying)
       this.tallyGuard(struck, dealt, guard);
     // A dying enemy takes nothing, so it shows nothing.

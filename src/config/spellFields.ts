@@ -27,7 +27,6 @@ export const STAT_CATEGORIES = {
   // damage — scaled by `damageMul`
   damage: 'damage',
   tickDamage: 'damage',
-  breakDamage: 'damage',
   burn: 'damage',
   bleed: 'damage',
   pondTickDamage: 'damage',
@@ -36,14 +35,13 @@ export const STAT_CATEGORIES = {
   // cooldown — scaled by `cooldownMul`
   cooldown: 'cooldown',
   attackCooldown: 'cooldown',
-  rechargeDelay: 'cooldown',
   fallDelay: 'cooldown',
+  recharge: 'cooldown',
   throwInterval: 'cooldown',
 
   // area — scaled by `areaMul`
   aoeRadius: 'area',
   radius: 'area',
-  breakRadius: 'area',
   chainRange: 'area',
   orbitRadius: 'area',
   leashRadius: 'area',
@@ -69,6 +67,7 @@ export const STAT_CATEGORIES = {
   stunDuration: 'duration',
   staggerDuration: 'duration',
   pondDuration: 'duration',
+  uptime: 'duration',
 
   // pierce — `pierceBonus` is added, not multiplied (#206)
   pierce: 'pierce',

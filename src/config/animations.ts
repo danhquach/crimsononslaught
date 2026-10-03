@@ -243,11 +243,16 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('ice.stormShard', 4, 12, ONCE),
   // Frost Nova Bomb (CO-182): the ice urchin that rolls and the icicle it
   // throws, both stills (the engine spins the one and turns the other along
-  // its flight), and the burst: a frost ring whose spikes rise and shatter.
-  // Ice Shield still bursts with `ice.nova`.
+  // its flight). Its old burst, `ice.spikeRing`, is no longer drawn (#406): the level 3 wave is `ice.wave`.
   spec('ice.urchin', 1, 1, LOOP),
   spec('ice.icicle', 1, 1, LOOP),
   spec('ice.spikeRing', 6, 15, ONCE),
+
+  // Ice Wave's frost ring and Ice Diamond's orbiting gem (CO-227): the ring is
+  // drawn from its centre and plays once as the wave spreads, scaled to the
+  // wave's radius by `ICE_WAVE_ART`; the gem spins in a loop.
+  spec('ice.wave', 4, 12, ONCE),
+  spec('ice.diamond', 4, 8, LOOP),
 
   spec('lightning.tornado', 4, 10, LOOP),
   spec('lightning.sword', 4, 12, LOOP),

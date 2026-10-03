@@ -96,8 +96,9 @@ export const PLACEHOLDERS: Readonly<Record<TextureKey, Placeholder>> = {
   // and never as the round `boulder` disc. With the atlas it plays `earth.fly`
   // (CO-138); the body stays this disc's circle, round the shard's middle.
   proj_spike: { shape: 'diamond', color: 0xa1887f, width: 16, height: 8 },
-  // #134: the Ice Shield's layer, drawn around the player. A ring rather
-  // than a disc so the hero is still visible through it; its own art is #145.
+  // #134: the Ice Shield's layer, drawn around the player. Since #406 the
+  // shield is a ring of diamonds and nothing draws this key: the HUD reads its
+  // colour for the shield bar.
   shield_ice: { shape: 'ring', color: 0xb3e5fc, width: 44, height: 44, thickness: 3 },
   // #135: a persistent ground area, drawn at `areaScale` of this size so the
   // ring outlines exactly the patch that ticks. An area spell keeps it as the

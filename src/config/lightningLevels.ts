@@ -1,6 +1,6 @@
 /**
  * What the Lightning spells' levels 2 and 3 do beyond their stat adds (#329).
- * The stat adds themselves (a second strike, four chains, a fourth and fifth
+ * The stat adds themselves (a second strike, four chains, a fourth
  * blade) are `SPELL_LEVEL_STATS` in `spellLevels.ts`; these are the other level
  * 2 and level 3 behaviours and the numbers they run on. First-cut values: the
  * bot sweep tunes them (#147's pass).
@@ -91,25 +91,23 @@ export const THUNDERCLAP = { jumps: 3, range: 100, damageFactor: 0.6 } as const;
 export const MAX_LIVE_COMPANION_STRIPS = 24;
 
 /**
- * Lightning Sword levels 2 and 3: the per-enemy window between two cuts is the
- * shorter of the sword's own `hitCooldown` and this. With 4 and 5 blades a blade
- * passes a point every 0.349 s and 0.279 s, inside the base 0.35 s window, so
- * without a shorter one the extra blades would add nothing on one enemy.
+ * Lightning Sword level 2: the per-enemy window between two cuts is the shorter
+ * of the sword's own `hitCooldown` and this. With 4 blades a blade passes a
+ * point every 0.349 s, inside the base 0.35 s window, so without a shorter one
+ * the fourth blade would add nothing on one enemy. Level 3 adds no blade, so it
+ * keeps level 2's window.
  */
-export const SWORD_HIT_WINDOW_S = { 2: 0.3, 3: 0.24 } as const;
+export const SWORD_HIT_WINDOW_S = { 2: 0.3, 3: 0.3 } as const;
 
 /**
- * Lightning Sword level 3: a blade's cut also arcs from the blade to up to
- * `jumps` other enemies, each within `range` of the last link, for
- * `damageFactor` x the sword's damage; a blade arcs at most once per
- * `perBladeCooldownS`. The stagger is the sword's own.
+ * Lightning Sword level 3, chain burst (#406): when the blades vanish at the end
+ * of their uptime, each blade fires once. Its first target is the nearest enemy
+ * within `range` of the blade, then it jumps to up to `jumps` more enemies, each
+ * the nearest new one within `range` of the last, so at most `1 + jumps` enemies
+ * a blade. Each is staggered for the sword's own stagger and dealt `damageFactor`
+ * x the sword's damage.
  */
-export const SWORD_ARC = {
-  jumps: 2,
-  range: 60,
-  damageFactor: 0.5,
-  perBladeCooldownS: 0.25,
-} as const;
+export const SWORD_BURST = { jumps: 2, range: 60, damageFactor: 1 } as const;
 
-/** Sword arc strips the pool may ever hold: at most 5 arcs per 0.25 s, 2 strips each, each up for one 0.2 s clip cycle. */
-export const MAX_LIVE_SWORD_ARC_STRIPS = 32;
+/** Burst strips the pool may ever hold: at most 4 blades x 3 links in one burst, each up for one 0.2 s clip cycle, and bursts are `uptime + recharge` apart, so 16 is the headroom. */
+export const MAX_LIVE_SWORD_BURST_STRIPS = 16;

@@ -22,9 +22,9 @@ export const EXPLOSION_SCALE_RADIUS = 40;
 export const NOVA_SCALE_RADIUS = 90;
 
 /**
- * Frost Nova Bomb's burst (CO-182) is drawn at `radius / SPIKE_RING_SCALE_RADIUS`:
- * the half-width of the frost ring in `ice.spikeRing`'s frames, in native px,
- * so the ring's rim sits on the radius the burst reaches.
+ * The half-width of the frost ring in `ice.spikeRing`'s frames, in native px
+ * (CO-182). The bomb no longer draws that burst (#406); the art test
+ * (`scripts/lib/frostNovaBombArt.test.mjs`) still pins the atlas frames to it.
  */
 export const SPIKE_RING_SCALE_RADIUS = 61;
 
@@ -134,7 +134,6 @@ export const FX_ALPHA: Readonly<Record<string, number>> = {
   'ice.nova': 0.6,
   'fire.wave': 0.6,
   'ice.shatter': 0.75,
-  'ice.spikeRing': 0.75,
   'fire.meteor': 0.75,
   'lightning.sword': 0.75,
 };

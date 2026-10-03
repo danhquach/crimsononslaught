@@ -1,41 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLUSTER,
   DEEP_FREEZE,
-  FROST_AURA,
   FROST_ORB,
   HAIL,
   ICE_ARROW_FAN,
+  ICE_SHIELD_WAVE,
+  ICE_WAVE_ART,
   SHATTER,
-  SHATTER_RING,
 } from '../config/iceLevels';
 import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
 import { PROFILE_CLAMPS } from '../config/passives';
 import type { SpellLevel } from '../config/spellLevels';
-import { BASE_ICE_SHIELD_STATS } from '../config/shields';
 import { BOSS_CC_RESIST } from '../config/boss';
 import { NO_BOSS_CC, bossFrost } from './bossCrowdControl';
 import { advanceArea, createArea } from './groundArea';
 import { NO_FROST, applyFrost, freezeDurationOf, tickFrost, type FrostHit } from './frostNova';
 import {
-  clusterBurst,
-  clusterHeadings,
   deepFreezeHit,
   fanHeadings,
   frostOrbHit,
   hailsDue,
-  hasCluster,
-  hasFrostAura,
+  hasNovaWave,
+  iceWaveFade,
+  iceWaveFrame,
+  iceWaveScale,
+  diamondWaveDamage,
+  hasDiamondWave,
   hasShatter,
-  inAura,
   isDeepFreezeTick,
   shardDamage,
   shatterHeadings,
-  shatterRingFrost,
-  shatterRingHeadings,
   stormTickCount,
 } from './iceLevels';
-import { spawnsDue } from './iceStorm';
 import { createRng } from './rng';
 
 /** #328: the level 2 and 3 rules of the Ice spells, checked without an engine. */
@@ -46,8 +42,8 @@ const DEG = Math.PI / 180;
 describe('level gates', () => {
   it('turns each behaviour on at its own level and keeps it on', () => {
     expect(LEVELS.map(hasShatter)).toEqual([false, false, true]);
-    expect(LEVELS.map(hasCluster)).toEqual([false, false, true]);
-    expect(LEVELS.map(hasFrostAura)).toEqual([false, true, true]);
+    expect(LEVELS.map(hasNovaWave)).toEqual([false, false, true]);
+    expect(LEVELS.map(hasDiamondWave)).toEqual([false, false, true]);
   });
 
   it('marks the deep freeze only on the last paid tick, from level 3', () => {
@@ -108,98 +104,49 @@ describe('Shatter', () => {
   });
 });
 
-describe('Cluster', () => {
-  it('spaces the urchins evenly round the circle, the first 60 degrees past the aim', () => {
-    const h = clusterHeadings(0.3);
-    expect(h).toHaveLength(CLUSTER.count);
-    expect(h[0]).toBeCloseTo(0.3 + 60 * DEG, 12);
-    for (let i = 1; i < h.length; i += 1) {
-      expect(h[i]! - h[i - 1]!).toBeCloseTo((Math.PI * 2) / CLUSTER.count, 12);
+describe('Frost wave ring art', () => {
+  const range = 110;
+
+  it('starts on the core burst and ends on the widest ring', () => {
+    expect(iceWaveFrame(0, range)).toBe(0);
+    expect(iceWaveFrame(range * 0.3, range)).toBe(1);
+    expect(iceWaveFrame(range * 0.6, range)).toBe(2);
+    expect(iceWaveFrame(range * 0.9, range)).toBe(3);
+    expect(iceWaveFrame(range, range)).toBe(3);
+    expect(iceWaveFrame(range * 2, range)).toBe(3);
+  });
+
+  it('never steps back as the wave grows', () => {
+    let last = 0;
+    for (let r = 0; r <= range; r += 1) {
+      const frame = iceWaveFrame(r, range);
+      expect(frame).toBeGreaterThanOrEqual(last);
+      last = frame;
     }
   });
 
-  it('is empty for no urchins', () => {
-    expect(clusterHeadings(0, 0)).toEqual([]);
-    expect(clusterHeadings(0, -1)).toEqual([]);
+  it('puts the drawn outer edge on the radius, whichever frame shows', () => {
+    for (let frame = 0; frame < ICE_WAVE_ART.outerRadius.length; frame += 1) {
+      expect(iceWaveScale(80, frame) * ICE_WAVE_ART.outerRadius[frame]!).toBeCloseTo(80, 9);
+    }
+    expect(iceWaveScale(-5, 1)).toBe(0);
   });
 
-  it('bursts at half the radius and 40% of the damage, with the same slow and no freeze', () => {
-    const burst = clusterBurst(BASE_NOVA_BOMB_STATS);
-    expect(burst.radius).toBe(BASE_NOVA_BOMB_STATS.radius * CLUSTER.radiusFactor);
-    expect(burst.damage).toBe(BASE_NOVA_BOMB_STATS.damage * CLUSTER.damageFactor);
-    expect(burst.slowPct).toBe(BASE_NOVA_BOMB_STATS.slowPct);
-    expect(burst.slowDuration).toBe(BASE_NOVA_BOMB_STATS.slowDuration);
-    // Slow only: the burst names no freeze at all, so it never rolls one.
-    expect(Object.keys(burst).sort()).toEqual(['damage', 'radius', 'slowDuration', 'slowPct']);
-  });
-
-  it('follows a bigger bomb (a wider-radius passive) without reading the base block', () => {
-    const wide = clusterBurst({ radius: 200, damage: 50, slowPct: 0.5, slowDuration: 3 });
-    expect(wide).toEqual({ radius: 100, damage: 20, slowPct: 0.5, slowDuration: 3 });
+  it('holds full opacity for the first 80% of the reach and fades to nothing at the end', () => {
+    expect(iceWaveFade(0, range)).toBe(1);
+    expect(iceWaveFade(range * 0.8, range)).toBe(1);
+    expect(iceWaveFade(range * 0.9, range)).toBeCloseTo(0.5, 9);
+    expect(iceWaveFade(range, range)).toBe(0);
+    expect(iceWaveFade(1, 0)).toBe(0);
   });
 });
 
-describe('Frost aura', () => {
-  const centre = { x: 100, y: 100 };
-
-  it('reaches `radius` past the enemy body, inclusive', () => {
-    expect(inAura(centre, { x: 100 + 30 + 12, y: 100, bodyRadius: 12 }, 30)).toBe(true);
-    expect(inAura(centre, { x: 100 + 30 + 12.01, y: 100, bodyRadius: 12 }, 30)).toBe(false);
-    expect(inAura(centre, { x: 100, y: 100, bodyRadius: 0 }, 30)).toBe(true);
-  });
-
-  it('counts a bigger body in from further out', () => {
-    const far = { x: 100, y: 100 + 60 };
-    expect(inAura(centre, { ...far, bodyRadius: 12 }, 30)).toBe(false);
-    expect(inAura(centre, { ...far, bodyRadius: 30 }, 30)).toBe(true);
-  });
-
-  it('pulses floor(time / tickEveryS) times over a stretch of any frame sizes, none while the clock is held', () => {
-    const rng = createRng(7);
-    for (let run = 0; run < 20; run += 1) {
-      let clock = 0;
-      let pulses = 0;
-      while (clock < 6) {
-        const delta = 0.005 + rng.next() * 0.2;
-        pulses += spawnsDue(clock, delta, 1 / FROST_AURA.tickEveryS);
-        clock += delta;
-      }
-      expect(pulses).toBe(Math.floor(clock / FROST_AURA.tickEveryS + 1e-9));
-    }
-    // A paused step (delta 0) pays nothing, and a clock reset to 0 starts the count over.
-    expect(spawnsDue(1, 0, 1 / FROST_AURA.tickEveryS)).toBe(0);
-    expect(spawnsDue(0, FROST_AURA.tickEveryS - 0.01, 1 / FROST_AURA.tickEveryS)).toBe(0);
-  });
-});
-
-describe('Shatter ring', () => {
-  it('fires 8 icicles evenly round the circle', () => {
-    const h = shatterRingHeadings();
-    expect(h).toHaveLength(SHATTER_RING.icicles);
-    expect(h[0]).toBe(0);
-    for (let i = 1; i < h.length; i += 1) expect(h[i]! - h[i - 1]!).toBeCloseTo(Math.PI / 4, 12);
-    expect(shatterRingHeadings(0)).toEqual([]);
-  });
-
-  it('is the break chill it always was below level 3, with no freeze', () => {
-    for (const level of [1, 2] as const) {
-      const hit = shatterRingFrost(BASE_ICE_SHIELD_STATS, level);
-      expect(hit).toEqual({
-        slowPct: BASE_ICE_SHIELD_STATS.slowPct,
-        slowDuration: BASE_ICE_SHIELD_STATS.slowDuration,
-        freeze: false,
-      });
-    }
-  });
-
-  it('adds a fixed 1 s freeze at level 3, on top of the same slow', () => {
-    const hit = shatterRingFrost(BASE_ICE_SHIELD_STATS, 3);
-    expect(hit).toEqual({
-      slowPct: BASE_ICE_SHIELD_STATS.slowPct,
-      slowDuration: BASE_ICE_SHIELD_STATS.slowDuration,
-      freeze: true,
-      freezeDuration: SHATTER_RING.freezeS,
-    });
+describe('Ice Shield frost burst (#406)', () => {
+  it('deals the wave 1.5 x the diamond damage, and nothing for none', () => {
+    expect(diamondWaveDamage(12)).toBe(12 * ICE_SHIELD_WAVE.damageFactor);
+    expect(diamondWaveDamage(12)).toBe(18);
+    expect(diamondWaveDamage(10, 0.5)).toBe(5);
+    expect(diamondWaveDamage(0)).toBe(0);
   });
 });
 
@@ -369,11 +316,6 @@ describe('boss crowd control, every Ice level 3 freeze source', () => {
     period: 12 * HASTE, // one Ice Storm cast, whose last tick freezes
     hit: deepFreezeHit({ slowPct: 0.5, slowDuration: 1 }),
   };
-  const ring: Source = {
-    name: 'shatter ring',
-    period: BASE_ICE_SHIELD_STATS.rechargeDelay * HASTE,
-    hit: shatterRingFrost(BASE_ICE_SHIELD_STATS, 3),
-  };
   const burst: Source = {
     name: 'nova burst',
     period: BASE_NOVA_BOMB_STATS.cooldown * HASTE,
@@ -385,10 +327,10 @@ describe('boss crowd control, every Ice level 3 freeze source', () => {
       freezeDuration: BASE_NOVA_BOMB_STATS.freezeDuration,
     },
   };
-  const all = [orb, deep, ring, burst];
+  const all = [orb, deep, burst];
 
   it('runs at the cadences the plan names', () => {
-    expect(all.map((s) => Number(s.period.toFixed(3)))).toEqual([1.96, 4.2, 2.1, 1.225]);
+    expect(all.map((s) => Number(s.period.toFixed(3)))).toEqual([1.96, 4.2, 1.225]);
     for (const source of all) expect(source.hit.freeze, source.name).toBe(true);
   });
 

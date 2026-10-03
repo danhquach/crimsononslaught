@@ -5,7 +5,7 @@ import {
   COMPANION_SWEEP,
   FORK,
   STORM_CELL,
-  SWORD_ARC,
+  SWORD_BURST,
   SWORD_HIT_WINDOW_S,
   THUNDERBOLT,
   THUNDERCLAP,
@@ -22,15 +22,13 @@ import { BASE_SPELL_STATS } from '../config/spells';
 import { startBossCycle, stepBossCycle } from './boss';
 import { NO_BOSS_CC, resistBossCc, type BossCcState } from './bossCrowdControl';
 import { chainPath, resolveCast } from './chainLightning';
-import { tickHitCooldown } from './hitWindow';
 import {
-  bladeArcReady,
   companionAttackCooldown,
   forkPaths,
   hasCompanionSweep,
   hasFork,
   hasStormCell,
-  hasSwordArc,
+  hasSwordBurst,
   hasThunderbolt,
   hasThunderclap,
   isThunderboltCast,
@@ -39,7 +37,7 @@ import {
   stormBoltDamage,
   stormBoltsDue,
   stormCellTarget,
-  swordArcPath,
+  swordBurstPath,
   swordHitCooldown,
   sweepChord,
   sweepTargets,
@@ -74,7 +72,7 @@ describe('level gates', () => {
     expect(LEVELS.map(hasStormCell)).toEqual([false, false, true]);
     expect(LEVELS.map(hasCompanionSweep)).toEqual([false, true, true]);
     expect(LEVELS.map(hasThunderclap)).toEqual([false, false, true]);
-    expect(LEVELS.map(hasSwordArc)).toEqual([false, false, true]);
+    expect(LEVELS.map(hasSwordBurst)).toEqual([false, false, true]);
     expect(LEVELS.map(tornadoesPerCast)).toEqual([1, TORNADO_SPLIT.count, TORNADO_SPLIT.count]);
   });
 });
@@ -85,9 +83,9 @@ describe('levelOneCount and rollsOnLevelStream', () => {
     expect(levelOneCount(2, 'lightning', 3, 'strikes')).toBe(1);
     expect(levelOneCount(4, 'lightning_chain', 2, 'chains')).toBe(2);
     expect(levelOneCount(4, 'lightning_chain', 3, 'chains')).toBe(2);
-    // The sword's adds are cumulative: level 3 carries level 2's.
+    // The sword's add is level 2's, and level 3 keeps it (#406: no fifth blade).
     expect(levelOneCount(4, 'lightning_sword', 2, 'count')).toBe(3);
-    expect(levelOneCount(5, 'lightning_sword', 3, 'count')).toBe(3);
+    expect(levelOneCount(4, 'lightning_sword', 3, 'count')).toBe(3);
   });
 
   it('is the count itself at level 1, for a field with no add, and for a spell with none', () => {
@@ -109,7 +107,7 @@ describe('levelOneCount and rollsOnLevelStream', () => {
     expect(
       levelOneCount(BASE_CHAIN_LIGHTNING_STATS.chains + 2, 'lightning_chain', 2, 'chains'),
     ).toBe(BASE_CHAIN_LIGHTNING_STATS.chains);
-    expect(levelOneCount(BASE_SWORD_STATS.count + 2, 'lightning_sword', 3, 'count')).toBe(
+    expect(levelOneCount(BASE_SWORD_STATS.count + 1, 'lightning_sword', 3, 'count')).toBe(
       BASE_SWORD_STATS.count,
     );
   });
@@ -552,62 +550,55 @@ describe('Lightning Sword levels', () => {
   it('keeps each window inside the gap between two blades passing a point', () => {
     for (const [level, blades] of [
       [2, 4],
-      [3, 5],
+      [3, 4],
     ] as const) {
       const gap = (2 * Math.PI) / (blades * BASE_SWORD_STATS.orbitSpeed);
       expect(swordHitCooldown(BASE_SWORD_STATS.hitCooldown, level)).toBeLessThan(gap);
     }
   });
 
-  describe('arc', () => {
+  describe('burst', () => {
     const blade = { x: 0, y: 0 };
-    const cut = at(20, 0, 8);
 
-    it('reaches up to two enemies, the first the nearest to the blade, each within 60 of the last', () => {
+    it('reaches up to three enemies, the first the nearest to the blade, each within 60 of the last', () => {
       const one = at(-30, 0);
       const two = at(-30, 50);
       const three = at(-30, 100);
-      const path = swordArcPath(blade, cut, [cut, three, two, one]);
-      expect(path).toEqual([one, two]);
-      expect(dist(one, blade)).toBeLessThanOrEqual(SWORD_ARC.range);
-      expect(dist(two, one)).toBeLessThanOrEqual(SWORD_ARC.range);
+      const four = at(-30, 150);
+      const path = swordBurstPath(blade, [four, three, two, one]);
+      expect(path).toEqual([one, two, three]);
+      expect(dist(one, blade)).toBeLessThanOrEqual(SWORD_BURST.range);
+      expect(dist(two, one)).toBeLessThanOrEqual(SWORD_BURST.range);
+      expect(dist(three, two)).toBeLessThanOrEqual(SWORD_BURST.range);
     });
 
-    it('never arcs back to the enemy the blade cut, or one excluded', () => {
-      const other = at(30, 0);
-      expect(swordArcPath(blade, cut, [cut, other])).toEqual([other]);
-      expect(swordArcPath(blade, cut, [cut, other], undefined, undefined, [other])).toEqual([]);
-      expect(
-        swordArcPath(blade, cut, [cut, other], undefined, undefined, new Set([other])),
-      ).toEqual([]);
+    it('never reaches an enemy twice', () => {
+      const only = at(30, 0);
+      expect(swordBurstPath(blade, [only])).toEqual([only]);
+      const a = at(30, 0);
+      const b = at(60, 0);
+      expect(swordBurstPath(blade, [a, b, a])).toEqual([a, b]);
     });
 
     it('takes one enemy when only one is in reach, and none when none is', () => {
-      expect(swordArcPath(blade, cut, [cut, at(40, 0), at(400, 0)])).toHaveLength(1);
-      expect(swordArcPath(blade, cut, [cut, at(SWORD_ARC.range + 0.01, 0)])).toEqual([]);
-      expect(swordArcPath(blade, cut, [cut, at(SWORD_ARC.range, 0)])).toHaveLength(1);
-      expect(swordArcPath(blade, cut, [cut])).toEqual([]);
+      expect(swordBurstPath(blade, [at(40, 0), at(400, 0)])).toHaveLength(1);
+      expect(swordBurstPath(blade, [at(SWORD_BURST.range + 0.01, 0)])).toEqual([]);
+      expect(swordBurstPath(blade, [at(SWORD_BURST.range, 0)])).toHaveLength(1);
+      expect(swordBurstPath(blade, [])).toEqual([]);
+    });
+
+    it('breaks a tie for the nearest by the earlier enemy', () => {
+      const left = at(-40, 0);
+      const right = at(40, 0);
+      expect(swordBurstPath(blade, [left, right])[0]).toBe(left);
+      expect(swordBurstPath(blade, [right, left])[0]).toBe(right);
     });
 
     it('stops at the jumps it is given', () => {
       const row = Array.from({ length: 5 }, (_, i) => at(-30 - i * 30, 0));
-      expect(swordArcPath(blade, cut, row, 60, 1)).toHaveLength(1);
-      expect(swordArcPath(blade, cut, row, 60, 0)).toEqual([]);
-    });
-
-    it('lets a blade arc again only after its cooldown has run out', () => {
-      expect(bladeArcReady(undefined)).toBe(true);
-      expect(bladeArcReady(0)).toBe(true);
-      expect(bladeArcReady(-0.01)).toBe(true);
-      expect(bladeArcReady(0.01)).toBe(false);
-      let remaining: number = SWORD_ARC.perBladeCooldownS;
-      let frames = 0;
-      while (!bladeArcReady(remaining)) {
-        remaining = tickHitCooldown(remaining, 1 / 60);
-        frames += 1;
-      }
-      expect(frames / 60).toBeGreaterThanOrEqual(SWORD_ARC.perBladeCooldownS - 1e-9);
-      expect(frames / 60).toBeLessThan(SWORD_ARC.perBladeCooldownS + 2 / 60);
+      expect(swordBurstPath(blade, row, { jumps: 1, range: 60 })).toHaveLength(2);
+      expect(swordBurstPath(blade, row, { jumps: 0, range: 60 })).toHaveLength(1);
+      expect(swordBurstPath(blade, row)).toHaveLength(1 + SWORD_BURST.jumps);
     });
   });
 });
@@ -626,7 +617,7 @@ describe('boss crowd control, every Lightning level 3 stagger at once', () => {
   const PERSISTENCE = PASSIVES.find((p) => p.id === 'passive_persistence')?.amount ?? NaN;
   const bolt = BASE_SPELL_STATS.lightning;
   const companion = BASE_COMPANION_STATS.lightning_companion;
-  const blades = BASE_SWORD_STATS.count + 2;
+  const blades = BASE_SWORD_STATS.count + 1;
 
   interface StaggerSource {
     name: string;
@@ -645,10 +636,10 @@ describe('boss crowd control, every Lightning level 3 stagger at once', () => {
       hits: 1,
     },
     {
-      name: 'sword arcs',
-      period: SWORD_ARC.perBladeCooldownS / blades,
+      name: 'sword bursts',
+      period: BASE_SWORD_STATS.uptime + BASE_SWORD_STATS.recharge * HASTE,
       staggerS: BASE_SWORD_STATS.staggerDuration,
-      hits: 1,
+      hits: blades,
     },
     {
       name: 'companion swing + Thunderclap',
@@ -717,7 +708,7 @@ describe('boss crowd control, every Lightning level 3 stagger at once', () => {
 
   it('runs at the cadences the plan names', () => {
     expect(all.map((s) => Number(s.period.toFixed(3)))).toEqual([
-      0.24, 0.05, 0.14, 0.125, 0.315, 0.49,
+      0.3, 6.05, 0.14, 0.125, 0.315, 0.49,
     ]);
   });
 

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ARENA_SIZE } from '../config/arena';
-import { BOSS, BOSS_SLAM, BOSS_SUMMON, type BossSkillId } from '../config/boss';
+import { BOSS, BOSS_DAMAGE_CAP, BOSS_SLAM, BOSS_SUMMON, type BossSkillId } from '../config/boss';
 import {
   bossAnimation,
   facingFromVector,
@@ -38,6 +38,11 @@ import {
 } from '../core/bossCrowdControl';
 import type { Vec2 } from '../core/enemy';
 import type { FrostHit } from '../core/frostNova';
+import {
+  EMPTY_BOSS_DAMAGE_CAP,
+  capBossDamage,
+  type BossDamageCapState,
+} from '../core/bossDamageCap';
 import { bossBarBroke, bossBarLayers } from '../core/hudModel';
 import { createRng, type Rng } from '../core/rng';
 import { emitRunEvent } from '../core/runEvents';
@@ -134,6 +139,10 @@ export class Boss extends Enemy {
   private lastImmuneS = -Infinity;
   /** #387: bars still alive as of the last hit, so a hit that takes one off can be told. */
   private barsLeft = BOSS.bars;
+  /** #406: the damage cap's leaky bucket, read on the run clock; reset on spawn. */
+  private damageCap: BossDamageCapState = EMPTY_BOSS_DAMAGE_CAP;
+  /** Test hook (#406): damage the cap has cut since spawn. */
+  private absorbedByCap = 0;
   /** #388: latched once the boss has crossed its enrage threshold; reset on spawn. */
   private enraged = false;
   /** Test hook (CO-222): charges begun since spawn. */
@@ -248,6 +257,19 @@ export class Boss extends Enemy {
     return super.facingDir;
   }
 
+  /** #406: what a hit of `amount` deals once capped, at run time `nowS`; the bucket keeps what it took. */
+  capDamage(amount: number, nowS: number): number {
+    const { dealt, state } = capBossDamage(this.damageCap, amount, nowS, BOSS_DAMAGE_CAP);
+    this.damageCap = state;
+    this.absorbedByCap += amount - dealt;
+    return dealt;
+  }
+
+  /** Test hook (#406): damage the cap has cut since spawn. */
+  get capAbsorbedForTest(): number {
+    return this.absorbedByCap;
+  }
+
   /** Test hook (CO-221): the boss clock, which advances only as the boss steers. */
   get clockForTest(): number {
     return this.clockS;
@@ -269,6 +291,8 @@ export class Boss extends Enemy {
     this.chainLog.length = 0;
     this.heroAt = null;
     this.clockS = 0;
+    this.damageCap = EMPTY_BOSS_DAMAGE_CAP;
+    this.absorbedByCap = 0;
     this.cc = NO_BOSS_CC;
     this.lastImmuneS = -Infinity;
     this.barsLeft = BOSS.bars;

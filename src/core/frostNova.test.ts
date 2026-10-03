@@ -3,7 +3,6 @@ import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
 import { FREEZE_DURATION } from '../config/spells';
 import { SPELL_LEVEL_STATS } from '../config/spellLevels';
 import {
-  BURST_TRIGGER_COUNT,
   ICICLE_SPIRAL_STEP_DEG,
   MAX_LIVE_BOMBS,
   MAX_LIVE_ICICLES,
@@ -16,8 +15,7 @@ import {
   isSlowed,
   pulseTargets,
   rollFreeze,
-  shouldBurst,
-  BURST_ARM_DISTANCE,
+  rolledOut,
   throwAngles,
   throwsDue,
   tickFrost,
@@ -334,46 +332,25 @@ describe('throwsDue (CO-182)', () => {
     expect(throwsDue(5, 0, 0)).toBe(0);
   });
 
-  it('makes 11 throws over the 3 s base flight, the last step bursting first', () => {
+  it('makes 11 throws over the 3 s base flight, the last step ending the roll first', () => {
     const flightS = BASE_NOVA_BOMB_STATS.range / BASE_NOVA_BOMB_STATS.speed;
-    // The step that reaches range bursts and throws nothing, so the 12th is never owed.
+    // The step that reaches range ends the roll and throws nothing, so the 12th is never owed.
     expect(throwsDue(flightS - 1e-9, 0, BASE_NOVA_BOMB_STATS.throwInterval)).toBe(11);
   });
 });
 
-describe('shouldBurst (CO-182)', () => {
-  const at = { x: 0, y: 0 };
-  const near = (n: number) => Array.from({ length: n }, (_, i) => ({ x: i * 5, y: 0 }));
-  const armed = BURST_ARM_DISTANCE;
-  const { range, radius } = BASE_NOVA_BOMB_STATS;
+describe('rolledOut (#406)', () => {
+  const { range } = BASE_NOVA_BOMB_STATS;
 
-  it('holds with fewer than the trigger count inside the burst radius', () => {
-    expect(shouldBurst(at, near(BURST_TRIGGER_COUNT - 1), armed, range, radius)).toBe(false);
+  it('rolls the whole range: nothing ends the roll early', () => {
+    expect(rolledOut(0, range)).toBe(false);
+    expect(rolledOut(range / 2, range)).toBe(false);
+    expect(rolledOut(range - 1e-9, range)).toBe(false);
   });
 
-  it('bursts once its ring would catch the trigger count, the radius inclusive', () => {
-    const pack = [...near(BURST_TRIGGER_COUNT - 1), { x: radius, y: 0 }];
-    expect(shouldBurst(at, pack, armed, range, radius)).toBe(true);
-  });
-
-  it('ignores enemies just outside the burst radius', () => {
-    const far = Array.from({ length: 5 }, () => ({ x: radius + 1, y: 0 }));
-    expect(shouldBurst(at, far, armed, range, radius)).toBe(false);
-  });
-
-  it('holds through a crowd until it has rolled the arming distance', () => {
-    expect(shouldBurst(at, near(10), 0, range, radius)).toBe(false);
-    expect(shouldBurst(at, near(10), armed - 1, range, radius)).toBe(false);
-    expect(shouldBurst(at, near(10), armed, range, radius)).toBe(true);
-  });
-
-  it('bursts at the end of its range with nobody near', () => {
-    expect(shouldBurst(at, [], range, range, radius)).toBe(true);
-    expect(shouldBurst(at, [], range - 1, range, radius)).toBe(false);
-  });
-
-  it('arms well inside the range', () => {
-    expect(BURST_ARM_DISTANCE).toBeLessThan(range);
+  it('is out of road at the range and past it', () => {
+    expect(rolledOut(range, range)).toBe(true);
+    expect(rolledOut(range + 30, range)).toBe(true);
   });
 });
 

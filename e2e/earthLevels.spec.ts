@@ -8,12 +8,13 @@ import {
   MAX_LIVE_SEISMIC_PATCHES,
   QUAKE_SPLIT,
   SPIKE_FAN,
-  TREMOR,
+  STONE_SHOCK,
 } from '../src/config/earthLevels';
 import { BASE_QUAKE_STATS } from '../src/config/areas';
 import { BASE_BOULDER_STATS } from '../src/config/earthRoster';
 import type { RosterSpellId } from '../src/config/loadout';
 import { MAX_LIVE_AREAS, MAX_LIVE_FX } from '../src/config/fx';
+import { BASE_EARTH_SHIELD_STATS } from '../src/config/shields';
 import { SPELL_IDS } from '../src/config/spells';
 import { MAX_LIVE_SPIKES } from '../src/core/earthSpike';
 import type { OfferCard } from '../src/core/levelUp';
@@ -401,7 +402,7 @@ test('Boulder level 3 ploughs a rut that staggers, inside the tile cap', async (
   expect(errors).toEqual([]);
 });
 
-test('Earth Shield level 2 has four stones on the ring', async ({ page }) => {
+test('Earth Shield level 2 has four stones on the ring while they are out', async ({ page }) => {
   const errors = collectErrors(page);
   await startEarthRun(page, 'earth_shield:2', 'startAt=120');
   const seen = await until(
@@ -411,52 +412,57 @@ test('Earth Shield level 2 has four stones on the ring', async ({ page }) => {
     (read) => {
       const shield = reportOf<EarthShieldLevelReport>(read, 'earth_shield');
       expect(shield.stones, 'stones on the ring').toBeLessThanOrEqual(4);
-      expect(shield.tremorCount, 'tremors at level 2').toBe(0);
+      // None while they recharge (#406).
+      if (shield.phase === 'recharge') expect(shield.stones, 'stones while recharging').toBe(0);
+      expect(shield.shockCount, 'shocks at level 2').toBe(0);
     },
   );
   const shield = reportOf<EarthShieldLevelReport>(seen, 'earth_shield');
-  console.log(`shield lv2: stones ${shield.stones}, tremors ${shield.tremorCount}`);
+  console.log(`shield lv2: stones ${shield.stones}, shocks ${shield.shockCount}`);
   expect(errors).toEqual([]);
 });
 
-test('Earth Shield level 3 sends a tremor every 2 s that staggers the enemies it reaches', async ({
+test('Earth Shield level 3 sends a shock as the stones vanish that staggers the enemies it reaches', async ({
   page,
 }) => {
   const errors = collectErrors(page);
-  // startAt=300: a crowd, so enemies stand within reach of the ring.
+  // startAt=300: a crowd, so enemies stand within reach of the stones.
   await startEarthRun(page, 'earth_shield:3', 'startAt=300');
   const seen = await until(
     page,
-    'a tremor that reached enemies and staggered them, after a second one',
+    'a shock that reached enemies and staggered them, after a second one',
     (read) => {
       const shield = reportOf<EarthShieldLevelReport>(read, 'earth_shield');
       return (
-        shield.tremorCount >= 2 &&
-        shield.tremors.some((t) => t.level === 3 && t.caught > 0 && t.staggered > 0)
+        shield.shockCount >= 2 &&
+        shield.shocks.some((t) => t.level === 3 && t.caught > 0 && t.staggered > 0)
       );
     },
     (read) => {
       const shield = reportOf<EarthShieldLevelReport>(read, 'earth_shield');
       expect(shield.stones, 'stones on the ring').toBeLessThanOrEqual(4);
-      // The ring never falls under `invulnerable`, so every tremor is on the fixed cadence; `atS` is the
-      // frame it struck on, so a gap can read a frame (0.2 s at this time scale) short.
-      const at = shield.tremors.map((t) => t.atS);
+      if (shield.phase === 'recharge') expect(shield.stones, 'stones while recharging').toBe(0);
+      // The ring never breaks under `invulnerable`, so every shock is a timed vanish, one a cycle:
+      // the uptime at the least (a passive only stretches it); `atS` is the frame it struck on, so
+      // a gap can read a frame (0.2 s at this time scale) short.
+      const at = shield.shocks.map((t) => t.atS);
       for (let i = 1; i < at.length; i++) {
         const gap = (at[i] ?? 0) - (at[i - 1] ?? 0);
-        expect(gap, 'seconds between tremors').toBeGreaterThanOrEqual(TREMOR.everyS - 0.2);
-        expect(gap, 'seconds between tremors').toBeLessThanOrEqual(TREMOR.everyS + 0.5);
+        expect(gap, 'seconds between shocks').toBeGreaterThanOrEqual(
+          BASE_EARTH_SHIELD_STATS.uptime - 0.2,
+        );
       }
-      for (const t of shield.tremors) {
+      for (const t of shield.shocks) {
         expect(t.staggered, 'staggered are caught').toBeLessThanOrEqual(t.caught);
         if (t.bossStaggerS !== null) {
-          expect(t.bossStaggerS, 'boss stagger').toBeLessThanOrEqual(TREMOR.staggerS + 1e-6);
+          expect(t.bossStaggerS, 'boss stagger').toBeLessThanOrEqual(STONE_SHOCK.staggerS + 1e-6);
         }
       }
     },
   );
   const shield = reportOf<EarthShieldLevelReport>(seen, 'earth_shield');
   console.log(
-    `shield lv3: tremors ${shield.tremorCount}, at ${shield.tremors.map((t) => t.atS.toFixed(2)).join(',')}, staggered/caught ${shield.tremors.map((t) => `${t.staggered}/${t.caught}`).join(',')}`,
+    `shield lv3: shocks ${shield.shockCount}, at ${shield.shocks.map((t) => t.atS.toFixed(2)).join(',')}, staggered/caught ${shield.shocks.map((t) => `${t.staggered}/${t.caught}`).join(',')}`,
   );
   expect(errors).toEqual([]);
 });
@@ -679,7 +685,7 @@ test('the whole Earth roster at level 3 holds every pool cap for 100 s and keeps
     },
   );
   console.log(
-    `roster lv3 over ${((seen.elapsedMs - (startMs ?? 0)) / 1000).toFixed(0)} s: fps ${seen.fps.toFixed(0)}, enemies ${seen.enemies}, peaks ${JSON.stringify(worst)}, splinters ${reportOf<SpikeLevelReport>(seen, 'earth').splinterCount}, tremors ${reportOf<EarthShieldLevelReport>(seen, 'earth_shield').tremorCount}, aftershocks ${reportOf<QuakeLevelReport>(seen, 'earth_quake').aftershockCount}`,
+    `roster lv3 over ${((seen.elapsedMs - (startMs ?? 0)) / 1000).toFixed(0)} s: fps ${seen.fps.toFixed(0)}, enemies ${seen.enemies}, peaks ${JSON.stringify(worst)}, splinters ${reportOf<SpikeLevelReport>(seen, 'earth').splinterCount}, shocks ${reportOf<EarthShieldLevelReport>(seen, 'earth_shield').shockCount}, aftershocks ${reportOf<QuakeLevelReport>(seen, 'earth_quake').aftershockCount}`,
   );
   for (const id of ['earth', 'earth_boulder', 'earth_shield', 'earth_quake', 'earth_companion']) {
     expect(seen.levels.find((l) => l.id === id)?.level, `${id} level`).toBe(3);

@@ -1029,3 +1029,45 @@ ticket asked for 3×; the PM chose 2× for now, and the bar code takes its count
 - **No survival pressure:** every mortal run won, so a fight twice as long is not
   yet expected to cost runs. A longer fight means twice the contact time with the
   boss, which the next sweep should watch.
+
+# Spell and boss rebalance (#406, 2026-10-03)
+
+Measured with `npm run sweep` (#407): 4 seeds per element, one sweep, 16 runs a
+round, one run at a time at `timeScale=8`, mortal, no dash. Each round changes
+values, so the same seed draws different level-up offers: rounds compare as pools,
+not seed by seed.
+
+| Round | Fire | Ice | Lightning | Earth | Wins | Median boss kill | Wins hit by volley |
+|---|---|---|---|---|---|---|---|
+| Baseline (`main`, fb4c768) | 4/4 | 3/4 | 0/4 | 3/4 | 10/16 | 61 s | 1 of 10 |
+| 1: boss 19000 HP, volley, weak actives up, Fire down | 2/4 | 2/4 | 1/4 | 1/4 | 6/16 | 67 s | 1 of 6 |
+| 2: companions ×1.5, Sword reach, boss 24000 HP | 4/4 | 1/4 | 3/4 | 4/4 | 12/16 | 65 s | 3 of 12 |
+| 3: damage cap, 21000 HP, orbit cycle, Frost Nova rework | 2/4 | 4/4 | 3/4 | 3/4 | 12/16 | 100 s | 3 of 12 |
+| 4: Earth Shield 20, Ice Shield 10/45 (reverted to 12/50 below), Chain Lightning 14/180 | 2/4 | 3/4 | 2/4 | 3/4 | 10/16 | 103 s | 5 of 10 |
+
+Two checks on the round-4 values, Ice and Lightning only, seeds 5–12:
+
+- **Chain Lightning** (damage 12 → 14, `targetRange` 150 → 180): 4 of 7 runs it was
+  offered in, pooled with round 4 (was 1 of 6 over rounds 1–3).
+- **Ice Shield** at damage 10 / absorb 45 won 1 of 4; its only win took 289 s at the
+  boss. Partly reverted to damage 12 / absorb 50 and re-run on the same seeds: 3 of 5,
+  boss kills 95 / 145 / 188 s. Ice overall 4 of 8 in that 12/50 re-run; Ice Companion was in all
+  four Ice deaths.
+
+What moved the numbers:
+
+- **Boss HP alone could not fix kill time.** At 19000 and 24000 HP the burst builds
+  (Meteor, Fire Dragon, Tornado) still killed in 33–57 s while Earth ran 135–214 s:
+  HP moves both together (as the #387 section predicted). The per-second damage cap
+  (`BOSS_DAMAGE_CAP`: 200 dps in full, 10 % above it, on the run clock) brought the
+  burst builds to 87–124 s without slowing Earth, whose damage is many small hits.
+- **Orbit shields on a 5 s / 3 s cycle cost Earth at the boss** (191 s and 401 s in
+  round 3). Earth Shield damage 16 → 20 brought Earth to 112–152 s in round 4.
+- **Reach decides survival.** The bot holds the boss at 200–330 px and backs away from
+  crowds inside 320 px, so short-reach builds die early or stall; every stall was
+  flagged `suspectBot`.
+
+Limits: n = 4 per element per round; per-active win rates rest on 2–7 runs each. A
+pooled 40-run sweep on the final values is still owed before the next balance pass.
+The shipped Ice Shield values (12/50) were checked on Ice seeds 5–12 only, not in a
+full 16-run round. Final values are in `src/config/` and the Phase 2 spec tables.

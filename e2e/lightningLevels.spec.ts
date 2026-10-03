@@ -4,9 +4,9 @@ import {
   FORK,
   MAX_LIVE_COMPANION_STRIPS,
   MAX_LIVE_STORM_BOLTS,
-  MAX_LIVE_SWORD_ARC_STRIPS,
+  MAX_LIVE_SWORD_BURST_STRIPS,
   STORM_CELL,
-  SWORD_ARC,
+  SWORD_BURST,
   THUNDERBOLT,
   THUNDERCLAP,
   TORNADO_SPLIT,
@@ -76,8 +76,8 @@ interface Trace {
   stormViews: string[];
   /** The most companion arc and Thunderclap strips up in any one frame. */
   maxCompanionStrips: number;
-  /** The most sword arc strips up in any one frame. */
-  maxArcStrips: number;
+  /** The most sword burst strips up in any one frame. */
+  maxBurstStrips: number;
 }
 
 /** Everything a check reads, from one evaluate so the values come from one frame. */
@@ -174,7 +174,7 @@ async function record(page: Page): Promise<void> {
       maxStormBolts: 0,
       stormViews: [],
       maxCompanionStrips: 0,
-      maxArcStrips: 0,
+      maxBurstStrips: 0,
     };
     (window as unknown as { lightningTrace: Trace }).lightningTrace = trace;
     run.events.on('postupdate', () => {
@@ -198,7 +198,7 @@ async function record(page: Page): Promise<void> {
         }
         if (id === 'lightning_sword') {
           const sword = report as unknown as SwordLevelReport;
-          trace.maxArcStrips = Math.max(trace.maxArcStrips, sword.liveArcStrips);
+          trace.maxBurstStrips = Math.max(trace.maxBurstStrips, sword.liveBurstStrips);
         }
       }
     });
@@ -564,8 +564,11 @@ test('Lightning Sword level 2 has four blades on the ring, and its cuts are logg
       ),
     (read) => {
       const sword = reportOf<SwordLevelReport>(read, 'lightning_sword');
-      expect(read.live.find((l) => l.id === 'lightning_sword')?.live, 'blades on the ring').toBe(4);
-      expect(sword.arcCount, 'a level 2 blade arcs').toBe(0);
+      // Four blades while they are out, none while they recharge (#406).
+      expect(sword.blades, `blades on the ring while ${sword.phase}`).toBe(
+        sword.phase === 'out' ? 4 : 0,
+      );
+      expect(sword.burstCount, 'a level 2 blade bursts').toBe(0);
     },
   );
   const sword = reportOf<SwordLevelReport>(seen, 'lightning_sword');
@@ -575,53 +578,48 @@ test('Lightning Sword level 2 has four blades on the ring, and its cuts are logg
   expect(errors).toEqual([]);
 });
 
-test('Lightning Sword level 3 has five blades, and a cut arcs from the cutting blade to one or two enemies nearby', async ({
+test('Lightning Sword level 3 ends its uptime with each blade firing a chain burst of up to three enemies', async ({
   page,
 }) => {
   const errors = collectErrors(page);
-  // startAt=300: a crowd, so a cut has other enemies within 60 px of the blade (at 120 the first
-  // arc came 11-28 s into the run, a quarter of the cap).
+  // startAt=300: a crowd, so a blade has an enemy within 60 px when the blades vanish.
   await startLightningRun(page, 'lightning_sword:3', 'startAt=300');
   await record(page);
-  // The cause: a level 3 cut. The effect, in the same entry: an arc that left the
-  // cutting blade's own position and reached one or two enemies.
+  // The cause: the blades vanishing at level 3. The effect, in the same entry: a burst that left
+  // a blade's own position and reached one to three enemies, each link within 60 px.
   const seen = await until(
     page,
-    'a level 3 arc from the blade to 1 or 2 enemies',
+    'a level 3 burst from a blade to 1 to 3 enemies',
     (read) =>
-      reportOf<SwordLevelReport>(read, 'lightning_sword').arcs.some(
-        (a) => a.level === 3 && a.targets >= 1 && a.targets <= SWORD_ARC.jumps,
+      reportOf<SwordLevelReport>(read, 'lightning_sword').bursts.some(
+        (b) => b.level === 3 && b.targets >= 1 && b.targets <= 1 + SWORD_BURST.jumps,
       ),
     (read) => {
       const sword = reportOf<SwordLevelReport>(read, 'lightning_sword');
-      expect(read.live.find((l) => l.id === 'lightning_sword')?.live, 'blades on the ring').toBe(5);
-      for (const a of sword.arcs) {
-        expect(a.targets, 'enemies from one arc').toBeLessThanOrEqual(SWORD_ARC.jumps);
-        expect(
-          Math.hypot(a.from.x - a.blade.x, a.from.y - a.blade.y),
-          'arc leaves the blade',
-        ).toBeLessThanOrEqual(1);
-        expect(Math.abs(a.casterDistance - a.orbitRadius), 'blade on the ring').toBeLessThanOrEqual(
+      expect(sword.blades, `blades on the ring while ${sword.phase}`).toBe(
+        sword.phase === 'out' ? 4 : 0,
+      );
+      for (const b of sword.bursts) {
+        expect(b.targets, 'enemies from one burst').toBeLessThanOrEqual(1 + SWORD_BURST.jumps);
+        expect(Math.abs(b.casterDistance - b.orbitRadius), 'blade on the ring').toBeLessThanOrEqual(
           1,
         );
-        expect(a.linkDistances, 'one link per enemy').toHaveLength(a.targets);
-        for (const d of a.linkDistances)
-          expect(d, 'link length').toBeLessThanOrEqual(SWORD_ARC.range + 1e-6);
-        if (a.sinceLastArcS !== null) {
-          expect(a.sinceLastArcS, 'a blade arcs at most once per cooldown').toBeGreaterThanOrEqual(
-            SWORD_ARC.perBladeCooldownS - 0.02,
-          );
-        }
+        expect(b.linkDistances, 'one link per enemy').toHaveLength(b.targets);
+        for (const d of b.linkDistances)
+          expect(d, 'link length').toBeLessThanOrEqual(SWORD_BURST.range + 1e-6);
       }
-      expect(sword.liveArcStrips, 'arc strips up').toBeLessThanOrEqual(MAX_LIVE_SWORD_ARC_STRIPS);
-      expect(read.trace?.maxArcStrips ?? 0, 'most arc strips up in a frame').toBeLessThanOrEqual(
-        MAX_LIVE_SWORD_ARC_STRIPS,
+      expect(sword.liveBurstStrips, 'burst strips up').toBeLessThanOrEqual(
+        MAX_LIVE_SWORD_BURST_STRIPS,
       );
+      expect(
+        read.trace?.maxBurstStrips ?? 0,
+        'most burst strips up in a frame',
+      ).toBeLessThanOrEqual(MAX_LIVE_SWORD_BURST_STRIPS);
     },
   );
   const sword = reportOf<SwordLevelReport>(seen, 'lightning_sword');
   console.log(
-    `sword lv3 at run ${((seen.elapsedMs - 300_000) / 1000).toFixed(1)} s: cuts logged ${sword.cuts.length}, arcs ${sword.arcCount}, targets ${sword.arcs.map((a) => a.targets).join(',')}, peak strips ${seen.trace?.maxArcStrips}`,
+    `sword lv3 at run ${((seen.elapsedMs - 300_000) / 1000).toFixed(1)} s: cuts logged ${sword.cuts.length}, bursts ${sword.burstCount}, targets ${sword.bursts.map((b) => b.targets).join(',')}, peak strips ${seen.trace?.maxBurstStrips}`,
   );
   expect(errors).toEqual([]);
 });
@@ -653,7 +651,7 @@ test('the whole Lightning roster at level 3 holds every pool cap for 100 s and k
       const live = (id: RosterSpellId): number => read.live.find((l) => l.id === id)?.live ?? 0;
       expect(live('lightning'), 'bolts in the air').toBeLessThanOrEqual(MAX_LIVE_BOLTS);
       expect(live('lightning_chain'), 'chain strips').toBeLessThanOrEqual(MAX_SEGMENTS);
-      expect(live('lightning_sword'), 'blades').toBeLessThanOrEqual(5);
+      expect(live('lightning_sword'), 'blades').toBeLessThanOrEqual(4);
       const tornado = reportOf<TornadoLevelReport>(read, 'lightning_tornado');
       expect(tornado.liveStormBolts, 'storm bolts').toBeLessThanOrEqual(MAX_LIVE_STORM_BOLTS);
       const companion = reportOf<CompanionLevelReport>(read, 'lightning_companion');
@@ -661,8 +659,8 @@ test('the whole Lightning roster at level 3 holds every pool cap for 100 s and k
         MAX_LIVE_COMPANION_STRIPS,
       );
       const sword = reportOf<SwordLevelReport>(read, 'lightning_sword');
-      expect(sword.liveArcStrips, 'sword arc strips').toBeLessThanOrEqual(
-        MAX_LIVE_SWORD_ARC_STRIPS,
+      expect(sword.liveBurstStrips, 'sword burst strips').toBeLessThanOrEqual(
+        MAX_LIVE_SWORD_BURST_STRIPS,
       );
       expect(read.areas, 'ground areas').toBeLessThanOrEqual(MAX_LIVE_AREAS);
       expect(read.fx, 'effect bursts').toBeLessThanOrEqual(MAX_LIVE_FX);
@@ -670,7 +668,7 @@ test('the whole Lightning roster at level 3 holds every pool cap for 100 s and k
     },
   );
   console.log(
-    `roster lv3 over ${((seen.elapsedMs - (startMs ?? 0)) / 1000).toFixed(0)} s: fps ${seen.fps.toFixed(0)}, enemies ${seen.enemies}, peak fx ${worst.fx}, peak areas ${worst.areas}, storm dropped ${reportOf<TornadoLevelReport>(seen, 'lightning_tornado').stormBoltsDropped}, arcs ${reportOf<SwordLevelReport>(seen, 'lightning_sword').arcCount}`,
+    `roster lv3 over ${((seen.elapsedMs - (startMs ?? 0)) / 1000).toFixed(0)} s: fps ${seen.fps.toFixed(0)}, enemies ${seen.enemies}, peak fx ${worst.fx}, peak areas ${worst.areas}, storm dropped ${reportOf<TornadoLevelReport>(seen, 'lightning_tornado').stormBoltsDropped}, bursts ${reportOf<SwordLevelReport>(seen, 'lightning_sword').burstCount}`,
   );
   for (const id of [
     'lightning',

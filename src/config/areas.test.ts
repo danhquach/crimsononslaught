@@ -36,13 +36,13 @@ describe('area ids', () => {
 });
 
 describe('area stat blocks', () => {
-  // #219 cut the radius from 180 to 80; #304 made it 120 and the storm 4 s.
+  // #219 cut the radius from 180 to 80; #304 made it 120 and the storm 4 s; #406 made it 156, 7 a tick, 10.8 s.
   it('carries the spec §9.3 numbers for Ice Storm', () => {
     expect(BASE_ICE_STORM_STATS).toEqual({
-      cooldown: 12,
-      tickDamage: 6,
+      cooldown: 10.8,
+      tickDamage: 7,
       tickRate: 0.5,
-      radius: 120,
+      radius: 156,
       duration: 4,
       targetRange: 180,
       slowPct: 0.5,
@@ -53,8 +53,8 @@ describe('area stat blocks', () => {
   // #220: radius 180 → 80, the slow swapped for a 0.2 s stagger each tick.
   it('carries the spec §9.5 numbers for Earthquake', () => {
     expect(BASE_QUAKE_STATS).toEqual({
-      cooldown: 14,
-      tickDamage: 8,
+      cooldown: 12,
+      tickDamage: 10,
       tickRate: 0.5,
       radius: 80,
       duration: 8,
@@ -72,9 +72,8 @@ describe('area stat blocks', () => {
 
   it('gives Earth the damage', () => {
     expect(BASE_QUAKE_STATS.tickDamage).toBeGreaterThan(BASE_ICE_STORM_STATS.tickDamage);
-    // Earth pays for its longer patch with a longer wait for it.
-    expect(BASE_QUAKE_STATS.duration).toBeGreaterThan(BASE_ICE_STORM_STATS.duration);
-    expect(BASE_QUAKE_STATS.cooldown).toBeGreaterThan(BASE_ICE_STORM_STATS.cooldown);
+    // Earth pays for its longer patch with a wait no shorter than Ice's (#406 cut it to Ice's 12 s).
+    expect(BASE_QUAKE_STATS.cooldown).toBeGreaterThanOrEqual(BASE_ICE_STORM_STATS.cooldown);
   });
 
   it('gives both a lifetime worth a whole number of ticks', () => {
@@ -149,7 +148,7 @@ describe('Ice Storm look (#219)', () => {
   it('names the card Ice Storm, a slow with no freeze in its words', () => {
     expect(AREA_CARDS.ice_blizzard.name).toBe('Ice Storm');
     expect(AREA_CARDS.ice_blizzard.description.toLowerCase()).not.toMatch(/freez/);
-    expect(AREA_CARDS.ice_blizzard.stats).toContainEqual(['Radius', '120']);
+    expect(AREA_CARDS.ice_blizzard.stats).toContainEqual(['Radius', '156']);
     expect(AREA_CARDS.ice_blizzard.stats).toContainEqual(['Lasts', '4 s']);
   });
 

@@ -13,6 +13,8 @@ import {
 } from '../config/spellFields';
 import { BASE_EARTH_ROSTER_STATS } from '../config/earthRoster';
 import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
+import { BASE_SWORD_STATS } from '../config/lightningRoster';
+import { BASE_EARTH_SHIELD_STATS } from '../config/shields';
 import { BASE_SPELL_STATS } from '../config/spells';
 import { BASE_METEOR_STATS } from '../config/strikes';
 import { resolveProfile, resolveSpellStats, validateSpellFields } from './playerProfile';
@@ -196,6 +198,29 @@ describe('resolveSpellStats', () => {
     expect(out.damage).toBeCloseTo(11);
   });
 
+  // #406: a ring spell's uptime is a duration and its recharge a cooldown.
+  describe('ring cycle (#406)', () => {
+    const blocks = [
+      ['Lightning Sword', BASE_SWORD_STATS],
+      ['Earth Shield', BASE_EARTH_SHIELD_STATS],
+    ] as const;
+
+    it.each(blocks)('%s: Persistence stretches uptime, Haste shortens recharge', (_name, base) => {
+      const persistence = PASSIVES.find((p) => p.id === 'passive_persistence');
+      const long = resolveSpellStats(base, resolveProfile(ranks([['passive_persistence', 2]])));
+      expect(long.uptime).toBeCloseTo(base.uptime * (persistence?.amount ?? NaN) ** 2, 9);
+      expect(long.recharge).toBe(base.recharge);
+      const hasted = resolveSpellStats(base, resolveProfile(ranks([['passive_haste', 5]])));
+      expect(hasted.recharge).toBeCloseTo(base.recharge * 0.92 ** 5, 9);
+      expect(hasted.uptime).toBe(base.uptime);
+    });
+
+    it.each(blocks)('%s: no other passive moves the cycle', (_name, base) => {
+      const power = resolveSpellStats(base, resolveProfile(ranks([['passive_power', 3]])));
+      expect([power.uptime, power.recharge]).toEqual([base.uptime, base.recharge]);
+    });
+  });
+
   // CO-167 rework spec §4: each passive reaches exactly the Meteor fields it names.
   describe('Meteor (CO-167)', () => {
     const at = (id: string, rank: number) =>
@@ -212,7 +237,7 @@ describe('resolveSpellStats', () => {
       const out = at('passive_expanse', 3);
       expect(out.aoeRadius).toBeCloseTo(98.3, 1);
       expect(out.pondRadius).toBeCloseTo(63.2, 1);
-      expect(out.targetRange).toBeCloseTo(189 * 1.12 ** 3, 9);
+      expect(out.targetRange).toBeCloseTo(240 * 1.12 ** 3, 9);
       expect(out.pondDuration).toBe(BASE_METEOR_STATS.pondDuration);
     });
 
@@ -258,7 +283,7 @@ describe('resolveSpellStats', () => {
     it('hits harder with Power, icicles and burst alike', () => {
       const out = at('passive_power', 3);
       expect(out.icicleDamage).toBeCloseTo(14 * 1.1 ** 3, 9);
-      expect(out.damage).toBeCloseTo(24 * 1.1 ** 3, 9);
+      expect(out.damage).toBeCloseTo(28 * 1.1 ** 3, 9);
     });
 
     it('reaches further with Expanse', () => {
@@ -306,7 +331,9 @@ describe('validateSpellFields', () => {
     // Fire Wave's `arc` (#218), 47 since Earth Spike's `bleedChance` (#205),
     // 52 since Meteor's edge factor and pond (CO-167), 57 since Frost Nova Bomb's
     // throw interval, icicle count, damage, speed and range (CO-182).
-    expect(fields.length).toBe(57);
+    // 59 since a ring spell's `uptime` and `recharge` (#406), 56 since Ice
+    // Shield's ring dropped `breakDamage`, `breakRadius` and `rechargeDelay`.
+    expect(fields.length).toBe(56);
   });
 
   // CO-109 routes every equipped spell's block through the category map, so a

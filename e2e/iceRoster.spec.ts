@@ -132,18 +132,15 @@ test('Ice Arrow and Frost Nova Bomb land hits on a live crowd and hold their cap
 });
 
 /**
- * CO-182: the reworked bomb in a thick crowd — it spins as it rolls, every
- * flight's icicles land, and an armed bomb goes off on a group. The run's own
- * enemy mix: swarm alone (`?enemies=swarm`) dies to Ice Arrow in one hit, so it
- * left 0–3 enemies within the bomb's range and nothing to burst on.
- *
- * "Most bursts land on a group" is not asserted here: an invulnerable player
- * standing still is mobbed, so the crowd hugs the player and a bomb armed
- * 120 px out has left most of it behind (5–8 of 16 bursts on 3 or more, over
- * three runs). With a player that kites, the crowd trails it and 55–66% of
- * bursts catch 3 or more (`docs/tuning/phase2-balance.md`, CO-182).
+ * CO-182, #406: the reworked bomb in a thick crowd — it spins as it rolls,
+ * every flight's icicles land, and at level 1 nothing happens where the roll
+ * ends: all of its damage is icicles. The run's own enemy mix: swarm alone
+ * (`?enemies=swarm`) dies to Ice Arrow in one hit, so it left 0–3 enemies
+ * within the bomb's range.
  */
-test('Frost Nova Bomb rolls spinning, sprays icicles, and bursts on a group', async ({ page }) => {
+test('Frost Nova Bomb rolls spinning, sprays icicles, and deals no damage where its roll ends', async ({
+  page,
+}) => {
   const errors = collectErrors(page);
   await page.goto(
     `/?seed=1&timeScale=10&invulnerable=1&startAt=${GROUP_START_S}&loadout=ice_nova_bomb`,
@@ -167,25 +164,24 @@ test('Frost Nova Bomb rolls spinning, sprays icicles, and bursts on a group', as
     await page.waitForTimeout(SAMPLE_MS);
   }
 
-  const caught = bomb?.burstCaught ?? [];
-  const onGroups = caught.filter((n) => n >= 3).length;
-  // Recorded by the spell at each burst, not sampled: a flight is 150–300 ms of
+  const rollouts = bomb?.rollouts ?? 0;
+  // Recorded by the spell at each roll's end, not sampled: a flight is 150–300 ms of
   // wall clock here, and CI's sample rounds missed every one (CO-185).
-  const spun = bomb?.spunBursts ?? 0;
+  const spun = bomb?.spunRolls ?? 0;
   // Logged before the asserts, so a CI failure shows the spread it failed on.
   console.log(
-    `CO-182 bursts=${caught.length} onGroups=${onGroups} icicleHits=${bomb?.icicleHits} ` +
-      `spun=${spun} caught=[${caught.join(',')}]`,
+    `#406 rollouts=${rollouts} icicleHits=${bomb?.icicleHits} waveHits=${bomb?.waveHits} ` +
+      `hits=${bomb?.hits} spun=${spun}`,
   );
+  expect(rollouts, 'bombs that rolled out over the window').toBeGreaterThan(0);
+  expect(spun, 'rolls whose bomb turned in flight').toBe(rollouts);
   expect(bomb?.icicleHits, 'icicle hits over the window').toBeGreaterThan(0);
-  expect(caught.length, 'bursts over the window').toBeGreaterThan(0);
-  expect(spun, 'bursts whose bomb turned in flight').toBe(caught.length);
-  expect(onGroups, `bursts on >=3 enemies, of ${caught.length}`).toBeGreaterThan(0);
-  // Every flight rolls at least the arming distance, so each sprays: 5-7 hits a
-  // burst over three runs, well clear of one.
-  expect(
-    bomb?.icicleHits ?? 0,
-    `icicle hits against ${caught.length} bursts`,
-  ).toBeGreaterThanOrEqual(caught.length);
+  // Level 1: no wave, so the end of the roll hit nobody and every hit is an icicle's.
+  expect(bomb?.waveHits, 'wave hits at level 1').toBe(0);
+  expect(bomb?.hits, 'hits over the window, all icicles').toBe(bomb?.icicleHits);
+  // Every flight rolls its whole range (3 s, 11 throws), so each sprays: well clear of one hit a roll.
+  expect(bomb?.icicleHits ?? 0, `icicle hits against ${rollouts} rolls`).toBeGreaterThanOrEqual(
+    rollouts,
+  );
   expect(errors).toEqual([]);
 });

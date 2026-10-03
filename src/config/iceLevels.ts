@@ -34,49 +34,31 @@ export const SHATTER = {
  */
 export const MAX_LIVE_SHARDS = 24;
 
-/** Frost Nova Bomb level 3, Cluster: the burst rolls out `count` small urchins that burst in turn. */
-export const CLUSTER = {
-  count: 3,
-  speed: 200,
-  range: 150,
-  radiusFactor: 0.5,
-  damageFactor: 0.4,
-  clip: 'ice.urchin',
-  drawScale: 0.5,
-} as const;
+/**
+ * Frost Nova Bomb level 3, Frost wave: where its roll ends it releases a
+ * full-circle cold wave that grows from the bomb's core to its `radius` at
+ * `speed` px/s (`core/frostNova.ts`'s `rolledOut`, `core/fireWave.ts`'s wave
+ * with a half arc of pi). At 280 px/s the 110 px reach takes about 0.4 s, and
+ * a bomb throws every 3.5 s, so one wave is out at a time per bomb.
+ */
+export const NOVA_WAVE = { speed: 280 } as const;
 
 /**
- * About 2 are live at the Haste clamp (3 urchins, 0.75 s each, one bomb per
- * 1.2 s); 12 is the margin. The range is past the bomb's own radius (110) plus
- * the urchin's (55) reach in: an urchin that burst inside the disc the bomb
- * just emptied would have nothing to catch (probed at range 70: 1 of 16 bursts).
+ * Ice Shield level 3, Frost burst (#406): when the diamonds vanish, at the end
+ * of their uptime or on a broken pool, each one releases a small full-circle
+ * cold wave from where it hangs (`IceRingWave`, `core/fireWave.ts` with a half
+ * arc of pi). A wave grows to `range` at `speed` px/s, chills each enemy it
+ * sweeps over once (`slowPct` for `slowDuration` s, no freeze) and deals
+ * `damageFactor` x the diamond's damage. At 240 px/s the 60 px reach takes
+ * 0.25 s, so at most the ring's four waves are out at once.
  */
-export const MAX_LIVE_MINI_URCHINS = 12;
-
-/** Ice Shield level 2, Frost aura: while up, an enemy within `radius` of the body's edge is chilled every `tickEveryS`. */
-export const FROST_AURA = {
-  radius: 30,
-  tickEveryS: 0.25,
-  slowPct: 0.3,
-  slowDurationS: 0.5,
+export const ICE_SHIELD_WAVE = {
+  range: 60,
+  speed: 240,
+  damageFactor: 1.5,
+  slowPct: 0.4,
+  slowDuration: 1.5,
 } as const;
-
-/** Ice Shield level 3, Shatter ring: a break also fires `icicles` icicles out to `range` and freezes what it chills. */
-export const SHATTER_RING = {
-  icicles: 8,
-  damageFactor: 0.35,
-  speed: 320,
-  range: 260,
-  freezeS: 1,
-} as const;
-
-/**
- * Two rings of 8 at most: a break every 2.1 s at the Haste clamp, each icicle in
- * the air 0.81 s. The range is well past `breakRadius` (120) on purpose: the
- * break has already hit everything inside that, so a ring that stopped at 140
- * would have nothing left to hit (probed: 0 hits in 3 runs).
- */
-export const MAX_LIVE_SHIELD_ICICLES = 16;
 
 /** Ice Companion level 3, Frost orb: every `every`th attack's first shot freezes its target and chills its neighbours. */
 export const FROST_ORB = {
@@ -94,3 +76,13 @@ export const HAIL = { everyS: 1, damageFactor: 3, clip: 'ice.stormShard', drawSc
 
 /** Ice Storm level 3, Deep freeze: the patch's last paid tick freezes everything inside for `freezeS`. */
 export const DEEP_FREEZE = { freezeS: 1 } as const;
+
+/**
+ * Where the `ice.wave` frost ring sits in its cut frames (CO-227): the ring is
+ * drawn about the frame's anchor, and `outerRadius[i]` is the distance from it
+ * to frame `i`'s outer edge, in the frame's native px (the 95th percentile of
+ * its opaque pixels' distances, so stray snow flecks do not count). The spell
+ * scales the sprite by `radius / outerRadius[i]`. Frame 1 is the core burst
+ * only. `scripts/lib/iceWaveArt.test.mjs` re-measures all four from the atlas.
+ */
+export const ICE_WAVE_ART = { outerRadius: [12, 35, 52, 56] } as const;

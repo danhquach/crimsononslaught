@@ -16,7 +16,7 @@ import { TEXTURE_KEYS } from './colors';
 
 describe('boss stats (CO-050)', () => {
   it('match the spec §5 "Boss" table', () => {
-    expect(BOSS).toMatchObject({ hp: 14400, bars: 2, speed: 70, contactDamage: 30, radius: 40 });
+    expect(BOSS).toMatchObject({ hp: 21000, bars: 2, speed: 70, contactDamage: 30, radius: 40 });
   });
 
   it('cycle every 4 s: 0.8 s telegraph then a 0.6 s charge at 400 px/s', () => {
@@ -45,8 +45,8 @@ describe('boss crowd-control diminishing returns (#315)', () => {
 });
 
 describe('boss enrage (#388)', () => {
-  it('starts at half the last bar: 3600 of 14400 HP over two bars', () => {
-    expect((BOSS.hp / BOSS.bars) * BOSS_ENRAGE.atLastBarFraction).toBe(3600);
+  it('starts at half the last bar: 5250 of 21000 HP over two bars', () => {
+    expect((BOSS.hp / BOSS.bars) * BOSS_ENRAGE.atLastBarFraction).toBe(5250);
   });
 
   it('shortens the cycle by cutting the chase, which stays positive', () => {
