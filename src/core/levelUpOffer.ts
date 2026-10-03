@@ -30,9 +30,9 @@ import type { Rng } from './rng';
  *    actives, so a slot is always filled before anything else is handed out.
  * 2. Otherwise -> offer passives that are not at `maxRank` and whose
  *    `requiresStat`, if any, a casting spell carries, together with (#326) an
- *    upgrade for each casting spell below level 3 that has level text. Four
- *    passives never cap, so this pool never runs dry the way the Phase 1 perk
- *    trees did.
+ *    upgrade for each casting spell below level 3 that has level text. Every
+ *    passive caps (CO-229), but once one does the charge cards join this pool
+ *    and never cap, so it runs dry only if the run bans both of them.
  * 3. Neither pool has a card -> an empty offer, which `resolveLevelUp` answers
  *    with the silent +10 max HP instead of an overlay.
  *
@@ -78,8 +78,8 @@ export function offerableActives(loadout: Loadout, catalog: ActiveCatalog): Acti
 }
 
 /**
- * Passives below their `maxRank`; an uncapped passive is always eligible
- * (spec §5). A passive outside the shipped list — a test's own config — reads
+ * Passives below their `maxRank` (spec §5); one with no `maxRank` (none ship
+ * since CO-229) is always eligible. A passive outside the shipped list — a test's own config — reads
  * as rank 0, since only shipped ids can be in the loadout's map.
  *
  * A passive with a `requiresStat` is eligible only while `carried` holds that

@@ -143,9 +143,11 @@ describe('passives', () => {
       'fire_column',
       SLOT_3_LEVEL,
     );
-    for (let i = 0; i < 30; i++) loadout = takePassive(loadout, 'passive_power');
+    for (const id of ['passive_power', 'passive_haste', 'passive_vitality'] as const) {
+      for (let i = 0; i < 8; i++) loadout = takePassive(loadout, id);
+    }
     expect(isFull(loadout)).toBe(true);
-    expect(passiveRank(loadout, 'passive_power')).toBe(30);
+    expect(passiveRank(loadout, 'passive_vitality')).toBe(8);
   });
 
   it('stops a capped passive at its maxRank', () => {
