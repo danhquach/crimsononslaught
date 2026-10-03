@@ -23,6 +23,59 @@ and pad button. Every figure in this document is therefore a no-dash run and
 stays valid; a bot that dashes is a separate decision, and its runs would not be
 comparable with these.
 
+## The sweep tool (#407)
+
+The bot is now a committed tool, `scripts/sweep/`, so a balance sweep is one
+command instead of a scratch script. It changes no game code: it steers the
+`Player` by overriding its keyboard read, as above, and plays the level-up and
+spell-select screens by key.
+
+```
+npm run sweep -- --elements fire,ice --seeds 1-5 --sweeps 2 --out sweep-results/run.jsonl
+npm run sweep:summary -- sweep-results/run.jsonl
+```
+
+**Options.** `--elements` (default all four), `--seeds` (`1-5` or `1,3,7`,
+default 1–5, at most 100), `--sweeps N` (the whole set N times, default 1),
+`--port` (default 5190), `--loadout fire,fire_dragon:3` (the game's `?loadout=`
+switch), `--invulnerable` (`?invulnerable=1`), `--dash` (the bot dashes; off by
+default, because the figures here are no-dash runs), `--out` (a `.jsonl` file,
+default `sweep-results/runs.jsonl`, git-ignored). Every value is allow-listed, so
+a bad flag fails before a browser starts. Runs go at `timeScale=8`.
+
+**What it does.** Starts its own Vite server from the checkout, plays one run
+per element, seed and sweep in a fresh headless Chromium, and appends one JSON
+line per run: outcome (`win`, `death`, `stall-timeout`, `error`), time
+survived, boss kill time, levels, the final build, HP lost by source, minutes at
+the enemy cap, one sample per minute (live enemies, level, fps, boss HP), the
+commit, whether `src/` or `public/` had uncommitted changes (`dirty`), and the
+options. A run still alive at 40:00 is a stall.
+
+**Resume.** Rerunning the same command skips runs already finished under the
+same options **and on the same commit**; runs that ended in `error` are played
+again. A new commit, a changed option, or a record marked `dirty` (uncommitted
+changes in `src/` or `public/`) all play again, so a file never mixes builds
+under one resume. `dashes` in a record counts the dashes the bot queued.
+
+**Summary.** `sweep:summary` prints the run table, the group tables (all runs,
+per element, with and without a reach spell, per sweep), wins per extra active,
+and the death and frame-rate lines. It reproduces the #406 tables from that
+sweep's results file.
+
+**Known limits.**
+
+- The bot kites perfectly and never closes in, so it overstates survival for
+  kits that need to be near the crowd. Compare pooled sweeps of about 40 runs
+  (4 elements, 5 seeds, 2 sweeps); one sweep, or one seed, is noise.
+- `suspectBot` is set when the bot is level 5 or less at 10:00 (it is probably
+  stuck). It is a warning only; it does not change the outcome.
+- HP lost misses damage taken on the same step as a heal.
+- Run one sweep at a time, and in its own worktree: a second sweep or a test
+  run on the same machine slows the game and skews the frame-rate figures.
+- The bot reads game fields by name. A renamed or removed field stops the
+  sweep with `sweep: game field missing: <path>` rather than steering on
+  nothing; update `scripts/sweep/bot.mjs` to match.
+
 ## Ice roster viability (#141, 2026-09-22)
 
 Configs as merged with #141: Ice Arrow as the `ice` default, Frost Nova Bomb,
