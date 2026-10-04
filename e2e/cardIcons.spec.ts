@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import type Phaser from 'phaser';
+import { chargeById } from '../src/config/offerActions';
 import { SPELL_IDS } from '../src/config/spells';
+import { spellLevelCardId } from '../src/core/levelUp';
+import { chargeCard } from '../src/core/levelUpOffer';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import { cardCenter, collectErrors, startFromIntro, waitForScene } from './game';
@@ -213,7 +216,10 @@ const BUILD_OFFER = [
   { kind: 'relic', id: 'relic_bulwark', name: 'Bulwark', description: 'Guards.', rank: 1 },
 ] as const;
 
-async function openBuildOffer(page: Page): Promise<CardSample[]> {
+async function openBuildOffer(
+  page: Page,
+  offer: readonly object[] = BUILD_OFFER,
+): Promise<CardSample[]> {
   await page.goto('/?seed=1&invulnerable=1');
   await startFromIntro(page);
   await waitForScene(page, SCENE.spellSelect);
@@ -224,7 +230,7 @@ async function openBuildOffer(page: Page): Promise<CardSample[]> {
       const { game } = await import('/src/main.ts');
       game.scene.getScene(gameKey).scene.launch(levelUpKey, { offer });
     },
-    [SCENE.game, SCENE.levelUp, BUILD_OFFER] as const,
+    [SCENE.game, SCENE.levelUp, offer] as const,
   );
   await waitForScene(page, SCENE.levelUp);
   return sampleCards(page, SCENE.levelUp);
@@ -252,6 +258,68 @@ test('with no icon art, passive and relic level-up cards keep their text-only he
   await page.route('**/assets/atlas/props17.png', (route) => route.abort());
   const cards = await openBuildOffer(page);
   expect(cards.map((card) => card.icons)).toEqual(BUILD_OFFER.map(() => []));
-  for (const card of cards) expect(card.frame.bottom - card.frame.top).toBe(260);
+  for (const card of cards) expect(card.frame.bottom - card.frame.top).toBe(244);
   cards.forEach(expectLaidOut);
+});
+
+/**
+ * Every part but the corner hotkey and rank line sits on the card's centre
+ * line, and each card's name starts at the same height across the row.
+ */
+function expectCentredRow(cards: CardSample[], offer: readonly { name: string }[]): void {
+  expect(cards).toHaveLength(offer.length);
+  cards.forEach(expectLaidOut);
+  const nameTops = cards.map((card, i) => {
+    const centre = (card.frame.left + card.frame.right) / 2;
+    const corners = [`${i + 1}`];
+    const middle = card.parts.filter(
+      (part) => !corners.includes(part.what) && !/^(Rank|Lv) \d/.test(part.what),
+    );
+    // Name, kind and description at least; the icon too where it has one.
+    expect(middle.length, `card ${i + 1} parts`).toBeGreaterThanOrEqual(3);
+    for (const part of middle) {
+      expect(Math.abs((part.left + part.right) / 2 - centre), `${part.what} centred`).toBeLessThan(
+        1.5,
+      );
+    }
+    const name = card.parts.find((part) => part.what === offer[i]?.name);
+    expect(name, `card ${i + 1} name`).toBeDefined();
+    return name!.top;
+  });
+  expect(new Set(nameTops).size, `name tops ${nameTops.join(', ')}`).toBe(1);
+}
+
+test('passive, charge and relic cards centre alike, and the icon-less charge keeps the band', async ({
+  page,
+}) => {
+  const charge = chargeById('charge_levelup_ban');
+  if (!charge) throw new Error('charge_levelup_ban missing');
+  const offer = [BUILD_OFFER[1], chargeCard(charge), BUILD_OFFER[2]];
+  const cards = await openBuildOffer(page, offer);
+  expect(cards.map((card) => card.icons.length)).toEqual([1, 0, 1]);
+  // The icon row's height on every card, the charge's included.
+  for (const card of cards) expect(card.frame.bottom - card.frame.top).toBe(310);
+  expectCentredRow(cards, offer);
+});
+
+test('new-spell and MAX upgrade cards centre alike, the icon clear of the rank line', async ({
+  page,
+}) => {
+  const [first, second] = SPELL_IDS;
+  const offer = [
+    { kind: 'active', id: second, name: 'New one', description: 'A new spell.' },
+    {
+      kind: 'upgrade',
+      id: spellLevelCardId(first),
+      name: 'Upgrade',
+      description: 'Its last level.',
+      rank: 3,
+      maxRank: 3,
+    },
+  ] as const;
+  const cards = await openBuildOffer(page, offer);
+  expect(cards.map((card) => card.icons.length)).toEqual([1, 1]);
+  expect(cards[1]?.parts.some((part) => part.what === 'Lv 3/3 · MAX')).toBe(true);
+  // `expectLaidOut` inside: the wide MAX rank line never runs over the centred icon.
+  expectCentredRow(cards, offer);
 });
