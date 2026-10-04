@@ -31,6 +31,7 @@ import {
   NO_SKILLS,
   phaseLengthS,
   summonCount,
+  summonPack,
   volleyBoltDirections,
   type BossImmunePayload,
   type BossPhasePayload,
@@ -384,6 +385,8 @@ const QUAKE_LEVEL_STREAM = 'quakeLevelPicks';
  * its own, so its rolls never move a seed's spawns, offers or drops.
  */
 const BOSS_SKILL_STREAM = 'bossSkills';
+/** The types of the boss's summoned pack only (CO-231), so a pack never moves another stream's draws. */
+const BOSS_SUMMON_STREAM = 'bossSummonPack';
 
 const SUMMON_BLOCKED: ReadonlySet<BossSkillId> = new Set(['summon']);
 
@@ -457,7 +460,13 @@ export class GameScene extends Phaser.Scene {
     summons: number;
     spawned: number;
     dropped: number;
-    log: { atS: number; enraged: boolean; liveBefore: number; spawned: number }[];
+    log: {
+      atS: number;
+      enraged: boolean;
+      liveBefore: number;
+      spawned: number;
+      types: EnemyType[];
+    }[];
   } = { summons: 0, spawned: 0, dropped: 0, log: [] };
   /** CO-224: summons landed this step, spawned after the physics step like splits. */
   private pendingSummons: BossSummonPayload[] = [];
@@ -509,6 +518,8 @@ export class GameScene extends Phaser.Scene {
   private quakeLevelRng!: Rng;
   /** The boss's distance-weighted skill picks only (CO-223); see `BOSS_SKILL_STREAM`. */
   private bossSkillRng!: Rng;
+  /** Summon pack types only (CO-231); see `BOSS_SUMMON_STREAM`. */
+  private summonRng!: Rng;
   private run!: RunState;
   /** Every active this run is casting (CO-109), each on its own cooldown. */
   private spells!: Spellbook;
@@ -740,8 +751,16 @@ export class GameScene extends Phaser.Scene {
       summons: number;
       spawned: number;
       dropped: number;
-      log: { atS: number; enraged: boolean; liveBefore: number; spawned: number }[];
+      log: {
+        atS: number;
+        enraged: boolean;
+        liveBefore: number;
+        spawned: number;
+        types: EnemyType[];
+      }[];
       liveSummoned: number;
+      /** CO-231: every live pack member, splitlings included. */
+      pack: { type: EnemyType; elite: boolean }[];
       readyInS: number;
       circlesVisible: number;
       points: { x: number; y: number }[];
@@ -789,8 +808,11 @@ export class GameScene extends Phaser.Scene {
       },
       summon: {
         ...this.summonTally,
-        log: [...this.summonTally.log],
+        log: this.summonTally.log.map((line) => ({ ...line, types: [...line.types] })),
         liveSummoned: this.enemies.liveSummoned,
+        pack: this.enemies.live
+          .filter((enemy) => enemy.isSummoned)
+          .map((enemy) => ({ type: enemy.enemyType, elite: enemy.isElite })),
         readyInS: boss.readyInS('summon'),
         circlesVisible: this.bossSummonFx.circlesVisible,
         points: boss.lockedSummonPoints.map(({ x, y }) => ({ x, y })),
@@ -1367,11 +1389,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Test hook (CO-224): every live summoned enemy dies through the real damage
-   * path, gems and all. Returns how many were killed.
+   * Test hook (CO-224): every live summoned enemy (CO-231: of `type` only, when
+   * given) dies through the real damage path, gems and all. Returns how many were killed.
    */
-  killSummonedForTest(): number {
-    const pack = this.enemies.live.filter((enemy) => enemy.isSummoned);
+  killSummonedForTest(type?: EnemyType): number {
+    const pack = this.enemies.live.filter(
+      (enemy) => enemy.isSummoned && (type === undefined || enemy.enemyType === type),
+    );
     for (const enemy of pack) this.damageEnemy(enemy, enemy.remainingHp, 'tick', undefined, false);
     return pack.length;
   }
@@ -1513,6 +1537,7 @@ export class GameScene extends Phaser.Scene {
     this.spikeLevelRng = createRng(deriveSeed(seed, SPIKE_LEVEL_STREAM));
     this.quakeLevelRng = createRng(deriveSeed(seed, QUAKE_LEVEL_STREAM));
     this.bossSkillRng = createRng(deriveSeed(seed, BOSS_SKILL_STREAM));
+    this.summonRng = createRng(deriveSeed(seed, BOSS_SUMMON_STREAM));
     this.run = new RunState(this.events, this.timeScale(), this.startAt());
     // The arena is stepped from `update`, not by Arcade's own clock: every
     // simulation step runs the game logic and then one physics step of the same
@@ -2569,7 +2594,14 @@ export class GameScene extends Phaser.Scene {
     if (enemy.enemyType === 'exploder') this.detonate(x, y, enemy.hitScale);
     else if (enemy.enemyType === 'splitter') {
       const { child, count, spread } = SPLITTER_SPLIT;
-      this.splits.push({ type: child, at: { x, y }, count, spread, scale: enemy.waveScale });
+      this.splits.push({
+        type: child,
+        at: { x, y },
+        count,
+        spread,
+        scale: enemy.waveScale,
+        summoned: enemy.isSummoned,
+      });
     }
   }
 
@@ -2628,16 +2660,11 @@ export class GameScene extends Phaser.Scene {
     for (const { points, atS } of landed) {
       const liveBefore = this.enemies.liveSummoned;
       const count = summonCount(liveBefore, MAX_LIVE_ENEMIES - this.enemies.liveCount);
+      const types = summonPack(this.summonRng, count);
       let spawned = 0;
-      for (const at of points.slice(0, count)) {
-        const enemy = this.enemies.spawn(
-          BOSS_SUMMON.type,
-          at.x,
-          at.y,
-          BOSS_SUMMON.scale,
-          false,
-          true,
-        );
+      for (const [i, at] of points.slice(0, count).entries()) {
+        const type = types[i] as EnemyType;
+        const enemy = this.enemies.spawn(type, at.x, at.y, BOSS_SUMMON.scale, false, true);
         if (!enemy) break;
         this.bossSummonFx.burst(at, spawned);
         spawned += 1;
@@ -2650,6 +2677,7 @@ export class GameScene extends Phaser.Scene {
         enraged: this.enemies.boss?.isEnraged ?? false,
         liveBefore,
         spawned,
+        types: types.slice(0, spawned),
       });
     }
   }
@@ -2670,12 +2698,18 @@ export class GameScene extends Phaser.Scene {
     tally.log.push({ atS, chargesBefore: this.enemies.boss?.chargesForTest ?? 0, hit, hpLost });
   }
 
-  /** #126: spawn the children every split this step owes; one past the live cap is dropped. */
+  /**
+   * #126: spawn the children every split this step owes; one past the live cap
+   * is dropped. CO-231: a summoned splitter's children are summoned too, and one
+   * past the pack cap is dropped, so a pack never splits past `maxLive`.
+   */
   private releaseSplits(): void {
     if (this.splits.length === 0) return;
     const { spawned, dropped } = flushSplits(
       this.splits,
-      (type, at, scale) => this.enemies.spawn(type, at.x, at.y, scale) !== null,
+      (type, at, scale, summoned) =>
+        (!summoned || this.enemies.liveSummoned < BOSS_SUMMON.maxLive) &&
+        this.enemies.spawn(type, at.x, at.y, scale, false, summoned) !== null,
     );
     this.blastSplitTally.children += spawned;
     this.blastSplitTally.dropped += dropped;

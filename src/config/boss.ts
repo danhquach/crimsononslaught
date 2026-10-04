@@ -1,4 +1,5 @@
 import type { TextureKey } from './colors';
+import type { EnemyType } from './enemies';
 import type { FrameName } from './frames';
 import { WAVES } from './waves';
 
@@ -216,14 +217,17 @@ const LAST_FIGHT_WAVE = [...WAVES].reverse().find((wave) => wave.types.length > 
 /**
  * Summon (CO-224): the boss stops for `windupS`, and `circleRadius`-px circles
  * show on the floor in a ring of `ringRadius` px round it, `packSize` of them,
- * the first along the aim locked as the wind-up began. As it lands a Swarm
- * enemy spawns at each circle. The pack is capped: at most `maxLive` summoned
- * enemies alive at once, so a landing tops the pack up to the cap rather than
- * past it, and while the cap is full the boss draws another skill. Summoned
- * enemies drop XP gems only, no Embers or consumables. They are scaled as the
- * last wave row of the schedule scales its enemies (`scale`), read from
- * `WAVES` so the pack keeps pace with the table. No RNG. `cooldownS` keeps the
- * next summon 14 s from the wind-up's start.
+ * the first along the aim locked as the wind-up began. As it lands an enemy
+ * spawns at each circle, its type drawn from `types` with equal weights on the
+ * run's seeded summon stream (CO-231), at most `maxHeavy` of the `heavy` types
+ * a landing, so a pack of Tanks can't wall the arena. Never an elite. The pack
+ * is capped: at most `maxLive` summoned enemies alive at once, so a landing tops
+ * the pack up to the cap rather than past it, and while the cap is full the
+ * boss draws another skill. A summoned splitter's splitlings join the pack and
+ * count toward the cap. Summoned enemies drop XP gems only, no Embers or
+ * consumables. They are scaled as the last wave row of the schedule scales its
+ * enemies (`scale`), read from `WAVES` so the pack keeps pace with the table.
+ * `cooldownS` keeps the next summon 14 s from the wind-up's start.
  */
 export const BOSS_SUMMON = {
   windupS: 1.0,
@@ -233,7 +237,16 @@ export const BOSS_SUMMON = {
   maxLive: 10,
   ringRadius: 110,
   circleRadius: 22,
-  type: 'swarm',
+  types: [
+    'fast',
+    'tank',
+    'ranged',
+    'exploder',
+    'splitter',
+    'shielded',
+  ] as const satisfies readonly EnemyType[],
+  heavy: ['tank', 'shielded'] as const satisfies readonly EnemyType[],
+  maxHeavy: 2,
   scale: { hpMul: LAST_FIGHT_WAVE.hpMul, damageMul: LAST_FIGHT_WAVE.damageMul },
 } as const;
 
