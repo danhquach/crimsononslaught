@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { BOSS, BOSS_SUMMON } from '../src/config/boss';
 import { SPELL_IDS } from '../src/config/spells';
-import { enrageThresholdHp } from '../src/core/boss';
+import { enrageThresholdHp, summonPack } from '../src/core/boss';
+import { createRng, deriveSeed } from '../src/core/rng';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import {
@@ -14,10 +15,12 @@ import {
 } from './game';
 
 /**
- * CO-224 in the browser: from the second bar the boss may call a pack of Swarm
+ * CO-224 in the browser: from the second bar the boss may call a pack of
  * enemies round itself (a 1 s wind-up with a circle where each one will
  * appear), at most `maxLive` of the pack alive, a summon at least 14 s of boss
- * time after the last, and the pack drops XP gems and nothing else. The run
+ * time after the last, and the pack drops XP gems and nothing else. CO-231:
+ * the pack is a seeded mix of the higher tiers, never elite, and a summoned
+ * splitter's splitlings join the pack under its cap. The run
  * starts a second short of the boss (`?startAt=`) at `?timeScale=4`. Every
  * sample reads all it needs in one `evaluate`; spacing is read from the boss's
  * own clock. The hero is kept far from the boss where a test must keep the
@@ -28,6 +31,11 @@ const START_AT_S = 1199;
 const SCALE = '&timeScale=4&invulnerable=1';
 
 type Report = NonNullable<GameScene['bossReport']>;
+
+/** A fresh copy of the run's summon stream for `?seed=1` (CO-231); the label is `BOSS_SUMMON_STREAM` in GameScene. */
+function seed1Packs(): ReturnType<typeof createRng> {
+  return createRng(deriveSeed(1, 'bossSummonPack'));
+}
 
 async function startRun(page: Page, query = SCALE): Promise<void> {
   await page.goto(`/?seed=1&startAt=${START_AT_S}${query}`);
@@ -125,14 +133,15 @@ test('a summon shows circles where the pack appears, then the pack lands there',
 }) => {
   const errors = collectErrors(page);
   await startRun(page);
-  await forceSummon(page, 300);
+  // Far off, so the hero's spells never reach the pack (Fast closes 300 px within a sample).
+  await forceSummon(page, 1000);
   let seenCircles = 0;
   let windupSamples = 0;
   const bad: string[] = [];
   let last: Report | null = null;
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
-    last = await sample(page, 300);
+    last = await sample(page, 1000);
     if (!last) break;
     if (last.phase === 'windup' && last.skill === 'summon') {
       windupSamples += 1;
@@ -165,6 +174,11 @@ test('a summon shows circles where the pack appears, then the pack lands there',
   expect(last?.summon.log[0]).toMatchObject({ liveBefore: 0, spawned: BOSS_SUMMON.packSize });
   expect(last?.summon.spawned).toBe(BOSS_SUMMON.packSize);
   expect(last?.summon.liveSummoned).toBe(BOSS_SUMMON.packSize);
+  // CO-231: the seed's first pack, drawn on the summon stream alone, and none an elite.
+  const firstPack = summonPack(seed1Packs(), BOSS_SUMMON.packSize);
+  expect(last?.summon.log[0]?.types).toEqual(firstPack);
+  expect(last?.summon.pack.map((m) => m.type).sort()).toEqual([...firstPack].sort());
+  expect(last?.summon.pack.some((m) => m.elite)).toBe(false);
   expect(last?.summon.circlesVisible).toBe(0);
   expect(sounds).toHaveLength(last?.summon.summons ?? -1);
   expect(errors).toEqual([]);
@@ -263,14 +277,21 @@ test('the pack drops XP gems and no Embers or consumables', async ({ page }) => 
     const { game } = await import('/src/main.ts');
     const g = game.scene.getScene(scene.game) as GameScene;
     const before = { ...g.pickupReport, xp: { ...g.xpReport } };
+    const types = g.bossReport?.summon.pack.map((m) => m.type) ?? [];
     const killed = g.killSummonedForTest();
     const after = { ...g.pickupReport, xp: { ...g.xpReport } };
-    return { before, killed, after };
+    return { before, types, killed, after };
   }, SCENE);
-  const { before, after, killed } = result;
+  const { before, after, killed, types } = result;
+  // CO-231: a Tank drops 3 gems, the rest 1 (splitlings none, but none is in a fresh pack).
+  const gems = types.reduce(
+    (n, type) => n + (type === 'tank' ? 3 : type === 'splitling' ? 0 : 1),
+    0,
+  );
   console.log(
     'killed',
     killed,
+    JSON.stringify(types),
     'gems',
     before.gems,
     '->',
@@ -285,7 +306,8 @@ test('the pack drops XP gems and no Embers or consumables', async ({ page }) => 
     after.embers,
   );
   expect(killed).toBeGreaterThan(0);
-  expect(after.gems - before.gems).toBe(killed);
+  expect(types).toHaveLength(killed);
+  expect(after.gems - before.gems).toBe(gems);
   expect(after.drops).toBe(before.drops);
   expect(after.embers).toBe(before.embers);
   expect(after.consumables).toBe(before.consumables);
@@ -304,6 +326,76 @@ test('the pack drops XP gems and no Embers or consumables', async ({ page }) => 
       { timeout: 10_000 },
     )
     .toBeGreaterThan(key(before.xp));
+  expect(errors).toEqual([]);
+});
+
+test('a summoned splitter splits into the pack, and the pack cap holds the children', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const errors = collectErrors(page);
+  // Real time, so the pack (Fast included) is still far from the hero two summons in.
+  await startRun(page, '&invulnerable=1');
+  // Two summons, nothing killed: the pack is seed 1's first two draws, 10 with a splitter in it.
+  const stream = seed1Packs();
+  const expected = [
+    ...summonPack(stream, BOSS_SUMMON.packSize),
+    ...summonPack(stream, BOSS_SUMMON.packSize),
+  ];
+  expect(expected, 'seed 1 no longer draws a splitter in its first two packs').toContain(
+    'splitter',
+  );
+  let s: Report | null = null;
+  for (let i = 1; i <= 2; i += 1) {
+    await forceSummon(page, 1000);
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      s = await sample(page, 1000);
+      if ((s?.summon.summons ?? 0) >= i) break;
+      await page.waitForTimeout(50);
+    }
+  }
+  const full = s?.summon;
+  console.log('full pack', JSON.stringify(full?.pack));
+  expect(full?.liveSummoned).toBe(BOSS_SUMMON.maxLive);
+  expect(full?.pack.map((m) => m.type).sort()).toEqual([...expected].sort());
+  const splitters = expected.filter((type) => type === 'splitter').length;
+
+  // Kill only the splitters: each frees one place in the pack and owes 3 children.
+  const before = await page.evaluate(async (scene) => {
+    const { game } = await import('/src/main.ts');
+    const g = game.scene.getScene(scene.game) as GameScene;
+    const split = g.blastSplitReport;
+    const killed = g.killSummonedForTest('splitter');
+    return { killed, children: split.children, dropped: split.dropped };
+  }, SCENE);
+  expect(before.killed).toBe(splitters);
+  let after: { children: number; dropped: number; report: Report | null } | null = null;
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    after = await page.evaluate(async (scene) => {
+      const { game } = await import('/src/main.ts');
+      const g = game.scene.getScene(scene.game) as GameScene;
+      const { children, dropped } = g.blastSplitReport;
+      return { children, dropped, report: g.bossReport };
+    }, SCENE);
+    if (after.children + after.dropped > before.children + before.dropped) break;
+    await page.waitForTimeout(50);
+  }
+  const pack = after?.report?.summon.pack ?? [];
+  console.log(
+    'after split',
+    JSON.stringify(pack),
+    'split tally',
+    JSON.stringify(after),
+    JSON.stringify(before),
+  );
+  // The children took the places the splitters left, and the rest were dropped, not queued.
+  expect((after?.children ?? 0) - before.children).toBe(before.killed);
+  expect((after?.dropped ?? 0) - before.dropped).toBe(2 * before.killed);
+  expect(after?.report?.summon.liveSummoned).toBe(BOSS_SUMMON.maxLive);
+  expect(pack.filter((m) => m.type === 'splitling')).toHaveLength(before.killed);
+  expect(pack.some((m) => m.elite)).toBe(false);
   expect(errors).toEqual([]);
 });
 

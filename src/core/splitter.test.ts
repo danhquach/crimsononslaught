@@ -67,6 +67,27 @@ describe('flushSplits', () => {
     // Nothing owed comes back on the next flush.
     expect(flushSplits(queue, () => true)).toEqual({ spawned: 0, dropped: 0 });
   });
+
+  it('tells the spawner which splits came from a summoned splitter (CO-231)', () => {
+    const queue = [split({ summoned: true, count: 2 }), split({ count: 1 })];
+    const flags: boolean[] = [];
+    flushSplits(queue, (_type, _at, _scale, summoned) => {
+      flags.push(summoned);
+      return true;
+    });
+    expect(flags).toEqual([true, true, false]);
+  });
+
+  it('drops a summoned splitter’s children past the pack cap (CO-231)', () => {
+    let pack = 9;
+    const result = flushSplits([split({ summoned: true })], (_t, _a, _s, summoned) => {
+      if (summoned && pack >= 10) return false;
+      pack++;
+      return true;
+    });
+    expect(result).toEqual({ spawned: 1, dropped: 2 });
+    expect(pack).toBe(10);
+  });
 });
 
 describe('the splitter tuning (#126)', () => {

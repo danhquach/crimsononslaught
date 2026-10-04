@@ -18,6 +18,8 @@ export interface Split {
   readonly count: number;
   readonly spread: number;
   readonly scale: Readonly<WaveScale>;
+  /** CO-231: the splitter was a boss's pack member, so its children join the pack. */
+  readonly summoned?: boolean;
 }
 
 /**
@@ -35,19 +37,25 @@ export function splitSpawns(at: Readonly<Vec2>, count: number, spread: number): 
 
 /**
  * Spawn every child the queued splits owe, in order, through `spawn`, which
- * answers whether the child landed. One that does not (the live cap is
- * reached) is dropped, not retried: a crowd at the cap cannot be made bigger
- * by killing splitters in it. The queue is emptied either way.
+ * answers whether the child landed. One that does not (the live cap, or the
+ * boss's pack cap for a summoned splitter's, is reached) is dropped, not
+ * retried: a crowd at the cap cannot be made bigger by killing splitters in
+ * it. The queue is emptied either way.
  */
 export function flushSplits(
   queue: Split[],
-  spawn: (type: EnemyType, at: Readonly<Vec2>, scale: Readonly<WaveScale>) => boolean,
+  spawn: (
+    type: EnemyType,
+    at: Readonly<Vec2>,
+    scale: Readonly<WaveScale>,
+    summoned: boolean,
+  ) => boolean,
 ): { spawned: number; dropped: number } {
   let spawned = 0;
   let dropped = 0;
   for (const split of queue.splice(0)) {
     for (const at of splitSpawns(split.at, split.count, split.spread)) {
-      if (spawn(split.type, at, split.scale)) spawned++;
+      if (spawn(split.type, at, split.scale, split.summoned ?? false)) spawned++;
       else dropped++;
     }
   }

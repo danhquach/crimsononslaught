@@ -112,9 +112,24 @@ describe('boss ground slam (CO-222)', () => {
       maxLive: 10,
       ringRadius: 110,
       circleRadius: 22,
-      type: 'swarm',
+      maxHeavy: 2,
     });
     expect(BOSS_SUMMON.packSize).toBeLessThanOrEqual(BOSS_SUMMON.maxLive);
+  });
+
+  it('summon (CO-231): calls the higher tiers, Tank and Shielded the heavy ones', () => {
+    expect([...BOSS_SUMMON.types]).toEqual([
+      'fast',
+      'tank',
+      'ranged',
+      'exploder',
+      'splitter',
+      'shielded',
+    ]);
+    expect([...BOSS_SUMMON.heavy]).toEqual(['tank', 'shielded']);
+    for (const type of BOSS_SUMMON.heavy) expect(BOSS_SUMMON.types).toContain(type);
+    // At least one light type, or a landing past the heavy cap has nothing to pick.
+    expect(BOSS_SUMMON.types.length - BOSS_SUMMON.heavy.length).toBeGreaterThan(0);
   });
 
   it('summon scales the pack as the last fighting wave row does', () => {

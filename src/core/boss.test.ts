@@ -26,6 +26,7 @@ import {
   startBossCycle,
   stepBossCycle,
   summonCount,
+  summonPack,
   summonPoints,
   type BossCycle,
   volleyBoltDirections,
@@ -761,6 +762,52 @@ describe('boss summon (CO-224)', () => {
     expect(summonCount(0, 2)).toBe(2);
     expect(summonCount(0, 0)).toBe(0);
     expect(summonCount(0, -3)).toBe(0);
+  });
+
+  it('draws the pack from the higher tiers, never Swarm or a splitling (CO-231)', () => {
+    const rng = createRng(7);
+    const seen = new Set<string>();
+    for (let i = 0; i < 400; i += 1) for (const type of summonPack(rng, 5)) seen.add(type);
+    expect([...seen].sort()).toEqual([...BOSS_SUMMON.types].sort());
+    expect(seen.has('swarm')).toBe(false);
+    expect(seen.has('splitling')).toBe(false);
+  });
+
+  it('puts at most 2 Tanks and Shielded together in a landing (CO-231)', () => {
+    const rng = createRng(3);
+    const heavy = new Set<string>(BOSS_SUMMON.heavy);
+    let full = 0;
+    for (let i = 0; i < 2000; i += 1) {
+      const n = summonPack(rng, 5).filter((type) => heavy.has(type)).length;
+      expect(n).toBeLessThanOrEqual(BOSS_SUMMON.maxHeavy);
+      if (n === BOSS_SUMMON.maxHeavy) full += 1;
+    }
+    // The cap is reached, not just never hit by chance.
+    expect(full).toBeGreaterThan(0);
+  });
+
+  it('weights the light types equally (CO-231)', () => {
+    const rng = createRng(5);
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < 4000; i += 1)
+      for (const type of summonPack(rng, 1)) counts[type] = (counts[type] ?? 0) + 1;
+    const share = 4000 / BOSS_SUMMON.types.length;
+    for (const type of BOSS_SUMMON.types)
+      expect(Math.abs((counts[type] ?? 0) - share)).toBeLessThan(share * 0.15);
+  });
+
+  it('replays the same pack from the same seed, one draw a member (CO-231)', () => {
+    const a = createRng(42);
+    const b = createRng(42);
+    expect(summonPack(a, 5)).toEqual(summonPack(b, 5));
+    expect(summonPack(createRng(1), 0)).toEqual([]);
+    const c = createRng(9);
+    summonPack(c, 3);
+    const d = createRng(9);
+    d.next();
+    d.next();
+    d.next();
+    expect(c.next()).toBe(d.next());
   });
 
   it('keeps the pack under the cap whatever the kills: two summons on a full cap add nothing', () => {

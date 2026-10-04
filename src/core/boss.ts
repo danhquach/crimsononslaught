@@ -12,7 +12,9 @@ import {
   BOSS_VOLLEY,
   type BossSkillId,
 } from '../config/boss';
+import type { EnemyType } from '../config/enemies';
 import type { Vec2 } from './enemy';
+import type { Rng } from './rng';
 
 /**
  * Boss rules that do not need an engine (spec §5 "Boss"): the charge cycle —
@@ -361,6 +363,25 @@ export function summonPoints(
  */
 export function summonCount(liveSummoned: number, poolRoom: number): number {
   return Math.max(0, Math.min(BOSS_SUMMON.packSize, BOSS_SUMMON.maxLive - liveSummoned, poolRoom));
+}
+
+/**
+ * The types of a summon's `count` pack members, in ring order (CO-231): each an
+ * equal-weight pick from `BOSS_SUMMON.types`, the heavy ones left out once
+ * `maxHeavy` of them are in. One draw on `rng` a member, so a seed replays it.
+ */
+export function summonPack(rng: Rng, count: number): EnemyType[] {
+  const { types, heavy, maxHeavy } = BOSS_SUMMON;
+  const isHeavy = (type: EnemyType): boolean => (heavy as readonly EnemyType[]).includes(type);
+  const light = types.filter((type) => !isHeavy(type));
+  const out: EnemyType[] = [];
+  let heavies = 0;
+  for (let i = 0; i < count; i += 1) {
+    const type = rng.pick(heavies < maxHeavy ? types : light);
+    if (isHeavy(type)) heavies += 1;
+    out.push(type);
+  }
+  return out;
 }
 
 /** Scale that makes a warning sprite `artW` px wide span the slam's diameter (CO-222). */
