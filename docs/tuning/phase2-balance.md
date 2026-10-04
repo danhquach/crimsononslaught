@@ -1115,3 +1115,32 @@ sweep 1: the same 20 element-seed jobs.
 Limits: 20 runs a side, n = 5 per element; the ticket asked for a pooled 40. The
 Earth boss-kill signal rests on 3 runs, but every one was slow; it needs its own
 check (Earth seeds 6–15 with the caps) before Earth is tuned: [#417](https://github.com/danhquach/crimsononslaught/issues/417).
+
+# Boss chase speed (CO-230, 2026-10-03)
+
+The boss chased at 70 px/s (91 enraged) against the hero's 180, so walking away
+kept it off. Chase speed 70 → 140 (182 enraged); the charge (400) and every skill
+are unchanged. Measured with `npm run sweep`: seeds 1–5 per element, one sweep, 20
+runs a side, one run at a time at `timeScale=8`, mortal, no dash. Baseline is `main`
+at 6dc3684.
+
+| Arm | Fire | Ice | Lightning | Earth | Wins | Boss fights won | Median boss kill (range) | Wins hit by slam · volley |
+|---|---|---|---|---|---|---|---|---|
+| 70 px/s (`main`) | 2/5 | 3/5 | 3/5 | 4/5 | 12/20 | 12 of 12 | 106 s (94–712) | 0 · 3 of 12 |
+| **140 px/s** | 2/5 | 5/5 | 1/5 | 3/5 | 11/20 | 11 of 12 | **101 s (84–262)** | 0 · 0 of 11 |
+
+- **Boss kill time held:** 101 s median, inside 90–180 s. One Earth kill took 262 s
+  (main had one at 712 s).
+- **Win rate held:** 16 of the 17 deaths came before 20:00, where the boss is not
+  yet up, so the per-element moves are offer-draw noise. One run (Lightning, seed 5)
+  died in the boss fight at 140; none did at 70.
+- **The slam still never lands on the bot, at either speed.** The boss stands still
+  through the slam's 1 s ring, and the bot steps out of any ring it sees (0.4 s at
+  180 px/s), so chase speed does not reach the slam. The PM accepted this: reading
+  the ring is a fair answer. A hero who ignores the ring still takes it.
+- **The volley stopped landing** (0 of 11 wins hit, 3 of 12 on `main`). The hero now
+  spends more time near the boss, where the volley is weighted down; not broken out
+  further.
+
+Limits: 20 runs a side, n = 5 per element; slam damage is measured on a bot that
+always dodges the ring, so it says nothing about a human player.
