@@ -4,6 +4,7 @@ import {
   BOSS_CC_DR,
   BOSS_CHAIN,
   BOSS_ENRAGE,
+  BOSS_LEAP,
   BOSS_SKILL_RANGE,
   BOSS_SKILL_ROTATION,
   BOSS_SKILL_WEIGHTS,
@@ -11,6 +12,7 @@ import {
   BOSS_SLAM,
   BOSS_SUMMON,
 } from './boss';
+import { PLAYER_SPEED } from './player';
 import { WAVES } from './waves';
 import { TEXTURE_KEYS } from './colors';
 
@@ -82,17 +84,21 @@ describe('boss ground slam (CO-222)', () => {
   it('has a rotation list per bar, the first holding the slam', () => {
     expect(BOSS_SKILL_ROTATION).toHaveLength(BOSS.bars);
     expect(BOSS_SKILL_ROTATION[0]).toEqual(['slam']);
-    expect(BOSS_SKILL_ROTATION[1]).toEqual(['slam', 'volley', 'summon']);
+    expect(BOSS_SKILL_ROTATION[1]).toEqual(['slam', 'volley', 'summon', 'leap']);
   });
 
   it('weights every skill by how far the hero is: the slam up close, the volley far off', () => {
     expect(BOSS_SKILL_RANGE.nearPx).toBeLessThan(BOSS_SKILL_RANGE.farPx);
     expect(Object.keys(BOSS_SKILL_WEIGHTS).sort()).toEqual(Object.keys(BOSS_SKILLS).sort());
     for (const row of Object.values(BOSS_SKILL_WEIGHTS))
-      for (const w of Object.values(row)) expect(w).toBeGreaterThan(0);
+      for (const w of Object.values(row)) expect(w).toBeGreaterThanOrEqual(0);
+    // Zero keeps a skill out of a band, but every band must leave something to pick.
+    for (const band of ['near', 'mid', 'far'] as const)
+      expect(Object.values(BOSS_SKILL_WEIGHTS).some((row) => row[band] > 0)).toBe(true);
     expect(BOSS_SKILL_WEIGHTS.slam).toEqual({ near: 3, mid: 1, far: 1 });
     expect(BOSS_SKILL_WEIGHTS.volley).toEqual({ near: 1, mid: 1, far: 3 });
     expect(BOSS_SKILL_WEIGHTS.summon).toEqual({ near: 1, mid: 2, far: 2 });
+    expect(BOSS_SKILL_WEIGHTS.leap).toEqual({ near: 0, mid: 1, far: 3 });
   });
 
   it('has a timing row for every skill id the rotation names', () => {
@@ -101,6 +107,25 @@ describe('boss ground slam (CO-222)', () => {
         expect(BOSS_SKILLS[id].windupS).toBeGreaterThan(0);
         expect(BOSS_SKILLS[id].activeS).toBeGreaterThan(0);
       }
+  });
+
+  it('leap (CO-232): 0.9 s warning, 0.35 s in the air, a 90 px landing for slam damage, 12 s cooldown', () => {
+    expect(BOSS_LEAP).toEqual({
+      windupS: 0.9,
+      airS: 0.35,
+      activeS: 0.4,
+      cooldownS: 12,
+      radius: 90,
+      damage: 30,
+    });
+    expect(BOSS_SKILLS.leap).toBe(BOSS_LEAP);
+    expect(BOSS_LEAP.airS).toBeLessThan(BOSS_LEAP.windupS);
+    expect(BOSS_LEAP.damage).toBe(BOSS_SLAM.damage);
+  });
+
+  it('leap (CO-232): a hero standing at the circle centre walks out inside the warning', () => {
+    // The hit test is centre distance only (`blastReaches`), so the walk is the radius alone.
+    expect(BOSS_LEAP.radius / PLAYER_SPEED).toBeLessThan(BOSS_LEAP.windupS);
   });
 
   it('summon (CO-224): a pack of 5, capped at 10, on a 14 s cooldown', () => {

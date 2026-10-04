@@ -160,7 +160,7 @@ export const BOSS_ENRAGE: Readonly<BossEnrage> = {
 export const BOSS_CHAIN = { minCharges: 2, maxCharges: 2, telegraphS: 0.4 } as const;
 
 /** A boss skill (CO-222): its wind-up warning and the beat it lands in. Later skills append here. */
-export type BossSkillId = 'slam' | 'volley' | 'summon';
+export type BossSkillId = 'slam' | 'volley' | 'summon' | 'leap';
 
 export interface BossSkillTiming {
   /** Seconds the boss stands and the warning shows before the skill lands. */
@@ -250,10 +250,33 @@ export const BOSS_SUMMON = {
   scale: { hpMul: LAST_FIGHT_WAVE.hpMul, damageMul: LAST_FIGHT_WAVE.damageMul },
 } as const;
 
+/**
+ * Leap (CO-232), the gap closer: the boss crouches for `windupS` while a
+ * `radius`-px circle shows on the floor where the hero stood as the wind-up
+ * began, then springs. It is still for the first `windupS - airS` s, in the air
+ * for the last `airS` s, and lands on the circle as the wind-up ends, hitting a
+ * hero inside it for `damage` times the enrage multiplier, through the
+ * immunity window like the slam. The circle is locked, so a hero who walks out
+ * of it during the 0.9 s warning takes nothing (150 px clears the 90 px ring
+ * in under a second at 180 px/s). While airborne the boss does no contact
+ * damage. Never drawn within `near` reach (weight 0 close in: the slam is
+ * the answer there); `cooldownS` keeps the next one 12 s from the wind-up's
+ * start. Radius 90 and weights are starting values to tune; damage matches the slam.
+ */
+export const BOSS_LEAP = {
+  windupS: 0.9,
+  airS: 0.35,
+  activeS: 0.4,
+  cooldownS: 12,
+  radius: 90,
+  damage: 30,
+} as const;
+
 export const BOSS_SKILLS: Readonly<Record<BossSkillId, BossSkillTiming>> = {
   slam: BOSS_SLAM,
   volley: BOSS_VOLLEY,
   summon: BOSS_SUMMON,
+  leap: BOSS_LEAP,
 };
 
 /**
@@ -263,7 +286,7 @@ export const BOSS_SKILLS: Readonly<Record<BossSkillId, BossSkillTiming>> = {
  */
 export const BOSS_SKILL_ROTATION: readonly (readonly BossSkillId[])[] = [
   ['slam'],
-  ['slam', 'volley', 'summon'],
+  ['slam', 'volley', 'summon', 'leap'],
 ];
 
 /**
@@ -279,7 +302,8 @@ export type BossRangeBand = 'near' | 'mid' | 'far';
  * The weight each skill carries in a roll, by the hero's band (CO-223): near,
  * the slam is picked 3 times in 4 against the volley; far, the volley is. Only
  * ready skills of the bar's list enter the roll; a skill's row is its own, so a
- * later skill adds a row here.
+ * later skill adds a row here. A weight of 0 keeps a skill out of that band
+ * (the leap never starts within `nearPx`); every band keeps one skill above 0.
  */
 export const BOSS_SKILL_WEIGHTS: Readonly<
   Record<BossSkillId, Readonly<Record<BossRangeBand, number>>>
@@ -287,4 +311,5 @@ export const BOSS_SKILL_WEIGHTS: Readonly<
   slam: { near: 3, mid: 1, far: 1 },
   volley: { near: 1, mid: 1, far: 3 },
   summon: { near: 1, mid: 2, far: 2 },
+  leap: { near: 0, mid: 1, far: 3 },
 };

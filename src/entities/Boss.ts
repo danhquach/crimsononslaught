@@ -1,6 +1,13 @@
 import Phaser from 'phaser';
 import { ARENA_SIZE } from '../config/arena';
-import { BOSS, BOSS_DAMAGE_CAP, BOSS_SLAM, BOSS_SUMMON, type BossSkillId } from '../config/boss';
+import {
+  BOSS,
+  BOSS_DAMAGE_CAP,
+  BOSS_LEAP,
+  BOSS_SLAM,
+  BOSS_SUMMON,
+  type BossSkillId,
+} from '../config/boss';
 import {
   bossAnimation,
   facingFromVector,
@@ -14,6 +21,8 @@ import {
   bossMods,
   bossSkillsFor,
   enterEnrage,
+  leapDamage,
+  leapPoint,
   shouldEnrage,
   slamDamage,
   startBossCycle,
@@ -79,6 +88,9 @@ export interface BossChainLogEntry {
 /** #388: the red an enraged placeholder ring is multiplied by; with the atlas the aura says it instead. */
 const ENRAGE_TINT = 0xff6a6a;
 
+/** CO-232: no velocity, for the frames a leap places the boss itself. */
+const NO_MOVE: Vec2 = { x: 0, y: 0 };
+
 /**
  * The boss (spec §5 "Boss"): an enemy with its own stats and a charge cycle.
  * Between charges it chases like any enemy, at 140 px/s. Every 4 s it stops and
@@ -111,6 +123,12 @@ const ENRAGE_TINT = 0xff6a6a;
  * Between charges it uses a skill (CO-222): a 1 s windup standing still, then
  * the skill lands once (`BOSS_EVENT.skill`, at the boss's spot) and plays out
  * 0.4 s; which skill comes from the list for the bars broken so far.
+ *
+ * Leap (CO-232) is a skill whose wind-up moves the boss: it crouches in place,
+ * then flies in a straight line to the circle locked at the wind-up's start and
+ * lands as the wind-up ends. The flight is placed from the cycle clock
+ * (`leapPoint`), not by velocity, so it is the same at any frame length; it does
+ * no contact damage while airborne, and the landing is the skill's impact.
  *
  * Enrage (#388): a hit that leaves it at or under half its last bar latches
  * it enraged for the rest of the fight (`BOSS_ENRAGE`): harder contact, faster,
@@ -185,6 +203,28 @@ export class Boss extends Enemy {
   /** CO-222: seconds of the wind-up left on the boss clock, 0 outside one. */
   get windupLeftS(): number {
     return this.cycle.phase === 'windup' ? this.cycle.remainingS : 0;
+  }
+
+  /** CO-232: where a leap in its wind-up or landing lands, the target locked as the wind-up began; null outside one. */
+  get lockedLeapPoint(): Vec2 | null {
+    const { phase, skill, skillTarget } = this.cycle;
+    return skill === 'leap' && (phase === 'windup' || phase === 'skill')
+      ? { x: skillTarget.x, y: skillTarget.y }
+      : null;
+  }
+
+  /** CO-232: whether the boss is off the ground: the last `airS` s of a leap's wind-up. */
+  get isAirborne(): boolean {
+    return (
+      this.cycle.phase === 'windup' &&
+      this.cycle.skill === 'leap' &&
+      this.cycle.remainingS <= BOSS_LEAP.airS
+    );
+  }
+
+  /** CO-232: the flight does no contact damage; the body stays on, so spells still hit it. */
+  override tryContact(): boolean {
+    return this.isAirborne ? false : super.tryContact();
   }
 
   /** CO-225: the unit direction of the charge, locked as its telegraph ended; zero outside a charge. */
@@ -419,11 +459,23 @@ export class Boss extends Enemy {
     // The slam lands where the boss stood at the frame's start: it holds still
     // through a wind-up, so only a frame long enough to also span the chase
     // before it (a scaled clock) lands it short of where the boss ends up.
-    for (const { skill, aim, atS } of step.impacts) {
+    for (const { skill, aim, target: locked, atS } of step.impacts) {
       const base = { x: from.x, y: from.y, atS };
       const aimRad = Math.atan2(aim.y, aim.x);
       let payload: BossSkillPayload;
-      if (skill === 'volley')
+      if (skill === 'leap') {
+        // The landing is the impact: the boss is on the locked circle before the hit is read.
+        this.placeAt(locked);
+        payload = {
+          x: this.x,
+          y: this.y,
+          atS,
+          skill,
+          from: { x: this.cycle.skillFrom.x, y: this.cycle.skillFrom.y },
+          radius: BOSS_LEAP.radius,
+          damage: leapDamage(this.enraged),
+        };
+      } else if (skill === 'volley')
         payload = { ...base, skill, aimRad, damage: volleyDamage(this.enraged) };
       else if (skill === 'summon') {
         // A frame that spanned the whole wind-up never saw it begin: the ring is made now.
@@ -433,7 +485,22 @@ export class Boss extends Enemy {
         payload = { ...base, skill, radius: BOSS_SLAM.radius, damage: slamDamage(this.enraged) };
       this.scene.events.emit(BOSS_EVENT.skill, payload);
     }
+    // A leap places the boss itself and holds it still for the body's step.
+    const flight = leapPoint(this.cycle);
+    if (flight) {
+      this.placeAt(flight);
+      return NO_MOVE;
+    }
     return step.velocity;
+  }
+
+  /** CO-232: set the position directly, kept inside the arena, as `Enemy.knockBack` does. */
+  private placeAt(point: Readonly<Vec2>): void {
+    const bounds = this.scene.physics.world.bounds;
+    this.setPosition(
+      Phaser.Math.Clamp(point.x, bounds.left, bounds.right),
+      Phaser.Math.Clamp(point.y, bounds.top, bounds.bottom),
+    );
   }
 
   /** CO-224: lock the pack's landing ring if a summon's wind-up is the one that just began. */

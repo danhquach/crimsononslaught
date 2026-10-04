@@ -240,6 +240,12 @@ export const RECIPES = {
       [envelope(sweep(0.7, 135, 270), 0.3), 0.45],
       [envelope(noise(0.7, 73, 700), 0.25), 0.35],
     ),
+  // CO-232: a heavy landing, a lower, longer thump than the slam's (90 -> 30 Hz) under a dull noise crack, 0.55 s.
+  'boss.leap': () =>
+    mix(
+      [envelope(sweep(0.55, 90, 30), 0.004), 0.95],
+      [envelope(noise(0.55, 77, 1200), 0.004), 0.55],
+    ),
   'boss.death': () =>
     mix([envelope(sweep(1.0, 300, 35), 0.02), 0.9], [envelope(noise(1.0, 43, 700), 0.02), 0.4]),
 

@@ -16,6 +16,7 @@ import {
   BOSS_AURA_DEPTH,
   BOSS_CHAIN_FX,
   BOSS_TRAIL_DEPTH,
+  BOSS_LEAP_FX,
   BOSS_SLAM_FX,
   BOSS_SLAM_WARN_DEPTH,
   ELITE_MARK_DEPTH,
@@ -128,6 +129,21 @@ describe('Ground slam fx (CO-222)', () => {
   it('lays the warning and the fire ring on the floor: over the enrage ring, under every entity', () => {
     expect(BOSS_SLAM_WARN_DEPTH).toBeGreaterThan(BOSS_AURA_DEPTH);
     expect(BOSS_SLAM_WARN_DEPTH).toBeLessThan(0);
+  });
+});
+
+describe('Leap fx (CO-232)', () => {
+  it('draws its warning rim round, with an animation per clip it names', () => {
+    const { w, h } = ART_BOXES[BOSS_LEAP_FX.rim];
+    expect(Math.abs(w - h)).toBeLessThanOrEqual(3);
+    const names = new Set(ANIMATIONS.map((a) => a.name));
+    for (const clip of [BOSS_LEAP_FX.rim, BOSS_LEAP_FX.fill, BOSS_LEAP_FX.shock])
+      expect(names.has(clip), clip).toBe(true);
+  });
+
+  it('shows brighter than the slam warning, the dark floor swallowing its dark disc', () => {
+    expect(BOSS_LEAP_FX.rimAlpha).toBeGreaterThan(BOSS_SLAM_FX.rimAlpha);
+    expect(BOSS_LEAP_FX.fillAlpha).toBeGreaterThan(BOSS_SLAM_FX.fillAlpha);
   });
 });
 

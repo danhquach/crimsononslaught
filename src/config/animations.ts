@@ -167,6 +167,15 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   spec('boss.summonBurst', 4, 10, ONCE),
   spec('boss.chainTrail', 4, 12, LOOP),
   spec('boss.chainFlash', 4, 10, ONCE),
+  // CO-232: the Leap, paced to its 0.9 s wind-up: the crouch is held for ~0.55 s (1.8 fps,
+  // so the spring frame shows for the last ~0.35 s, airborne) and the landing pair plays
+  // once. The warning rim and shadow disc loop under the landing spot; the shockwave
+  // plays once on the landing.
+  ...facings('boss.leapWindup', 2, 1.8, ONCE),
+  ...facings('boss.leap', 2, 5, ONCE),
+  spec('boss.leapWarnRim', 4, 8, LOOP),
+  spec('boss.leapWarnFill', 4, 8, LOOP),
+  spec('boss.leapShock', 4, 10, ONCE),
 
   // XP gem (CO-075).
   spec('gem.idle', 4, 6, LOOP),
