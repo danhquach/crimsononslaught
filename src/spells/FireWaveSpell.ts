@@ -251,9 +251,11 @@ export class FireWaveSpell extends Spell<'fire_column'> {
         this.landed += 1;
         const push = knockbackVector(wave.origin, enemy, knockback, wave.origin);
         this.fx.burst('fire.explode', enemy.x, enemy.y, { scale: HIT_BURST_SCALE });
+        // Exploit reads the enemy as the wave found it, before its own burn (CO-234).
+        const afflicted = enemy.isAfflicted;
         // Status before damage, so a killing hit has still marked the enemy.
         enemy.applyBurn(burn, burnDuration);
-        this.damage(enemy, damage, 'hit', wave.origin);
+        this.damage(enemy, damage, 'hit', wave.origin, afflicted);
         // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
         if (enemy.active) enemy.knockBack(push);
       }

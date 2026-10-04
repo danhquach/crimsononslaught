@@ -51,6 +51,8 @@ export interface PlayerProfile {
   pierceBonus: number;
   /** Fraction of the spell damage that lands, healed back (CO-235); `core/siphon.ts` caps the rate. */
   siphonShare: number;
+  /** Extra damage a spell deals to an enemy under a status, as a fraction (CO-234); `core/exploit.ts`. */
+  exploitBonus: number;
 }
 
 export type ProfileField = keyof PlayerProfile;
@@ -76,6 +78,7 @@ export const BASE_PLAYER_PROFILE: Readonly<PlayerProfile> = {
   damageReduction: 0,
   pierceBonus: 0,
   siphonShare: 0,
+  exploitBonus: 0,
 };
 
 /**
@@ -117,11 +120,6 @@ export interface Passive {
    * offered, so it never shows up as a dead pick (#206). Absent: always offered.
    */
   requiresStat?: SpellStatField;
-  /**
-   * `false`: withheld from level-up offers (CO-235) but still resolvable, so a
-   * carried rank, a relic or a saved run keeps its meaning. Absent: offered.
-   */
-  offered?: false;
 }
 
 /**
@@ -249,15 +247,13 @@ const PASSIVE_LIST = [
     maxRank: 5,
   },
   {
-    id: 'passive_pierce',
-    name: 'Pierce',
-    description: 'Piercing spells pass through 1 more enemy.',
-    field: 'pierceBonus',
+    id: 'passive_exploit',
+    name: 'Exploit',
+    description: 'Spells deal 8% more damage to enemies under a status.',
+    field: 'exploitBonus',
     op: 'add',
-    amount: 1,
-    maxRank: 3,
-    requiresStat: 'pierce',
-    offered: false,
+    amount: 0.08,
+    maxRank: 5,
   },
   {
     id: 'passive_siphon',

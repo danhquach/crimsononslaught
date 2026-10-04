@@ -2065,7 +2065,7 @@
           { "anim": "passive_regeneration", "cols": [1, 1], "centred": true },
           { "anim": "passive_magnet", "cols": [2, 2], "centred": true },
           { "anim": "passive_avarice", "cols": [3, 3], "centred": true },
-          { "anim": "passive_pierce", "cols": [4, 4], "centred": true },
+          { "anim": "passive_exploit", "cols": [4, 4], "centred": true },
           { "anim": "passive_siphon", "cols": [5, 5], "centred": true }
         ]
       ]

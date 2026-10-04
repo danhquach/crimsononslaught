@@ -313,9 +313,11 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
     hitbox.despawn();
     this.icicleLanded += 1;
     this.fx.burst('ice.shatter', enemy.x, enemy.y);
+    // Exploit reads the enemy as the icicle found it, before its own chill (CO-234).
+    const afflicted = enemy.isAfflicted;
     // Chill first, then damage, the way every Ice hit lands.
     enemy.applyFrost(icicleFrost(this.stats));
-    this.damage(enemy, this.stats.icicleDamage, 'hit', from);
+    this.damage(enemy, this.stats.icicleDamage, 'hit', from, afflicted);
   }
 
   /**
@@ -358,9 +360,11 @@ export class NovaBombSpell extends Spell<'ice_nova_bomb'> {
         if (!enemy.active) continue;
         live.caught += 1;
         this.waveLanded += 1;
+        // Exploit reads the enemy as the wave found it, before its own chill (CO-234).
+        const afflicted = enemy.isAfflicted;
         // Chill (and the freeze roll) first, then damage, the way every Ice hit lands.
         enemy.applyFrost(bombFrost(stats, this.rng));
-        this.damage(enemy, stats.damage, 'hit', wave.origin);
+        this.damage(enemy, stats.damage, 'hit', wave.origin, afflicted);
       }
       if (waveDone(wave, stats.radius)) {
         live.view.destroy();

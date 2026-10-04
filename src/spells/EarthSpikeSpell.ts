@@ -213,7 +213,7 @@ export class EarthSpikeSpell extends Spell<'earth'> {
     // Where the spike struck, before the shove moves the enemy: a splinter centres here.
     const struckAt = { x: enemy.x, y: enemy.y };
 
-    // Read live, so a pick taken while a spike is in the air (#206's Pierce)
+    // Read live, so a pick taken while a spike is in the air (#206's Impaler)
     // reaches it too.
     const stats = this.stats;
     const push = knockbackVector(hitbox, enemy, stats.knockback, this.caster);
@@ -227,10 +227,12 @@ export class EarthSpikeSpell extends Spell<'earth'> {
     );
     this.landed += 1;
     this.fx.burst('earth.impact', enemy.x, enemy.y);
+    // Exploit reads the enemy as the spike found it, before its own bleed (CO-234).
+    const afflicted = enemy.isAfflicted;
     // Status before damage, so a killing spike has still marked the enemy
     // while it was there.
     if (bleed > 0) enemy.applyBleed(bleed, bleedDurationS);
-    this.damage(enemy, damage, 'hit', hitbox);
+    this.damage(enemy, damage, 'hit', hitbox, afflicted);
     // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
     if (enemy.active) {
       enemy.knockBack(push);

@@ -297,8 +297,10 @@ export class TornadoSpell extends Spell<'lightning_tornado'> {
     const { target } = bolt;
     this.boltHits += 1;
     this.fx.burst('lightning.impact', target.x, target.y, { scale: STORM_CELL.impactScale });
+    // Exploit reads the enemy as the bolt found it, before its own stagger (CO-234).
+    const afflicted = target.isAfflicted;
     target.applyStagger(STORM_CELL.staggerS);
-    this.damage(target, bolt.damage, 'hit', from);
+    this.damage(target, bolt.damage, 'hit', from, afflicted);
   }
 
   private makeSprite(): Phaser.GameObjects.Sprite {

@@ -211,7 +211,7 @@ describe('Spellbook (CO-109)', () => {
     expect(fire.stats.damage).toBe(100);
   });
 
-  it('raises a live piercing spell with Pierce, and leaves the others alone (#206)', () => {
+  it('raises a live piercing spell with Impaler, and leaves the others alone (#206)', () => {
     // A Boulder's block under a stub id: the rig casts stubs, the resolver only
     // sees the block.
     const spells = book(factory, (spellId) =>
@@ -223,8 +223,8 @@ describe('Spellbook (CO-109)', () => {
       (spell.stats as SpellStatBlock).pierce;
     expect(pierceOf(boulder)).toBe(5);
 
-    spells.takePassive('passive_pierce');
-    expect(pierceOf(boulder)).toBe(6);
+    spells.takeRelic('relic_impaler');
+    expect(pierceOf(boulder)).toBe(7);
     expect(pierceOf(ice)).toBeUndefined();
     expect(ice.stats).toEqual(BASE_SPELL_STATS.ice);
   });

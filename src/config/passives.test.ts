@@ -24,7 +24,7 @@ const SPEC_TABLE: readonly [string, string, 'add' | 'mul', number, number][] = [
   ['passive_regeneration', 'hpRegen', 'add', 0.5, 6],
   ['passive_magnet', 'pickupRadius', 'mul', 1.25, 3],
   ['passive_avarice', 'xpGain', 'mul', 1.12, 5],
-  ['passive_pierce', 'pierceBonus', 'add', 1, 3],
+  ['passive_exploit', 'exploitBonus', 'add', 0.08, 5],
   ['passive_siphon', 'siphonShare', 'add', 0.005, 4],
 ];
 
@@ -50,17 +50,14 @@ describe('passives config', () => {
     expect(PASSIVES.filter((passive) => passive.maxRank === undefined)).toEqual([]);
   });
 
-  it('gates only Pierce on a stat, the one it raises (#206)', () => {
-    const gated = PASSIVES.filter((passive) => passive.requiresStat !== undefined);
-    expect(gated.map((passive) => [passive.id, passive.requiresStat])).toEqual([
-      ['passive_pierce', 'pierce'],
-    ]);
+  it('gates no passive on a stat since Exploit replaced Pierce (CO-234)', () => {
+    // Relics still gate on one (Impaler needs a casting spell that pierces).
+    expect(PASSIVES.filter((passive) => passive.requiresStat !== undefined)).toEqual([]);
   });
 
-  it('withholds only Pierce from level-up offers (CO-235)', () => {
-    expect(PASSIVES.filter((passive) => passive.offered === false).map((p) => p.id)).toEqual([
-      'passive_pierce',
-    ]);
+  it('has no Pierce passive, while the pierce bonus stays for Impaler (CO-234)', () => {
+    expect(passiveById('passive_pierce')).toBeUndefined();
+    expect(BASE_PLAYER_PROFILE.pierceBonus).toBe(0);
   });
 
   it("sets Siphon's ceiling at Regeneration's full stack (CO-235)", () => {
@@ -85,6 +82,7 @@ describe('passives config', () => {
       damageReduction: 0,
       pierceBonus: 0,
       siphonShare: 0,
+      exploitBonus: 0,
     });
     expect(PROFILE_CLAMPS).toEqual({
       cooldownMul: { min: 0.35 },
@@ -121,5 +119,11 @@ describe('passives config', () => {
     const siphon = passiveById('passive_siphon') as Passive;
     expect(siphon.description).toContain(`${siphon.amount * 100}% of spell damage`);
     expect(siphon.description).toContain(`${SIPHON.maxHealPerS} HP/s`);
+  });
+
+  it("states Exploit's bonus in its description, built from the amount (CO-234)", () => {
+    const exploit = passiveById('passive_exploit') as Passive;
+    expect(exploit.description).toContain(`${Math.round(exploit.amount * 100)}% more damage`);
+    expect(exploit.description).toContain('under a status');
   });
 });

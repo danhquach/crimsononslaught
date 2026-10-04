@@ -587,8 +587,10 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
       (live) => {
         for (const member of membersOf(live, this.enemies.live)) {
           if (!member.active) continue;
+          // Exploit reads the enemy as the tick found it, before its own stagger (CO-234).
+          const afflicted = member.isAfflicted;
           if (staggerS > 0) member.applyStagger(staggerS);
-          this.damage(member, tickDamage, 'tick', live);
+          this.damage(member, tickDamage, 'tick', live, afflicted);
         }
       },
       {
@@ -636,8 +638,10 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
       if (!enemy.active) continue;
       sweptHit += 1;
       this.fx.burst('lightning.impact', enemy.x, enemy.y, { scale: COMPANION_SWEEP.impactScale });
+      // Exploit reads the enemy as the swing found it, before its own stagger (CO-234).
+      const afflicted = enemy.isAfflicted;
       if (staggerDuration) enemy.applyStagger(staggerDuration);
-      this.damage(enemy, damage * COMPANION_SWEEP.damageFactor, 'hit', this.position);
+      this.damage(enemy, damage * COMPANION_SWEEP.damageFactor, 'hit', this.position, afflicted);
     }
     const clap = hasThunderclap(level)
       ? thunderclapPath(target, this.enemies.live, new Set([target, ...swept]))
@@ -648,8 +652,9 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
       if (strips.lay(from, enemy)) clapStrips += 1;
       const link = from;
       from = { x: enemy.x, y: enemy.y };
+      const afflicted = enemy.isAfflicted;
       if (staggerDuration) enemy.applyStagger(staggerDuration);
-      this.damage(enemy, damage * THUNDERCLAP.damageFactor, 'hit', link);
+      this.damage(enemy, damage * THUNDERCLAP.damageFactor, 'hit', link, afflicted);
     }
     recordCapped(this.swingLog, {
       level,
@@ -697,10 +702,12 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     const around = pulseTargets(at, this.enemies.live, slowRadius).filter(
       (other) => other !== enemy,
     );
+    // Exploit reads the enemy as the orb found it, before the freeze (CO-234).
+    const afflicted = enemy.isAfflicted;
     enemy.applyFrost(frostOrbHit(this.companionStats));
     const targetFrozenS = enemy.crowdControlRemainingS.frozenS;
     const boss = enemy instanceof Boss;
-    this.onCompanionHit(enemy, from);
+    this.onCompanionHit(enemy, from, afflicted);
     this.fx.burst('ice.nova', at.x, at.y, { scale: novaScale(slowRadius) });
     let slowedAround = 0;
     for (const other of around) {
@@ -756,8 +763,14 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
    * What one companion attack costs the enemy it lands on: `damage`, plus the
    * element's own mark — Fire's burn, Ice's chill, Lightning's stagger (#139),
    * Earth's shove. `from` is where it struck from: the ally's swing or its shot.
+   * `afflicted` is the enemy's status before this hit, read here unless the
+   * caller applied a status of its own first (CO-234).
    */
-  private onCompanionHit(enemy: Enemy, from: Readonly<Vec2>): void {
+  private onCompanionHit(
+    enemy: Enemy,
+    from: Readonly<Vec2>,
+    afflicted: boolean = enemy.isAfflicted,
+  ): void {
     const { damage, burn, burnDuration, slowPct, slowDuration, staggerDuration, knockback } =
       this.companionStats;
     this.landed += 1;
@@ -769,7 +782,7 @@ export class CompanionSpell extends Spell<CompanionSpellId> {
     // The shove is measured before the blow, so a killing hit drops its gems
     // where the enemy stood rather than where it would have been thrown.
     const push = knockback ? knockbackVector(this.position, enemy, knockback, this.caster) : null;
-    this.damage(enemy, damage, 'hit', from);
+    this.damage(enemy, damage, 'hit', from, afflicted);
     if (!push || !enemy.active) return;
     enemy.knockBack(push);
     this.fx.burst('earth.dust', enemy.x, enemy.y + enemy.bodyRadius, { flipX: dustFlip(push) });

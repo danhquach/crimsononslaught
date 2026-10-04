@@ -1192,3 +1192,44 @@ Limits: 20 runs a side, n = 5 per element. A one-win swing per element is noise
 takes Siphon as filler, so this shows Siphon breaks nothing, not what it is worth to
 a player who builds around it. The baseline log flagged 2 suspect-bot runs; the
 Siphon arm flagged none.
+
+# Exploit (CO-234, 2026-10-04)
+
+Exploit replaces Pierce: spells deal +8% damage per rank (5 ranks, +40%) to an
+enemy that is burning, slowed, frozen, stunned, staggered or bleeding, on spell
+hits and ground ticks only, never on burn or bleed ticks, and read from the
+enemy's status before the hit applies its own. It multiplies with Power. Pierce
+and its `offered: false` mechanism are gone; `pierceBonus` stays for the Impaler
+relic. Same-seed sweep with `npm run sweep -- --seeds 1-5`, baseline `main` at
+96a8ea1, one run at a time, mortal, no dash, 20 runs a side. Wins per element, of 5:
+
+| Arm | Fire | Ice | Lightning | Earth | Wins | Deaths (fire / ice / lightning / earth) | Median boss kill (range) | Top passive's share of win ranks |
+|---|---|---|---|---|---|---|---|---|
+| Baseline (`main`) | 3 | 4 | 3 | 4 | 14 / 20 | 2 / 1 / 2 / 1 | 111 s (89-183) | Power 17.0% |
+| **Exploit** | 3 | 4 | 2 | 3 | 12 / 20 | 2 / 1 / 3 / 2 | 106 s (85-163) | Power 16.2% |
+
+- Fire Bolt applies no burn (only Fire Wave and the Fire Companion do), so the
+  default Fire spell does not set up Exploit by itself; Fire needs a second spell
+  for statuses.
+- Win rate: 14 to 12 of 20, Fire and Ice unchanged, Lightning and Earth one
+  win lower each. Adding Exploit to the offers changes every later offer, so the
+  two arms play different builds from the first level-up; most deaths are before
+  the 11-minute mark with 0-2 Exploit ranks. Lightning seed 4 ended at level 8
+  with no Power and no Exploit, a bot run that never levelled. The same baseline
+  scored Lightning 5 of 5 on CO-235 and 3 of 5 here.
+- Earth on its own: 4 to 3 of 5. The Exploit arm's Earth deaths came at 16:20
+  (0 Exploit ranks) and 20:46 (2 ranks). Earth Spike bleeds on 5% of hits, so its statuses come
+  mostly from Earthquake, Boulder and Earth Shield's shockwave; if Earth falls
+  behind, count knockback as a status or raise Earth Spike's bleed chance.
+- Median boss kill: 106 s, inside 90-180 s (two Ice kills at 85 and 87 s, as
+  the baseline had one at 89 s). The boss cannot be stunned or frozen
+  and takes stagger and slow at a quarter length (CO-221), so Exploit lands on
+  it through burn, bleed and the short stagger and slow.
+- Exploit's share of win ranks: 5.7% (28 of 495), taken in winning runs on all
+  four elements (Fire 8, Ice 9, Lightning 5, Earth 6 ranks). Top passive: Power
+  16.2%; none above 25%.
+
+Limits: 20 runs a side, n = 5 per element. A one-win swing per element is noise
+([#210](https://github.com/danhquach/crimsononslaught/issues/210)), and the bot only
+takes Exploit as filler, so this shows Exploit breaks nothing, not what it is worth
+to a player who builds around statuses. Neither arm flagged a suspect-bot run.

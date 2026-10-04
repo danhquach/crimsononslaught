@@ -238,12 +238,14 @@ export class ChainLightningSpell extends Spell<'lightning_chain'> {
     const { stats } = this;
     const at = { x: target.x, y: target.y };
     this.landed += 1;
+    // Exploit reads the enemy as the bolt found it, before its own stagger and stun (CO-234).
+    const afflicted = target.isAfflicted;
     target.applyStagger(stats.staggerDuration);
     if (onLevelStream) this.levelRolls += 1;
     if (rollStun(onLevelStream ? this.levelRng : this.rng, stats.stunChance)) {
       target.applyStun(stats.stunDuration);
     }
-    this.damage(target, damage, 'hit', from);
+    this.damage(target, damage, 'hit', from, afflicted);
     return at;
   }
 }

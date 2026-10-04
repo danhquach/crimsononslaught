@@ -205,9 +205,11 @@ export class IceShieldSpell extends ShieldSpell<'ice_shield'> {
         if (!enemy.active) continue;
         live.caught += 1;
         this.waveLanded += 1;
+        // Exploit reads the enemy as the wave found it, before its own chill (CO-234).
+        const afflicted = enemy.isAfflicted;
         // Chill first, then damage, the way every Ice hit lands.
         enemy.applyFrost(icicleFrost(ICE_SHIELD_WAVE));
-        this.damage(enemy, live.damage, 'hit', wave.origin);
+        this.damage(enemy, live.damage, 'hit', wave.origin, afflicted);
       }
       if (waveDone(wave, range)) {
         live.view.destroy();
@@ -232,8 +234,10 @@ export class IceShieldSpell extends ShieldSpell<'ice_shield'> {
 
     this.cuts += 1;
     this.fx.burst('ice.shatter', enemy.x, enemy.y);
+    // Exploit reads the enemy as the diamond found it, before its own chill (CO-234).
+    const afflicted = enemy.isAfflicted;
     // Chill first, then damage, the way every Ice hit lands.
     enemy.applyFrost(icicleFrost(this.stats));
-    this.damage(enemy, this.stats.damage, 'hit', diamond);
+    this.damage(enemy, this.stats.damage, 'hit', diamond, afflicted);
   }
 }
