@@ -2057,7 +2057,7 @@
       "ticket": "CO-179",
       "file": "CO-179/icons_passives_3.png",
       "page": 17,
-      "cols": 4,
+      "cols": 5,
       "rows": 1,
       "sheetCell": 144,
       "rowSpecs": [
@@ -2065,7 +2065,8 @@
           { "anim": "passive_regeneration", "cols": [1, 1], "centred": true },
           { "anim": "passive_magnet", "cols": [2, 2], "centred": true },
           { "anim": "passive_avarice", "cols": [3, 3], "centred": true },
-          { "anim": "passive_pierce", "cols": [4, 4], "centred": true }
+          { "anim": "passive_pierce", "cols": [4, 4], "centred": true },
+          { "anim": "passive_siphon", "cols": [5, 5], "centred": true }
         ]
       ]
     },
@@ -2432,6 +2433,17 @@
       "rows": 1,
       "sheetCell": 480,
       "rowSpecs": [[{ "anim": "leapShock", "cols": [1, 4], "centred": true }]]
+    },
+    {
+      "key": "hero",
+      "ticket": "CO-235",
+      "file": "CO-235/hero_siphon.png",
+      "page": 32,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 144,
+      "maxMagenta": 20,
+      "rowSpecs": [[{ "anim": "siphon", "cols": [1, 4] }]]
     }
   ]
 }

@@ -14,7 +14,7 @@ import { CARD_FILL, CARD_FILL_HOVER, cssColor, offerColor } from '../core/offerC
 import { bindingLabel, defaultControls, keyBadge } from '../core/controls';
 import { SCENE, isLevelUpPayload } from '../core/scenePayloads';
 import { audioOf } from '../render/audio';
-import { addSpellIcon } from '../render/spellIcon';
+import { addBuildCardIcon, addSpellIcon, buildIconArt } from '../render/spellIcon';
 import { focusable, frameBox } from './focusRing';
 import { controlsOf } from './controls';
 import { attachBoundPadButtons, attachMenuInput, attachPadButtons, type MenuItem } from './input';
@@ -22,9 +22,10 @@ import { attachBoundPadButtons, attachMenuInput, attachPadButtons, type MenuItem
 const CARD_WIDTH = 220;
 const CARD_HEIGHT = 260;
 /**
- * CO-155: a spell card's icon band above its name — a 2x (64 px) icon and its
- * margins. An offer with a spell in it, a new one or an upgrade (#326), grows
- * every card by it; a row of passive and relic cards keeps its height and layout.
+ * CO-155: a card's icon band above its name — a 2x (64 px) icon and its
+ * margins. An offer with an icon in it, a spell's (a new one or an upgrade,
+ * #326) or a passive's or relic's art (CO-235), grows every card by it; a row
+ * whose passive or relic cards have no art keeps its height and layout.
  */
 const ICON_BAND = 50;
 const ICON_SCALE = 2;
@@ -144,9 +145,13 @@ export class LevelUpScene extends Phaser.Scene {
     const rowWidth = n * CARD_WIDTH + (n - 1) * CARD_GAP;
     const firstX = (width - rowWidth) / 2 + CARD_WIDTH / 2;
     // A new spell's offer is all spells (spec §7.1), but an upgrade (#326) can sit
-    // beside passives, so the row shares one height: the taller if any card has an icon.
+    // beside passives, so the row shares one height: the taller if any card
+    // will draw an icon, as `addCard` decides it.
     const cardHeight =
-      CARD_HEIGHT + (this.cards.some((card) => cardSpellId(card) !== undefined) ? ICON_BAND : 0);
+      CARD_HEIGHT +
+      (this.cards.some((card) => cardSpellId(card) !== undefined || this.hasBuildIcon(card))
+        ? ICON_BAND
+        : 0);
     const cardY = 160 + cardHeight / 2;
     const items = this.cards.map((card, i) =>
       this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, cardHeight, card, i + 1),
@@ -290,6 +295,13 @@ export class LevelUpScene extends Phaser.Scene {
     };
   }
 
+  /** Whether a passive or relic card has icon art to draw (CO-235). */
+  private hasBuildIcon(card: OfferCard): boolean {
+    return (
+      (card.kind === 'passive' || card.kind === 'relic') && buildIconArt(this, card.id) !== null
+    );
+  }
+
   private addCard(x: number, y: number, height: number, card: OfferCard, hotkey: number): MenuItem {
     const innerWidth = CARD_WIDTH - CARD_PADDING * 2;
     const left = -CARD_WIDTH / 2 + CARD_PADDING;
@@ -298,7 +310,7 @@ export class LevelUpScene extends Phaser.Scene {
     // the border and the kind label, at rest and under hover alike.
     const stroke = offerColor(card.kind, card.id);
     // A spell, or an upgrade of one (#326), shows its icon (CO-155) between the
-    // hotkey and its name.
+    // hotkey and its name; so does a passive or relic with art (CO-235).
     const spellId = cardSpellId(card);
     // An upgrade's rank line, `Lv 3/3 · MAX`, is wide enough to run under a
     // centred icon, so its icon sits left of it instead.
@@ -312,7 +324,9 @@ export class LevelUpScene extends Phaser.Scene {
             { id: spellId, name: card.name, color: card.color ?? stroke },
             ICON_SCALE,
           )
-        : [];
+        : this.hasBuildIcon(card)
+          ? addBuildCardIcon(this, iconX, top + 40, card.id, ICON_SCALE)
+          : [];
     const band = icon.length > 0 ? ICON_BAND : 0;
 
     const frame = this.add.rectangle(0, 0, CARD_WIDTH, height, CARD_FILL).setStrokeStyle(2, stroke);

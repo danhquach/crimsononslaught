@@ -73,6 +73,9 @@ export const ANIMATIONS: readonly AnimationSpec[] = [
   ...facings('hero.walk', 4, 8, LOOP),
   ...facings('hero.hurt', 1, 10, ONCE),
   spec('hero.death', 6, 8, ONCE),
+  // Siphon heal cue (CO-235): a red-to-mint mote rising from the hero, played
+  // once per heal tick.
+  spec('hero.siphon', 4, 12, ONCE),
   // Hero dash pose (CO-218): lean, burst, recover over the 150 ms dash. The
   // smoke is a separate sheet so a dash spell can swap it without the hero.
   ...facings('hero.dash', 3, 20, ONCE),

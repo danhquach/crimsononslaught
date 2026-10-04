@@ -26,6 +26,25 @@ export function buildIconArt(scene: Phaser.Scene, id: string): FrameName | null 
   return frame && hasFrameArt(scene, frame) ? frame : null;
 }
 
+/**
+ * A passive's or relic buff's icon art (CO-235) centred on (x, y) at a
+ * whole-number `scale` of the spell icon's size, for a level-up card. Its art is
+ * already a round button, so it is drawn bare; with no art, or no atlas, `[]`,
+ * and the card keeps its text alone.
+ */
+export function addBuildCardIcon(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  id: string,
+  scale: number,
+): Phaser.GameObjects.GameObject[] {
+  const frame = buildIconArt(scene, id);
+  if (!frame) return [];
+  const icon = scene.add.image(x, y, FRAMES[frame].page, artFrame(frame));
+  return [icon.setScale((SPELL_ICON_ART_SIZE * scale) / Math.max(icon.width, icon.height))];
+}
+
 /** What an icon knows about the spell it shows. */
 export interface IconSpell {
   id: string;

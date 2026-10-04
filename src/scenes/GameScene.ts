@@ -104,6 +104,7 @@ import {
   settleOutcome,
   type DecidedOutcome,
 } from '../core/runOutcome';
+import { accrueSiphon, drainSiphon, resetSiphon, type SiphonState } from '../core/siphon';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
 import { spawnPoint } from '../core/spawnDirector';
 import type { Spell } from '../core/spell';
@@ -140,6 +141,7 @@ import {
 } from '../config/spellLevels';
 import {
   BASE_PLAYER_PROFILE,
+  SIPHON,
   isPassiveId,
   passiveById,
   type PlayerProfile,
@@ -248,6 +250,7 @@ import { PickupPool } from '../systems/PickupPool';
 import { OverlayPool } from '../systems/OverlayPool';
 import { BossChainFx } from '../systems/BossChainFx';
 import { BossEnrageFx } from '../systems/BossEnrageFx';
+import { SiphonCueFx } from '../systems/SiphonCueFx';
 import { BossSlamFx } from '../systems/BossSlamFx';
 import { BossSummonFx } from '../systems/BossSummonFx';
 import { EliteMarkPool } from '../systems/EliteMarkPool';
@@ -330,6 +333,18 @@ const PICKUP_STREAM = 'pickups';
  * the floor never moves a seed's spawns, offers or drops.
  */
 const ARENA_STREAM = 'arena';
+
+/** `siphonReport`'s tally (CO-235); `second` and the two `second*` fields are the run-second being counted, by step start. */
+const EMPTY_SIPHON_TALLY = {
+  fed: 0,
+  healed: 0,
+  cues: 0,
+  peakHealPerS: 0,
+  peakCuesPerS: 0,
+  second: -1,
+  secondHealed: 0,
+  secondCues: 0,
+};
 
 /**
  * Where a ground area's shards fall draws from a stream of its own (#219):
@@ -511,6 +526,12 @@ export class GameScene extends Phaser.Scene {
   private bossChainFx!: BossChainFx;
   /** #388: the enraged boss's ember ring and burst. */
   private bossEnrageFx!: BossEnrageFx;
+  /** CO-235: Siphon's heal cue on the hero. */
+  private siphonCueFx!: SiphonCueFx;
+  /** CO-235: damage banked for Siphon, paid out as HP by `tickSiphon`. */
+  private siphon: SiphonState = resetSiphon();
+  /** Test hook (CO-235): damage fed, HP healed, cues due, and the busiest whole run-second of each. */
+  private siphonTally = { ...EMPTY_SIPHON_TALLY };
   private bossSlamFx!: BossSlamFx;
   private bossLeapFx!: BossSlamFx;
   private bossSummonFx!: BossSummonFx;
@@ -674,6 +695,25 @@ export class GameScene extends Phaser.Scene {
       if (key) clips.add(key);
     }
     return { live, ...this.blastSplitTally, clips: [...clips].sort() };
+  }
+
+  /**
+   * Test hook (CO-235): the damage fed to Siphon (counted only while a rank is
+   * held), the HP it healed, the cues it called and the pulses actually played,
+   * with the most HP and the most cue requests (`drainSiphon`'s, before the clip's
+   * own throttle) seen in any one run-second, which the browser suite holds to
+   * the heal ceiling.
+   */
+  get siphonReport(): {
+    fed: number;
+    healed: number;
+    cues: number;
+    pulses: number;
+    peakHealPerS: number;
+    peakCuesPerS: number;
+  } {
+    const { fed, healed, cues, peakHealPerS, peakCuesPerS } = this.siphonTally;
+    return { fed, healed, cues, pulses: this.siphonCueFx.pulses, peakHealPerS, peakCuesPerS };
   }
 
   /**
@@ -1655,6 +1695,8 @@ export class GameScene extends Phaser.Scene {
     this.blastSplitTally = { blasts: 0, blastHits: 0, blastHpLost: 0, children: 0, dropped: 0 };
     this.guardTally = { blocked: 0, full: 0, blockedRaw: 0, blockedDealt: 0 };
     this.elitesKilled = 0;
+    this.siphon = resetSiphon();
+    this.siphonTally = { ...EMPTY_SIPHON_TALLY };
     this.spawns = new SpawnDirector(
       this.cameras.main,
       this.enemies,
@@ -1675,6 +1717,7 @@ export class GameScene extends Phaser.Scene {
     this.eliteMarks = new EliteMarkPool(this);
     this.bossChainFx = new BossChainFx(this);
     this.bossEnrageFx = new BossEnrageFx(this);
+    this.siphonCueFx = new SiphonCueFx(this);
     this.bossSlamFx = new BossSlamFx(this);
     this.bossLeapFx = new BossSlamFx(this, 'leap');
     this.bossSummonFx = new BossSummonFx(this);
@@ -1989,7 +2032,7 @@ export class GameScene extends Phaser.Scene {
     this.enemies.update(
       step.deltaMs,
       this.player,
-      (enemy, amount) => this.damageEnemy(enemy, amount, 'dot'),
+      (enemy, amount) => this.feedSiphon(this.damageEnemy(enemy, amount, 'dot')),
       (enemy, target) => this.enemyShots.fire(enemy, target, enemy.shotDamage),
     );
     // Before the physics step, so a shot spent at its range cannot land a hit past it.
@@ -2029,6 +2072,50 @@ export class GameScene extends Phaser.Scene {
     this.bossLeapFx.update(this.enemies.boss);
     this.bossSummonFx.update(this.enemies.boss);
     this.numbers.update(step.deltaMs);
+    this.tickSiphon(step);
+  }
+
+  /** CO-235: bank `landed`, the HP a hit really took off, at the held Siphon share. */
+  private feedSiphon(landed: number): void {
+    const share = this.spells.profile.siphonShare;
+    if (!(share > 0) || !(landed > 0)) return;
+    this.siphon = accrueSiphon(this.siphon, landed, share, SIPHON);
+    this.siphonTally.fed += landed;
+  }
+
+  /**
+   * CO-235: pay the bank out, a step's worth at a time, into HP the hero has
+   * room for, and play the cue. The share is read live, so a rank taken mid-run
+   * counts from the next hit. Death empties the bank.
+   */
+  private tickSiphon(step: Readonly<{ startMs: number; deltaMs: number }>): void {
+    if (this.player.isDead) {
+      this.siphon = resetSiphon();
+      this.siphonCueFx.hide();
+      return;
+    }
+    const room = this.player.maxHp - this.player.hp;
+    const out = drainSiphon(this.siphon, step.deltaMs / 1000, room, SIPHON);
+    this.siphon = out.state;
+    if (out.heal > 0) this.player.restoreHp(out.heal);
+    this.siphonCueFx.update(this.player, out.cue);
+    const tally = this.siphonTally;
+    // Bucketed by the step's own start: `run.tick` has already moved the clock to
+    // the frame's end, so a bucket holds exactly the steps that start in its second.
+    const second = Math.floor(step.startMs / 1000);
+    if (second !== tally.second) {
+      tally.second = second;
+      tally.secondHealed = 0;
+      tally.secondCues = 0;
+    }
+    tally.healed += out.heal;
+    tally.secondHealed += out.heal;
+    if (out.cue) {
+      tally.cues += 1;
+      tally.secondCues += 1;
+    }
+    tally.peakHealPerS = Math.max(tally.peakHealPerS, tally.secondHealed);
+    tally.peakCuesPerS = Math.max(tally.peakCuesPerS, tally.secondCues);
   }
 
   /**
@@ -2061,8 +2148,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
+    // The one place a spell's damage feeds Siphon (CO-235), besides the status
+    // burn and bleed (one `dot` callback feeds both): the test hooks, the exploder's contact kill and the bomb call
+    // `damageEnemy` directly and so feed nothing.
     const damage = (enemy: Enemy, amount: number, kind?: HitKind, from?: Readonly<Vec2>): void =>
-      this.damageEnemy(enemy, amount, kind, from);
+      this.feedSiphon(this.damageEnemy(enemy, amount, kind, from));
     switch (spellId) {
       case 'fire':
         return new FireballSpell(
@@ -2587,8 +2677,8 @@ export class GameScene extends Phaser.Scene {
     kind: HitKind = 'hit',
     from?: Readonly<Vec2>,
     capped = true,
-  ): void {
-    if (!enemy.active) return;
+  ): number {
+    if (!enemy.active) return 0;
     const { x, y, enemyType, isElite, isSummoned } = enemy;
     const boss = enemy instanceof Boss;
     const { critChance, critMultiplier } = this.spells.profile;
@@ -2605,9 +2695,12 @@ export class GameScene extends Phaser.Scene {
       this.tallyGuard(struck, dealt, guard);
     // A dying enemy takes nothing, so it shows nothing.
     if (!enemy.isDying) this.showHit(enemy, dealt, kind, crit);
-    if (!enemy.takeDamage(dealt)) {
+    const hpBefore = enemy.remainingHp;
+    const died = enemy.takeDamage(dealt);
+    const removed = Math.max(0, hpBefore - Math.max(0, enemy.remainingHp));
+    if (!died) {
       this.audio.play('enemy.hurt');
-      return;
+      return removed;
     }
     this.numbers.flushDot(enemy);
     this.run.recordKill();
@@ -2621,17 +2714,18 @@ export class GameScene extends Phaser.Scene {
       // The blow decides the run (#315): a win unless the hero is already dead.
       this.decidedOutcome = decideOnBossKill(this.decidedOutcome, this.player.isDead);
       this.run.addEmbers(BOSS_EMBERS);
-      return;
+      return removed;
     }
     this.onDeath(enemy, x, y);
     if (isElite) this.elitesKilled += 1;
     // #126: a splitter's children drop nothing, or splitters become farms.
-    if (ENEMY_ARCHETYPES[enemyType].loot === false) return;
+    if (ENEMY_ARCHETYPES[enemyType].loot === false) return removed;
     // #126: an elite drops `ELITE.gemMul` times its type's gems, and a chest.
     this.gems.dropFor(enemyType, x, y, isElite ? eliteGemCount(enemyType) : undefined);
     // CO-224: a boss's pack pays XP alone, so no drop roll is made (pickupRng stays put).
-    if (isSummoned) return;
+    if (isSummoned) return removed;
     this.dropPickups(enemyType, x, y, isElite);
+    return removed;
   }
 
   /** #126: count a hit on a shielded enemy for `guardReport`. */

@@ -195,6 +195,13 @@ export const BOSS_BURST = { clip: 'boss.enrageBurst', span: 3 } as const;
 export const BOSS_AURA_DEPTH = -0.2;
 
 /**
+ * CO-235: Siphon's heal cue, a small mote that rises from the hero (4 frames,
+ * played once) at `FX_DEPTH`. One sprite, never restarted mid-clip, so with the
+ * heal ceiling's one cue per HP it plays at most 3 times a second.
+ */
+export const SIPHON_CUE = { clip: 'hero.siphon' } as const;
+
+/**
  * CO-222: the Ground slam's floor warning, a translucent red disc under a
  * bright rim, scaled so the rim's outer edge sits on the slam's radius; it lies
  * over the enrage ring and under every entity. The shockwave plays once at the
