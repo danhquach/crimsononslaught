@@ -69,7 +69,7 @@ import {
   startingActions,
   type OfferActions,
 } from '../core/offerActions';
-import { relicOffer } from '../core/relicOffer';
+import { relicOffer, relicOfferAfterBan, type RelicOfferInput } from '../core/relicOffer';
 import { PLAYER_EVENT } from '../core/health';
 import {
   PICKUP_EVENT,
@@ -371,6 +371,9 @@ const AREA_FX_STREAM = 'areaFx';
  */
 const RELIC_OFFER_STREAM = 'relicOffers';
 
+/** Whose offer the overlay shows; Reroll and Ban redraw from that pool (CO-239). */
+type OfferSource = 'levelUp' | 'relic';
+
 /**
  * Where an elite lands draws from a stream of its own (#126), so the elites
  * never move a seed's crowd, offers or drops.
@@ -600,8 +603,8 @@ export class GameScene extends Phaser.Scene {
   private pendingRelics = 0;
   /** The cards the open overlay is showing; a pick is only honoured against these. */
   private offer: readonly OfferCard[] = [];
-  /** Whether `offer` is a level-up's: Reroll, Skip and Ban (#228) answer only those. */
-  private offerIsLevelUp = false;
+  /** Whose offer `offer` is: Reroll, Skip and Ban (#228, CO-239) redraw from its pool. */
+  private offerSource: OfferSource | undefined = undefined;
   /** #228: the run's rerolls, bans and banned cards; fresh every run. */
   private offerActions: OfferActions = startingActions();
   /** `?invulnerable=1` (test hook): every hit is dropped before it reaches the player. */
@@ -1698,7 +1701,7 @@ export class GameScene extends Phaser.Scene {
     this.pausing = false;
     this.magnetMsLeft = 0;
     this.offer = [];
-    this.offerIsLevelUp = false;
+    this.offerSource = undefined;
     this.offerActions = startingActions();
     this.invulnerable = this.registry.get(INVULNERABLE_REGISTRY_KEY) === true;
     this.audio = audioOf(this);
@@ -1810,7 +1813,7 @@ export class GameScene extends Phaser.Scene {
     this.events.on(LEVEL_UP_EVENT.pick, onPick);
     const onReroll = (): void => this.rerollOffer();
     this.events.on(LEVEL_UP_EVENT.reroll, onReroll);
-    const onSkip = (): void => this.skipLevelUp();
+    const onSkip = (): void => this.skipOpenOffer();
     this.events.on(LEVEL_UP_EVENT.skip, onSkip);
     const onBan = (ban: LevelUpPickPayload): void => this.banCard(ban.offerId);
     this.events.on(LEVEL_UP_EVENT.ban, onBan);
@@ -3153,28 +3156,47 @@ export class GameScene extends Phaser.Scene {
       this.player.grantMaxHp(resolution.maxHpBonus);
       return false;
     }
-    this.offer = resolution.cards;
-    this.offerIsLevelUp = true;
-    const payload: LevelUpPayload = {
-      offer: resolution.cards,
-      actions: countsOf(this.offerActions),
-    };
-    if (!fresh) {
-      this.scene.launch(SCENE.levelUp, payload);
-      return true;
-    }
-    this.audio.play('progress.levelUp');
-    this.pauseUnder(SCENE.levelUp, payload);
+    this.showOffer(resolution.cards, 'levelUp', fresh);
     return true;
   }
 
   /**
+   * #227: a relic's offer on the same overlay, with the same counts (CO-239).
+   * An empty one shows nothing and grants nothing. Returns whether it shows.
+   */
+  private showRelicOffer(offer: readonly OfferCard[], fresh: boolean): boolean {
+    if (offer.length === 0) return false;
+    this.showOffer(offer, 'relic', fresh);
+    return true;
+  }
+
+  private showOffer(offer: readonly OfferCard[], source: OfferSource, fresh: boolean): void {
+    this.offer = offer;
+    this.offerSource = source;
+    const payload = this.offerPayload();
+    if (!fresh) {
+      this.scene.launch(SCENE.levelUp, payload);
+      return;
+    }
+    this.audio.play('progress.levelUp');
+    this.pauseUnder(SCENE.levelUp, payload);
+  }
+
+  /** The open offer as the overlay takes it: its cards, the run's counts, and whether it is a relic's. */
+  private offerPayload(): LevelUpPayload {
+    const payload: LevelUpPayload = { offer: this.offer, actions: countsOf(this.offerActions) };
+    if (this.offerSource === 'relic') payload.relic = true;
+    return payload;
+  }
+
+  /**
    * #228: spend a reroll on a fresh draw that leaves out the cards just shown
-   * while the pool has others. Game is authoritative: a reroll it cannot pay
-   * for shows the same offer again rather than leave the overlay waiting.
+   * while the pool has others; a relic's offer (CO-239) redraws from the relic
+   * pool. Game is authoritative: a reroll it cannot pay for shows the same
+   * offer again rather than leave the overlay waiting.
    */
   private rerollOffer(): void {
-    const spent = this.offerIsLevelUp ? spendReroll(this.offerActions) : undefined;
+    const spent = this.offerSource ? spendReroll(this.offerActions) : undefined;
     if (!spent) {
       if (this.offer.length > 0) console.warn('[Game] ignoring reroll');
       this.reshowOffer();
@@ -3182,16 +3204,21 @@ export class GameScene extends Phaser.Scene {
     }
     this.offerActions = spent;
     const exclude = new Set(this.offer.map((card) => card.id));
-    this.redrawLevelUp(levelUpOffer(this.rng, { ...this.offerInput(), exclude }));
+    this.redrawOffer(
+      this.offerSource === 'relic'
+        ? relicOffer(this.relicRng, { ...this.relicInput(), exclude })
+        : levelUpOffer(this.rng, { ...this.offerInput(), exclude }),
+    );
   }
 
   /**
-   * #228: ban a card of the open level-up for the rest of the run and redraw
+   * #228: ban a card of the open offer for the rest of the run and redraw
    * its place. A card not on the offer, or a ban the run has not got, is
    * refused like a stale pick.
    */
   private banCard(offerId: string): void {
-    const onOffer = this.offerIsLevelUp && this.offer.some((card) => card.id === offerId);
+    const onOffer =
+      this.offerSource !== undefined && this.offer.some((card) => card.id === offerId);
     const spent = onOffer ? spendBan(this.offerActions, offerId) : undefined;
     if (!spent) {
       if (this.offer.length > 0) console.warn(`[Game] ignoring ban of "${offerId}"`);
@@ -3199,17 +3226,26 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.offerActions = spent;
-    this.redrawLevelUp(offerAfterBan(this.rng, this.offerInput(), this.offer, offerId));
+    this.redrawOffer(
+      this.offerSource === 'relic'
+        ? relicOfferAfterBan(this.relicRng, this.relicInput(), this.offer, offerId)
+        : offerAfterBan(this.rng, this.offerInput(), this.offer, offerId),
+    );
   }
 
   /**
-   * Show a redrawn offer on the open overlay. One a ban emptied has paid the
-   * +10 max HP instead, so the overlay closes and the run goes on.
+   * Show a redrawn offer on the open overlay. A level-up a ban emptied has
+   * paid the +10 max HP instead, and a relic's grants nothing (CO-239), so the
+   * overlay closes and the run goes on.
    */
-  private redrawLevelUp(offer: readonly OfferCard[]): void {
-    if (this.showLevelUp(offer, false)) return;
+  private redrawOffer(offer: readonly OfferCard[]): void {
+    const shown =
+      this.offerSource === 'relic'
+        ? this.showRelicOffer(offer, false)
+        : this.showLevelUp(offer, false);
+    if (shown) return;
     this.offer = [];
-    this.offerIsLevelUp = false;
+    this.offerSource = undefined;
     this.scene.stop(SCENE.levelUp);
     this.scene.resume();
   }
@@ -3217,23 +3253,22 @@ export class GameScene extends Phaser.Scene {
   /** Relaunch the open overlay unchanged after a refused request; nothing when none is open. */
   private reshowOffer(): void {
     if (this.offer.length === 0) return;
-    const payload: LevelUpPayload = { offer: this.offer };
-    if (this.offerIsLevelUp) payload.actions = countsOf(this.offerActions);
-    this.scene.launch(SCENE.levelUp, payload);
+    this.scene.launch(SCENE.levelUp, this.offerPayload());
   }
 
   /**
    * #228: Skip takes nothing and pays +1 reroll; the overlay has closed
-   * itself. An open slot stays open, so the next level-up offers it again.
+   * itself. An open slot stays open, so the next level-up offers it again. A
+   * skipped relic (CO-239) grants no buff but was counted when touched.
    */
-  private skipLevelUp(): void {
-    if (!this.offerIsLevelUp) {
-      console.warn('[Game] ignoring skip with no level-up open');
+  private skipOpenOffer(): void {
+    if (!this.offerSource) {
+      console.warn('[Game] ignoring skip with no offer open');
       return;
     }
     this.offerActions = skipOffer(this.offerActions);
     this.offer = [];
-    this.offerIsLevelUp = false;
+    this.offerSource = undefined;
   }
 
   /**
@@ -3251,18 +3286,17 @@ export class GameScene extends Phaser.Scene {
 
   /** #227: pause and offer up to 3 relic buffs on the level-up overlay. */
   private openRelicOffer(): boolean {
-    const cards = relicOffer(this.relicRng, {
+    return this.showRelicOffer(relicOffer(this.relicRng, this.relicInput()), true);
+  }
+
+  /** What a relic draws from right now, the run's bans (CO-239) included. */
+  private relicInput(): RelicOfferInput {
+    return {
       ranks: this.spells.loadout.relics,
       profile: this.spells.profile,
       carried: this.spells.carriedStats,
-    });
-    if (cards.length === 0) return false;
-    this.offer = cards;
-    this.offerIsLevelUp = false;
-    const payload: LevelUpPayload = { offer: cards };
-    this.audio.play('progress.levelUp');
-    this.pauseUnder(SCENE.levelUp, payload);
-    return true;
+      banned: this.offerActions.banned,
+    };
   }
 
   /**
@@ -3348,7 +3382,7 @@ export class GameScene extends Phaser.Scene {
   private applyPick(offerId: string): void {
     const card = this.offer.find((c) => c.id === offerId);
     this.offer = [];
-    this.offerIsLevelUp = false;
+    this.offerSource = undefined;
     if (!card) {
       console.warn(`[Game] ignoring pick of unoffered card "${offerId}"`);
       return;

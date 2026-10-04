@@ -70,16 +70,18 @@ const BAN_COLOR = 0xdc143c;
  * A relic's offer (#227) is the same overlay with relic cards and its own
  * title, so every flow that answers a level-up answers a relic too.
  *
- * A level-up's payload also carries the run's Reroll and Ban counts (#228),
- * which add Reroll (R), Skip (S) and Ban (B) buttons under the cards; arrows +
- * Enter reach them and the cards alike. Ban is a mode: press it, then pick the
- * card to ban; Esc or Ban again cancels. The overlay only asks — Reroll and
+ * The payload also carries the run's Reroll and Ban counts (#228; a relic's
+ * offer too since CO-239), which add Reroll (R), Skip (S) and Ban (B) buttons
+ * under the cards; arrows + Enter reach them and the cards alike. Ban is a
+ * mode: press it, then pick the card to ban; Esc or Ban again cancels. The overlay only asks — Reroll and
  * Ban are `LEVEL_UP_EVENT`s Game answers by relaunching this scene with the new
  * offer (or closing it), and Skip closes it like a pick.
  */
 export class LevelUpScene extends Phaser.Scene {
   private cards: readonly OfferCard[] = [];
   private actions: OfferActionCounts | undefined;
+  /** A relic's offer (#227), titled as one. */
+  private relic = false;
   /** Set once this overlay has asked Game for something; everything after is ignored. */
   private acted = false;
   private banning = false;
@@ -94,6 +96,7 @@ export class LevelUpScene extends Phaser.Scene {
   init(data: unknown): void {
     this.cards = isLevelUpPayload(data) ? data.offer : [];
     this.actions = isLevelUpPayload(data) ? data.actions : undefined;
+    this.relic = isLevelUpPayload(data) && data.relic === true;
     // Phaser replays the last launch payload on a payload-less launch; clear it.
     this.scene.settings.data = {};
   }
@@ -102,9 +105,10 @@ export class LevelUpScene extends Phaser.Scene {
   get view(): {
     cards: readonly OfferCard[];
     actions: OfferActionCounts | undefined;
+    relic: boolean;
     banning: boolean;
   } {
-    return { cards: this.cards, actions: this.actions, banning: this.banning };
+    return { cards: this.cards, actions: this.actions, relic: this.relic, banning: this.banning };
   }
 
   create(): void {
@@ -123,10 +127,7 @@ export class LevelUpScene extends Phaser.Scene {
     // Full-screen backdrop; interactive so clicks never reach Game objects underneath.
     this.add.rectangle(0, 0, width, height, 0x000000, BACKDROP_ALPHA).setOrigin(0).setInteractive();
 
-    // A relic's offer can hold charge cards (#228) but never Reroll or Ban.
-    const relic =
-      this.actions === undefined &&
-      this.cards.every((card) => card.kind === 'relic' || card.kind === 'charge');
+    const { relic } = this;
     this.add
       .text(width / 2, 70, relic ? 'Relic found!' : 'Level up!', {
         fontFamily: 'Georgia, serif',
