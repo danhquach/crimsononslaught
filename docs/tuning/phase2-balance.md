@@ -1144,3 +1144,21 @@ at 6dc3684.
 
 Limits: 20 runs a side, n = 5 per element; slam damage is measured on a bot that
 always dodges the ring, so it says nothing about a human player.
+
+# Boss Leap (CO-232, 2026-10-04)
+
+A gap closer for a far hero: staying beyond 280 px was safe from everything but the
+volley and the charge. From the second bar the boss can crouch and land on the hero's
+spot. Starting values, not yet swept (`npm run sweep` was not run for this ticket):
+
+| Value | Setting |
+|---|---|
+| Wind-up | 0.9 s: still 0.55 s, airborne the last 0.35 s, lands as it ends |
+| Landing circle | 90 px, locked at the wind-up's start (the hero can walk out of it) |
+| Damage | 30, 45 enraged (the slam's), through the immunity window |
+| Cooldown | 12 s from the wind-up's start, on the boss clock |
+| Weights (near / mid / far) | 0 / 1 / 3; a weight of 0 drops the skill from the roll, so it is never drawn within 160 px |
+| Far odds, all four skills ready | slam 1, volley 3, summon 2, leap 3 (of 9) |
+
+A hero at the circle's centre needs 90 / 180 = 0.5 s to clear it (the hit test is
+centre distance only, `blastReaches`), inside the 0.9 s warning. Like the slam, a bot that steps out of rings will not be hit by it.

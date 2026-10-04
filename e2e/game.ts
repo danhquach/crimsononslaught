@@ -4,6 +4,7 @@ import { SPELL_IDS } from '../src/config/spells';
 import type { HudModel } from '../src/core/hudModel';
 import { AUDIO_REGISTRY_KEY, SCENE } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
+import type { GameScene } from '../src/scenes/GameScene';
 import type { HudScene } from '../src/scenes/HudScene';
 import type { FocusRingReport } from '../src/scenes/focusRing';
 import type { MenuRowReport } from '../src/scenes/menuUi';
@@ -23,6 +24,23 @@ import type { MenuRowReport } from '../src/scenes/menuUi';
  * catches a stalled loop (#260).
  */
 export const MIN_FPS = process.env.CI ? 5 : 20;
+
+/**
+ * CO-232: leave `skills` out of the boss's roll for the rest of the run, so a
+ * spec that counts the other skills' picks (a far hero draws Leap 3 times in 9)
+ * stays deterministic. A test hook on the scene, not a URL param.
+ */
+export async function blockBossSkills(page: Page, skills: readonly string[]): Promise<void> {
+  await page.evaluate(
+    async ({ scene, skills }) => {
+      const { game } = await import('/src/main.ts');
+      (game.scene.getScene(scene.game) as GameScene).blockBossSkillsForTest(
+        skills as Parameters<GameScene['blockBossSkillsForTest']>[0],
+      );
+    },
+    { scene: SCENE, skills },
+  );
+}
 
 export function isSceneActive(page: Page, key: string): Promise<boolean> {
   return page.evaluate(async (sceneKey) => {

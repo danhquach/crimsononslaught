@@ -1,0 +1,573 @@
+{
+  "frames": {
+    "boss.leap.down.0": {
+      "frame": {
+        "x": 107,
+        "y": 108,
+        "w": 123,
+        "h": 66
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 123,
+        "h": 66
+      },
+      "sourceSize": {
+        "w": 123,
+        "h": 66
+      }
+    },
+    "boss.leap.down.1": {
+      "frame": {
+        "x": 231,
+        "y": 108,
+        "w": 123,
+        "h": 66
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 123,
+        "h": 66
+      },
+      "sourceSize": {
+        "w": 123,
+        "h": 66
+      }
+    },
+    "boss.leap.left.0": {
+      "frame": {
+        "x": 1721,
+        "y": 1,
+        "w": 107,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 107,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 107,
+        "h": 68
+      }
+    },
+    "boss.leap.left.1": {
+      "frame": {
+        "x": 1829,
+        "y": 1,
+        "w": 107,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 107,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 107,
+        "h": 68
+      }
+    },
+    "boss.leap.right.0": {
+      "frame": {
+        "x": 1937,
+        "y": 1,
+        "w": 105,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 105,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 105,
+        "h": 68
+      }
+    },
+    "boss.leap.right.1": {
+      "frame": {
+        "x": 1,
+        "y": 108,
+        "w": 105,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 105,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 105,
+        "h": 68
+      }
+    },
+    "boss.leap.up.0": {
+      "frame": {
+        "x": 355,
+        "y": 108,
+        "w": 123,
+        "h": 66
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 123,
+        "h": 66
+      },
+      "sourceSize": {
+        "w": 123,
+        "h": 66
+      }
+    },
+    "boss.leap.up.1": {
+      "frame": {
+        "x": 479,
+        "y": 108,
+        "w": 123,
+        "h": 66
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 123,
+        "h": 66
+      },
+      "sourceSize": {
+        "w": 123,
+        "h": 66
+      }
+    },
+    "boss.leapShock.0": {
+      "frame": {
+        "x": 443,
+        "y": 1,
+        "w": 118,
+        "h": 100
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 118,
+        "h": 100
+      },
+      "sourceSize": {
+        "w": 118,
+        "h": 100
+      }
+    },
+    "boss.leapShock.1": {
+      "frame": {
+        "x": 562,
+        "y": 1,
+        "w": 118,
+        "h": 100
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 118,
+        "h": 100
+      },
+      "sourceSize": {
+        "w": 118,
+        "h": 100
+      }
+    },
+    "boss.leapShock.2": {
+      "frame": {
+        "x": 681,
+        "y": 1,
+        "w": 118,
+        "h": 100
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 118,
+        "h": 100
+      },
+      "sourceSize": {
+        "w": 118,
+        "h": 100
+      }
+    },
+    "boss.leapShock.3": {
+      "frame": {
+        "x": 800,
+        "y": 1,
+        "w": 118,
+        "h": 100
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 118,
+        "h": 100
+      },
+      "sourceSize": {
+        "w": 118,
+        "h": 100
+      }
+    },
+    "boss.leapWarnFill.0": {
+      "frame": {
+        "x": 1057,
+        "y": 1,
+        "w": 82,
+        "h": 82
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 82
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 82
+      }
+    },
+    "boss.leapWarnFill.1": {
+      "frame": {
+        "x": 1140,
+        "y": 1,
+        "w": 82,
+        "h": 82
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 82
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 82
+      }
+    },
+    "boss.leapWarnFill.2": {
+      "frame": {
+        "x": 1223,
+        "y": 1,
+        "w": 82,
+        "h": 82
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 82
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 82
+      }
+    },
+    "boss.leapWarnFill.3": {
+      "frame": {
+        "x": 1306,
+        "y": 1,
+        "w": 82,
+        "h": 82
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 82
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 82
+      }
+    },
+    "boss.leapWarnRim.0": {
+      "frame": {
+        "x": 1389,
+        "y": 1,
+        "w": 82,
+        "h": 82
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 82
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 82
+      }
+    },
+    "boss.leapWarnRim.1": {
+      "frame": {
+        "x": 1472,
+        "y": 1,
+        "w": 82,
+        "h": 82
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 82
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 82
+      }
+    },
+    "boss.leapWarnRim.2": {
+      "frame": {
+        "x": 1555,
+        "y": 1,
+        "w": 82,
+        "h": 82
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 82
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 82
+      }
+    },
+    "boss.leapWarnRim.3": {
+      "frame": {
+        "x": 1638,
+        "y": 1,
+        "w": 82,
+        "h": 82
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 82
+      },
+      "sourceSize": {
+        "w": 82,
+        "h": 82
+      }
+    },
+    "boss.leapWindup.down.0": {
+      "frame": {
+        "x": 153,
+        "y": 1,
+        "w": 75,
+        "h": 103
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 75,
+        "h": 103
+      },
+      "sourceSize": {
+        "w": 75,
+        "h": 103
+      }
+    },
+    "boss.leapWindup.down.1": {
+      "frame": {
+        "x": 229,
+        "y": 1,
+        "w": 75,
+        "h": 103
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 75,
+        "h": 103
+      },
+      "sourceSize": {
+        "w": 75,
+        "h": 103
+      }
+    },
+    "boss.leapWindup.left.0": {
+      "frame": {
+        "x": 919,
+        "y": 1,
+        "w": 68,
+        "h": 100
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 100
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 100
+      }
+    },
+    "boss.leapWindup.left.1": {
+      "frame": {
+        "x": 988,
+        "y": 1,
+        "w": 68,
+        "h": 100
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 100
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 100
+      }
+    },
+    "boss.leapWindup.right.0": {
+      "frame": {
+        "x": 305,
+        "y": 1,
+        "w": 68,
+        "h": 102
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 102
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 102
+      }
+    },
+    "boss.leapWindup.right.1": {
+      "frame": {
+        "x": 374,
+        "y": 1,
+        "w": 68,
+        "h": 102
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 68,
+        "h": 102
+      },
+      "sourceSize": {
+        "w": 68,
+        "h": 102
+      }
+    },
+    "boss.leapWindup.up.0": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 75,
+        "h": 106
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 75,
+        "h": 106
+      },
+      "sourceSize": {
+        "w": 75,
+        "h": 106
+      }
+    },
+    "boss.leapWindup.up.1": {
+      "frame": {
+        "x": 77,
+        "y": 1,
+        "w": 75,
+        "h": 106
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 75,
+        "h": 106
+      },
+      "sourceSize": {
+        "w": 75,
+        "h": 106
+      }
+    }
+  },
+  "meta": {
+    "app": "scripts/cut-sheets.mjs",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 256
+    },
+    "scale": "1"
+  }
+}

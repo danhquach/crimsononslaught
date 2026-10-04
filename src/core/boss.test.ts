@@ -4,6 +4,7 @@ import {
   BOSS,
   BOSS_CHAIN,
   BOSS_ENRAGE,
+  BOSS_LEAP,
   BOSS_SLAM,
   BOSS_SUMMON,
   BOSS_VOLLEY,
@@ -19,6 +20,8 @@ import {
   chainChargeCount,
   enrageThresholdHp,
   enterEnrage,
+  leapDamage,
+  leapPoint,
   phaseLengthS,
   pickBossSkill,
   shouldEnrage,
@@ -55,6 +58,8 @@ describe('startBossCycle (CO-050)', () => {
       next: 'charge',
       skill: null,
       skillDir: { x: 0, y: 0 },
+      skillFrom: { x: 0, y: 0 },
+      skillTarget: { x: 0, y: 0 },
       clockS: 0,
       readyAtS: {},
       chainLength: 1,
@@ -450,7 +455,7 @@ describe('skill rotation (CO-222)', () => {
     expect(pickBossSkill(['slam'], {}, 0, 0, () => 0.99)).toBe('slam');
     expect(pickBossSkill(['slam'], {}, 0, 999, () => 0)).toBe('slam');
     expect(bossSkillsFor(0)).toEqual(['slam']);
-    expect(bossSkillsFor(1)).toEqual(['slam', 'volley', 'summon']);
+    expect(bossSkillsFor(1)).toEqual(['slam', 'volley', 'summon', 'leap']);
     expect(bossSkillsFor(9)).toEqual(bossSkillsFor(BOSS.bars - 1));
     expect(bossSkillsFor(-1)).toEqual(bossSkillsFor(0));
   });
@@ -846,6 +851,168 @@ describe('boss summon (CO-224)', () => {
       expect(impacts.length).toBeGreaterThanOrEqual(2);
     });
   }
+});
+
+describe('boss leap (CO-232)', () => {
+  const ALL: readonly BossSkillId[] = ['slam', 'volley', 'summon', 'leap'];
+  const FROM = { x: 100, y: 200 };
+  const TARGET = { x: 700, y: 600 };
+  const GROUND = { slam: 99, volley: 99, summon: 99 };
+
+  /** A cycle that begins a leap wind-up from FROM toward TARGET. */
+  const leaping = (): BossCycle => beginWindup(startBossCycle(), 'leap', 0, FROM, TARGET);
+
+  it('is on the second bar only', () => {
+    expect(bossSkillsFor(0)).not.toContain('leap');
+    expect(bossSkillsFor(1)).toContain('leap');
+  });
+
+  it('is never picked up close, even as the only skill ready, and draws nothing then', () => {
+    let draws = 0;
+    const rand = () => {
+      draws += 1;
+      return 0.5;
+    };
+    for (const d of [0, 80, 159])
+      expect(pickBossSkill(ALL, GROUND, 1, d, rand), String(d)).toBeNull();
+    expect(draws).toBe(0);
+    expect(pickBossSkill(['leap'], {}, 1, 100, rand)).toBeNull();
+    expect(draws).toBe(0);
+    // Mid and far it is the pick when it is all that is ready.
+    expect(pickBossSkill(['leap'], {}, 1, 220, rand)).toBe('leap');
+    expect(pickBossSkill(ALL, GROUND, 1, 400, rand)).toBe('leap');
+    expect(draws).toBe(2);
+  });
+
+  it('never leaves the near roll with a leap in it, and a near skill leg falls back to a charge', () => {
+    const rng = createRng(5);
+    for (let i = 0; i < 2000; i += 1)
+      expect(pickBossSkill(ALL, {}, 0, 100, () => rng.next())).not.toBe('leap');
+    const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 0 };
+    const step = stepBossCycle(chase, 0.01, ORIGIN, { x: 100, y: 0 }, 1, false, ['leap']);
+    expect(step.cycle.phase).toBe('telegraph');
+  });
+
+  it('far off the odds are 1:3:2:3 for slam, volley, summon and leap', () => {
+    const rng = createRng(9);
+    const counts: Record<string, number> = {};
+    const n = 9000;
+    for (let i = 0; i < n; i += 1) {
+      const pick = pickBossSkill(ALL, {}, 0, 400, () => rng.next()) as string;
+      counts[pick] = (counts[pick] ?? 0) + 1;
+    }
+    // Far weights: slam 1, volley 3, summon 2, leap 3 -> 1/9, 3/9, 2/9, 3/9.
+    expect((counts.slam ?? 0) / n).toBeCloseTo(1 / 9, 1);
+    expect((counts.volley ?? 0) / n).toBeCloseTo(3 / 9, 1);
+    expect((counts.summon ?? 0) / n).toBeCloseTo(2 / 9, 1);
+    expect((counts.leap ?? 0) / n).toBeCloseTo(3 / 9, 1);
+  });
+
+  it('starts a 12 s cooldown as the wind-up begins', () => {
+    const chase = { ...startBossCycle(), next: 'skill' as const, remainingS: 0, clockS: 20 };
+    const step = stepBossCycle(chase, 0.01, ORIGIN, { x: 500, y: 0 }, 1, false, ['leap']);
+    expect(step.cycle.skill).toBe('leap');
+    expect(step.cycle.readyAtS.leap).toBeCloseTo(20.01 - 0.01 + BOSS_LEAP.cooldownS, 9);
+    expect(pickBossSkill(['leap'], step.cycle.readyAtS, 31, 400, () => 0)).toBeNull();
+    expect(pickBossSkill(['leap'], step.cycle.readyAtS, 32.1, 400, () => 0)).toBe('leap');
+  });
+
+  it('locks where the wind-up began and where the target stood', () => {
+    const cycle = leaping();
+    expect(cycle.skillFrom).toEqual(FROM);
+    expect(cycle.skillTarget).toEqual(TARGET);
+    expect(leapPoint({ ...cycle, skill: 'slam' })).toBeNull();
+  });
+
+  it('is still for the first 0.55 s of the wind-up, then flies in a straight line', () => {
+    const still = BOSS_LEAP.windupS - BOSS_LEAP.airS;
+    expect(still).toBeCloseTo(0.55, 9);
+    const at = (elapsedS: number) =>
+      leapPoint({ ...leaping(), remainingS: BOSS_LEAP.windupS - elapsedS });
+    expect(at(0)).toEqual(FROM);
+    expect(at(still)).toEqual(FROM);
+    const mid = at(still + BOSS_LEAP.airS / 2) as { x: number; y: number };
+    expect(mid.x).toBeCloseTo((FROM.x + TARGET.x) / 2, 9);
+    expect(mid.y).toBeCloseTo((FROM.y + TARGET.y) / 2, 9);
+    expect(at(BOSS_LEAP.windupS)).toEqual(TARGET);
+  });
+
+  it('is on the target through the landing, and nowhere outside a leap', () => {
+    const landed = { ...leaping(), phase: 'skill' as const, remainingS: 0.2 };
+    expect(leapPoint(landed)).toEqual(TARGET);
+    expect(leapPoint({ ...landed, phase: 'chase' })).toBeNull();
+    expect(leapPoint(startBossCycle())).toBeNull();
+    expect(leapPoint({ ...leaping(), skill: 'volley' })).toBeNull();
+  });
+
+  it('flies the same path whatever the frame length: 1, 7 and 60 frames of the same time', () => {
+    const total = BOSS_LEAP.windupS - 0.2; // 0.2 s of the flight left
+    const at = (frames: number) => {
+      let cycle = leaping();
+      for (let i = 0; i < frames; i += 1)
+        cycle = stepBossCycle(cycle, total / frames, FROM, TARGET, 1, false, ALL).cycle;
+      return leapPoint(cycle) as { x: number; y: number };
+    };
+    const one = at(1);
+    for (const frames of [7, 60]) {
+      expect(at(frames).x).toBeCloseTo(one.x, 9);
+      expect(at(frames).y).toBeCloseTo(one.y, 9);
+    }
+    expect(one.x).toBeGreaterThan(FROM.x);
+  });
+
+  it('reports one impact carrying the locked target when the wind-up ends, at any frame length', () => {
+    for (const frames of [1, 7, 60]) {
+      let cycle = leaping();
+      const impacts: { skill: string; target: { x: number; y: number }; atS: number }[] = [];
+      for (let i = 0; i < frames; i += 1) {
+        // The hero moves after the lock; the landing must not follow.
+        const step = stepBossCycle(
+          cycle,
+          (BOSS_LEAP.windupS + 0.01) / frames,
+          FROM,
+          { x: 0, y: 0 },
+          1,
+          false,
+          ALL,
+        );
+        impacts.push(...step.impacts);
+        cycle = step.cycle;
+      }
+      expect(impacts, String(frames)).toHaveLength(1);
+      expect(impacts[0]).toMatchObject({ skill: 'leap', target: TARGET });
+      expect(impacts[0]?.atS).toBeCloseTo(BOSS_LEAP.windupS, 9);
+      expect(cycle.phase).toBe('skill');
+    }
+  });
+
+  it('keeps the boss still in the core: velocity 0 through the wind-up and landing', () => {
+    let cycle = leaping();
+    for (let i = 0; i < 90; i += 1) {
+      const step = stepBossCycle(cycle, 0.01, FROM, TARGET, 1, false, ALL);
+      if (cycle.phase !== 'chase') expect(step.velocity).toEqual({ x: 0, y: 0 });
+      cycle = step.cycle;
+    }
+  });
+
+  it('deals 30, or 45 enraged', () => {
+    expect(leapDamage(false)).toBe(30);
+    expect(leapDamage(true)).toBe(45);
+  });
+
+  it('cuts an enraged chain short when forced mid-chain, and the leg after is the charge', () => {
+    const chained = {
+      ...startBossCycle(),
+      phase: 'telegraph' as const,
+      remainingS: 0.2,
+      chainLength: 2,
+      link: 1,
+    };
+    const cycle = beginWindup(chained, 'leap', 5, FROM, TARGET);
+    expect(cycle).toMatchObject({ phase: 'windup', skill: 'leap', chainLength: 1, link: 0 });
+    expect(phaseLengthS('windup', true, 'leap')).toBe(BOSS_LEAP.windupS);
+    expect(phaseLengthS('skill', true, 'leap')).toBe(BOSS_LEAP.activeS);
+  });
 });
 
 describe('calm cycle is unchanged (CO-225)', () => {

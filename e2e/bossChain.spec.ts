@@ -6,6 +6,7 @@ import { enrageThresholdHp } from '../src/core/boss';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import {
+  blockBossSkills,
   cardCenter,
   collectErrors,
   readSounds,
@@ -45,6 +46,8 @@ async function startRun(page: Page): Promise<void> {
   await expect
     .poll(async () => (await sample(page, 400, 0)) !== null, { timeout: 20_000 })
     .toBe(true);
+  // CO-232: a far hero draws Leap too; this spec is about the chain.
+  await blockBossSkills(page, ['leap']);
 }
 
 /**

@@ -2,6 +2,7 @@ import {
   BOSS,
   BOSS_CHAIN,
   BOSS_ENRAGE,
+  BOSS_LEAP,
   BOSS_SKILL_RANGE,
   BOSS_SKILL_ROTATION,
   BOSS_SKILL_WEIGHTS,
@@ -43,7 +44,8 @@ export type BossPhase = 'chase' | 'telegraph' | 'charge' | 'windup' | 'skill';
  * fires once, when a hit takes the boss to its enrage threshold (#388). `immune`
  * fires with `{ x, y }` over the boss when a stun or freeze is shrugged off
  * (CO-221), throttled by the entity. `skill` fires once with a
- * `BossSkillPayload` when a skill lands (CO-222), at the boss's spot then.
+ * `BossSkillPayload` when a skill lands (CO-222), at the boss's spot then (a
+ * leap's, where it lands).
  */
 export const BOSS_EVENT = {
   died: 'boss:died',
@@ -103,7 +105,16 @@ export interface BossSummonPayload extends BossSkillPayloadBase {
   readonly points: readonly Vec2[];
 }
 
-export type BossSkillPayload = BossSlamPayload | BossVolleyPayload | BossSummonPayload;
+/** Leap (CO-232): a ring of `radius` px round the landing (x, y), the point locked as the wind-up began. */
+export interface BossLeapPayload extends BossSkillPayloadBase {
+  readonly skill: 'leap';
+  readonly radius: number;
+  /** Where the boss took off, as the wind-up began. */
+  readonly from: Vec2;
+}
+
+export type BossSkillPayload =
+  BossSlamPayload | BossVolleyPayload | BossSummonPayload | BossLeapPayload;
 
 export interface BossCycle {
   readonly phase: BossPhase;
@@ -121,6 +132,10 @@ export interface BossCycle {
   readonly skill: BossSkillId | null;
   /** Unit vector toward the target, locked as a skill's windup began; zero when the target stood on the boss. */
   readonly skillDir: Vec2;
+  /** Where the boss stood as a skill's windup began (CO-232: a leap's take-off). */
+  readonly skillFrom: Vec2;
+  /** Where the target stood as it began, locked (CO-232: a leap's landing point). */
+  readonly skillTarget: Vec2;
   /** Seconds of frames fed to the cycle so far: the clock the cooldowns run on (CO-223). */
   readonly clockS: number;
   /** Boss clock each skill is next allowed to start a windup at; absent = ready. */
@@ -168,6 +183,8 @@ export interface BossStep {
   readonly impacts: readonly {
     readonly skill: BossSkillId;
     readonly aim: Vec2;
+    /** The target locked as the wind-up began (CO-232: where a leap lands). */
+    readonly target: Vec2;
     readonly atS: number;
   }[];
   /** CO-225: one per telegraph that ended this frame, so a long frame reports each lock exactly once. */
@@ -270,8 +287,9 @@ export function bossRangeBand(distancePx: number): BossRangeBand {
 /**
  * The skill a list gives next (CO-222, CO-223): at random from those whose
  * cooldown is over at `nowS`, each weighted by `BOSS_SKILL_WEIGHTS` for the
- * band of `distancePx`. `rand` is drawn from once, and not at all when none is
- * ready (or the list is empty): the leg is a charge instead, so null. A skill in
+ * band of `distancePx`; a skill weighted 0 there is left out. `rand` is drawn
+ * from once, and not at all when none is ready (or the list is empty): the leg
+ * is a charge instead, so null. A skill in
  * `blocked` is out of the roll whatever its cooldown (CO-224: summon while the
  * pack is at its cap), so a capped boss slams or volleys instead.
  */
@@ -283,11 +301,15 @@ export function pickBossSkill(
   rand: () => number,
   blocked: ReadonlySet<BossSkillId> = NO_SKILLS,
 ): BossSkillId | null {
+  const band = bossRangeBand(distancePx);
+  // A zero weight is out of the roll (CO-232: no leap up close), not a skill that merely rarely comes.
   const ready = list.filter(
-    (skill) => !blocked.has(skill) && (readyAtS[skill] ?? -Infinity) <= nowS,
+    (skill) =>
+      !blocked.has(skill) &&
+      (readyAtS[skill] ?? -Infinity) <= nowS &&
+      BOSS_SKILL_WEIGHTS[skill][band] > 0,
   );
   if (ready.length === 0) return null;
-  const band = bossRangeBand(distancePx);
   const weights = ready.map((skill) => BOSS_SKILL_WEIGHTS[skill][band]);
   const total = weights.reduce((sum, w) => sum + w, 0);
   let roll = rand() * total;
@@ -307,6 +329,29 @@ export function bossSkillsFor(barsBroken: number): readonly BossSkillId[] {
 /** Ground slam damage to a player in reach (CO-222), enrage included. */
 export function slamDamage(enraged: boolean): number {
   return BOSS_SLAM.damage * bossMods(enraged).damage;
+}
+
+/** Leap damage to a player under the landing (CO-232), enrage included. */
+export function leapDamage(enraged: boolean): number {
+  return BOSS_LEAP.damage * bossMods(enraged).damage;
+}
+
+/**
+ * Where a boss in a leap is (CO-232), or null when it is not leaping. The
+ * wind-up is a crouch on the spot until `airS` s are left, then a straight
+ * flight from `skillFrom` to the locked `skillTarget`, arriving exactly as the
+ * wind-up ends; the landing's recovery stays on the target. A function of the
+ * time left alone, so a frame's length never changes the path. The core's
+ * velocity stays 0 for a leap: the entity places the boss at this point.
+ */
+export function leapPoint(cycle: Readonly<BossCycle>): Vec2 | null {
+  if (cycle.skill !== 'leap') return null;
+  if (cycle.phase === 'skill') return { x: cycle.skillTarget.x, y: cycle.skillTarget.y };
+  if (cycle.phase !== 'windup') return null;
+  const { airS } = BOSS_LEAP;
+  const t = Math.min(1, Math.max(0, (airS - cycle.remainingS) / airS));
+  const { skillFrom: a, skillTarget: b } = cycle;
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
 /** Bolt volley damage per bolt to a player it reaches (CO-223), enrage included. */
@@ -384,9 +429,9 @@ export function summonPack(rng: Rng, count: number): EnemyType[] {
   return out;
 }
 
-/** Scale that makes a warning sprite `artW` px wide span the slam's diameter (CO-222). */
-export function slamArtScale(artW: number): number {
-  return (2 * BOSS_SLAM.radius) / artW;
+/** Scale that makes a warning sprite `artW` px wide span a ring of `radius` px (CO-222: the slam's; CO-232: the leap's). */
+export function slamArtScale(artW: number, radius: number = BOSS_SLAM.radius): number {
+  return (2 * radius) / artW;
 }
 
 /** A fresh boss opens with a chase; the first telegraph comes `cycleS - telegraphS - chargeS` s in. */
@@ -398,6 +443,8 @@ export function startBossCycle(): BossCycle {
     next: 'charge',
     skill: null,
     skillDir: NO_DIRECTION,
+    skillFrom: NO_DIRECTION,
+    skillTarget: NO_DIRECTION,
     clockS: 0,
     readyAtS: {},
     chainLength: 1,
@@ -428,6 +475,8 @@ export function beginWindup(
     link: 0,
     skill,
     skillDir: unitToward(from, target),
+    skillFrom: { x: from.x, y: from.y },
+    skillTarget: { x: target.x, y: target.y },
     readyAtS:
       cooldownS === undefined ? cycle.readyAtS : { ...cycle.readyAtS, [skill]: nowS + cooldownS },
   };
@@ -479,9 +528,10 @@ export function stepBossCycle(
 ): BossStep {
   if (!(deltaS > 0) || !Number.isFinite(deltaS))
     return { cycle, velocity: NO_DIRECTION, impacts: [], locks: [] };
-  let { phase, remainingS, chargeDir, next, skill, skillDir, readyAtS } = cycle;
+  let { phase, remainingS, chargeDir, next, skill, skillDir, skillFrom, skillTarget, readyAtS } =
+    cycle;
   let { chainLength, link, telegraphAtS } = cycle;
-  const impacts: { skill: BossSkillId; aim: Vec2; atS: number }[] = [];
+  const impacts: { skill: BossSkillId; aim: Vec2; target: Vec2; atS: number }[] = [];
   const locks: BossLock[] = [];
   const chaseDir = unitToward(from, target);
   const distance = Math.hypot(target.x - from.x, target.y - from.y);
@@ -525,6 +575,8 @@ export function stepBossCycle(
         phase = 'windup';
         skill = picked;
         skillDir = begun.skillDir;
+        skillFrom = begun.skillFrom;
+        skillTarget = begun.skillTarget;
         readyAtS = begun.readyAtS;
       } else {
         phase = 'telegraph';
@@ -547,7 +599,13 @@ export function stepBossCycle(
       }
     } else if (phase === 'windup') {
       phase = 'skill';
-      if (skill) impacts.push({ skill, aim: skillDir, atS: cycle.clockS + deltaS - left });
+      if (skill)
+        impacts.push({
+          skill,
+          aim: skillDir,
+          target: skillTarget,
+          atS: cycle.clockS + deltaS - left,
+        });
     } else {
       phase = 'chase';
       next = 'charge';
@@ -565,6 +623,8 @@ export function stepBossCycle(
       next,
       skill,
       skillDir,
+      skillFrom,
+      skillTarget,
       clockS: cycle.clockS + deltaS,
       readyAtS,
       chainLength,

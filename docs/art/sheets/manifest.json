@@ -2393,6 +2393,45 @@
       "rows": 1,
       "sheetCell": 224,
       "rowSpecs": [[{ "anim": "diamond", "cols": [1, 4], "centred": true }]]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-232",
+      "file": "CO-232/boss_leap.png",
+      "page": 31,
+      "cols": 4,
+      "rows": 4,
+      "sheetCell": 560,
+      "recolour": { "gamma": 0.8, "rim": "#ff8a3d" },
+      "rowSpecs": [
+        [{ "anim": "leapWindup", "facing": "down", "cols": [1, 2] }, { "anim": "leap", "facing": "down", "cols": [3, 4] }],
+        [{ "anim": "leapWindup", "facing": "up", "cols": [1, 2] }, { "anim": "leap", "facing": "up", "cols": [3, 4] }],
+        [{ "anim": "leapWindup", "facing": "left", "cols": [1, 2] }, { "anim": "leap", "facing": "left", "cols": [3, 4] }],
+        [{ "anim": "leapWindup", "facing": "right", "cols": [1, 2] }, { "anim": "leap", "facing": "right", "cols": [3, 4] }]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-232",
+      "file": "CO-232/boss_leap_fx.png",
+      "page": 31,
+      "cols": 4,
+      "rows": 2,
+      "sheetCell": 480,
+      "rowSpecs": [
+        [{ "anim": "leapWarnRim", "cols": [1, 4], "centred": true }],
+        [{ "anim": "leapWarnFill", "cols": [1, 4], "centred": true }]
+      ]
+    },
+    {
+      "key": "boss",
+      "ticket": "CO-232",
+      "file": "CO-232/boss_leap_shock.png",
+      "page": 31,
+      "cols": 4,
+      "rows": 1,
+      "sheetCell": 480,
+      "rowSpecs": [[{ "anim": "leapShock", "cols": [1, 4], "centred": true }]]
     }
   ]
 }

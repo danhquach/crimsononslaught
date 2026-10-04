@@ -5,6 +5,7 @@ import { enrageThresholdHp } from '../src/core/boss';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import {
+  blockBossSkills,
   cardCenter,
   collectErrors,
   readSounds,
@@ -39,6 +40,8 @@ async function startRun(page: Page, query = ''): Promise<void> {
   await waitForScene(page, SCENE.game);
   await recordSounds(page);
   await expect.poll(async () => (await report(page)) !== null, { timeout: 20_000 }).toBe(true);
+  // CO-232: a far hero draws Leap too; this spec is about the volley.
+  await blockBossSkills(page, ['leap']);
 }
 
 /**

@@ -7,6 +7,7 @@ import { enrageThresholdHp } from '../src/core/boss';
 import { SCENE } from '../src/core/scenePayloads';
 import type { GameScene } from '../src/scenes/GameScene';
 import {
+  blockBossSkills,
   cardCenter,
   collectErrors,
   readSounds,
@@ -176,6 +177,8 @@ test('stepping out of the ring avoids the slam', async ({ page }) => {
 test('an enraged boss slams harder', async ({ page }) => {
   const errors = collectErrors(page);
   await startRun(page);
+  // The hero ends 1000 px out (far band) on bar 2: keep Leap out so no landing reaches them (CO-232).
+  await blockBossSkills(page, ['leap']);
   const enraged = await page.evaluate(
     async ({ scene, threshold }) => {
       const { game } = await import('/src/main.ts');

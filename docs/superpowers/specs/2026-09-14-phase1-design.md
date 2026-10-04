@@ -233,6 +233,13 @@ src/
   break cue per bar. The fight's target window is now 90–180 s.
 - Every 4 s: 0.8 s telegraph (color flash), then charge toward player's
   position at 400 px/s for 0.6 s.
+- Skill Leap (CO-232, from the second bar, a gap closer): a 0.9 s crouch with a
+  90 px landing circle on the floor where the hero stood as it began, then a
+  flight that lands on the circle as the wind-up ends (still for 0.55 s, in the
+  air the last 0.35 s). A hero inside the circle takes 30 (45 enraged) through
+  the hit-immunity window; one who walks out during the warning takes nothing.
+  No contact damage while airborne. Weights near 0 / mid 1 / far 3 (never
+  picked within 160 px), cooldown 12 s from the wind-up's start.
 - Remaining regular enemies keep living but no new spawns.
 - Boss death -> win.
 

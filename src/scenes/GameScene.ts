@@ -36,6 +36,7 @@ import {
   type BossImmunePayload,
   type BossPhasePayload,
   type BossSkillPayload,
+  type BossLeapPayload,
   type BossSlamPayload,
   type BossSummonPayload,
   type BossVolleyPayload,
@@ -446,6 +447,25 @@ export class GameScene extends Phaser.Scene {
     hpLost: number;
     log: { atS: number; chargesBefore: number; hit: boolean; hpLost: number }[];
   } = { slams: 0, hits: 0, hpLost: 0, log: [] };
+  /** Test hook (CO-232): leaps landed, those that hit the hero, the HP they took and a line per leap. */
+  private leapTally: {
+    leaps: number;
+    hits: number;
+    hpLost: number;
+    log: {
+      atS: number;
+      x: number;
+      y: number;
+      heroDist: number;
+      takeoffDist: number;
+      hit: boolean;
+      hpLost: number;
+    }[];
+  } = { leaps: 0, hits: 0, hpLost: 0, log: [] };
+  /** Test hook (CO-232): skills a spec leaves out of the boss's roll, on top of the pack cap's. */
+  private testBlockedSkills: ReadonlySet<BossSkillId> = NO_SKILLS;
+  /** The pack cap's block and the spec's together, rebuilt only when the hook changes. */
+  private summonBlocked: ReadonlySet<BossSkillId> = SUMMON_BLOCKED;
   /** The boss's volley bolts in the air (CO-223): a pool apart from the ranged enemies' shots. */
   private bossBolts!: EnemyShotPool;
   /** Test hook (CO-223): volleys fired, bolts that hit the hero, the HP they took and a line per volley. */
@@ -492,6 +512,7 @@ export class GameScene extends Phaser.Scene {
   /** #388: the enraged boss's ember ring and burst. */
   private bossEnrageFx!: BossEnrageFx;
   private bossSlamFx!: BossSlamFx;
+  private bossLeapFx!: BossSlamFx;
   private bossSummonFx!: BossSummonFx;
   /** Persistent ground areas (#135): every patch on the ground, whichever spell placed it. */
   private areas!: AreaPool;
@@ -737,6 +758,28 @@ export class GameScene extends Phaser.Scene {
       hpLost: number;
       log: { atS: number; chargesBefore: number; hit: boolean; hpLost: number }[];
     };
+    leap: {
+      leaps: number;
+      hits: number;
+      hpLost: number;
+      log: {
+        atS: number;
+        x: number;
+        y: number;
+        heroDist: number;
+        /** How far the take-off was from the locked landing: the hero's distance as the pick was made. */
+        takeoffDist: number;
+        hit: boolean;
+        hpLost: number;
+      }[];
+      /** The landing point locked as the wind-up began; null outside a leap. */
+      target: { x: number; y: number } | null;
+      readyInS: number;
+      airborne: boolean;
+      warnVisible: boolean;
+      warnRadiusPx: number;
+      shockPlays: number;
+    };
     volley: {
       volleys: number;
       boltHits: number;
@@ -798,6 +841,16 @@ export class GameScene extends Phaser.Scene {
       x: boss.x,
       y: boss.y,
       slam: { ...this.slamTally, log: [...this.slamTally.log] },
+      leap: {
+        ...this.leapTally,
+        log: this.leapTally.log.map((line) => ({ ...line })),
+        target: boss.lockedLeapPoint,
+        readyInS: boss.readyInS('leap'),
+        airborne: boss.isAirborne,
+        warnVisible: this.bossLeapFx.warnVisible,
+        warnRadiusPx: this.bossLeapFx.warnRadiusPx,
+        shockPlays: this.bossLeapFx.shockPlays,
+      },
       volley: {
         ...this.volleyTally,
         log: [...this.volleyTally.log],
@@ -1388,6 +1441,12 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
+  /** Test hook (CO-232): leave `skills` out of the boss's roll from now on, whatever its cooldown; `[]` lifts it. */
+  blockBossSkillsForTest(skills: readonly BossSkillId[]): void {
+    this.testBlockedSkills = new Set(skills);
+    this.summonBlocked = new Set([...SUMMON_BLOCKED, ...skills]);
+  }
+
   /**
    * Test hook (CO-224): every live summoned enemy (CO-231: of `type` only, when
    * given) dies through the real damage path, gems and all. Returns how many were killed.
@@ -1586,6 +1645,9 @@ export class GameScene extends Phaser.Scene {
     this.shotHits = 0;
     this.shotHpLost = 0;
     this.slamTally = { slams: 0, hits: 0, hpLost: 0, log: [] };
+    this.leapTally = { leaps: 0, hits: 0, hpLost: 0, log: [] };
+    this.testBlockedSkills = NO_SKILLS;
+    this.summonBlocked = SUMMON_BLOCKED;
     this.volleyTally = { volleys: 0, boltHits: 0, hpLost: 0, log: [] };
     this.summonTally = { summons: 0, spawned: 0, dropped: 0, log: [] };
     this.pendingSummons = [];
@@ -1614,6 +1676,7 @@ export class GameScene extends Phaser.Scene {
     this.bossChainFx = new BossChainFx(this);
     this.bossEnrageFx = new BossEnrageFx(this);
     this.bossSlamFx = new BossSlamFx(this);
+    this.bossLeapFx = new BossSlamFx(this, 'leap');
     this.bossSummonFx = new BossSummonFx(this);
     this.areas = new AreaPool(this, createRng(deriveSeed(seed, AREA_FX_STREAM)));
     this.telegraphs = new TelegraphPool(this);
@@ -1963,6 +2026,7 @@ export class GameScene extends Phaser.Scene {
     this.bossChainFx.update(this.enemies.boss);
     this.bossEnrageFx.update(this.enemies.boss);
     this.bossSlamFx.update(this.enemies.boss);
+    this.bossLeapFx.update(this.enemies.boss);
     this.bossSummonFx.update(this.enemies.boss);
     this.numbers.update(step.deltaMs);
   }
@@ -2624,6 +2688,7 @@ export class GameScene extends Phaser.Scene {
   private onBossSkill(payload: BossSkillPayload): void {
     if (payload.skill === 'volley') this.onBossVolley(payload);
     else if (payload.skill === 'summon') this.onBossSummon(payload);
+    else if (payload.skill === 'leap') this.onBossLeap(payload);
     else this.onBossSlam(payload);
   }
 
@@ -2680,6 +2745,24 @@ export class GameScene extends Phaser.Scene {
         types: types.slice(0, spawned),
       });
     }
+  }
+
+  /** CO-232: the leap lands on the circle locked at its wind-up and hits the hero if the ring reaches them. */
+  private onBossLeap({ x, y, from, radius, damage, atS }: BossLeapPayload): void {
+    this.audio.play('boss.leap');
+    this.shakeFor('bossSlam');
+    this.bossLeapFx.impact(x, y);
+    const tally = this.leapTally;
+    tally.leaps += 1;
+    const hit = blastReaches({ x, y }, this.player, radius);
+    const hpLost = hit ? this.hurtPlayer(damage, { ignoreImmunity: true }) : 0;
+    if (hit) {
+      tally.hits += 1;
+      tally.hpLost += hpLost;
+    }
+    const heroDist = Math.hypot(this.player.x - x, this.player.y - y);
+    const takeoffDist = Math.hypot(x - from.x, y - from.y);
+    tally.log.push({ atS, x, y, heroDist, takeoffDist, hit, hpLost });
   }
 
   /** CO-222: the slam hits the hero if the ring reaches them, through the immunity window. */
@@ -2778,7 +2861,9 @@ export class GameScene extends Phaser.Scene {
     );
     this.enemies.spawnBoss(point.x, point.y, this.bossSkillRng, () =>
       // CO-224: a pack at its cap leaves summon out of the pick, so the boss slams or volleys.
-      this.enemies.liveSummoned >= BOSS_SUMMON.maxLive ? SUMMON_BLOCKED : NO_SKILLS,
+      this.enemies.liveSummoned >= BOSS_SUMMON.maxLive
+        ? this.summonBlocked
+        : this.testBlockedSkills,
     );
     this.audio.play('boss.spawn');
     this.audio.startBossMusic();

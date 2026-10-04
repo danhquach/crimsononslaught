@@ -223,6 +223,7 @@ test('the pack never passes the cap, and the boss still uses its other skills', 
   const before = await report(page);
   const startSlams = before?.slam.slams ?? 0;
   const startVolleys = before?.volley.volleys ?? 0;
+  const startLeaps = before?.leap.leaps ?? 0;
   const startSummons = before?.summon.summons ?? 0;
   const startClock = before?.volley.clockS ?? 0;
   let last: Report | null = before;
@@ -238,7 +239,10 @@ test('the pack never passes the cap, and the boss still uses its other skills', 
   }
   const natural = (last?.summon.log ?? []).slice(startSummons);
   const otherSkills =
-    (last?.slam.slams ?? 0) - startSlams + ((last?.volley.volleys ?? 0) - startVolleys);
+    (last?.slam.slams ?? 0) -
+    startSlams +
+    ((last?.volley.volleys ?? 0) - startVolleys) +
+    ((last?.leap.leaps ?? 0) - startLeaps);
   console.log(
     'natural window',
     ((last?.volley.clockS ?? 0) - startClock).toFixed(1),
