@@ -214,7 +214,7 @@ export const BOSS_SLAM_WARN_DEPTH = -0.15;
 /**
  * CO-232: Leap's floor warning at the locked landing point, the slam's
  * treatment (a rim and a disc scaled so the rim's outer edge is the 90 px
- * radius, the shockwave once on landing). Alphas are above the slam's (rim 0.7, fill 0.3): its disc is darker, and
+ * radius, the shockwave once on landing). Alphas are above the slam's (0.55 and 0.2), at rim 0.7 and fill 0.3: its disc is darker, and
  * the dark floor swallows 20% of it, so it needs more to read.
  */
 export const BOSS_LEAP_FX = {
