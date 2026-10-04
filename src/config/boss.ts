@@ -37,7 +37,8 @@ export const BOSS: Readonly<BossConfig> = {
   // #387: doubled (#406: 21000), shown as two bars of 10500 so the fight reads as two rounds.
   hp: 21000,
   bars: 2,
-  speed: 70,
+  // CO-230: 70 → 140 so walking away no longer outruns it (enraged 182, just over the base hero).
+  speed: 140,
   contactDamage: 30,
   radius: 40,
   texture: 'boss',

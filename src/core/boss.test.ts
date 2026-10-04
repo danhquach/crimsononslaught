@@ -279,7 +279,7 @@ describe('boss enrage (#388)', () => {
     expect(after.remainingS).toBeCloseTo(ENRAGED_CHASE_S - 0.5, 6);
   });
 
-  it('moves at 91 px/s chasing, 520 charging and 0 telegraphing', () => {
+  it('moves at 182 px/s chasing, 520 charging and 0 telegraphing', () => {
     const target = { x: 100, y: 0 };
     const chase = stepBossCycle(
       { ...startBossCycle(), phase: 'chase', remainingS: 1, chargeDir: { x: 0, y: 0 } },
@@ -289,7 +289,7 @@ describe('boss enrage (#388)', () => {
       1,
       true,
     );
-    expect(chase.velocity.x).toBeCloseTo(91, 6);
+    expect(chase.velocity.x).toBeCloseTo(182, 6);
     const telegraph = stepBossCycle(
       { ...startBossCycle(), phase: 'telegraph', remainingS: 0.8, chargeDir: { x: 0, y: 0 } },
       0.5,
@@ -807,7 +807,8 @@ describe('calm cycle is unchanged (CO-225)', () => {
   /**
    * Calm boss, 180 s, `createRng(11)`, all skills: a readable summary of the
    * whole run. Pinned on the code before the chain charge existed, so a calm
-   * boss provably still behaves as it did. To regenerate (only for a change
+   * boss provably still behaves as it did (`dist` re-pinned for CO-230's faster
+   * chase; nothing else moved). To regenerate (only for a change
    * meant to alter calm behaviour): log `summary(...)` and paste it below.
    */
   function summary(stepS: number, heroX: number) {
@@ -838,7 +839,7 @@ describe('calm cycle is unchanged (CO-225)', () => {
   const PINNED = {
     a: {
       transitions: 133,
-      dist: '13470.000,0.000',
+      dist: '21660.000,0.000',
       end: 'telegraph 0.700000000 charge 180.000',
       impacts: [
         'slam@7.600',
@@ -854,7 +855,7 @@ describe('calm cycle is unchanged (CO-225)', () => {
     },
     b: {
       transitions: 130,
-      dist: '13288.000,0.000',
+      dist: '21296.000,0.000',
       end: 'windup 0.200000000 skill 180.000',
       impacts: [
         'volley@7.800',

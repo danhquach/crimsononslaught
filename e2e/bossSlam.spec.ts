@@ -190,6 +190,24 @@ test('an enraged boss slams harder', async ({ page }) => {
   expect(enraged).toBe(true);
   await slamWithHeroAt(page, BOSS_SLAM.radius * 0.65);
 
+  // CO-230: an enraged boss chases at 182 px/s, so its bites (45 each) kill a
+  // standing hero inside `afterSlam`'s extra second. Once the slam is over, put
+  // the hero out of reach; the plain test above covers "only one hit".
+  await expect
+    .poll(
+      async () => {
+        const r = await report(page);
+        return (r?.slam.slams ?? 0) >= 1 && r?.phase !== 'skill';
+      },
+      { timeout: 10_000, intervals: [50] },
+    )
+    .toBe(true);
+  await page.evaluate(async (scene) => {
+    const { game } = await import('/src/main.ts');
+    const g = game.scene.getScene(scene.game) as GameScene;
+    const boss = g.bossReport;
+    if (boss) g.placeHeroForTest(boss.x + 1000, boss.y);
+  }, SCENE);
   const after = await afterSlam(page);
   console.log('slam enraged', JSON.stringify(after?.slam));
   expect(after?.slam.hits).toBe(1);

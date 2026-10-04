@@ -81,7 +81,7 @@ const ENRAGE_TINT = 0xff6a6a;
 
 /**
  * The boss (spec §5 "Boss"): an enemy with its own stats and a charge cycle.
- * Between charges it chases like any enemy, at 70 px/s. Every 4 s it stops and
+ * Between charges it chases like any enemy, at 140 px/s. Every 4 s it stops and
  * flashes for 0.8 s, then charges for 0.6 s at 400 px/s along a line locked
  * toward where the player stood as the flash ended.
  *
