@@ -20,17 +20,24 @@ import { controlsOf } from './controls';
 import { attachBoundPadButtons, attachMenuInput, attachPadButtons, type MenuItem } from './input';
 
 const CARD_WIDTH = 220;
-const CARD_HEIGHT = 260;
+const CARD_HEIGHT = 244;
 /**
  * CO-155: a card's icon band above its name — a 2x (64 px) icon and its
  * margins. An offer with an icon in it, a spell's (a new one or an upgrade,
- * #326) or a passive's or relic's art (CO-235), grows every card by it; a row
- * whose passive or relic cards have no art keeps its height and layout.
+ * #326) or a passive's or relic's art (CO-235), grows every card by it, an
+ * icon-less card too, so names, kinds and descriptions line up across the row;
+ * a row with no icon at all keeps the shorter card. It sets the name
+ * (30 px down, plus the band) 8 px under the icon's bottom (`ICON_Y` + 32), so
+ * `ICON_Y` and the band move together.
  */
-const ICON_BAND = 50;
+const ICON_BAND = 66;
 const ICON_SCALE = 2;
-/** #326: an upgrade card's icon centre, from the card's left padding edge; clears the hotkey and the rank line. */
-const UPGRADE_ICON_INSET = 50;
+/**
+ * The icon's centre below the card's padding edge: centred on every card, it
+ * sits under the rank line (`Lv 3/3 · MAX` runs past the middle) rather than
+ * beside it, with slack for CI's taller text.
+ */
+const ICON_Y = 56;
 const CARD_GAP = 28;
 const CARD_PADDING = 14;
 const BACKDROP_ALPHA = 0.65;
@@ -145,16 +152,16 @@ export class LevelUpScene extends Phaser.Scene {
     const rowWidth = n * CARD_WIDTH + (n - 1) * CARD_GAP;
     const firstX = (width - rowWidth) / 2 + CARD_WIDTH / 2;
     // A new spell's offer is all spells (spec §7.1), but an upgrade (#326) can sit
-    // beside passives, so the row shares one height: the taller if any card
-    // will draw an icon, as `addCard` decides it.
-    const cardHeight =
-      CARD_HEIGHT +
-      (this.cards.some((card) => cardSpellId(card) !== undefined || this.hasBuildIcon(card))
-        ? ICON_BAND
-        : 0);
-    const cardY = 160 + cardHeight / 2;
+    // beside passives, so the row shares one height and one band: the band if
+    // any card will draw an icon, on every card so the names line up.
+    const band = this.cards.some(
+      (card) => cardSpellId(card) !== undefined || this.hasBuildIcon(card),
+    )
+      ? ICON_BAND
+      : 0;
+    const cardY = 160 + (CARD_HEIGHT + band) / 2;
     const items = this.cards.map((card, i) =>
-      this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, cardHeight, card, i + 1),
+      this.addCard(firstX + i * (CARD_WIDTH + CARD_GAP), cardY, band, card, i + 1),
     );
     if (this.actions) items.push(...this.addActionButtons(this.actions, subtitle, hint));
     attachMenuInput(this, items, { keyboard: true });
@@ -302,7 +309,8 @@ export class LevelUpScene extends Phaser.Scene {
     );
   }
 
-  private addCard(x: number, y: number, height: number, card: OfferCard, hotkey: number): MenuItem {
+  private addCard(x: number, y: number, band: number, card: OfferCard, hotkey: number): MenuItem {
+    const height = CARD_HEIGHT + band;
     const innerWidth = CARD_WIDTH - CARD_PADDING * 2;
     const left = -CARD_WIDTH / 2 + CARD_PADDING;
     const top = -height / 2 + CARD_PADDING;
@@ -312,22 +320,18 @@ export class LevelUpScene extends Phaser.Scene {
     // A spell, or an upgrade of one (#326), shows its icon (CO-155) between the
     // hotkey and its name; so does a passive or relic with art (CO-235).
     const spellId = cardSpellId(card);
-    // An upgrade's rank line, `Lv 3/3 · MAX`, is wide enough to run under a
-    // centred icon, so its icon sits left of it instead.
-    const iconX = card.kind === 'upgrade' ? left + UPGRADE_ICON_INSET : 0;
     const icon =
       spellId !== undefined
         ? addSpellIcon(
             this,
-            iconX,
-            top + 40,
+            0,
+            top + ICON_Y,
             { id: spellId, name: card.name, color: card.color ?? stroke },
             ICON_SCALE,
           )
         : this.hasBuildIcon(card)
-          ? addBuildCardIcon(this, iconX, top + 40, card.id, ICON_SCALE)
+          ? addBuildCardIcon(this, 0, top + ICON_Y, card.id, ICON_SCALE)
           : [];
-    const band = icon.length > 0 ? ICON_BAND : 0;
 
     const frame = this.add.rectangle(0, 0, CARD_WIDTH, height, CARD_FILL).setStrokeStyle(2, stroke);
     const key = this.add.text(left, top, `${hotkey}`, {
@@ -342,24 +346,32 @@ export class LevelUpScene extends Phaser.Scene {
         color: grantsMaxRank(card) ? MAX_RANK_CSS : '#aaaaaa',
       })
       .setOrigin(1, 0);
-    const name = this.add.text(left, top + 30 + band, card.name, {
-      fontFamily: 'Georgia, serif',
-      fontSize: '22px',
-      color: '#ffffff',
-      wordWrap: { width: innerWidth },
-    });
-    const kind = this.add.text(left, top + 92 + band, KIND_LABEL[card.kind], {
-      fontFamily: 'monospace',
-      fontSize: '13px',
-      color: cssColor(stroke),
-    });
-    const description = this.add.text(left, top + 120 + band, card.description, {
-      fontFamily: 'Georgia, serif',
-      fontSize: '15px',
-      color: '#dddddd',
-      wordWrap: { width: innerWidth },
-      lineSpacing: 3,
-    });
+    const name = this.add
+      .text(0, top + 30 + band, card.name, {
+        fontFamily: 'Georgia, serif',
+        fontSize: '22px',
+        color: '#ffffff',
+        align: 'center',
+        wordWrap: { width: innerWidth },
+      })
+      .setOrigin(0.5, 0);
+    const kind = this.add
+      .text(0, top + 92 + band, KIND_LABEL[card.kind], {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: cssColor(stroke),
+      })
+      .setOrigin(0.5, 0);
+    const description = this.add
+      .text(0, top + 120 + band, card.description, {
+        fontFamily: 'Georgia, serif',
+        fontSize: '15px',
+        color: '#dddddd',
+        align: 'center',
+        wordWrap: { width: innerWidth },
+        lineSpacing: 3,
+      })
+      .setOrigin(0.5, 0);
 
     this.add.container(x, y, [frame, ...icon, key, rank, name, kind, description]);
 
