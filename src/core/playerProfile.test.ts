@@ -11,6 +11,7 @@ import {
   type SpellStatBlock,
   type SpellStatField,
 } from '../config/spellFields';
+import { RELIC_BUFFS } from '../config/relics';
 import { BASE_EARTH_ROSTER_STATS } from '../config/earthRoster';
 import { BASE_NOVA_BOMB_STATS } from '../config/iceRoster';
 import { BASE_SWORD_STATS } from '../config/lightningRoster';
@@ -175,12 +176,12 @@ describe('resolveSpellStats', () => {
     expect(base).toEqual({ damage: 12, aoeRadius: 50, duration: 3 });
   });
 
-  it('adds Pierce to exactly the blocks that pierce (#206)', () => {
-    const profile = resolveProfile(ranks([['passive_pierce', 3]]));
-    expect(profile.pierceBonus).toBe(3);
-    // The ticket's numbers at rank 3: Earth Spike 1 -> 4, Boulder 5 -> 8.
-    expect(resolveSpellStats(BASE_SPELL_STATS.earth, profile).pierce).toBe(4);
-    expect(resolveSpellStats(BASE_EARTH_ROSTER_STATS.earth_boulder, profile).pierce).toBe(8);
+  it('adds the Impaler relic to exactly the blocks that pierce (#206)', () => {
+    const profile = resolveProfile(ranks([['relic_impaler', 1]]), [...PASSIVES, ...RELIC_BUFFS]);
+    expect(profile.pierceBonus).toBe(2);
+    // Impaler's two more: Earth Spike 1 -> 3, Boulder 5 -> 7.
+    expect(resolveSpellStats(BASE_SPELL_STATS.earth, profile).pierce).toBe(3);
+    expect(resolveSpellStats(BASE_EARTH_ROSTER_STATS.earth_boulder, profile).pierce).toBe(7);
     // A block without `pierce` gains none and is otherwise untouched.
     expect(resolveSpellStats(BASE_SPELL_STATS.fire, profile)).toEqual(BASE_SPELL_STATS.fire);
   });
@@ -188,12 +189,13 @@ describe('resolveSpellStats', () => {
   it('still multiplies the other fields of a piercing block', () => {
     const profile = resolveProfile(
       ranks([
-        ['passive_pierce', 1],
+        ['relic_impaler', 1],
         ['passive_power', 1],
       ]),
+      [...PASSIVES, ...RELIC_BUFFS],
     );
     const out = resolveSpellStats({ damage: 10, pierce: 5 }, profile);
-    expect(out.pierce).toBe(6);
+    expect(out.pierce).toBe(7);
     expect(out.damage).toBeCloseTo(11);
   });
 

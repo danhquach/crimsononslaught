@@ -40,7 +40,7 @@
         "h": 36
       }
     },
-    "icon.passive_haste.0": {
+    "icon.passive_exploit.0": {
       "frame": {
         "x": 75,
         "y": 1,
@@ -60,7 +60,7 @@
         "h": 36
       }
     },
-    "icon.passive_magnet.0": {
+    "icon.passive_haste.0": {
       "frame": {
         "x": 112,
         "y": 1,
@@ -80,7 +80,7 @@
         "h": 36
       }
     },
-    "icon.passive_persistence.0": {
+    "icon.passive_magnet.0": {
       "frame": {
         "x": 149,
         "y": 1,
@@ -100,7 +100,7 @@
         "h": 36
       }
     },
-    "icon.passive_pierce.0": {
+    "icon.passive_persistence.0": {
       "frame": {
         "x": 186,
         "y": 1,

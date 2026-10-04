@@ -342,12 +342,14 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     for (const enemy of membersOf(area, this.enemies.live)) {
       if (!enemy.active) continue;
       this.ticked += 1;
+      // Exploit reads the enemy as the tick found it, before its own status (CO-234).
+      const afflicted = enemy.isAfflicted;
       if (slowPct > 0) enemy.applyFrost({ slowPct, slowDuration, freeze: false });
       if (staggerS > 0) {
         enemy.applyStagger(staggerS);
         this.staggered += 1;
       }
-      this.damage(enemy, tickDamage, 'tick', area);
+      this.damage(enemy, tickDamage, 'tick', area, afflicted);
     }
   }
 
@@ -416,8 +418,9 @@ export class GroundAreaSpell extends Spell<AreaSpellId> {
     }
     const target = kit.hailRng.pick(inside);
     kit.fx.burst(HAIL.clip, target.x, target.y, { scale: HAIL.drawScale });
+    const afflicted = target.isAfflicted;
     if (slowPct > 0) target.applyFrost({ slowPct, slowDuration, freeze: false });
-    this.damage(target, damage, 'tick', area);
+    this.damage(target, damage, 'tick', area, afflicted);
     this.hailHits += 1;
     recordCapped(this.hailLog, { level, patch, tickNumber, inside: inside.length, hit: true });
   }

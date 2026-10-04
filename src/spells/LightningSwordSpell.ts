@@ -149,10 +149,12 @@ export class LightningSwordSpell extends OrbitingBodySpell<'lightning_sword'> {
     recordCapped(this.cutLog, { level, blades: this.liveCount });
     const cut = swordCut(this.stats);
     this.fx.burst('lightning.impact', enemy.x, enemy.y);
+    // Exploit reads the enemy as the cut found it, before its own stagger (CO-234).
+    const afflicted = enemy.isAfflicted;
     // Status before damage, the convention every on-hit effect follows: a
     // killing cut has still staggered the enemy while it was there to take it.
     enemy.applyStagger(cut.staggerS);
-    this.damage(enemy, cut.damage, 'hit', body);
+    this.damage(enemy, cut.damage, 'hit', body, afflicted);
   }
 
   /**
@@ -189,8 +191,9 @@ export class LightningSwordSpell extends OrbitingBodySpell<'lightning_sword'> {
       const link = from;
       from = { x: enemy.x, y: enemy.y };
       this.fx.burst('lightning.impact', enemy.x, enemy.y);
+      const afflicted = enemy.isAfflicted;
       enemy.applyStagger(cut.staggerS);
-      this.damage(enemy, cut.damage * SWORD_BURST.damageFactor, 'hit', link);
+      this.damage(enemy, cut.damage * SWORD_BURST.damageFactor, 'hit', link, afflicted);
     }
     this.bursts += 1;
     recordCapped(this.burstLog, {

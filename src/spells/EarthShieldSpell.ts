@@ -162,12 +162,14 @@ export class EarthShieldSpell extends ShieldSpell<'earth_shield'> {
     for (const { enemy, stone } of hits) {
       if (!enemy.active) continue;
       const push = stoneShockPush(stone, enemy, this.caster);
+      // Exploit reads the enemy as the shock found it, before its own stagger (CO-234).
+      const afflicted = enemy.isAfflicted;
       enemy.applyStagger(STONE_SHOCK.staggerS);
       if (enemy.isStaggered) staggered += 1;
       if (enemy instanceof Boss) {
         bossStaggerS = Math.max(bossStaggerS ?? 0, enemy.crowdControlRemainingS.staggerS);
       }
-      this.damage(enemy, damage, 'hit', stone);
+      this.damage(enemy, damage, 'hit', stone, afflicted);
       // A killing blow drops its gems where the enemy stood; only a survivor is shoved.
       if (!enemy.active) continue;
       enemy.knockBack(push);

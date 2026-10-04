@@ -249,12 +249,14 @@ export class LightningBoltSpell extends Spell<'lightning'> {
     this.landed += 1;
     this.fx.burst('lightning.strike', target.x, target.y);
     this.fx.burst('lightning.impact', target.x, target.y);
+    // Exploit reads the enemy as the bolt found it, before its own stagger and stun (CO-234).
+    const afflicted = target.isAfflicted;
     target.applyStagger(stats.staggerDuration);
     if (onLevelStream) this.levelRolls += 1;
     if (rollStun(onLevelStream ? this.levelRng : this.rng, stats.stunChance)) {
       target.applyStun(stats.stunDuration);
     }
-    this.damage(target, stats.damage, 'hit', from);
+    this.damage(target, stats.damage, 'hit', from, afflicted);
   }
 
   /**
@@ -270,6 +272,8 @@ export class LightningBoltSpell extends Spell<'lightning'> {
     this.fx.burst(THUNDERBOLT.strikeClip, at.x, at.y, { scale: THUNDERBOLT.strikeScale });
     this.fx.burst(THUNDERBOLT.impactClip, at.x, at.y, { scale: THUNDERBOLT.impactScale });
     const caught = thunderboltTargets(target, this.enemies.live);
+    // Exploit reads each enemy as the bolt found it, before the stagger and stun (CO-234).
+    const afflicted = caught.map((enemy) => enemy.isAfflicted);
     let stunnedAfter = 0;
     let boss: Boss | undefined;
     for (const enemy of caught) {
@@ -289,7 +293,7 @@ export class LightningBoltSpell extends Spell<'lightning'> {
       look: `${THUNDERBOLT.strikeClip}@${THUNDERBOLT.strikeScale}`,
     });
     const damage = thunderboltDamage(stats.damage);
-    for (const enemy of caught) this.damage(enemy, damage, 'hit', at);
+    caught.forEach((enemy, i) => this.damage(enemy, damage, 'hit', at, afflicted[i]));
   }
 
   private makeSprite(): Phaser.GameObjects.Sprite {

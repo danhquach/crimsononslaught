@@ -58,7 +58,7 @@ Every disc stays inside its own cell at the margin given above and never touches
 
 ## 3. `icons_passives_3.png`: 4 passives
 
-Save as `docs/art/sheets/CO-179/icons_passives_3.png`. Copy the whole block below; it is the complete prompt.
+Save as `docs/art/sheets/CO-179/icons_passives_3.png`. Copy the whole block below; it is the complete prompt. Pierce, column 4, was retired in #415; that cell now holds Exploit's icon, see `CO-234-exploit.md`.
 
 Delivered as: JPEG 1408x480 px from `openai/gpt-image-2` (asked 1024x256, 4x1 of 256 px), with concept A attached as the reference, first try. The discs came back about 283 px across, so each disc was found by its columns and rows of art, not by grid. Everything outside each disc's circle, pulled in 1.5 px off the JPEG fringe, was set to #FF00FF. Each disc was then area-averaged onto a 36 px native cell with the disc 32 px across, averaging the art pixels alone and skipping magenta-tinted specks on the rim (the house rule, `b > 0.8r && g < 0.6r && r > 140`, kept to the outer 6 px so the relics' violet is not dropped), and scaled back up 4x nearest-neighbour, so the cutter's 4x nearest-neighbour downscale lands on those averages. The magenta test for the background is strict (`r > 190 && b > 190 && g < 90`) because the relic violet, #9966FF, passes a loose one. Saved as PNG (576x144, no metadata chunks) before the cut. Ruled grid band: no. `sheetCell` 144, `centred`; cuts to 36x36 native frames with a 32x32 art box. Column 5 is Siphon, added by CO-235 (sheet widened to 720x144), see `CO-235-siphon.md`.
 

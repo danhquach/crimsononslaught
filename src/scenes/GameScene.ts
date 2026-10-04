@@ -104,6 +104,7 @@ import {
   settleOutcome,
   type DecidedOutcome,
 } from '../core/runOutcome';
+import { exploitFactor } from '../core/exploit';
 import { accrueSiphon, drainSiphon, resetSiphon, type SiphonState } from '../core/siphon';
 import { RunState, clampTimeScale, simulationSteps, type RunFrame } from '../core/runState';
 import { spawnPoint } from '../core/spawnDirector';
@@ -212,6 +213,7 @@ import type { EnemyShot } from '../entities/EnemyShot';
 import { Player } from '../entities/Player';
 import type { Pickup } from '../entities/Pickup';
 import { XpGem } from '../entities/XpGem';
+import type { DamageSink } from '../spells/DamageSink';
 import { ChainLightningSpell, type ChainLevelReport } from '../spells/ChainLightningSpell';
 import { LightningBoltSpell, type BoltLevelReport } from '../spells/LightningBoltSpell';
 import { FireballSpell, type FireBoltLevelReport } from '../spells/FireballSpell';
@@ -344,6 +346,16 @@ const EMPTY_SIPHON_TALLY = {
   second: -1,
   secondHealed: 0,
   secondCues: 0,
+};
+
+/** `exploitReport`'s tally (CO-234). */
+const EMPTY_EXPLOIT_TALLY = {
+  hits: 0,
+  afflicted: 0,
+  raw: 0,
+  bonus: 0,
+  firstHits: 0,
+  firstHitsBoosted: 0,
 };
 
 /**
@@ -532,6 +544,10 @@ export class GameScene extends Phaser.Scene {
   private siphon: SiphonState = resetSiphon();
   /** Test hook (CO-235): damage fed, HP healed, cues due, and the busiest whole run-second of each. */
   private siphonTally = { ...EMPTY_SIPHON_TALLY };
+  /** Test hook (CO-234): spell hits and ground ticks, those on an afflicted enemy, their raw damage and the bonus Exploit added. */
+  private exploitTally = { ...EMPTY_EXPLOIT_TALLY };
+  /** Test hook (CO-234): enemies a spell has already hit, for `firstHits`. */
+  private exploitSeen = new WeakSet<Enemy>();
   private bossSlamFx!: BossSlamFx;
   private bossLeapFx!: BossSlamFx;
   private bossSummonFx!: BossSummonFx;
@@ -695,6 +711,34 @@ export class GameScene extends Phaser.Scene {
       if (key) clips.add(key);
     }
     return { live, ...this.blastSplitTally, clips: [...clips].sort() };
+  }
+
+  /**
+   * Test hook (CO-234): spell hits and ground ticks that reached Exploit's
+   * closure (`hits`), how many found the enemy afflicted (`afflicted`), the
+   * damage those carried before the bonus (`raw`) and the damage Exploit added
+   * to them (`bonus`; 0 while no rank is held), and the first spell hit on each
+   * enemy (`firstHits`) with how many of those were boosted (`firstHitsBoosted`):
+   * a spell that applies its own status must not boost its first hit.
+   */
+  get exploitReport(): {
+    hits: number;
+    afflicted: number;
+    raw: number;
+    bonus: number;
+    firstHits: number;
+    firstHitsBoosted: number;
+  } {
+    return { ...this.exploitTally };
+  }
+
+  /**
+   * Test hook (CO-234): `amount` through the same closure the spells' hits take,
+   * so the browser suite can drive Exploit and its pre-hit snapshot (`afflicted`,
+   * read live when absent) without a spell. Returns the HP the enemy lost.
+   */
+  spellHitForTest(enemy: Enemy, amount: number, afflicted?: boolean): number {
+    return this.spellDamage(enemy, amount, 'hit', undefined, afflicted);
   }
 
   /**
@@ -1697,6 +1741,8 @@ export class GameScene extends Phaser.Scene {
     this.elitesKilled = 0;
     this.siphon = resetSiphon();
     this.siphonTally = { ...EMPTY_SIPHON_TALLY };
+    this.exploitTally = { ...EMPTY_EXPLOIT_TALLY };
+    this.exploitSeen = new WeakSet<Enemy>();
     this.spawns = new SpawnDirector(
       this.cameras.main,
       this.enemies,
@@ -2147,12 +2193,47 @@ export class GameScene extends Phaser.Scene {
     return spell;
   }
 
+  /**
+   * CO-234: a spell's hit or ground tick, the one place Exploit and Siphon see
+   * it. Exploit multiplies the amount before `damageEnemy`, so crit, guard and
+   * the boss cap still apply after it; a `dot` (the burn and bleed ticks) never
+   * comes through here. `afflicted` is the enemy's status before this hit
+   * applied its own, which a spell that applies a status first passes in; absent,
+   * it is read live.
+   */
+  private spellDamage(
+    enemy: Enemy,
+    amount: number,
+    kind?: HitKind,
+    from?: Readonly<Vec2>,
+    afflicted: boolean = enemy.isAfflicted,
+  ): number {
+    const { exploitBonus } = this.spells.profile;
+    const factor = exploitFactor(exploitBonus, afflicted);
+    const tally = this.exploitTally;
+    tally.hits += 1;
+    if (!this.exploitSeen.has(enemy)) {
+      this.exploitSeen.add(enemy);
+      tally.firstHits += 1;
+      if (factor > 1) tally.firstHitsBoosted += 1;
+    }
+    if (afflicted) {
+      tally.afflicted += 1;
+      tally.raw += amount;
+      tally.bonus += amount * (factor - 1);
+    }
+    const removed = this.damageEnemy(enemy, amount * factor, kind, from);
+    this.feedSiphon(removed);
+    return removed;
+  }
+
   private buildSpell(spellId: RosterSpellId, stats: SpellStatBlock): Spell | undefined {
     // The one place a spell's damage feeds Siphon (CO-235), besides the status
     // burn and bleed (one `dot` callback feeds both): the test hooks, the exploder's contact kill and the bomb call
     // `damageEnemy` directly and so feed nothing.
-    const damage = (enemy: Enemy, amount: number, kind?: HitKind, from?: Readonly<Vec2>): void =>
-      this.feedSiphon(this.damageEnemy(enemy, amount, kind, from));
+    const damage: DamageSink = (enemy, amount, kind, from, afflicted) => {
+      this.spellDamage(enemy, amount, kind, from, afflicted);
+    };
     switch (spellId) {
       case 'fire':
         return new FireballSpell(

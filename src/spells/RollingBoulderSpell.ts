@@ -383,12 +383,14 @@ export class RollingBoulderSpell extends Spell<'earth_boulder'> {
       const under = ruttedBy(enemy, this.tiles);
       const first = under[0];
       if (!first) continue;
+      // Exploit reads the enemy as the tick found it, before its own stagger (CO-234).
+      const afflicted = enemy.isAfflicted;
       if (staggerS > 0) {
         enemy.applyStagger(staggerS);
         this.rutStaggerCount += 1;
       }
       const damage = rutTickDamage(under);
-      this.damage(enemy, damage, 'tick', first);
+      this.damage(enemy, damage, 'tick', first, afflicted);
       this.rutHitCount += 1;
       this.rutDamageDealt += damage;
     }

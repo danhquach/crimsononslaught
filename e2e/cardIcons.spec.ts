@@ -203,7 +203,13 @@ test('with no icon art, each spell-select card shows its colour-and-letters glyp
 /** A hand-made passive and relic offer, as the Game scene would launch it (CO-235). */
 const BUILD_OFFER = [
   { kind: 'passive', id: 'passive_siphon', name: 'Siphon', description: 'Heals.', rank: 1 },
-  { kind: 'passive', id: 'passive_power', name: 'Power', description: 'Hits harder.', rank: 1 },
+  {
+    kind: 'passive',
+    id: 'passive_exploit',
+    name: 'Exploit',
+    description: 'Hits statused enemies harder.',
+    rank: 1,
+  },
   { kind: 'relic', id: 'relic_bulwark', name: 'Bulwark', description: 'Guards.', rank: 1 },
 ] as const;
 

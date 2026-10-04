@@ -78,7 +78,7 @@ export function offerableActives(loadout: Loadout, catalog: ActiveCatalog): Acti
 }
 
 /**
- * Passives below their `maxRank` (spec §5), never one marked `offered: false` (Pierce, CO-235); one with no `maxRank` (none ship
+ * Passives below their `maxRank` (spec §5); one with no `maxRank` (none ship
  * since CO-229) is always eligible. A passive outside the shipped list — a test's own config — reads
  * as rank 0, since only shipped ids can be in the loadout's map.
  *
@@ -98,7 +98,6 @@ export function eligiblePassives(
 ): Passive[] {
   return passives.filter(
     (passive) =>
-      passive.offered !== false &&
       rankOf(loadout, passive.id) < (passive.maxRank ?? Infinity) &&
       (passive.requiresStat === undefined || carried.has(passive.requiresStat)) &&
       !(profile && atCap(passive, profile)),

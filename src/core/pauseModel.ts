@@ -68,10 +68,14 @@ export interface PauseBuild {
   elapsedMs: number;
 }
 
+/** Names whose first two letters another passive already takes: Exploit and Expanse are both "Ex" (CO-234). */
+const FACE_OVERRIDES: Readonly<Record<string, string>> = { Exploit: 'Xp' };
+
 /** A tile's face: the initials of a name of two words or more, else its first two letters. */
 export function abbreviate(name: string): string {
   const [first = '', second] = name.split(/\s+/).filter((word) => word.length > 0);
   if (second) return (first.charAt(0) + second.charAt(0)).toUpperCase();
+  if (FACE_OVERRIDES[first]) return FACE_OVERRIDES[first];
   return first.charAt(0).toUpperCase() + first.charAt(1).toLowerCase();
 }
 

@@ -133,6 +133,8 @@ describe('abbreviate', () => {
     expect(abbreviate('Ancient Fury')).toBe('AF');
     expect(abbreviate("Sage's Tome")).toBe('ST');
     expect(abbreviate('Power')).toBe('Po');
+    expect(abbreviate('Exploit')).toBe('Xp');
+    expect(abbreviate('Expanse')).toBe('Ex');
     expect(abbreviate('  Hawk   Eye ')).toBe('HE');
     expect(abbreviate('')).toBe('');
   });

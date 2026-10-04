@@ -28,6 +28,7 @@ import {
   type Vec2,
   type WaveScale,
 } from '../core/enemy';
+import { isAfflicted } from '../core/exploit';
 import { applyStun, stunSpeedFactor, tickStun } from '../core/chainLightning';
 import { eliteScale } from '../core/elites';
 import { NO_BURN, applyBurn, hasBurn, tickBurn, type BurnState } from '../core/fireball';
@@ -203,6 +204,18 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   /** #139: in the short stop of a stagger; the overlay pool marks it. */
   get isStaggered(): boolean {
     return this.staggerS > 0;
+  }
+
+  /** CO-234: under any status Exploit counts: burning, slowed, frozen, stunned, staggered or bleeding. */
+  get isAfflicted(): boolean {
+    return isAfflicted({
+      burning: this.isBurning,
+      slowed: this.slowed,
+      frozen: this.isFrozen,
+      stunned: this.isStunned,
+      staggered: this.isStaggered,
+      bleeding: this.isBleeding,
+    });
   }
 
   /** Test hook (#315): seconds left on each stop and on the slow, for the browser suite. */

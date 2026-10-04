@@ -39,9 +39,9 @@ touch controls, more maps — is tracked as GitHub issues.
   | Earth     | Earth Spike    | Boulder, Earth Shield, Earthquake, Earth Companion             |
 
 - **Level-ups.** Each level draws three cards: new spells while a slot is open,
-  then 14 ranked passives for the rest of the run (damage, cooldown, area,
+  then 15 ranked passives for the rest of the run (damage, cooldown, area,
   projectile speed, duration, crit, damage taken, move speed, max HP,
-  regeneration, gem pull, XP, Pierce). **Reroll**, **Skip** (earns a reroll)
+  regeneration, gem pull, XP, Siphon, Exploit). **Reroll**, **Skip** (earns a reroll)
   and **Ban** reshape an offer.
 - **Relics.** Five relics lie around the arena; a bigger map holds more.
   Touching one pauses the run on three cards, mostly relic buffs that last the

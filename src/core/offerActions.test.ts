@@ -55,7 +55,7 @@ describe('offer actions (#228)', () => {
     if (!once) throw new Error('ban refused');
     expect(once.bans).toBe(START_BANS - 1);
     expect([...once.banned]).toEqual(['passive_magnet']);
-    expect(spendBan(once, 'passive_pierce')).toBeUndefined();
+    expect(spendBan(once, 'passive_nope')).toBeUndefined();
     expect(spendBan({ ...once, bans: 1 }, 'passive_magnet')).toBeUndefined();
   });
 

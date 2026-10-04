@@ -205,15 +205,17 @@ export class IceArrowSpell extends Spell<'ice'> {
     // Read before `despawn` zeroes the velocity: the shards fan out from it.
     const { x: vx, y: vy } = (hitbox.body as Phaser.Physics.Arcade.Body).velocity;
     const level = this.launched.get(hitbox) ?? 1;
-    // Shatter reads the enemy as the arrow found it, before the arrow's own chill.
+    // Shatter reads the enemy as the arrow found it, before the arrow's own chill;
+    // so does Exploit (CO-234).
     const wasSlowed = enemy.slowed;
+    const afflicted = enemy.isAfflicted;
     this.retire(hitbox);
     this.landed += 1;
     this.fx.burst('ice.shatter', enemy.x, enemy.y);
     // Status before damage, the convention every Ice hit keeps: a killing
     // arrow has still chilled the enemy while it was there to take it.
     enemy.applyFrost(arrowFrost(this.stats));
-    this.damage(enemy, this.stats.damage, 'hit', from);
+    this.damage(enemy, this.stats.damage, 'hit', from, afflicted);
     // Only an arrow launched at level 3 shatters, and only on an enemy already slowed.
     const shards = hasShatter(level) && wasSlowed ? this.throwShards(enemy, Math.atan2(vy, vx)) : 0;
     recordCapped(this.hitLog, { level, wasSlowed, shards });
@@ -250,8 +252,10 @@ export class IceArrowSpell extends Spell<'ice'> {
     this.retireShard(hitbox);
     this.shardHitCount += 1;
     this.fx.burst('ice.shatter', enemy.x, enemy.y);
+    // Exploit reads the enemy as the shard found it, before its own chill (CO-234).
+    const afflicted = enemy.isAfflicted;
     enemy.applyFrost(arrowFrost(this.stats));
-    this.damage(enemy, shardDamage(this.stats.damage), 'hit', from);
+    this.damage(enemy, shardDamage(this.stats.damage), 'hit', from, afflicted);
   }
 
   private retire(arrow: Projectile): void {

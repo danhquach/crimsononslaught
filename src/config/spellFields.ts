@@ -9,8 +9,8 @@
  * Counts stay unscaled on purpose: a global "+12% area" that silently became
  * "+12% boulders" would round to nothing on a 3-boulder ring and to a lot on a
  * 9-boulder one. Counts change only in a spell's own block and in #147's pass.
- * The one exception is `pierce` (#206): the Pierce passive adds to it, a flat
- * +1 per rank, so it has its own additive category.
+ * The one exception is `pierce` (#206): the Impaler relic adds to it, a flat
+ * +2 per rank, so it has its own additive category.
  *
  * The Phase 1 blocks (`config/spells.ts`) are covered too: CO-109 made this map
  * the path every equipped spell's numbers go through, so a field missing here

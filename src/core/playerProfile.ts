@@ -99,7 +99,7 @@ function clampField(field: ProfileField, value: number): number {
  * error `validateSpellFields` reports at boot, not a reason to throw mid-run.
  *
  * Only the fields `base` carries are written, so a spell that does not pierce
- * never gains a `pierce` from the Pierce passive.
+ * never gains a `pierce` from the Impaler relic.
  *
  * Called where the value is used, never stored on the loadout: a snapshotting
  * caller (a projectile in flight) reads once at spawn, a live one (a companion,

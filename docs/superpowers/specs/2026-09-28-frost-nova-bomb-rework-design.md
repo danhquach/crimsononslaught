@@ -210,7 +210,7 @@ sheet.
 - Ice Storm's numbers. #304 (CO-183) owns them.
 - New sounds for the icicles or the burst.
 - Removing `ice.nova` from the atlas. Ice Shield still uses it.
-- Pierce for the icicles (the Pierce passive does not reach this spell).
+- Pierce for the icicles (only the Impaler relic raises pierce, and it does not reach this spell).
 - #301's reach problem, beyond what the longer 240 range already gives.
 
 ## 9. Risks
