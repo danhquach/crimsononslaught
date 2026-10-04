@@ -94,13 +94,15 @@ export interface GamePayload {
 
 /**
  * `Game -> LevelUp` (launched over the paused Game). Never empty: Game handles
- * the empty-offer path itself. `actions` is a level-up's Reroll and Ban counts
+ * the empty-offer path itself. `actions` is the run's Reroll and Ban counts
  * (#228), which put the Reroll, Skip and Ban buttons on the overlay; a relic's
- * offer has none.
+ * offer carries them too since CO-239. `relic` marks a relic's offer, which
+ * the overlay titles as one.
  */
 export interface LevelUpPayload {
   offer: readonly OfferCard[];
   actions?: OfferActionCounts;
+  relic?: boolean;
 }
 
 /**
@@ -218,7 +220,8 @@ export function isLevelUpPayload(data: unknown): data is LevelUpPayload {
     data.offer.length >= 1 &&
     data.offer.length <= MAX_OFFER_SIZE &&
     data.offer.every(isOfferCard) &&
-    (data.actions === undefined || isActionCounts(data.actions))
+    (data.actions === undefined || isActionCounts(data.actions)) &&
+    (data.relic === undefined || typeof data.relic === 'boolean')
   );
 }
 

@@ -586,4 +586,19 @@ describe('isLevelUpPayload', () => {
     expect(isLevelUpPayload({ offer: [passive], actions: { rerolls: 1.5, bans: 0 } })).toBe(false);
     expect(isLevelUpPayload({ offer: [passive], actions: { rerolls: 1 } })).toBe(false);
   });
+
+  it('accepts a boolean relic flag, and rejects anything else (CO-239)', () => {
+    const relic = {
+      kind: 'relic',
+      id: 'relic_bulwark',
+      name: 'Bulwark',
+      description: 'x',
+      rank: 1,
+    };
+    const actions = { rerolls: 3, bans: 1 };
+    expect(isLevelUpPayload({ offer: [relic], actions, relic: true })).toBe(true);
+    expect(isLevelUpPayload({ offer: [passive], actions, relic: false })).toBe(true);
+    expect(isLevelUpPayload({ offer: [relic], actions, relic: 'yes' })).toBe(false);
+    expect(isLevelUpPayload({ offer: [relic], actions, relic: 1 })).toBe(false);
+  });
 });

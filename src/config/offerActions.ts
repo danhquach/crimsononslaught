@@ -1,6 +1,6 @@
 /**
- * Reroll, Skip and Ban on the level-up offer (#228), and the charge cards that
- * grant more of them.
+ * Reroll, Skip and Ban on the level-up offer (#228) and the relic offer
+ * (CO-239), and the charge cards that grant more of them.
  *
  * A run starts with `START_REROLLS` rerolls and `START_BANS` bans; Skip is
  * free and pays `SKIP_REROLL_BONUS` rerolls. Nothing carries over between runs.
@@ -35,7 +35,7 @@ export const LEVEL_UP_CHARGES: readonly ChargeCard[] = [
   {
     id: 'charge_levelup_reroll',
     name: '+1 Reroll',
-    description: 'One more reroll of a level-up offer this run.',
+    description: 'One more reroll of an offer this run.',
     resource: 'rerolls',
     amount: 1,
     weight: 1,
@@ -43,7 +43,7 @@ export const LEVEL_UP_CHARGES: readonly ChargeCard[] = [
   {
     id: 'charge_levelup_ban',
     name: '+1 Ban',
-    description: 'One more ban of a level-up card this run.',
+    description: 'One more ban of an offer card this run.',
     resource: 'bans',
     amount: 1,
     weight: 1,
@@ -55,7 +55,7 @@ export const RELIC_CHARGES: readonly ChargeCard[] = [
   {
     id: 'charge_relic_rerolls',
     name: '+2 Rerolls',
-    description: 'Two more rerolls of a level-up offer this run.',
+    description: 'Two more rerolls of an offer this run.',
     resource: 'rerolls',
     amount: 2,
     weight: 0.4,
@@ -63,7 +63,7 @@ export const RELIC_CHARGES: readonly ChargeCard[] = [
   {
     id: 'charge_relic_ban',
     name: '+1 Ban',
-    description: 'One more ban of a level-up card this run.',
+    description: 'One more ban of an offer card this run.',
     resource: 'bans',
     amount: 1,
     weight: 0.4,

@@ -270,7 +270,7 @@ export function controlHelpRows(
       action: 'Level-up',
       keyboard: trio('keyboard'),
       gamepad: trio('pad'),
-      note: 'On the level-up screen; 1-3 pick a card',
+      note: 'On a level-up or relic; 1-3 pick a card',
     },
     {
       action: 'Help tabs',

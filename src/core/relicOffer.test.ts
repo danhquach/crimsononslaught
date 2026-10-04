@@ -5,7 +5,9 @@ import { RELIC_BUFFS, type RelicBuff, type RelicBuffId } from '../config/relics'
 import { MAX_OFFER_SIZE, isOfferCard } from './levelUp';
 import { levelUpOffer } from './levelUpOffer';
 import { buildLoadout, profileOf, takePassive, takeRelic, type Loadout } from './loadout';
-import { relicOffer, weightedSample } from './relicOffer';
+import { spendBan, startingActions } from './offerActions';
+import { relicOffer, relicOfferAfterBan, weightedSample } from './relicOffer';
+import { RELIC_OFFER_GOLDEN } from './relicOffer.golden';
 import { createRng } from './rng';
 
 const offerFor = (loadout: Loadout, seed = 1) =>
@@ -181,5 +183,117 @@ describe('relicOffer requiresStat (#377)', () => {
     for (let seed = 1; seed <= 300; seed++) {
       expect(offerFor(loadout, seed).map((card) => card.id)).not.toContain('relic_impaler');
     }
+  });
+});
+
+describe('relicOffer — Reroll, Skip and Ban (CO-239)', () => {
+  const profile = profileOf(buildLoadout('fire'));
+  const ids = (cards: readonly { id: string }[]) => cards.map((card) => card.id);
+
+  it('draws the same offers from a seed as before, with no ban or reroll in play', () => {
+    const fresh = buildLoadout('fire');
+    let stacked = buildLoadout('ice');
+    for (let i = 0; i < 15; i++) stacked = takeRelic(stacked, 'relic_hourglass');
+    stacked = takeRelic(stacked, 'relic_bulwark');
+    const lines: string[] = [];
+    for (const [name, loadout] of [
+      ['fresh', fresh],
+      ['stacked', stacked],
+    ] as const) {
+      for (let seed = 1; seed <= 12; seed++) {
+        const rng = createRng(seed);
+        // An empty ban set and exclude, as Game passes them, draw like none at all.
+        const input = {
+          ranks: loadout.relics,
+          profile: profileOf(loadout),
+          banned: startingActions().banned,
+          exclude: new Set<string>(),
+        };
+        const draws = [0, 1, 2].map(() =>
+          relicOffer(rng, input)
+            .map((card) => `${card.id}@${card.rank ?? ''}`)
+            .join(','),
+        );
+        lines.push(`${name}:${seed}:${draws.join(';')}|${rng.next()}`);
+      }
+    }
+    expect(lines).toEqual(RELIC_OFFER_GOLDEN);
+  });
+
+  it('never offers a banned buff or charge again that run', () => {
+    let actions = spendBan(startingActions(), 'relic_lodestone');
+    actions = actions && spendBan({ ...actions, bans: 1 }, 'charge_relic_ban');
+    if (!actions) throw new Error('the bans were refused');
+    for (let seed = 1; seed <= 300; seed++) {
+      const offer = ids(
+        relicOffer(createRng(seed), { ranks: new Map(), profile, banned: actions.banned }),
+      );
+      expect(offer, `seed ${seed}`).not.toContain('relic_lodestone');
+      expect(offer, `seed ${seed}`).not.toContain('charge_relic_ban');
+    }
+  });
+
+  it('offers a banned buff again on the next run', () => {
+    const banned = spendBan(startingActions(), 'relic_lodestone');
+    expect(banned?.banned.has('relic_lodestone')).toBe(true);
+    const next = startingActions();
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 100; seed++) {
+      for (const id of ids(
+        relicOffer(createRng(seed), { ranks: new Map(), profile, banned: next.banned }),
+      )) {
+        seen.add(id);
+      }
+    }
+    expect(seen.has('relic_lodestone')).toBe(true);
+  });
+
+  it('a reroll leaves out the cards just shown while the pool has others', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const rng = createRng(seed);
+      const shown = relicOffer(rng, { ranks: new Map(), profile });
+      const exclude = new Set(ids(shown));
+      const rerolled = relicOffer(rng, { ranks: new Map(), profile, exclude });
+      expect(rerolled, `seed ${seed}`).toHaveLength(MAX_OFFER_SIZE);
+      for (const id of ids(rerolled)) expect(exclude.has(id), `seed ${seed}`).toBe(false);
+    }
+  });
+
+  it('a reroll of a short pool tops up from the cards just shown', () => {
+    const buffs = [buff('a', 1), buff('b', 1), buff('c', 1), buff('d', 1)];
+    const input = { ranks: new Map(), profile, buffs, charges: [] };
+    const rerolled = relicOffer(createRng(4), { ...input, exclude: new Set(['a', 'b', 'c']) });
+    expect(rerolled).toHaveLength(3);
+    expect(rerolled[0]?.id, 'the one fresh card first').toBe('d');
+    expect(new Set(ids(rerolled)).size, 'no card twice').toBe(3);
+  });
+
+  it('a ban redraws only the banned card, in its place', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const rng = createRng(seed);
+      const shown = relicOffer(rng, { ranks: new Map(), profile });
+      const bannedId = shown[1]?.id ?? '';
+      const banned = new Set([bannedId]);
+      const after = relicOfferAfterBan(rng, { ranks: new Map(), profile, banned }, shown, bannedId);
+      expect(after, `seed ${seed}`).toHaveLength(MAX_OFFER_SIZE);
+      expect(after[0]).toEqual(shown[0]);
+      expect(after[2]).toEqual(shown[2]);
+      expect(ids(after)).not.toContain(bannedId);
+      expect(new Set(ids(after)).size).toBe(MAX_OFFER_SIZE);
+    }
+  });
+
+  it('a ban that empties the pool leaves what is left, or nothing', () => {
+    const input = { ranks: new Map(), profile, buffs: [buff('a', 1), buff('b', 1)], charges: [] };
+    const shown = relicOffer(createRng(1), input);
+    const one = relicOfferAfterBan(createRng(2), { ...input, banned: new Set(['a']) }, shown, 'a');
+    expect(ids(one)).toEqual(['b']);
+    const none = relicOfferAfterBan(
+      createRng(2),
+      { ...input, banned: new Set(['a', 'b']) },
+      one,
+      'b',
+    );
+    expect(none).toEqual([]);
   });
 });
