@@ -3,7 +3,7 @@ import { PLAYER_MAX_HP, PLAYER_SPEED } from './player';
 import type { SpellStatField } from './spellFields';
 
 /**
- * The player profile a run accumulates and the fourteen passives that change
+ * The player profile a run accumulates and the fifteen passives that change
  * it (Phase 2 spec §4, §5).
  *
  * A passive is one `{field, op, amount}` change, applied once per rank. It
@@ -49,6 +49,8 @@ export interface PlayerProfile {
   damageReduction: number;
   /** Extra enemies a piercing spell passes through, added to its `pierce` (#206). */
   pierceBonus: number;
+  /** Fraction of the spell damage that lands, healed back (CO-235); `core/siphon.ts` caps the rate. */
+  siphonShare: number;
 }
 
 export type ProfileField = keyof PlayerProfile;
@@ -73,6 +75,7 @@ export const BASE_PLAYER_PROFILE: Readonly<PlayerProfile> = {
   critMultiplier: 1.5,
   damageReduction: 0,
   pierceBonus: 0,
+  siphonShare: 0,
 };
 
 /**
@@ -114,6 +117,11 @@ export interface Passive {
    * offered, so it never shows up as a dead pick (#206). Absent: always offered.
    */
   requiresStat?: SpellStatField;
+  /**
+   * `false`: withheld from level-up offers (CO-235) but still resolvable, so a
+   * carried rank, a relic or a saved run keeps its meaning. Absent: offered.
+   */
+  offered?: false;
 }
 
 /**
@@ -249,6 +257,16 @@ const PASSIVE_LIST = [
     amount: 1,
     maxRank: 3,
     requiresStat: 'pierce',
+    offered: false,
+  },
+  {
+    id: 'passive_siphon',
+    name: 'Siphon',
+    description: 'Heal 0.5% of spell damage dealt, up to 3 HP/s.',
+    field: 'siphonShare',
+    op: 'add',
+    amount: 0.005,
+    maxRank: 4,
   },
 ] as const satisfies readonly Passive[];
 
@@ -265,3 +283,17 @@ export function passiveById(id: string): Passive | undefined {
 export function isPassiveId(value: unknown): value is PassiveId {
   return typeof value === 'string' && PASSIVES.some((passive) => passive.id === value);
 }
+
+/**
+ * Siphon's pacing (CO-235). The ceiling is Regeneration's full stack, so one
+ * passive can never out-heal the other's best. It bounds Siphon alone: with
+ * Regeneration and Wellspring a run may still exceed it in total.
+ */
+export const SIPHON = {
+  /** HP per second, whatever the rank or the damage. */
+  maxHealPerS: 3,
+  /** Seconds of the ceiling that banked damage may hold, so a burst pays out over a second. */
+  bankS: 1,
+  /** HP healed between heal cues, which holds the cue to the ceiling's rate. */
+  cueEveryHp: 1,
+} as const;

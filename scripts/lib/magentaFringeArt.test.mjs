@@ -53,7 +53,7 @@ const frames = (re) => Object.keys(FRAMES).filter((n) => re.test(n));
 describe('magenta fringe (CO-171)', () => {
   const GHOST = /^hero\.death\.[45]$/;
   const sets = {
-    hero: [/^hero\./, 46],
+    hero: [/^hero\./, 50],
     tank: [/^tank\./, 30],
     fast: [/^fast\./, 13],
     swarm: [/^swarm\./, 13],

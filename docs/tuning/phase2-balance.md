@@ -1162,3 +1162,33 @@ spot. Starting values, not yet swept (`npm run sweep` was not run for this ticke
 
 A hero at the circle's centre needs 90 / 180 = 0.5 s to clear it (the hit test is
 centre distance only, `blastReaches`), inside the 0.9 s warning. Like the slam, a bot that steps out of rings will not be hit by it.
+
+# Siphon (CO-235, 2026-10-04)
+
+Siphon heals 0.5% of the spell damage that lands per rank (4 ranks, 2%), capped at
+3 HP/s (Regeneration's full stack). Pierce is withheld from offers (`offered: false`)
+until Exploit ([#415](https://github.com/danhquach/crimsononslaught/issues/415)). Same-seed sweep with
+`npm run sweep -- --seeds 1-5`, baseline `main` at 2f8c4b3, one run at a time,
+mortal, no dash, 20 runs a side. Wins per element, of 5:
+
+| Arm | Fire | Ice | Lightning | Earth | Wins | Deaths (fire / ice / lightning / earth) | Median boss kill (range) | Top passive's share of win ranks |
+|---|---|---|---|---|---|---|---|---|
+| Baseline (`main`) | 1 | 4 | 5 | 3 | 13 / 20 | 4 / 1 / 0 / 2 | 98 s (81-170) | Haste 18.8% |
+| **Siphon** | 2 | 3 | 5 | 3 | 13 / 20 | 3 / 2 / 0 / 2 | 106 s (90-147) | Power 16.7% |
+
+- Win rate: the same, 13 of 20.
+- Median boss kill: 106 s, inside 90-180 s.
+- No passive is above 25% of win ranks. Siphon has 2.6% (14 ranks) and Regeneration
+  2.8% (15 ranks); both were taken in winning runs, so neither is a dead pick.
+  Across all runs Regeneration fell from 31 ranks to 16, the two sharing the filler
+  slots the bot leaves after Power, Haste, Expanse and Persistence.
+- Median HP lost in a win fell from 121 to 93. The bot reads net HP, so Siphon's
+  healing counts against that figure.
+- Pierce took 2 of 522 win ranks in the baseline (0.4%), so taking it out of the
+  offers barely moves the comparison.
+
+Limits: 20 runs a side, n = 5 per element. A one-win swing per element is noise
+([#210](https://github.com/danhquach/crimsononslaught/issues/210)), and the bot only
+takes Siphon as filler, so this shows Siphon breaks nothing, not what it is worth to
+a player who builds around it. The baseline log flagged 2 suspect-bot runs; the
+Siphon arm flagged none.

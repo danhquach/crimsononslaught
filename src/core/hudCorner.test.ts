@@ -59,7 +59,7 @@ describe('passiveTileLayout', () => {
   it('lays the whole roster in four rows inside the corner', () => {
     const all = PASSIVES.map(({ id, name }) => ({ id, name, rank: 1 }));
     const tiles = passiveTileLayout(all, 778, 72);
-    expect(tiles).toHaveLength(14);
+    expect(tiles).toHaveLength(PASSIVES.length);
     expect(new Set(tiles.map((t) => t.y)).size).toBe(4);
     expect(Math.min(...tiles.map((t) => t.x))).toBe(778);
     expect(Math.max(...tiles.map((t) => t.x))).toBe(922);

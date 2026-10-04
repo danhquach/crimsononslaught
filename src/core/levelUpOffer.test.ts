@@ -5,6 +5,7 @@ import {
   BASE_PLAYER_PROFILE,
   PASSIVES,
   PROFILE_CLAMPS,
+  passiveById,
   type Passive,
   type PassiveId,
   type PlayerProfile,
@@ -26,7 +27,15 @@ import {
   type OfferInput,
 } from './levelUpOffer';
 import { OFFER_GOLDEN } from './levelUpOffer.golden';
-import { buildLoadout, equip, openSlots, takePassive, upgradeSpell, type Loadout } from './loadout';
+import {
+  buildLoadout,
+  equip,
+  openSlots,
+  passiveRank,
+  takePassive,
+  upgradeSpell,
+  type Loadout,
+} from './loadout';
 import { createRng, type Rng } from './rng';
 
 const [SLOT_2_LEVEL, SLOT_3_LEVEL] = SLOT_UNLOCK_LEVELS;
@@ -269,7 +278,7 @@ describe('levelUpOffer — no passive at its clamp (#315)', () => {
   });
 });
 
-describe('levelUpOffer — Pierce only while a spell pierces (#206)', () => {
+describe('levelUpOffer — Pierce is withheld (CO-235)', () => {
   const PIERCING = new Set(['damage', 'pierce'] as const);
   const offersPierce = (loadout: Loadout, carried?: ReadonlySet<'damage' | 'pierce'>): boolean => {
     for (let seed = 1; seed <= 100; seed++) {
@@ -284,28 +293,50 @@ describe('levelUpOffer — Pierce only while a spell pierces (#206)', () => {
     return false;
   };
 
-  it('never offers Pierce when no casting spell carries pierce', () => {
-    const ids = (carried?: ReadonlySet<'damage'>): string[] =>
+  it('never offers Pierce, even while a casting spell carries pierce', () => {
+    const ids = (carried?: ReadonlySet<'damage' | 'pierce'>): string[] =>
       eligiblePassives(fullLoadout(), PASSIVES, carried).map((p) => p.id);
     expect(ids()).not.toContain('passive_pierce');
     expect(ids(new Set(['damage']))).not.toContain('passive_pierce');
+    expect(ids(PIERCING)).not.toContain('passive_pierce');
     expect(offersPierce(fullLoadout())).toBe(false);
-    expect(offersPierce(fullLoadout(), new Set(['damage']))).toBe(false);
+    expect(offersPierce(fullLoadout(), PIERCING)).toBe(false);
   });
 
-  it('offers Pierce while one does, until it reaches rank 3', () => {
-    let loadout = fullLoadout();
-    expect(eligiblePassives(loadout, PASSIVES, PIERCING).map((p) => p.id)).toContain(
+  it('still honours requiresStat for a passive that is offered', () => {
+    const gated: Passive = { ...passiveById('passive_pierce')!, offered: undefined };
+    expect(eligiblePassives(fullLoadout(), [gated], PIERCING).map((p) => p.id)).toEqual([
       'passive_pierce',
-    );
-    expect(offersPierce(loadout, PIERCING)).toBe(true);
+    ]);
+    expect(eligiblePassives(fullLoadout(), [gated])).toEqual([]);
+  });
 
-    for (let rank = 0; rank < 3; rank++) loadout = takePassive(loadout, 'passive_pierce');
-    expect(eligiblePassives(loadout, PASSIVES, PIERCING).map((p) => p.id)).not.toContain(
-      'passive_pierce',
-    );
-    expect(offersPierce(loadout, PIERCING)).toBe(false);
-    expect(() => takePassive(loadout, 'passive_pierce')).toThrow();
+  it('still resolves a carried Pierce rank', () => {
+    const loadout = takePassive(fullLoadout(), 'passive_pierce');
+    expect(passiveRank(loadout, 'passive_pierce')).toBe(1);
+  });
+});
+
+describe('levelUpOffer — Siphon (CO-235)', () => {
+  const offersSiphon = (loadout: Loadout): boolean => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const offer = levelUpOffer(createRng(seed), {
+        loadout,
+        level: SLOT_3_LEVEL + 1,
+        actives: [],
+      });
+      if (offer.some((card) => card.id === 'passive_siphon')) return true;
+    }
+    return false;
+  };
+
+  it('is offered with nothing carried, and not after rank 4', () => {
+    let loadout = fullLoadout();
+    expect(eligiblePassives(loadout).map((p) => p.id)).toContain('passive_siphon');
+    expect(offersSiphon(loadout)).toBe(true);
+    for (let rank = 0; rank < 4; rank++) loadout = takePassive(loadout, 'passive_siphon');
+    expect(eligiblePassives(loadout).map((p) => p.id)).not.toContain('passive_siphon');
+    expect(offersSiphon(loadout)).toBe(false);
   });
 });
 
@@ -687,7 +718,9 @@ const TABLE: SpellLevelTable = {
 
 /** The draws behind `OFFER_GOLDEN`: cases, seeds 1 to 50, every spell casting, no level text. */
 function replayGolden(): string[] {
-  const shared = { actives: FIRE_CATALOG, casting: FIRE_CASTING, spellLevels: {} };
+  // The golden predates Siphon (CO-235), which would join every passive pool.
+  const passives = PASSIVES.filter((passive) => passive.id !== 'passive_siphon');
+  const shared = { actives: FIRE_CATALOG, casting: FIRE_CASTING, spellLevels: {}, passives };
   const lines: string[] = [];
   const cases: [string, Loadout, number, Partial<OfferInput>][] = [
     ['fresh', buildLoadout('fire'), 1, {}],

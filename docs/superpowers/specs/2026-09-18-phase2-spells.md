@@ -134,6 +134,7 @@ can change.
 | `critMultiplier` | 1.5 | Damage multiplier on a crit |
 | `damageReduction` | 0 | Fraction of incoming player damage removed, 0–1 |
 | `pierceBonus` | 0 | Extra enemies a piercing spell passes through, added to its `pierce` ([#206](https://github.com/danhquach/crimsononslaught/issues/206)) |
+| `siphonShare` | 0 | Fraction of the spell damage that lands, healed back at no more than Siphon's ceiling (§5, CO-235) |
 
 `critChance` / `critMultiplier` are the stats
 [#125](https://github.com/danhquach/crimsononslaught/issues/125) asks the
@@ -172,7 +173,7 @@ accumulated in place, so a wrong rank can never be baked in.
 
 ## 5. Passives
 
-Fourteen passives, shared by every element. A passive is data:
+Fifteen passives, shared by every element. A passive is data:
 
 ```ts
 interface Passive {
@@ -184,6 +185,7 @@ interface Passive {
   amount: number;
   maxRank?: number;               // absent = stacks without limit
   requiresStat?: SpellStatField;  // offered only while a casting spell carries it
+  offered?: false;                // withheld from level-up offers, still resolvable (§7.1)
 }
 ```
 
@@ -203,6 +205,7 @@ interface Passive {
 | `passive_magnet` | Magnet | `pickupRadius` | mul | 1.25 | 3 |
 | `passive_avarice` | Avarice | `xpGain` | mul | 1.12 | 5 |
 | `passive_pierce` | Pierce | `pierceBonus` | add | 1 | 3 |
+| `passive_siphon` | Siphon | `siphonShare` | add | 0.005 | 4 |
 
 Notes:
 
@@ -224,7 +227,32 @@ Notes:
   capped at rank 3. It reaches only spells whose block already has `pierce`
   (Earth Spike 1 → 4, Boulder 5 → 8 at rank 3), and it is offered only while a
   casting spell carries `pierce` (`requiresStat`, §7.1), so it is never a dead
-  pick.
+  pick. Since CO-235 it is withheld from every offer (`offered: false`, §7.1)
+  until Exploit ([#415](https://github.com/danhquach/crimsononslaught/issues/415))
+  lands; its data and art stay, and a carried rank or a relic still resolves.
+- Siphon (CO-235, [#416](https://github.com/danhquach/crimsononslaught/issues/416))
+  heals 0.5% of the spell damage that lands per rank, up to 2% at rank 4, and is
+  offered on every element. It is independent of Exploit.
+  - **Ceiling model.** Landed damage is banked (`pending += landed × share`) and
+    paid out as HP at no more than 3 HP/s, Regeneration's full stack, whatever
+    the rank or the damage. The bank holds one second of the ceiling, so a
+    burst pays out over about a second, healing stops within a second of the
+    damage stopping, and a hero at full HP cannot save healing for later:
+    paying out drains the bank whether or not there was room. The pure model is
+    `core/siphon.ts`; the 3 HP/s is `SIPHON.maxHealPerS`, and a test holds it
+    equal to Regeneration's `amount × maxRank`.
+  - **What counts.** The HP an enemy actually lost: after crit, guard, enrage
+    and the boss damage cap (#406), with no overkill, so a hit on a dying enemy
+    or one the cap cut to nothing feeds 0. Only spell hits and the status
+    damage over time (burn and bleed) feed it. The test hooks, an exploder's contact kill and the bomb pickup do
+    not.
+  - **The ceiling covers Siphon only.** Regeneration, Wellspring and Siphon
+    together may exceed 3 HP/s; that is accepted.
+  - **Interactions.** Melee immunity, Ward and Bulwark act on incoming damage and
+    are unchanged; Siphon heals what is left and never above max HP. A dead hero
+    is not healed and the bank is emptied.
+  - **The cue.** A small mote plays on the hero once per HP healed, so at most 3
+    a second, never restarted mid-clip.
 
 ## 6. From the profile to a spell's stat block
 
@@ -305,7 +333,9 @@ On each level-up, in order:
 2. **Otherwise** → offer 3 passives drawn from those with `rank < maxRank`, via
    `rng.shuffle(pool).slice(0, 3)`. A
    passive with a `requiresStat` is eligible only while a casting spell's base
-   block carries that stat — slotted or not, so a `?loadout=` extra counts.
+   block carries that stat — slotted or not, so a `?loadout=` extra counts. A
+   passive with `offered: false` (Pierce, CO-235) is never eligible; it stays in
+   the config so a carried rank still resolves.
 3. **Nothing eligible** → no overlay; grant `EMPTY_OFFER_MAX_HP_BONUS` (+10 max
    HP) and resume, exactly as Phase 1 does.
 

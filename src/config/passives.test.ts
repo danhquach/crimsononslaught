@@ -5,6 +5,7 @@ import {
   PASSIVES,
   PROFILE_CLAMPS,
   passiveById,
+  SIPHON,
   type Passive,
 } from './passives';
 
@@ -24,6 +25,7 @@ const SPEC_TABLE: readonly [string, string, 'add' | 'mul', number, number][] = [
   ['passive_magnet', 'pickupRadius', 'mul', 1.25, 3],
   ['passive_avarice', 'xpGain', 'mul', 1.12, 5],
   ['passive_pierce', 'pierceBonus', 'add', 1, 3],
+  ['passive_siphon', 'siphonShare', 'add', 0.005, 4],
 ];
 
 describe('passives config', () => {
@@ -55,6 +57,17 @@ describe('passives config', () => {
     ]);
   });
 
+  it('withholds only Pierce from level-up offers (CO-235)', () => {
+    expect(PASSIVES.filter((passive) => passive.offered === false).map((p) => p.id)).toEqual([
+      'passive_pierce',
+    ]);
+  });
+
+  it("sets Siphon's ceiling at Regeneration's full stack (CO-235)", () => {
+    const regen = passiveById('passive_regeneration');
+    expect(SIPHON.maxHealPerS).toBe((regen?.amount ?? 0) * (regen?.maxRank ?? 0));
+  });
+
   it('holds the spec §4.1 base profile and the §4.3 clamps', () => {
     expect(BASE_PLAYER_PROFILE).toEqual({
       moveSpeed: 180,
@@ -71,6 +84,7 @@ describe('passives config', () => {
       critMultiplier: 1.5,
       damageReduction: 0,
       pierceBonus: 0,
+      siphonShare: 0,
     });
     expect(PROFILE_CLAMPS).toEqual({
       cooldownMul: { min: 0.35 },
@@ -101,5 +115,11 @@ describe('passives config', () => {
       'passive "p_amount": a mul amount must be > 0, got 0',
       'passive "p_finite": amount must be finite, got NaN',
     ]);
+  });
+
+  it("states Siphon's share and ceiling in its description", () => {
+    const siphon = passiveById('passive_siphon') as Passive;
+    expect(siphon.description).toContain(`${siphon.amount * 100}% of spell damage`);
+    expect(siphon.description).toContain(`${SIPHON.maxHealPerS} HP/s`);
   });
 });

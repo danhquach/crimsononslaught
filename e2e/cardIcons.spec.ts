@@ -199,3 +199,53 @@ test('with no icon art, each spell-select card shows its colour-and-letters glyp
     expectLaidOut(card);
   }
 });
+
+/** A hand-made passive and relic offer, as the Game scene would launch it (CO-235). */
+const BUILD_OFFER = [
+  { kind: 'passive', id: 'passive_siphon', name: 'Siphon', description: 'Heals.', rank: 1 },
+  { kind: 'passive', id: 'passive_power', name: 'Power', description: 'Hits harder.', rank: 1 },
+  { kind: 'relic', id: 'relic_bulwark', name: 'Bulwark', description: 'Guards.', rank: 1 },
+] as const;
+
+async function openBuildOffer(page: Page): Promise<CardSample[]> {
+  await page.goto('/?seed=1&invulnerable=1');
+  await startFromIntro(page);
+  await waitForScene(page, SCENE.spellSelect);
+  await page.keyboard.press('1');
+  await waitForScene(page, SCENE.game);
+  await page.evaluate(
+    async ([gameKey, levelUpKey, offer]) => {
+      const { game } = await import('/src/main.ts');
+      game.scene.getScene(gameKey).scene.launch(levelUpKey, { offer });
+    },
+    [SCENE.game, SCENE.levelUp, BUILD_OFFER] as const,
+  );
+  await waitForScene(page, SCENE.levelUp);
+  return sampleCards(page, SCENE.levelUp);
+}
+
+test('a passive or relic level-up card shows its build icon at 2x, clear of its text', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  const cards = await openBuildOffer(page);
+  expect(cards.map((card) => card.icons)).toEqual(
+    BUILD_OFFER.map(({ id }) => [{ frame: `icon.${id}.0.art`, width: 64, interactive: false }]),
+  );
+  cards.forEach(expectLaidOut);
+  // One shared, taller row: the icon band is added to every card.
+  expect(new Set(cards.map((card) => card.frame.bottom - card.frame.top)).size).toBe(1);
+  expect(cards[0]?.frame.bottom).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
+test('with no icon art, passive and relic level-up cards keep their text-only height', async ({
+  page,
+}) => {
+  // The icons' page failing takes every atlas page down with it (CO-130).
+  await page.route('**/assets/atlas/props17.png', (route) => route.abort());
+  const cards = await openBuildOffer(page);
+  expect(cards.map((card) => card.icons)).toEqual(BUILD_OFFER.map(() => []));
+  for (const card of cards) expect(card.frame.bottom - card.frame.top).toBe(260);
+  cards.forEach(expectLaidOut);
+});

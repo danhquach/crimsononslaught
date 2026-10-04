@@ -45,6 +45,7 @@ export const ATLAS_PAGES = [
   { key: 'props29', texture: 'assets/atlas/props29.png', data: 'assets/atlas/props29.json' },
   { key: 'props30', texture: 'assets/atlas/props30.png', data: 'assets/atlas/props30.json' },
   { key: 'props31', texture: 'assets/atlas/props31.png', data: 'assets/atlas/props31.json' },
+  { key: 'props32', texture: 'assets/atlas/props32.png', data: 'assets/atlas/props32.json' },
 ] as const satisfies readonly AtlasPage[];
 
 /** Texture key of an atlas page. */
@@ -575,6 +576,10 @@ export const FRAMES = {
   'hero.idle.right.1': { w: 30, h: 36, anchorX: 16, anchorY: 17, page: 'props' },
   'hero.idle.up.0': { w: 36, h: 37, anchorX: 19, anchorY: 18, page: 'props' },
   'hero.idle.up.1': { w: 36, h: 37, anchorX: 19, anchorY: 18, page: 'props' },
+  'hero.siphon.0': { w: 21, h: 32, anchorX: 11, anchorY: 15, page: 'props32' },
+  'hero.siphon.1': { w: 21, h: 32, anchorX: 11, anchorY: 15, page: 'props32' },
+  'hero.siphon.2': { w: 21, h: 32, anchorX: 11, anchorY: 15, page: 'props32' },
+  'hero.siphon.3': { w: 21, h: 32, anchorX: 11, anchorY: 15, page: 'props32' },
   'hero.walk.down.0': { w: 27, h: 37, anchorX: 16, anchorY: 18, page: 'props' },
   'hero.walk.down.1': { w: 27, h: 37, anchorX: 16, anchorY: 18, page: 'props' },
   'hero.walk.down.2': { w: 27, h: 37, anchorX: 16, anchorY: 18, page: 'props' },
@@ -712,6 +717,7 @@ export const FRAMES = {
   'icon.passive_precision.0': { w: 36, h: 36, anchorX: 18, anchorY: 18, page: 'props17' },
   'icon.passive_regeneration.0': { w: 36, h: 36, anchorX: 18, anchorY: 18, page: 'props17' },
   'icon.passive_savagery.0': { w: 36, h: 36, anchorX: 18, anchorY: 18, page: 'props17' },
+  'icon.passive_siphon.0': { w: 36, h: 36, anchorX: 18, anchorY: 18, page: 'props17' },
   'icon.passive_swift.0': { w: 36, h: 36, anchorX: 18, anchorY: 18, page: 'props17' },
   'icon.passive_velocity.0': { w: 36, h: 36, anchorX: 18, anchorY: 18, page: 'props17' },
   'icon.passive_vitality.0': { w: 36, h: 36, anchorX: 18, anchorY: 18, page: 'props17' },
@@ -1115,6 +1121,7 @@ export const ART_BOXES = {
   'hero.idle.left': { x: 1, y: 1, w: 25, h: 34 },
   'hero.idle.right': { x: 1, y: 1, w: 28, h: 34 },
   'hero.idle.up': { x: 1, y: 1, w: 34, h: 35 },
+  'hero.siphon': { x: 1, y: 1, w: 19, h: 30 },
   'hero.walk.down': { x: 1, y: 1, w: 25, h: 35 },
   'hero.walk.left': { x: 1, y: 1, w: 29, h: 34 },
   'hero.walk.right': { x: 1, y: 1, w: 29, h: 34 },
@@ -1178,6 +1185,7 @@ export const ART_BOXES = {
   'icon.passive_precision': { x: 2, y: 2, w: 32, h: 32 },
   'icon.passive_regeneration': { x: 2, y: 2, w: 32, h: 32 },
   'icon.passive_savagery': { x: 2, y: 2, w: 32, h: 32 },
+  'icon.passive_siphon': { x: 2, y: 2, w: 32, h: 32 },
   'icon.passive_swift': { x: 2, y: 2, w: 32, h: 32 },
   'icon.passive_velocity': { x: 2, y: 2, w: 32, h: 32 },
   'icon.passive_vitality': { x: 2, y: 2, w: 32, h: 32 },

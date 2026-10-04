@@ -347,6 +347,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Siphon's heal (CO-235), a fraction of a point per step: capped at the
+   * maximum, and the HUD is told only when the HP it would draw changes.
+   */
+  restoreHp(amount: number): void {
+    const before = Math.ceil(this.health.hp);
+    this.setHealth(heal(this.health, amount));
+    if (Math.ceil(this.health.hp) === before) return;
+    emitRunEvent(this.scene.events, 'hp', { hp: this.health.hp, maxHp: this.health.maxHp });
+  }
+
+  /**
    * One step of Regeneration. Healing is continuous but the HUD is told only
    * when the HP it would draw changes, so a scaled run does not emit an event
    * per simulation step for a fraction of a point.
