@@ -1233,3 +1233,48 @@ Limits: 20 runs a side, n = 5 per element. A one-win swing per element is noise
 ([#210](https://github.com/danhquach/crimsononslaught/issues/210)), and the bot only
 takes Exploit as filler, so this shows Exploit breaks nothing, not what it is worth
 to a player who builds around statuses. Neither arm flagged a suspect-bot run.
+
+# Earth boss kill with the passive caps (CO-236, 2026-10-04)
+
+[#417](https://github.com/danhquach/crimsononslaught/issues/417) reported that Earth's
+Earthquake wins slowed past 180 s at the boss with the #410 caps (3 of 4 capped wins
+took 317–338 s). Re-measured on `main` (c845b6f) with `npm run sweep`: Earth only,
+seeds 1–15, `timeScale=8`, mortal, no dash, no forced loadout, one run at a time.
+No value changed.
+
+| Seed | Spells | Boss kill |
+|---|---|---|
+| 1 | Earth Spike, Earth Shield, Boulder | 282 s |
+| 2 | Earth Spike, Earth Shield, Earth Companion | 132 s |
+| 3 | Earth Spike, Earthquake, Earth Shield | 135 s |
+| 4 | Earth Spike, Earth Companion, Boulder | 102 s |
+| 5 | Earth Spike, Earth Shield, Boulder | 735 s |
+| 6 | Earth Spike, Boulder, Earth Companion | 107 s |
+| 7 | Earth Spike, Boulder, Earth Shield | 169 s |
+| 8 | Earth Spike, Earth Companion, Earthquake | 107 s |
+| 9 | Earth Spike, Earthquake, Earth Companion | 109 s |
+| 10 | Earth Spike, Earth Companion, Earth Shield | 157 s |
+| 11 | Earth Spike, Earth Companion, Boulder | 131 s |
+| 12 | Earth Spike, Boulder, Earth Shield | 156 s |
+| 13 | Earth Spike, Boulder, Earth Companion | 107 s |
+| 14 | Earth Spike, Earth Companion, Earth Shield | 147 s |
+| 15 | Earth Spike, Boulder, Earthquake | 107 s |
+
+- **Not reproduced.** 15 of 15 wins (the #410 capped sweep: 4 of 5), median boss
+  kill 132 s, 13 of 15 inside 90–180 s. All four Earthquake wins took 107–135 s.
+- **The slow kills are builds without the Earth Companion**, here and in the #410
+  baseline and capped sweeps: every Earth win over 180 s (282 and 735 s here; 290 and
+  400 s in the two #410 baseline sweeps, before the caps; 317–338 s capped) had no
+  Earth Companion, and every Earth Companion win took 102–157 s. The Earth Companion
+  is Earth's one spell that walks to the boss; the rest work from around the hero
+  (Earth Spike's base range is 144 px), and the sweep bot holds the boss 200–330 px
+  away (`scripts/sweep/bot.mjs`), so part of this tail may be the bot's standoff
+  rather than the game. Builds without the Earth Companion still won inside the
+  window 4 times of 6.
+- Closed with no balance change. If Earth's tail matters later, probe it first with a
+  forced Shield + Boulder loadout at a closer bot standoff before tuning a lever.
+
+Limits: one sweep, n = 15, Earth only; no other element was re-run, as nothing
+changed. A one-win swing is noise
+([#210](https://github.com/danhquach/crimsononslaught/issues/210)). No run was flagged
+as a suspect bot.
