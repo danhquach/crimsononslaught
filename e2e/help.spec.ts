@@ -218,22 +218,51 @@ async function expectTable(
 }
 
 /**
- * The Spells page on screen: every row of `page` drawn inside the panel, clear
- * of the tabs above and the Back row below, and each pager button that exists
- * (`< Prev` / `Next >`) clear of Back and the side edges. The screen is still,
- * so texts, boxes and rows read one after another agree.
+ * The pager on a paged tab: a button only where that neighbour page exists
+ * (`< Prev` / `Next >`), each on Back's row with its label centred, and 8 px
+ * clear of Back and the panel's side edges.
+ */
+async function expectPager(
+  page: Page,
+  neighbours: { prev?: string; next?: string },
+): Promise<void> {
+  const boxes = await drawnBounds(page);
+  const menu = await menuRows(page, SCENE.help);
+  const back = menu.find((row) => row.label === 'Back  (Esc)')!;
+  // Slack for CI's taller fonts: nothing may come within 8 px of Back or the side edges.
+  const SLACK = 8;
+  const pager = menu.filter((row) => row.label.startsWith('< ') || row.label.endsWith(' >'));
+  expect(pager.map((row) => row.label)).toEqual(
+    [neighbours.prev && `< ${neighbours.prev}`, neighbours.next && `${neighbours.next} >`].filter(
+      (label): label is string => label !== undefined,
+    ),
+  );
+  for (const button of pager) {
+    const { x, y, width, height } = button.bounds;
+    const label = boxes.find((b) => b.label === button.label);
+    if (!label) throw new Error(`Help drew no text "${button.label}"`);
+    expect(y + height / 2, button.label).toBeCloseTo(back.bounds.y + back.bounds.height / 2, 0);
+    expect((label.l + label.r) / 2, button.label).toBeCloseTo(x + width / 2, 0);
+    expect(label.l, button.label).toBeGreaterThanOrEqual(x + SLACK);
+    expect(label.r, button.label).toBeLessThanOrEqual(x + width - SLACK);
+    expect(x, button.label).toBeGreaterThanOrEqual(30 + SLACK);
+    expect(x + width, button.label).toBeLessThanOrEqual(930 - SLACK);
+    const clear =
+      x + width <= back.bounds.x - SLACK || x >= back.bounds.x + back.bounds.width + SLACK;
+    expect(clear, `${button.label} clear of Back`).toBe(true);
+  }
+}
+
+/**
+ * The Spells page on screen: the tabs in order with Spells open, every row of
+ * `page` as a table line, and its pager. The screen is still, so texts, boxes
+ * and rows read one after another agree.
  */
 async function expectSpellsPageFits(
   page: Page,
   spellsPage: ReturnType<typeof spellHelpPages>[number],
   neighbours: { prev?: string; next?: string },
 ): Promise<void> {
-  const boxes = await drawnBounds(page);
-  const boxOf = (label: string): (typeof boxes)[number] => {
-    const box = boxes.find((b) => b.label === label);
-    if (!box) throw new Error(`Help drew no text "${label}"`);
-    return box;
-  };
   const menu = await menuRows(page, SCENE.help);
   expect(menu.filter((row) => row.active).map((row) => row.label)).toEqual(['Spells']);
   const tabs = menu.filter((row) =>
@@ -246,37 +275,12 @@ async function expectSpellsPageFits(
     'Controls',
     'About',
   ]);
-  const back = menu.find((row) => row.label === 'Back  (Esc)')!;
-
-  // Slack for CI's taller fonts: nothing may come within 8 px of the tabs, Back or the side edges.
-  const SLACK = 8;
   await expectTable(
     page,
     ['Spell', 'Lv 2', 'Lv 3 (max)'],
     spellsPage.rows.map((row) => [row.name, row.lv2, row.lv3]),
   );
-
-  // A pager button only where that neighbour page exists, labelled with its element.
-  const pager = menu.filter((row) => row.label.startsWith('< ') || row.label.endsWith(' >'));
-  expect(pager.map((row) => row.label)).toEqual(
-    [neighbours.prev && `< ${neighbours.prev}`, neighbours.next && `${neighbours.next} >`].filter(
-      (label): label is string => label !== undefined,
-    ),
-  );
-  for (const button of pager) {
-    const { x, y, width, height } = button.bounds;
-    const label = boxOf(button.label);
-    // On Back's row, centred label, and 8 px clear of Back and of the panel's side edges.
-    expect(y + height / 2, button.label).toBeCloseTo(back.bounds.y + back.bounds.height / 2, 0);
-    expect((label.l + label.r) / 2, button.label).toBeCloseTo(x + width / 2, 0);
-    expect(label.l, button.label).toBeGreaterThanOrEqual(x + SLACK);
-    expect(label.r, button.label).toBeLessThanOrEqual(x + width - SLACK);
-    expect(x, button.label).toBeGreaterThanOrEqual(30 + SLACK);
-    expect(x + width, button.label).toBeLessThanOrEqual(930 - SLACK);
-    const clear =
-      x + width <= back.bounds.x - SLACK || x >= back.bounds.x + back.bounds.width + SLACK;
-    expect(clear, `${button.label} clear of Back`).toBe(true);
-  }
+  await expectPager(page, neighbours);
   await expectOnScreen(page);
 }
 
@@ -327,76 +331,46 @@ test('the Spells tab lists every spell of each element with its two upgrades, in
   expect(errors).toEqual([]);
 });
 
-/** The Passives page on screen: a header, then every row on one line with its icon, inside the panel and clear of the tabs and Back. */
+/**
+ * The Passives page on screen: every row of `page` as a table line and its
+ * pager, plus what Passives adds: one icon per line at the icon size, and each
+ * max rank centred under its own header.
+ */
 async function expectPassivesPageFits(
   page: Page,
   passivesPage: ReturnType<typeof passiveHelpPages>[number],
   neighbours: { prev?: string; next?: string },
 ): Promise<void> {
-  const boxes = await drawnBounds(page);
-  const boxOf = (label: string): (typeof boxes)[number] => {
-    const box = boxes.find((b) => b.label === label);
-    if (!box) throw new Error(`Help drew no text "${label}"`);
-    return box;
-  };
   const menu = await menuRows(page, SCENE.help);
   expect(menu.filter((row) => row.active).map((row) => row.label)).toEqual(['Passives']);
-  const tabs = menu.filter((row) =>
-    ['Pickups', 'Spells', 'Passives', 'Controls', 'About'].includes(row.label),
+  await expectTable(
+    page,
+    ['Passive', 'Per rank', 'Max rank'],
+    passivesPage.rows.map((row) => [row.name, row.effect, row.cap]),
   );
-  const back = menu.find((row) => row.label === 'Back  (Esc)')!;
-  const tabsBottom = Math.max(...tabs.map((row) => row.bounds.y + row.bounds.height));
-  const SLACK = 8;
 
-  // One icon per row, at the one icon size (the backdrop is an Image too, hence the size cut).
+  const boxes = await drawnBounds(page);
+  const mid = (b: (typeof boxes)[number]): number => (b.t + b.b) / 2;
+  const centre = (b: (typeof boxes)[number]): number => (b.l + b.r) / 2;
+  // One icon per line, at the one icon size (the backdrop is an Image too, hence the size cut).
   const icons = boxes.filter((b) => b.label === 'Image' && b.r - b.l < 100);
   expect(icons).toHaveLength(passivesPage.rows.length);
-  for (const icon of icons) {
-    expect(Math.max(icon.r - icon.l, icon.b - icon.t)).toBeCloseTo(32, 0);
-    expect(icon.l).toBeGreaterThanOrEqual(38);
-    expect(icon.t).toBeGreaterThanOrEqual(tabsBottom + 4);
-    expect(icon.b).toBeLessThanOrEqual(back.bounds.y - SLACK);
-  }
-  // The header names the columns, above every row.
-  const headers = ['Passive', 'Per rank', 'Max rank'].map(boxOf);
-  for (const box of headers) expect(box.t, box.label).toBeGreaterThanOrEqual(tabsBottom + 4);
-  const headerBottom = Math.max(...headers.map((box) => box.b));
+  const header = boxes.find((b) => b.label === 'Max rank');
+  if (!header) throw new Error('Help drew no header "Max rank"');
   for (const row of passivesPage.rows) {
-    const name = boxOf(row.name);
-    expect(name.t, row.name).toBeGreaterThanOrEqual(headerBottom);
-    const effect = boxOf(row.effect);
-    // A table line: the cap is on this row's line (caps repeat across rows), in the right-hand column.
-    const mid = (b: (typeof boxes)[number]): number => (b.t + b.b) / 2;
+    const name = boxes.find((b) => b.label === row.name);
+    if (!name) throw new Error(`Help drew no "${row.name}"`);
+    const icon = icons.find((b) => Math.abs(mid(b) - mid(name)) <= 4);
+    if (!icon) throw new Error(`Help drew no icon on the ${row.name} line`);
+    expect(Math.max(icon.r - icon.l, icon.b - icon.t), row.name).toBeCloseTo(32, 0);
+    expect(icon.l, row.name).toBeGreaterThanOrEqual(38);
+    expect(icon.r, row.name).toBeLessThanOrEqual(name.l - 8);
+    // Caps repeat across rows, so the cap is the one on this row's line.
     const cap = boxes.find((b) => b.label === row.cap && Math.abs(mid(b) - mid(name)) <= 4);
     if (!cap) throw new Error(`Help drew no "${row.cap}" on the ${row.name} line`);
-    expect(Math.abs(mid(effect) - mid(name)), row.effect).toBeLessThanOrEqual(4);
-    expect(effect.r, row.effect).toBeLessThanOrEqual(cap.l - SLACK);
-    for (const box of [name, effect, cap]) {
-      expect(box.l, box.label).toBeGreaterThanOrEqual(38);
-      expect(box.r, box.label).toBeLessThanOrEqual(922);
-      expect(box.t, box.label).toBeGreaterThanOrEqual(tabsBottom + 4);
-      expect(box.b, box.label).toBeLessThanOrEqual(back.bounds.y - SLACK);
-    }
-    expect(name.r, row.name).toBeLessThanOrEqual(effect.l - SLACK);
+    expect(Math.abs(centre(cap) - centre(header)), row.name).toBeLessThanOrEqual(1);
   }
-
-  const pager = menu.filter((row) => row.label.startsWith('< ') || row.label.endsWith(' >'));
-  expect(pager.map((row) => row.label)).toEqual(
-    [neighbours.prev && `< ${neighbours.prev}`, neighbours.next && `${neighbours.next} >`].filter(
-      (label): label is string => label !== undefined,
-    ),
-  );
-  for (const button of pager) {
-    const { x, y, width, height } = button.bounds;
-    const label = boxOf(button.label);
-    expect(y + height / 2, button.label).toBeCloseTo(back.bounds.y + back.bounds.height / 2, 0);
-    expect((label.l + label.r) / 2, button.label).toBeCloseTo(x + width / 2, 0);
-    expect(label.l, button.label).toBeGreaterThanOrEqual(x + SLACK);
-    expect(label.r, button.label).toBeLessThanOrEqual(x + width - SLACK);
-    const clear =
-      x + width <= back.bounds.x - SLACK || x >= back.bounds.x + back.bounds.width + SLACK;
-    expect(clear, `${button.label} clear of Back`).toBe(true);
-  }
+  await expectPager(page, neighbours);
   await expectOnScreen(page);
 }
 

@@ -250,7 +250,7 @@ export function passiveHelpPages(passives: readonly Passive[] = PASSIVES): Passi
 }
 
 /** `page` held to a page that exists, on the Spells or Passives tab: NaN or a fraction is the first page, out of range the nearest end. */
-export function clampSpellPage(page: number, count: number): number {
+export function clampHelpPage(page: number, count: number): number {
   if (count <= 0 || !Number.isFinite(page)) return 0;
   return Math.min(Math.max(Math.trunc(page), 0), count - 1);
 }
