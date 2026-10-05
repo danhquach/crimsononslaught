@@ -678,10 +678,9 @@ test('hints and labels name the rebound keys and buttons on the level-up and Hel
     .poll(async () => (await sceneTexts(page, SCENE.help)).some((t) => t.includes('X reroll')))
     .toBe(true);
   const help = await sceneTexts(page, SCENE.help);
-  expect(help).toContain(
-    'Keyboard: X reroll, S skip, V ban      Gamepad: RT reroll, RB skip, Y ban',
+  expect(help).toEqual(
+    expect.arrayContaining(['X reroll, S skip, V ban', 'RT reroll, RB skip, Y ban', 'Q / P']),
   );
-  expect(help).toContain('Keyboard: Q / P      Gamepad: LB / RB');
   expect(help.some((t) => t.includes('Q/P tabs'))).toBe(true);
   // The bound tab key walks the tabs.
   await page.keyboard.press('KeyP');

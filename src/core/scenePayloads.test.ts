@@ -176,6 +176,61 @@ describe('isHelpPayload', () => {
       isHelpPayload(Object.assign(Object.create({ spellPage: 999 }), { view: 'spells' })),
     ).toBe(false);
   });
+
+  it('accepts a passivePage (CO-238) only as a small non-negative integer, or left out', () => {
+    expect(isHelpPayload({ view: 'passives' })).toBe(true);
+    expect(isHelpPayload({ view: 'passives', passivePage: undefined })).toBe(true);
+    for (const passivePage of [0, 1, 3, MAX_SPELL_PAGE]) {
+      expect(isHelpPayload({ view: 'passives', passivePage }), String(passivePage)).toBe(true);
+    }
+  });
+
+  it('rejects a hostile passivePage', () => {
+    const hostile: unknown[] = [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      -1,
+      -0.5,
+      1.5,
+      MAX_SPELL_PAGE + 1,
+      Number.MAX_SAFE_INTEGER,
+      1e21,
+      '1',
+      '',
+      null,
+      true,
+      [],
+      [1],
+      {},
+      { valueOf: () => 1 },
+      BigInt(1),
+    ];
+    for (const passivePage of hostile) {
+      expect(isHelpPayload({ view: 'passives', passivePage }), String(passivePage)).toBe(false);
+    }
+    // JSON.parse makes `__proto__` an ordinary own key: the first payload has a hostile
+    // passivePage of its own and is rejected; in the second `__proto__` is just an extra
+    // key, the prototype is untouched, passivePage is absent and the payload is accepted.
+    expect(isHelpPayload(JSON.parse('{"view":"spells","passivePage":{"__proto__":{"x":1}}}'))).toBe(
+      false,
+    );
+    expect(isHelpPayload(JSON.parse('{"view":"spells","__proto__":{"passivePage":"x"}}'))).toBe(
+      true,
+    );
+  });
+
+  it('reads passivePage as the scene does, so an inherited value is checked like an own one', () => {
+    // The validator and HelpScene both read `data.passivePage` along the prototype chain.
+    expect(isHelpPayload(Object.create({ view: 'passives', passivePage: 3 }))).toBe(true);
+    expect(isHelpPayload(Object.create({ view: 'passives', passivePage: '3' }))).toBe(false);
+    expect(
+      isHelpPayload(Object.assign(Object.create({ passivePage: 3 }), { view: 'passives' })),
+    ).toBe(true);
+    expect(
+      isHelpPayload(Object.assign(Object.create({ passivePage: 999 }), { view: 'passives' })),
+    ).toBe(false);
+  });
 });
 
 describe('isPausePayload', () => {

@@ -28,6 +28,7 @@ import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVELS, spellLevelText, type SpellLevelTable } from '../config/spellLevels';
 import { bindingLabel, defaultControls, moveLabel, type Controls } from './controls';
 import { MAX_OFFER_SIZE } from './levelUp';
+import { PASSIVES, type Passive } from '../config/passives';
 import { relicCountFor } from './pickups';
 import type { HelpView } from './scenePayloads';
 
@@ -138,14 +139,14 @@ export interface SpellHelpRow {
   lv3: string;
 }
 
-/** The Spells panel fits five 64 px rows above Back; a pager is needed beyond that. */
+/** The Spells table fits five 56 px lines above Back; a pager is needed beyond that. */
 export const MAX_SPELL_HELP_ROWS = 5;
 
 /**
  * The Spells tab: one row per roster spell that has a level entry, in roster
  * order, so an element's upgrades appear here the moment its ticket fills the
- * table in (#328-#330). The two lines are the level-up card's own text, one
- * source, behind a prefix that names the level.
+ * table in (#328-#330). The two levels are the level-up card's own text, one
+ * source; the table's Lv 2 and Lv 3 headers name them (CO-238).
  */
 export function spellHelpRows(table: SpellLevelTable = SPELL_LEVELS): SpellHelpRow[] {
   const cards = new Map(rosterCards().map((card) => [card.id, card]));
@@ -160,8 +161,8 @@ export function spellHelpRows(table: SpellLevelTable = SPELL_LEVELS): SpellHelpR
         name: card.name,
         color: card.color,
         description: card.description,
-        lv2: `Lv 2: ${lv2}`,
-        lv3: `Lv 3 (max): ${lv3}`,
+        lv2,
+        lv3,
       },
     ];
   });
@@ -194,7 +195,61 @@ export function spellHelpPages(table: SpellLevelTable = SPELL_LEVELS): SpellHelp
   });
 }
 
-/** `page` held to a page that exists: NaN or a fraction is the first page, out of range the nearest end. */
+/** One row of the Help screen's Passives tab (CO-238): a passive, what one rank does and its cap. */
+export interface PassiveHelpRow {
+  id: string;
+  name: string;
+  /** What one rank does: the Per rank column. */
+  effect: string;
+  /** The rank cap, `—` for a passive with none: the Max rank column. */
+  cap: string;
+}
+
+/** No cap to show in the Max rank column. */
+export const NO_RANK_CAP = '—';
+
+/**
+ * The Passives tab: one row per passive in the catalog, in catalog order, so a
+ * retune or a new passive changes the Help text with no edit here. The effect is
+ * the level-up card's own line; the passive that shares a name with a pickup
+ * says it is not that pickup.
+ */
+export function passiveHelpRows(passives: readonly Passive[] = PASSIVES): PassiveHelpRow[] {
+  const pickupNames = new Set(pickupHelpRows().map((row) => row.name));
+  return passives.map((passive) => ({
+    id: passive.id,
+    name: passive.name,
+    effect:
+      passive.description +
+      (pickupNames.has(passive.name) ? ` Not the ${passive.name} pickup.` : ''),
+    cap: passive.maxRank === undefined ? NO_RANK_CAP : `${passive.maxRank}`,
+  }));
+}
+
+/** The Passives table fits eight 36 px rows under its header, above Back; a pager is needed beyond that. */
+export const MAX_PASSIVE_HELP_ROWS = 8;
+
+/** One page of the Passives tab: at most `MAX_PASSIVE_HELP_ROWS` rows. */
+export interface PassiveHelpPage {
+  /** `Page 1`, `Page 2`...: the pager buttons' label. */
+  title: string;
+  rows: PassiveHelpRow[];
+}
+
+/** The Passives tab split into pages of `MAX_PASSIVE_HELP_ROWS`; none for an empty catalog. */
+export function passiveHelpPages(passives: readonly Passive[] = PASSIVES): PassiveHelpPage[] {
+  const rows = passiveHelpRows(passives);
+  const pages: PassiveHelpPage[] = [];
+  for (let i = 0; i < rows.length; i += MAX_PASSIVE_HELP_ROWS) {
+    pages.push({
+      title: `Page ${pages.length + 1}`,
+      rows: rows.slice(i, i + MAX_PASSIVE_HELP_ROWS),
+    });
+  }
+  return pages;
+}
+
+/** `page` held to a page that exists, on the Spells or Passives tab: NaN or a fraction is the first page, out of range the nearest end. */
 export function clampSpellPage(page: number, count: number): number {
   if (count <= 0 || !Number.isFinite(page)) return 0;
   return Math.min(Math.max(Math.trunc(page), 0), count - 1);
@@ -276,35 +331,38 @@ export function controlHelpRows(
       action: 'Help tabs',
       keyboard: pair('keyboard'),
       gamepad: pair('pad'),
-      note: 'Previous and next tab of this screen',
+      note: 'Previous and next tab or page',
     },
   ];
 }
 
-/** The Help tabs, left to right; Spells' pages come before the next one. */
-const HELP_TAB_ORDER: readonly HelpView[] = ['pickups', 'spells', 'controls', 'about'];
+/** The Help tabs, left to right; a paged tab's pages come before the next one. */
+const HELP_TAB_ORDER: readonly HelpView[] = ['pickups', 'spells', 'passives', 'controls', 'about'];
+
+/** The tabs that run over several pages. */
+export type PagedHelpView = 'spells' | 'passives';
 
 /**
  * Where a shoulder button (LB -1, RB +1) takes the Help screen (#377): the tabs
- * run Pickups, Spells, Controls, About without wrapping, and on Spells a press
- * turns the page before it leaves. `null` when there is nowhere to go, or on the
- * feedback form, which has no tabs.
+ * run Pickups, Spells, Passives, Controls, About without wrapping, and on a
+ * paged tab a press turns the page before it leaves (CO-238). `null` when there
+ * is nowhere to go, or on the feedback form, which has no tabs.
  */
 export function helpShoulderStep(
   view: HelpView,
-  spellPage: number,
-  pageCount: number,
+  page: number,
+  pageCounts: Readonly<Record<PagedHelpView, number>>,
   dir: -1 | 1,
-): { view: HelpView; spellPage?: number } | null {
+): { view: HelpView; page?: number } | null {
   if (view === 'feedback') return null;
-  if (view === 'spells') {
-    const next = spellPage + dir;
-    if (next >= 0 && next < pageCount) return { view: 'spells', spellPage: next };
+  if (view === 'spells' || view === 'passives') {
+    const next = page + dir;
+    if (next >= 0 && next < pageCounts[view]) return { view, page: next };
   }
   const target = HELP_TAB_ORDER[HELP_TAB_ORDER.indexOf(view) + dir];
   if (!target) return null;
-  // Arriving on Spells from the right lands on its last page, from the left on its first.
-  if (target === 'spells')
-    return { view: 'spells', spellPage: dir === 1 ? 0 : Math.max(pageCount - 1, 0) };
+  // Arriving on a paged tab from the right lands on its last page, from the left on its first.
+  if (target === 'spells' || target === 'passives')
+    return { view: target, page: dir === 1 ? 0 : Math.max(pageCounts[target] - 1, 0) };
   return { view: target };
 }

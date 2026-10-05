@@ -126,4 +126,17 @@ describe('passives config', () => {
     expect(exploit.description).toContain(`${Math.round(exploit.amount * 100)}% more damage`);
     expect(exploit.description).toContain('under a status');
   });
+
+  it('states every amount in its description, so a retune cannot leave the text behind (CO-238)', () => {
+    for (const passive of PASSIVES) {
+      const shown =
+        passive.op === 'mul'
+          ? [`${Math.round(Math.abs(passive.amount - 1) * 100)}%`]
+          : [`${+(passive.amount * 100).toFixed(4)}%`, `${passive.amount}`];
+      expect(
+        shown.some((text) => passive.description.includes(text)),
+        `${passive.id}: "${passive.description}" should state ${shown.join(' or ')}`,
+      ).toBe(true);
+    }
+  });
 });

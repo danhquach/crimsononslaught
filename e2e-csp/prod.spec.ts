@@ -23,8 +23,8 @@ import { cardCenter } from '../e2e/game';
  */
 
 const HELP_ENTRY = { x: 480, y: 262 + 3 * 54 };
-/** The fourth of four tabs (Pickups | Spells | Controls | About, #384): 264 px right of centre. */
-const ABOUT_TAB = { x: 744, y: 92 };
+/** The fifth of five tabs (Pickups | Spells | Passives | Controls | About, CO-238): 352 px right of centre. */
+const ABOUT_TAB = { x: 832, y: 92 };
 const SEND_FEEDBACK = { x: 480, y: 410 };
 const SEND = { x: 370, y: 446 };
 const CANCEL = { x: 590, y: 446 };

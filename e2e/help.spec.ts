@@ -4,7 +4,12 @@ import { E2E_FEEDBACK_KEY } from '../playwright.config';
 import { ARENA_SIZE } from '../src/config/arena';
 import { CHANGELOG } from '../src/config/changelog';
 import { FEEDBACK_URL } from '../src/core/feedback';
-import { controlHelpRows, pickupHelpRows, spellHelpPages } from '../src/core/helpModel';
+import {
+  controlHelpRows,
+  passiveHelpPages,
+  pickupHelpRows,
+  spellHelpPages,
+} from '../src/core/helpModel';
 import { relicCountFor } from '../src/core/pickups';
 import { AUDIO_REGISTRY_KEY, SCENE, type HelpView } from '../src/core/scenePayloads';
 import type { Audio } from '../src/render/audio';
@@ -44,7 +49,7 @@ async function waitForView(page: Page, view: HelpView): Promise<void> {
   await expect.poll(() => helpView(page), { message: `Help shows ${view}` }).toBe(view);
 }
 
-/** Every text and sprite Help draws, as game-pixel bounds, to check nothing is clipped. */
+/** Every text, sprite and image Help draws, as game-pixel bounds, to check nothing is clipped. */
 async function drawnBounds(
   page: Page,
 ): Promise<{ label: string; l: number; t: number; r: number; b: number }[]> {
@@ -52,7 +57,9 @@ async function drawnBounds(
     const { game } = await import('/src/main.ts');
     return game.scene
       .getScene(key)
-      .children.list.filter((child) => child.type === 'Text' || child.type === 'Sprite')
+      .children.list.filter(
+        (child) => child.type === 'Text' || child.type === 'Sprite' || child.type === 'Image',
+      )
       .map((child) => {
         const bounds = (child as unknown as { getBounds(): DOMRect }).getBounds();
         const label = (child as unknown as { text?: string }).text ?? child.type;
@@ -107,7 +114,7 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
   await waitForView(page, 'pickups');
 
   const texts = await sceneTexts(page, SCENE.help);
-  expect(texts).toEqual(expect.arrayContaining(['Help', 'Pickups', 'About', ...NAMES]));
+  expect(texts).toEqual(expect.arrayContaining(['Help', 'Pickups', 'Passives', 'About', ...NAMES]));
   // CO-208: the Relic row quotes the count the first map places.
   expect(texts).toContain(
     `${relicCountFor(ARENA_SIZE)} placed round the map at run start, more on bigger maps`,
@@ -115,6 +122,11 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
   for (const row of pickupHelpRows()) {
     expect(texts).toEqual(expect.arrayContaining([row.source, row.effect]));
   }
+  await expectTable(
+    page,
+    ['Pickup', 'Found', 'Effect'],
+    pickupHelpRows().map((row) => [row.name, row.source, row.effect]),
+  );
   // Each icon plays its own idle clip, scaled into the one icon box.
   const icons = await page.evaluate(async (key) => {
     const { game } = await import('/src/main.ts');
@@ -152,6 +164,60 @@ test('the mouse opens Help, every pickup has a row with art, and Back returns', 
 });
 
 /**
+ * A list tab drawn as a table (CO-238): the column headers under the tabs, then
+ * one line per row with its cells in column order. Each line's cells share its
+ * centre (a repeated cell, like a pickup's source, is matched on its own line),
+ * sit left to right 8 px apart, stay inside the panel, and the lines run down
+ * in order above Back.
+ */
+async function expectTable(
+  page: Page,
+  headers: readonly string[],
+  lines: readonly (readonly string[])[],
+): Promise<void> {
+  const boxes = await drawnBounds(page);
+  const menu = await menuRows(page, SCENE.help);
+  const tabs = menu.filter((row) =>
+    ['Pickups', 'Spells', 'Passives', 'Controls', 'About'].includes(row.label),
+  );
+  const tabsBottom = Math.max(...tabs.map((row) => row.bounds.y + row.bounds.height));
+  const back = menu.find((row) => row.label === 'Back  (Esc)')!;
+  const SLACK = 8;
+  const mid = (b: (typeof boxes)[number]): number => (b.t + b.b) / 2;
+  const inPanel = (b: (typeof boxes)[number]): void => {
+    expect(b.l, b.label).toBeGreaterThanOrEqual(30 + SLACK);
+    expect(b.r, b.label).toBeLessThanOrEqual(930 - SLACK);
+    expect(b.b, b.label).toBeLessThanOrEqual(back.bounds.y - SLACK);
+  };
+  const heads = headers.map((label) => {
+    const box = boxes.find((b) => b.label === label && b.t >= tabsBottom);
+    if (!box) throw new Error(`Help drew no header "${label}"`);
+    expect(box.t, label).toBeGreaterThanOrEqual(tabsBottom + 4);
+    inPanel(box);
+    return box;
+  });
+  let previousBottom = Math.max(...heads.map((box) => box.b));
+  for (const [first, ...rest] of lines) {
+    const lead = boxes.find((b) => b.label === first && b.t >= previousBottom - 1);
+    if (!lead) throw new Error(`Help drew no "${first}" below the last line`);
+    const cells = [lead];
+    for (const label of rest) {
+      const cell = boxes.find((b) => b.label === label && Math.abs(mid(b) - mid(lead)) <= 4);
+      if (!cell) throw new Error(`Help drew no "${label}" on the "${first}" line`);
+      cells.push(cell);
+    }
+    for (const [i, cell] of cells.entries()) {
+      inPanel(cell);
+      expect(cell.t, cell.label).toBeGreaterThanOrEqual(previousBottom - 1);
+      const next = cells[i + 1];
+      if (next)
+        expect(cell.r, `${cell.label} clear of ${next.label}`).toBeLessThanOrEqual(next.l - SLACK);
+    }
+    previousBottom = Math.max(...cells.map((cell) => cell.b));
+  }
+}
+
+/**
  * The Spells page on screen: every row of `page` drawn inside the panel, clear
  * of the tabs above and the Back row below, and each pager button that exists
  * (`< Prev` / `Next >`) clear of Back and the side edges. The screen is still,
@@ -170,29 +236,25 @@ async function expectSpellsPageFits(
   };
   const menu = await menuRows(page, SCENE.help);
   expect(menu.filter((row) => row.active).map((row) => row.label)).toEqual(['Spells']);
-  const tabs = menu.filter((row) => ['Pickups', 'Spells', 'Controls', 'About'].includes(row.label));
-  expect(tabs.map((row) => row.label)).toEqual(['Pickups', 'Spells', 'Controls', 'About']);
+  const tabs = menu.filter((row) =>
+    ['Pickups', 'Spells', 'Passives', 'Controls', 'About'].includes(row.label),
+  );
+  expect(tabs.map((row) => row.label)).toEqual([
+    'Pickups',
+    'Spells',
+    'Passives',
+    'Controls',
+    'About',
+  ]);
   const back = menu.find((row) => row.label === 'Back  (Esc)')!;
 
   // Slack for CI's taller fonts: nothing may come within 8 px of the tabs, Back or the side edges.
   const SLACK = 8;
-  const tabsBottom = Math.max(...tabs.map((row) => row.bounds.y + row.bounds.height));
-  let previousBottom = tabsBottom;
-  for (const row of spellsPage.rows) {
-    const name = boxOf(row.name);
-    const lv2 = boxOf(row.lv2);
-    const lv3 = boxOf(row.lv3);
-    expect(lv2.t, row.lv2).toBeGreaterThanOrEqual(previousBottom + SLACK / 2);
-    expect(lv3.t, row.lv3).toBeGreaterThanOrEqual(lv2.b);
-    for (const box of [name, lv2, lv3]) {
-      expect(box.l, box.label).toBeGreaterThanOrEqual(30 + SLACK);
-      expect(box.r, box.label).toBeLessThanOrEqual(930 - SLACK);
-    }
-    // The name shares the row: it starts left of the two lines and does not run into them.
-    expect(name.r, row.name).toBeLessThanOrEqual(lv2.l - SLACK);
-    previousBottom = lv3.b;
-  }
-  expect(previousBottom).toBeLessThanOrEqual(back.bounds.y - SLACK);
+  await expectTable(
+    page,
+    ['Spell', 'Lv 2', 'Lv 3 (max)'],
+    spellsPage.rows.map((row) => [row.name, row.lv2, row.lv3]),
+  );
 
   // A pager button only where that neighbour page exists, labelled with its element.
   const pager = menu.filter((row) => row.label.startsWith('< ') || row.label.endsWith(' >'));
@@ -265,6 +327,150 @@ test('the Spells tab lists every spell of each element with its two upgrades, in
   expect(errors).toEqual([]);
 });
 
+/** The Passives page on screen: a header, then every row on one line with its icon, inside the panel and clear of the tabs and Back. */
+async function expectPassivesPageFits(
+  page: Page,
+  passivesPage: ReturnType<typeof passiveHelpPages>[number],
+  neighbours: { prev?: string; next?: string },
+): Promise<void> {
+  const boxes = await drawnBounds(page);
+  const boxOf = (label: string): (typeof boxes)[number] => {
+    const box = boxes.find((b) => b.label === label);
+    if (!box) throw new Error(`Help drew no text "${label}"`);
+    return box;
+  };
+  const menu = await menuRows(page, SCENE.help);
+  expect(menu.filter((row) => row.active).map((row) => row.label)).toEqual(['Passives']);
+  const tabs = menu.filter((row) =>
+    ['Pickups', 'Spells', 'Passives', 'Controls', 'About'].includes(row.label),
+  );
+  const back = menu.find((row) => row.label === 'Back  (Esc)')!;
+  const tabsBottom = Math.max(...tabs.map((row) => row.bounds.y + row.bounds.height));
+  const SLACK = 8;
+
+  // One icon per row, at the one icon size (the backdrop is an Image too, hence the size cut).
+  const icons = boxes.filter((b) => b.label === 'Image' && b.r - b.l < 100);
+  expect(icons).toHaveLength(passivesPage.rows.length);
+  for (const icon of icons) {
+    expect(Math.max(icon.r - icon.l, icon.b - icon.t)).toBeCloseTo(32, 0);
+    expect(icon.l).toBeGreaterThanOrEqual(38);
+    expect(icon.t).toBeGreaterThanOrEqual(tabsBottom + 4);
+    expect(icon.b).toBeLessThanOrEqual(back.bounds.y - SLACK);
+  }
+  // The header names the columns, above every row.
+  const headers = ['Passive', 'Per rank', 'Max rank'].map(boxOf);
+  for (const box of headers) expect(box.t, box.label).toBeGreaterThanOrEqual(tabsBottom + 4);
+  const headerBottom = Math.max(...headers.map((box) => box.b));
+  for (const row of passivesPage.rows) {
+    const name = boxOf(row.name);
+    expect(name.t, row.name).toBeGreaterThanOrEqual(headerBottom);
+    const effect = boxOf(row.effect);
+    // A table line: the cap is on this row's line (caps repeat across rows), in the right-hand column.
+    const mid = (b: (typeof boxes)[number]): number => (b.t + b.b) / 2;
+    const cap = boxes.find((b) => b.label === row.cap && Math.abs(mid(b) - mid(name)) <= 4);
+    if (!cap) throw new Error(`Help drew no "${row.cap}" on the ${row.name} line`);
+    expect(Math.abs(mid(effect) - mid(name)), row.effect).toBeLessThanOrEqual(4);
+    expect(effect.r, row.effect).toBeLessThanOrEqual(cap.l - SLACK);
+    for (const box of [name, effect, cap]) {
+      expect(box.l, box.label).toBeGreaterThanOrEqual(38);
+      expect(box.r, box.label).toBeLessThanOrEqual(922);
+      expect(box.t, box.label).toBeGreaterThanOrEqual(tabsBottom + 4);
+      expect(box.b, box.label).toBeLessThanOrEqual(back.bounds.y - SLACK);
+    }
+    expect(name.r, row.name).toBeLessThanOrEqual(effect.l - SLACK);
+  }
+
+  const pager = menu.filter((row) => row.label.startsWith('< ') || row.label.endsWith(' >'));
+  expect(pager.map((row) => row.label)).toEqual(
+    [neighbours.prev && `< ${neighbours.prev}`, neighbours.next && `${neighbours.next} >`].filter(
+      (label): label is string => label !== undefined,
+    ),
+  );
+  for (const button of pager) {
+    const { x, y, width, height } = button.bounds;
+    const label = boxOf(button.label);
+    expect(y + height / 2, button.label).toBeCloseTo(back.bounds.y + back.bounds.height / 2, 0);
+    expect((label.l + label.r) / 2, button.label).toBeCloseTo(x + width / 2, 0);
+    expect(label.l, button.label).toBeGreaterThanOrEqual(x + SLACK);
+    expect(label.r, button.label).toBeLessThanOrEqual(x + width - SLACK);
+    const clear =
+      x + width <= back.bounds.x - SLACK || x >= back.bounds.x + back.bounds.width + SLACK;
+    expect(clear, `${button.label} clear of Back`).toBe(true);
+  }
+  await expectOnScreen(page);
+}
+
+test('the Passives tab lists every passive with its icon, effect and cap, paged (CO-238)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await addFakePad(page);
+  await page.goto('/?seed=1');
+  await waitForScene(page, SCENE.intro);
+  await clickRow(page, SCENE.intro, 'Help');
+  await waitForView(page, 'pickups');
+  await clickRow(page, SCENE.help, 'Passives');
+  await waitForView(page, 'passives');
+
+  const pages = passiveHelpPages();
+  expect(pages.length).toBeGreaterThanOrEqual(2);
+  const showing = async (i: number): Promise<void> => {
+    await expect
+      .poll(async () => sceneTexts(page, SCENE.help))
+      .toContain(pages[i]!.rows[0]!.effect);
+  };
+  // Pager clicks turn forward, then back.
+  for (const [i, passivesPage] of pages.entries()) {
+    await expectPassivesPageFits(page, passivesPage, {
+      prev: pages[i - 1]?.title,
+      next: pages[i + 1]?.title,
+    });
+    const texts = await sceneTexts(page, SCENE.help);
+    for (const row of passivesPage.rows) {
+      expect(texts).toEqual(expect.arrayContaining([row.name, row.effect, row.cap]));
+    }
+    await page.screenshot({ path: test.info().outputPath(`help-passives-${i + 1}.png`) });
+    const next = pages[i + 1];
+    if (next) {
+      await clickRow(page, SCENE.help, `${next.title} >`);
+      await showing(i + 1);
+    }
+  }
+  for (let i = pages.length - 1; i > 0; i--) {
+    await clickRow(page, SCENE.help, `< ${pages[i - 1]!.title}`);
+    await showing(i - 1);
+  }
+
+  // The bound tab keys turn pages first: E forward to the last page, then on to Controls.
+  await frames(page, 4);
+  for (let i = 1; i < pages.length; i++) {
+    await page.keyboard.press('KeyE');
+    await showing(i);
+  }
+  await page.keyboard.press('KeyE');
+  await waitForView(page, 'controls');
+  // Q from Controls lands on the last Passives page, and walks back down to the first.
+  await page.keyboard.press('KeyQ');
+  await waitForView(page, 'passives');
+  await showing(pages.length - 1);
+  for (let i = pages.length - 2; i >= 0; i--) {
+    await page.keyboard.press('KeyQ');
+    await showing(i);
+  }
+
+  // The pad's bumpers do the same.
+  await frames(page, 4);
+  await padPress(page, PAD.RB);
+  await showing(1);
+  await frames(page, 4);
+  await padPress(page, PAD.LB);
+  await showing(0);
+
+  await clickRow(page, SCENE.help, 'Back  (Esc)');
+  await waitForScene(page, SCENE.intro);
+  expect(errors).toEqual([]);
+});
+
 test('the Controls tab lists the dash with its real bindings (#384)', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto('/?seed=1');
@@ -284,21 +490,23 @@ test('the Controls tab lists the dash with its real bindings (#384)', async ({ p
     'Level-up',
     'Help tabs',
   ]);
-  for (const row of rows) {
-    expect(texts).toEqual(
-      expect.arrayContaining([
-        row.action,
-        `Keyboard: ${row.keyboard}      Gamepad: ${row.gamepad}`,
-        row.note,
-      ]),
-    );
-  }
-  expect(texts).toContain('Keyboard: Space      Gamepad: A');
-  expect(texts).toContain(
-    'Keyboard: R reroll, S skip, B ban      Gamepad: X reroll, RB skip, Y ban',
+  await expectTable(
+    page,
+    ['Action', 'Keyboard', 'Gamepad', 'Note'],
+    rows.map((row) => [row.action, row.keyboard, row.gamepad, row.note]),
   );
-  expect(texts).toContain('Keyboard: Q / E      Gamepad: LB / RB');
+  expect(texts).toEqual(
+    expect.arrayContaining([
+      'Space',
+      'A',
+      'R reroll, S skip, B ban',
+      'X reroll, RB skip, Y ban',
+      'Q / E',
+      'LB / RB',
+    ]),
+  );
   await expectOnScreen(page);
+  await page.screenshot({ path: test.info().outputPath('help-controls.png') });
 
   await page.keyboard.press('Escape');
   await waitForScene(page, SCENE.intro);
@@ -318,7 +526,7 @@ test('the Spells pager is reached by keyboard and turns the page', async ({ page
 
   // Menu order: tabs, `Next >` (page 0 has no `< Prev`), Back. Arrows reveal the first entry.
   await page.keyboard.press('ArrowRight'); // reveals the Pickups tab
-  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight'); // Spells, Controls, About, Next >
+  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight'); // Spells, Passives, Controls, About, Next >
   const lit = (await menuRows(page, SCENE.help)).filter((row) => row.selected);
   expect(lit.map((row) => row.label)).toEqual([`${pages[1]!.title} >`]);
   await page.keyboard.press('Enter');
@@ -342,6 +550,7 @@ test('the keyboard opens Help, switches to About, and Esc returns', async ({ pag
 
   await page.keyboard.press('ArrowRight'); // reveals the Pickups tab
   await page.keyboard.press('ArrowRight'); // Spells
+  await page.keyboard.press('ArrowRight'); // Passives
   await page.keyboard.press('ArrowRight'); // Controls
   await page.keyboard.press('ArrowRight'); // About
   await page.keyboard.press('Enter');
@@ -419,6 +628,7 @@ test('a gamepad opens Help, reaches About, and backs out', async ({ page }) => {
   await frames(4);
   await press(DOWN); // reveals the Pickups tab
   await press(DOWN); // Spells
+  await press(DOWN); // Passives
   await press(DOWN); // Controls
   await press(DOWN); // About
   await press(A);
@@ -441,15 +651,23 @@ test('a gamepad walks the Help tabs with LB/RB and backs out with B (#377)', asy
   await frames(page, 4); // a fresh scene baselines its pad first
 
   const pages = spellHelpPages().length;
-  const spellPage = (): Promise<number> =>
-    page.evaluate(async (key) => {
-      const { game } = await import('/src/main.ts');
-      return (game.scene.getScene(key) as unknown as { spellPage: number }).spellPage;
-    }, SCENE.help);
+  const passivePages = passiveHelpPages().length;
+  const pageOf = (field: 'spellPage' | 'passivePage'): Promise<number> =>
+    page.evaluate(
+      async ([key, name]) => {
+        const { game } = await import('/src/main.ts');
+        return (game.scene.getScene(key as string) as unknown as Record<string, number>)[
+          name as string
+        ]!;
+      },
+      [SCENE.help, field] as const,
+    );
   const step = async (button: number, view: HelpView, expectedPage?: number): Promise<void> => {
     await padPress(page, button);
     await waitForView(page, view);
-    if (expectedPage !== undefined) expect(await spellPage()).toBe(expectedPage);
+    if (expectedPage !== undefined) {
+      expect(await pageOf(view === 'passives' ? 'passivePage' : 'spellPage')).toBe(expectedPage);
+    }
     await frames(page, 4);
   };
 
@@ -459,6 +677,8 @@ test('a gamepad walks the Help tabs with LB/RB and backs out with B (#377)', asy
 
   await step(PAD.RB, 'spells', 0);
   for (let p = 1; p < pages; p += 1) await step(PAD.RB, 'spells', p);
+  await step(PAD.RB, 'passives', 0);
+  for (let p = 1; p < passivePages; p += 1) await step(PAD.RB, 'passives', p);
   await step(PAD.RB, 'controls');
   await step(PAD.RB, 'about');
   await padPress(page, PAD.RB); // nowhere right of About
@@ -466,6 +686,8 @@ test('a gamepad walks the Help tabs with LB/RB and backs out with B (#377)', asy
   expect(await helpView(page)).toBe('about');
 
   await step(PAD.LB, 'controls');
+  await step(PAD.LB, 'passives', passivePages - 1);
+  for (let p = passivePages - 2; p >= 0; p -= 1) await step(PAD.LB, 'passives', p);
   await step(PAD.LB, 'spells', pages - 1);
   for (let p = pages - 2; p >= 0; p -= 1) await step(PAD.LB, 'spells', p);
   await step(PAD.LB, 'pickups');
@@ -643,6 +865,19 @@ test('a hostile spellPage is refused whole: Help falls back to Pickups and draws
     // Back to the accepted case, so the fallback is seen to be a change and not a stale view.
     await restartHelp({ view: 'spells', spellPage: 1 });
     await waitForView(page, 'spells');
+  }
+  // The same for the Passives tab's page (CO-238).
+  await restartHelp({ view: 'passives', passivePage: 1 });
+  await waitForView(page, 'passives');
+  for (const passivePage of [999, -1, '1', Number.NaN, { page: 1 }]) {
+    await restartHelp({ view: 'passives', passivePage });
+    await expect
+      .poll(() => helpView(page), { message: `Help falls back for ${String(passivePage)}` })
+      .toBe('pickups');
+    await waitForScene(page, SCENE.help);
+    await expectOnScreen(page);
+    await restartHelp({ view: 'passives', passivePage: 1 });
+    await waitForView(page, 'passives');
   }
   expect(errors).toEqual([]);
 });

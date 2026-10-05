@@ -11,17 +11,23 @@ import {
   HEAL_AMOUNT,
   MAGNET_DURATION_MS,
 } from '../config/pickups';
+import { buildIconFrame } from '../config/buildIcons';
+import { PASSIVES, type Passive } from '../config/passives';
 import { ROSTER_SPELL_IDS, SPELLS_BY_ELEMENT, elementOf } from '../config/loadout';
 import { rosterCards } from '../config/rosterCards';
 import { SPELL_LEVEL_TEXT_MAX, SPELL_LEVELS, type SpellLevelTable } from '../config/spellLevels';
 import { defaultControls, rebind } from './controls';
 import {
+  MAX_PASSIVE_HELP_ROWS,
+  NO_RANK_CAP,
   MAX_SPELL_HELP_ROWS,
   aboutRowCount,
   clampSpellPage,
   groupChangelog,
   controlHelpRows,
   helpShoulderStep,
+  passiveHelpPages,
+  passiveHelpRows,
   pickupHelpRows,
   spellHelpPages,
   spellHelpRows,
@@ -118,15 +124,15 @@ describe('spellHelpRows', () => {
 
   it('shows the very text the level-up card shows for levels 2 and 3', () => {
     for (const r of spellHelpRows()) {
-      expect(r.lv2).toBe(`Lv 2: ${SPELL_LEVELS[r.id]?.[2]}`);
-      expect(r.lv3).toBe(`Lv 3 (max): ${SPELL_LEVELS[r.id]?.[3]}`);
+      expect(r.lv2).toBe(SPELL_LEVELS[r.id]?.[2]);
+      expect(r.lv3).toBe(SPELL_LEVELS[r.id]?.[3]);
     }
   });
 
-  it('keeps each line inside the level text budget plus its prefix', () => {
+  it('keeps each level inside the level text budget', () => {
     for (const r of spellHelpRows()) {
-      expect(r.lv2.length).toBeLessThanOrEqual(SPELL_LEVEL_TEXT_MAX + 'Lv 2: '.length);
-      expect(r.lv3.length).toBeLessThanOrEqual(SPELL_LEVEL_TEXT_MAX + 'Lv 3 (max): '.length);
+      expect(r.lv2.length).toBeLessThanOrEqual(SPELL_LEVEL_TEXT_MAX);
+      expect(r.lv3.length).toBeLessThanOrEqual(SPELL_LEVEL_TEXT_MAX);
     }
   });
 
@@ -245,35 +251,112 @@ describe('groupChangelog (#377)', () => {
   });
 });
 
-describe('helpShoulderStep (#377, #384)', () => {
-  it('walks Pickups -> Spells pages -> Controls -> About with RB', () => {
-    expect(helpShoulderStep('pickups', 0, 3, 1)).toEqual({ view: 'spells', spellPage: 0 });
-    expect(helpShoulderStep('spells', 0, 3, 1)).toEqual({ view: 'spells', spellPage: 1 });
-    expect(helpShoulderStep('spells', 1, 3, 1)).toEqual({ view: 'spells', spellPage: 2 });
-    expect(helpShoulderStep('spells', 2, 3, 1)).toEqual({ view: 'controls' });
-    expect(helpShoulderStep('controls', 0, 3, 1)).toEqual({ view: 'about' });
+describe('passiveHelpRows (CO-238)', () => {
+  const rows = passiveHelpRows();
+  const rowOf = (id: string) => {
+    const found = rows.find((r) => r.id === id);
+    if (!found) throw new Error(`no ${id} row`);
+    return found;
+  };
+
+  it('has one row per catalog passive, in catalog order', () => {
+    expect(rows.map((r) => r.id)).toEqual(PASSIVES.map((p) => p.id));
   });
 
-  it('walks back with LB', () => {
-    expect(helpShoulderStep('about', 0, 3, -1)).toEqual({ view: 'controls' });
-    expect(helpShoulderStep('controls', 0, 3, -1)).toEqual({ view: 'spells', spellPage: 2 });
-    expect(helpShoulderStep('spells', 2, 3, -1)).toEqual({ view: 'spells', spellPage: 1 });
-    expect(helpShoulderStep('spells', 0, 3, -1)).toEqual({ view: 'pickups' });
+  it('gives every row an icon, its description and its cap', () => {
+    for (const passive of PASSIVES) {
+      const r = rowOf(passive.id);
+      expect(buildIconFrame(passive.id), passive.id).toBeDefined();
+      expect(r.name, passive.id).toBe(passive.name);
+      expect(r.effect, passive.id).toContain(passive.description);
+      expect(r.cap, passive.id).toBe(String(passive.maxRank));
+    }
+  });
+
+  it('tells the Magnet passive from the Magnet pickup, and only that one', () => {
+    expect(rowOf('passive_magnet').effect).toContain('Not the Magnet pickup.');
+    expect(rows.filter((r) => r.effect.includes('Not the'))).toHaveLength(1);
+    expect(row('Magnet').effect).toContain('not the Magnet passive');
+  });
+
+  it('keeps every line to 90 characters or fewer', () => {
+    for (const r of rows) {
+      expect(r.effect.length, r.id).toBeLessThanOrEqual(90);
+      expect(r.cap.length, r.id).toBeLessThanOrEqual(90);
+    }
+  });
+
+  it('shows a dash in the Max rank column for a passive without a maxRank', () => {
+    const fake: Passive = {
+      id: 'passive_fake',
+      name: 'Fake',
+      description: 'Does a thing.',
+      field: 'damageMul',
+      op: 'mul',
+      amount: 1.1,
+    };
+    expect(passiveHelpRows([fake])[0]?.cap).toBe(NO_RANK_CAP);
+  });
+});
+
+describe('passiveHelpPages (CO-238)', () => {
+  const pages = passiveHelpPages();
+
+  it('holds at most MAX_PASSIVE_HELP_ROWS rows a page, every row once, in order', () => {
+    for (const page of pages) expect(page.rows.length).toBeLessThanOrEqual(MAX_PASSIVE_HELP_ROWS);
+    expect(pages.flatMap((p) => p.rows.map((r) => r.id))).toEqual(PASSIVES.map((p) => p.id));
+  });
+
+  it('titles the pages Page 1, Page 2 and so on', () => {
+    expect(pages.map((p) => p.title)).toEqual(pages.map((_, i) => `Page ${i + 1}`));
+  });
+
+  it('has no page for an empty catalog', () => {
+    expect(passiveHelpPages([])).toEqual([]);
+  });
+});
+
+describe('helpShoulderStep (#377, #384, CO-238)', () => {
+  const counts = { spells: 3, passives: 2 };
+
+  it('walks Pickups -> Spells pages -> Passives pages -> Controls -> About with RB', () => {
+    expect(helpShoulderStep('pickups', 0, counts, 1)).toEqual({ view: 'spells', page: 0 });
+    expect(helpShoulderStep('spells', 0, counts, 1)).toEqual({ view: 'spells', page: 1 });
+    expect(helpShoulderStep('spells', 1, counts, 1)).toEqual({ view: 'spells', page: 2 });
+    expect(helpShoulderStep('spells', 2, counts, 1)).toEqual({ view: 'passives', page: 0 });
+    expect(helpShoulderStep('passives', 0, counts, 1)).toEqual({ view: 'passives', page: 1 });
+    expect(helpShoulderStep('passives', 1, counts, 1)).toEqual({ view: 'controls' });
+    expect(helpShoulderStep('controls', 0, counts, 1)).toEqual({ view: 'about' });
+  });
+
+  it('walks back with LB, landing on the last page of a paged tab', () => {
+    expect(helpShoulderStep('about', 0, counts, -1)).toEqual({ view: 'controls' });
+    expect(helpShoulderStep('controls', 0, counts, -1)).toEqual({ view: 'passives', page: 1 });
+    expect(helpShoulderStep('passives', 1, counts, -1)).toEqual({ view: 'passives', page: 0 });
+    expect(helpShoulderStep('passives', 0, counts, -1)).toEqual({ view: 'spells', page: 2 });
+    expect(helpShoulderStep('spells', 2, counts, -1)).toEqual({ view: 'spells', page: 1 });
+    expect(helpShoulderStep('spells', 0, counts, -1)).toEqual({ view: 'pickups' });
   });
 
   it('does not wrap at either end', () => {
-    expect(helpShoulderStep('pickups', 0, 3, -1)).toBeNull();
-    expect(helpShoulderStep('about', 0, 3, 1)).toBeNull();
+    expect(helpShoulderStep('pickups', 0, counts, -1)).toBeNull();
+    expect(helpShoulderStep('about', 0, counts, 1)).toBeNull();
   });
 
   it('does nothing on the feedback form', () => {
-    expect(helpShoulderStep('feedback', 0, 3, 1)).toBeNull();
-    expect(helpShoulderStep('feedback', 0, 3, -1)).toBeNull();
+    expect(helpShoulderStep('feedback', 0, counts, 1)).toBeNull();
+    expect(helpShoulderStep('feedback', 0, counts, -1)).toBeNull();
   });
 
-  it('copes with a single page', () => {
-    expect(helpShoulderStep('spells', 0, 1, 1)).toEqual({ view: 'controls' });
-    expect(helpShoulderStep('controls', 0, 1, -1)).toEqual({ view: 'spells', spellPage: 0 });
+  it('copes with a single page, or none', () => {
+    const one = { spells: 1, passives: 1 };
+    expect(helpShoulderStep('spells', 0, one, 1)).toEqual({ view: 'passives', page: 0 });
+    expect(helpShoulderStep('passives', 0, one, 1)).toEqual({ view: 'controls' });
+    expect(helpShoulderStep('controls', 0, one, -1)).toEqual({ view: 'passives', page: 0 });
+    expect(helpShoulderStep('controls', 0, { spells: 1, passives: 0 }, -1)).toEqual({
+      view: 'passives',
+      page: 0,
+    });
   });
 });
 

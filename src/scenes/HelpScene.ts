@@ -15,12 +15,15 @@ import {
   controlHelpRows,
   groupChangelog,
   helpShoulderStep,
+  passiveHelpPages,
   pickupHelpRows,
   spellHelpPages,
+  type PagedHelpView,
 } from '../core/helpModel';
 import { SCENE, isHelpPayload, type HelpView } from '../core/scenePayloads';
+import { MAX_RANK_CSS } from '../core/maxRank';
 import { audioOf } from '../render/audio';
-import { addSpellIcon } from '../render/spellIcon';
+import { addBuildCardIcon, addSpellIcon } from '../render/spellIcon';
 import { CRIMSON_CSS, SERIF } from './buildStrips';
 import { controlsOf } from './controls';
 import { attachBoundPadButtons, attachMenuInput, attachPadButtons, type MenuItem } from './input';
@@ -37,32 +40,55 @@ const TAB_Y = 92;
 const TAB_WIDTH = 160;
 const BACK_Y = 478;
 
-/** Pickups tab: a panel with one 40 px row per pickup between the tabs and Back. */
+/**
+ * Every list tab is a table (CO-238): a header naming the columns, a rule, then
+ * one line per item, every other line shaded, in a panel between the tabs and
+ * Back. A cell too long for its column wraps inside it.
+ */
 const PANEL_TOP = 112;
 const PANEL_PADDING = 8;
-const ROW_TOP = PANEL_TOP + PANEL_PADDING + 19;
-const ROW_PITCH = 40;
+const TABLE_HEADER_Y = PANEL_TOP + PANEL_PADDING + 12;
+const TABLE_RULE_Y = TABLE_HEADER_Y + 14;
+const TABLE_ROW_TOP = TABLE_RULE_Y + 4;
+/** The rule and the shading span the panel inside its padding. */
+const TABLE_WIDTH = 884;
 const ICON_X = 60;
-/** The box every icon is scaled to fit: the relic's art is 3x the Ember's. */
+/** The box every pickup icon is scaled to fit: the relic's art is 3x the Ember's. */
 const ICON_BOX = 32;
 const NAME_X = 92;
-const TEXT_X = 196;
 
-/** Spells tab (#327): a 64 px row per spell, five to a page, filling the panel down to Back. */
-const SPELL_ROW_PITCH = 64;
-const SPELL_ROW_TOP = PANEL_TOP + PANEL_PADDING + SPELL_ROW_PITCH / 2;
-/** Room for the longest card name ("Lightning Companion", #329) at 19px, with slack for a wider font. */
-const SPELL_TEXT_X = 300;
+/** Pickups: a 40 px line per pickup; Found and Effect wrap to two lines at most. */
+const PICKUP_ROW_PITCH = 40;
+const PICKUP_SOURCE_X = 196;
+const PICKUP_EFFECT_X = 466;
+
+/** Passives: a 36 px line per passive, eight to a page; Per rank starts right of "Regeneration". */
+const PASSIVE_ROW_PITCH = 36;
+const PASSIVE_TEXT_X = 236;
+/** The Max rank column's centre. */
+const PASSIVE_CAP_X = 870;
+
+/**
+ * Spells (#327): a 56 px line per spell, five to a page, so the panel ends
+ * above Back. The name column holds "Lightning Companion" (#329); each level
+ * column wraps the level-up card's text to two lines.
+ */
+const SPELL_ROW_PITCH = 56;
+const SPELL_LV2_X = 282;
+const SPELL_LV3_X = 596;
+
+/** Controls (#384): a 44 px line per action, six of them since CO-226. */
+const CONTROL_ROW_PITCH = 44;
+const CONTROL_KEYBOARD_X = 180;
+const CONTROL_PAD_X = 370;
+const CONTROL_NOTE_X = 596;
+
 /**
  * The pager (#328) shares Back's row: Back spans 220 px and each pager button
  * 160, so buttons centred 206 px either side leave 16 px between them.
  */
 const PAGER_WIDTH = 160;
 const PAGER_OFFSET = 206;
-
-/** Controls tab (#384): a 48 px row per action, six of them since CO-226. */
-const CONTROL_ROW_PITCH = 48;
-const CONTROL_TEXT_X = 200;
 
 /** About tab's changelog rows (#377): a heading per version, then its lines. */
 const ABOUT_ROW_TOP = 214;
@@ -79,11 +105,13 @@ let lastSentAt: number | null = null;
 const FEEDBACK_KEY = import.meta.env.VITE_FEEDBACK_ACCESS_KEY;
 
 /**
- * Help screen (#226), reached from Intro and back to it. Four tabs: Pickups,
+ * Help screen (#226), reached from Intro and back to it. Five tabs: Pickups,
  * a row per thing on the floor with its art and what it does
  * (`core/helpModel.ts`); Spells (#327), a row per spell with its icon and what
- * its two upgrades add, the level-up card's own text; and About, the build's version, what's new
- * (`config/changelog.ts`) and a feedback form; Controls (#384) lists the keys and pad buttons. Like Pause, a tab switch or the
+ * its two upgrades add, the level-up card's own text; Passives (CO-238), a row
+ * per passive with its icon, what a rank does and its cap, as a table; Controls (#384)
+ * lists the keys and pad buttons; and About, the build's version, what's new
+ * (`config/changelog.ts`) and a feedback form. Like Pause, a tab switch or the
  * form restarts the scene on that view, so every view builds its own menu.
  *
  * The form is DOM (Phaser's DOM layer): a subject and a message, posted to the
@@ -97,6 +125,8 @@ export class HelpScene extends Phaser.Scene {
   private current: HelpView = 'pickups';
   /** The Spells page on screen (0-based), already clamped to the pages there are. */
   private spellPage = 0;
+  /** The Passives page on screen (0-based), already clamped to the pages there are. */
+  private passivePage = 0;
   private leaving = false;
   /** Bumped on every create, so a send that resolves after the form closed changes nothing. */
   private generation = 0;
@@ -118,6 +148,7 @@ export class HelpScene extends Phaser.Scene {
     this.current = isHelpPayload(data) ? data.view : 'pickups';
     // Clamped against the pages again in `drawSpells`, once the table is read.
     this.spellPage = isHelpPayload(data) ? (data.spellPage ?? 0) : 0;
+    this.passivePage = isHelpPayload(data) ? (data.passivePage ?? 0) : 0;
     // Phaser replays the last start payload on a payload-less start; clear it.
     this.scene.settings.data = {};
   }
@@ -141,6 +172,7 @@ export class HelpScene extends Phaser.Scene {
       const items: MenuItem[] = this.drawTabs();
       if (this.current === 'pickups') this.drawPickups();
       else if (this.current === 'spells') items.push(...this.drawSpells());
+      else if (this.current === 'passives') items.push(...this.drawPassives());
       else if (this.current === 'controls') this.drawControls();
       else items.push(...this.drawAbout());
       items.push(
@@ -185,9 +217,11 @@ export class HelpScene extends Phaser.Scene {
   }
 
   private shoulder(dir: -1 | 1): void {
-    const step = helpShoulderStep(this.current, this.spellPage, spellHelpPages().length, dir);
+    const page = this.current === 'passives' ? this.passivePage : this.spellPage;
+    const counts = { spells: spellHelpPages().length, passives: passiveHelpPages().length };
+    const step = helpShoulderStep(this.current, page, counts, dir);
     if (!step) return;
-    this.show(step.view, step.spellPage);
+    this.show(step.view, step.page);
   }
 
   /** Redraws Send's label as a send or its cooldown ends; unchanged text is a no-op. */
@@ -208,6 +242,7 @@ export class HelpScene extends Phaser.Scene {
     const tabs: readonly (readonly [label: string, view: HelpView])[] = [
       ['Pickups', 'pickups'],
       ['Spells', 'spells'],
+      ['Passives', 'passives'],
       ['Controls', 'controls'],
       ['About', 'about'],
     ];
@@ -226,87 +261,164 @@ export class HelpScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * A table (CO-238): the panel sized to `count` lines, the column headers and
+   * a rule, and a shade on every other line. Returns each line's centre; the
+   * caller draws the cells.
+   */
+  private drawTable(
+    count: number,
+    pitch: number,
+    headers: readonly (readonly [text: string, x: number, centred?: boolean])[],
+  ): number[] {
+    const left = 480 - TABLE_WIDTH / 2;
+    drawPanel(this, 30, PANEL_TOP, 900, TABLE_ROW_TOP - PANEL_TOP + count * pitch + PANEL_PADDING);
+    for (const [text, x, centred] of headers) {
+      this.add
+        .text(x, TABLE_HEADER_Y, text, { fontFamily: SERIF, fontSize: '15px', color: '#999999' })
+        .setOrigin(centred ? 0.5 : 0, 0.5);
+    }
+    this.add.rectangle(left, TABLE_RULE_Y, TABLE_WIDTH, 1, 0x5a1620).setOrigin(0, 0.5);
+    return Array.from({ length: count }, (_, i) => {
+      const y = TABLE_ROW_TOP + pitch / 2 + i * pitch;
+      // Every other line is shaded, so the eye can follow a row across the columns.
+      if (i % 2 === 1) {
+        this.add.rectangle(left, y, TABLE_WIDTH, pitch, 0xffffff, 0.04).setOrigin(0, 0.5);
+      }
+      return y;
+    });
+  }
+
+  /** One table cell, left-aligned on its line and wrapped at `width` when given. */
+  private addCell(
+    x: number,
+    y: number,
+    text: string,
+    size: number,
+    color: string,
+    width?: number,
+  ): Phaser.GameObjects.Text {
+    return this.add
+      .text(x, y, text, {
+        fontFamily: SERIF,
+        fontSize: `${size}px`,
+        color,
+        ...(width === undefined ? {} : { wordWrap: { width } }),
+      })
+      .setOrigin(0, 0.5);
+  }
+
+  /** Pickups tab: icon | pickup | found | effect. */
   private drawPickups(): void {
     const rows = pickupHelpRows();
-    drawPanel(this, 30, PANEL_TOP, 900, rows.length * ROW_PITCH + PANEL_PADDING * 2);
+    const ys = this.drawTable(rows.length, PICKUP_ROW_PITCH, [
+      ['Pickup', NAME_X],
+      ['Found', PICKUP_SOURCE_X],
+      ['Effect', PICKUP_EFFECT_X],
+    ]);
     rows.forEach((row, i) => {
-      const y = ROW_TOP + i * ROW_PITCH;
+      const y = ys[i]!;
       const icon = this.add.sprite(ICON_X, y, row.texture);
       // The clips are the game's; each sprite still has to start its own.
       if (this.anims.exists(row.clip)) icon.play(row.clip);
       icon.setScale(ICON_BOX / Math.max(icon.width, icon.height));
-
-      this.add
-        .text(NAME_X, y, row.name, { fontFamily: SERIF, fontSize: '19px', color: '#eeeeee' })
-        .setOrigin(0, 0.5);
-      this.add
-        .text(TEXT_X, y - 9, row.source, { fontFamily: SERIF, fontSize: '14px', color: '#999999' })
-        .setOrigin(0, 0.5);
-      this.add
-        .text(TEXT_X, y + 10, row.effect, { fontFamily: SERIF, fontSize: '16px', color: '#dddddd' })
-        .setOrigin(0, 0.5);
+      this.addCell(NAME_X, y, row.name, 18, '#eeeeee');
+      this.addCell(
+        PICKUP_SOURCE_X,
+        y,
+        row.source,
+        14,
+        '#999999',
+        PICKUP_EFFECT_X - PICKUP_SOURCE_X - 16,
+      );
+      this.addCell(PICKUP_EFFECT_X, y, row.effect, 15, '#dddddd', 922 - PICKUP_EFFECT_X);
     });
   }
 
-  /** Controls tab (#384): a row per action with its keyboard key, its pad button and what it does. */
+  /** Controls tab (#384): action | keyboard | gamepad | note, with the player's own bindings. */
   private drawControls(): void {
     const rows = controlHelpRows(undefined, this.controls);
-    drawPanel(this, 30, PANEL_TOP, 900, rows.length * CONTROL_ROW_PITCH + PANEL_PADDING * 2);
+    const ys = this.drawTable(rows.length, CONTROL_ROW_PITCH, [
+      ['Action', ICON_X],
+      ['Keyboard', CONTROL_KEYBOARD_X],
+      ['Gamepad', CONTROL_PAD_X],
+      ['Note', CONTROL_NOTE_X],
+    ]);
     rows.forEach((row, i) => {
-      const y = PANEL_TOP + PANEL_PADDING + CONTROL_ROW_PITCH / 2 + i * CONTROL_ROW_PITCH;
-      this.add
-        .text(ICON_X, y, row.action, { fontFamily: SERIF, fontSize: '19px', color: '#eeeeee' })
-        .setOrigin(0, 0.5);
-      this.add
-        .text(CONTROL_TEXT_X, y - 11, `Keyboard: ${row.keyboard}      Gamepad: ${row.gamepad}`, {
-          fontFamily: SERIF,
-          fontSize: '17px',
-          color: '#f0c674',
-        })
-        .setOrigin(0, 0.5);
-      this.add
-        .text(CONTROL_TEXT_X, y + 11, row.note, {
-          fontFamily: SERIF,
-          fontSize: '15px',
-          color: '#cccccc',
-        })
-        .setOrigin(0, 0.5);
+      const y = ys[i]!;
+      this.addCell(ICON_X, y, row.action, 18, '#eeeeee');
+      this.addCell(
+        CONTROL_KEYBOARD_X,
+        y,
+        row.keyboard,
+        16,
+        '#f0c674',
+        CONTROL_PAD_X - CONTROL_KEYBOARD_X - 16,
+      );
+      this.addCell(
+        CONTROL_PAD_X,
+        y,
+        row.gamepad,
+        16,
+        '#f0c674',
+        CONTROL_NOTE_X - CONTROL_PAD_X - 16,
+      );
+      this.addCell(CONTROL_NOTE_X, y, row.note, 14, '#cccccc', 922 - CONTROL_NOTE_X);
     });
   }
 
+  /** Spells tab (#327): icon | spell | Lv 2 | Lv 3 (max), an element to a page. */
   private drawSpells(): MenuItem[] {
-    const { width } = this.scale;
     const pages = spellHelpPages();
     this.spellPage = clampSpellPage(this.spellPage, pages.length);
     const rows = pages[this.spellPage]?.rows ?? [];
-    drawPanel(this, 30, PANEL_TOP, 900, rows.length * SPELL_ROW_PITCH + PANEL_PADDING * 2);
+    const ys = this.drawTable(rows.length, SPELL_ROW_PITCH, [
+      ['Spell', NAME_X],
+      ['Lv 2', SPELL_LV2_X],
+      ['Lv 3 (max)', SPELL_LV3_X],
+    ]);
     rows.forEach((row, i) => {
-      const y = SPELL_ROW_TOP + i * SPELL_ROW_PITCH;
+      const y = ys[i]!;
       // The HUD slot's own art, or its colour and letters when the run has no atlas.
       addSpellIcon(this, ICON_X, y, row, 1);
-      this.add
-        .text(NAME_X, y, row.name, { fontFamily: SERIF, fontSize: '19px', color: '#eeeeee' })
-        .setOrigin(0, 0.5);
-      this.add
-        .text(SPELL_TEXT_X, y - 11, row.lv2, {
-          fontFamily: SERIF,
-          fontSize: '15px',
-          color: '#dddddd',
-        })
-        .setOrigin(0, 0.5);
-      this.add
-        .text(SPELL_TEXT_X, y + 11, row.lv3, {
-          fontFamily: SERIF,
-          fontSize: '15px',
-          color: '#f0c674',
-        })
-        .setOrigin(0, 0.5);
+      this.addCell(NAME_X, y, row.name, 18, '#eeeeee');
+      this.addCell(SPELL_LV2_X, y, row.lv2, 14, '#dddddd', SPELL_LV3_X - SPELL_LV2_X - 16);
+      this.addCell(SPELL_LV3_X, y, row.lv3, 14, '#f0c674', 922 - SPELL_LV3_X);
     });
+    return this.drawPager('spells', this.spellPage, pages);
+  }
 
-    // A button only where that neighbour page exists; each names the element it goes to.
+  /** Passives tab (CO-238): icon | passive | per rank | max rank, eight to a page. */
+  private drawPassives(): MenuItem[] {
+    const pages = passiveHelpPages();
+    this.passivePage = clampSpellPage(this.passivePage, pages.length);
+    const rows = pages[this.passivePage]?.rows ?? [];
+    const ys = this.drawTable(rows.length, PASSIVE_ROW_PITCH, [
+      ['Passive', NAME_X],
+      ['Per rank', PASSIVE_TEXT_X],
+      ['Max rank', PASSIVE_CAP_X, true],
+    ]);
+    rows.forEach((row, i) => {
+      const y = ys[i]!;
+      // The level-up card's own art; a passive with none shows text alone.
+      addBuildCardIcon(this, ICON_X, y, row.id, 1);
+      this.addCell(NAME_X, y, row.name, 18, '#eeeeee');
+      this.addCell(PASSIVE_TEXT_X, y, row.effect, 16, '#dddddd');
+      this.addCell(PASSIVE_CAP_X, y, row.cap, 18, MAX_RANK_CSS).setOrigin(0.5);
+    });
+    return this.drawPager('passives', this.passivePage, pages);
+  }
+
+  /** A button only where that neighbour page exists; each names the page it goes to. */
+  private drawPager(
+    view: PagedHelpView,
+    page: number,
+    pages: readonly { title: string }[],
+  ): MenuItem[] {
+    const { width } = this.scale;
     const pager: MenuItem[] = [];
-    const prev = pages[this.spellPage - 1];
-    const next = pages[this.spellPage + 1];
+    const prev = pages[page - 1];
+    const next = pages[page + 1];
     if (prev) {
       pager.push(
         addMenuRow(this, {
@@ -315,7 +427,7 @@ export class HelpScene extends Phaser.Scene {
           x: width / 2 - PAGER_OFFSET,
           y: BACK_Y,
           width: PAGER_WIDTH,
-          onConfirm: () => this.showSpellPage(this.spellPage - 1),
+          onConfirm: () => this.show(view, page - 1),
         }),
       );
     }
@@ -327,7 +439,7 @@ export class HelpScene extends Phaser.Scene {
           x: width / 2 + PAGER_OFFSET,
           y: BACK_Y,
           width: PAGER_WIDTH,
-          onConfirm: () => this.showSpellPage(this.spellPage + 1),
+          onConfirm: () => this.show(view, page + 1),
         }),
       );
     }
@@ -514,20 +626,16 @@ export class HelpScene extends Phaser.Scene {
     subject.focus();
   }
 
-  /** Idempotent, like `back`: a click and a key in the same frame switch once. */
-  private show(view: HelpView, spellPage?: number): void {
+  /** Idempotent, like `back`: a click and a key in the same frame switch once. `page` is for a paged view. */
+  private show(view: HelpView, page?: number): void {
     if (this.leaving) return;
     this.leaving = true;
     audioOf(this).play('ui.confirm');
-    this.scene.restart({ view, spellPage });
-  }
-
-  /** Same guard as `show`: a click and a key in one frame turn the page once. */
-  private showSpellPage(spellPage: number): void {
-    if (this.leaving) return;
-    this.leaving = true;
-    audioOf(this).play('ui.confirm');
-    this.scene.restart({ view: 'spells', spellPage });
+    this.scene.restart({
+      view,
+      spellPage: view === 'spells' ? page : undefined,
+      passivePage: view === 'passives' ? page : undefined,
+    });
   }
 
   private back(): void {
