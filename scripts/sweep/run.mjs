@@ -73,7 +73,7 @@ async function runJob({ element, seed, sweepIndex, opts, commit, dirty, log }) {
     suspectBot: false,
   };
   const pageErrors = [];
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, args: ['--mute-audio'] });
   try {
     const context = await browser.newContext({ viewport: { width: 960, height: 540 } });
     const page = await context.newPage();
