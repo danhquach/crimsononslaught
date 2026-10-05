@@ -22,7 +22,7 @@ import {
   NO_RANK_CAP,
   MAX_SPELL_HELP_ROWS,
   aboutRowCount,
-  clampSpellPage,
+  clampHelpPage,
   groupChangelog,
   controlHelpRows,
   helpShoulderStep,
@@ -197,24 +197,24 @@ describe('spellHelpPages', () => {
   });
 });
 
-describe('clampSpellPage', () => {
+describe('clampHelpPage', () => {
   it('keeps a page that exists', () => {
-    expect(clampSpellPage(0, 2)).toBe(0);
-    expect(clampSpellPage(1, 2)).toBe(1);
+    expect(clampHelpPage(0, 2)).toBe(0);
+    expect(clampHelpPage(1, 2)).toBe(1);
   });
 
   it('clamps out-of-range pages to the nearest end', () => {
-    expect(clampSpellPage(2, 2)).toBe(1);
-    expect(clampSpellPage(Number.MAX_SAFE_INTEGER, 2)).toBe(1);
-    expect(clampSpellPage(-1, 2)).toBe(0);
-    expect(clampSpellPage(Number.NEGATIVE_INFINITY, 2)).toBe(0);
+    expect(clampHelpPage(2, 2)).toBe(1);
+    expect(clampHelpPage(Number.MAX_SAFE_INTEGER, 2)).toBe(1);
+    expect(clampHelpPage(-1, 2)).toBe(0);
+    expect(clampHelpPage(Number.NEGATIVE_INFINITY, 2)).toBe(0);
   });
 
   it('sends NaN, infinity and no pages to the first page, and truncates fractions', () => {
-    expect(clampSpellPage(Number.NaN, 2)).toBe(0);
-    expect(clampSpellPage(Number.POSITIVE_INFINITY, 2)).toBe(0);
-    expect(clampSpellPage(1, 0)).toBe(0);
-    expect(clampSpellPage(1.9, 3)).toBe(1);
+    expect(clampHelpPage(Number.NaN, 2)).toBe(0);
+    expect(clampHelpPage(Number.POSITIVE_INFINITY, 2)).toBe(0);
+    expect(clampHelpPage(1, 0)).toBe(0);
+    expect(clampHelpPage(1.9, 3)).toBe(1);
   });
 });
 

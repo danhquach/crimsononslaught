@@ -11,7 +11,7 @@ import {
   validateFeedback,
 } from '../core/feedback';
 import {
-  clampSpellPage,
+  clampHelpPage,
   controlHelpRows,
   groupChangelog,
   helpShoulderStep,
@@ -52,6 +52,8 @@ const TABLE_RULE_Y = TABLE_HEADER_Y + 14;
 const TABLE_ROW_TOP = TABLE_RULE_Y + 4;
 /** The rule and the shading span the panel inside its padding. */
 const TABLE_WIDTH = 884;
+/** The table's right edge: a wrapped cell in the last column wraps here. */
+const TABLE_RIGHT = 480 + TABLE_WIDTH / 2;
 const ICON_X = 60;
 /** The box every pickup icon is scaled to fit: the relic's art is 3x the Ember's. */
 const ICON_BOX = 32;
@@ -282,6 +284,7 @@ export class HelpScene extends Phaser.Scene {
     return Array.from({ length: count }, (_, i) => {
       const y = TABLE_ROW_TOP + pitch / 2 + i * pitch;
       // Every other line is shaded, so the eye can follow a row across the columns.
+      // The first line stays plain so no shade sits against the header rule.
       if (i % 2 === 1) {
         this.add.rectangle(left, y, TABLE_WIDTH, pitch, 0xffffff, 0.04).setOrigin(0, 0.5);
       }
@@ -331,7 +334,7 @@ export class HelpScene extends Phaser.Scene {
         '#999999',
         PICKUP_EFFECT_X - PICKUP_SOURCE_X - 16,
       );
-      this.addCell(PICKUP_EFFECT_X, y, row.effect, 15, '#dddddd', 922 - PICKUP_EFFECT_X);
+      this.addCell(PICKUP_EFFECT_X, y, row.effect, 15, '#dddddd', TABLE_RIGHT - PICKUP_EFFECT_X);
     });
   }
 
@@ -363,14 +366,14 @@ export class HelpScene extends Phaser.Scene {
         '#f0c674',
         CONTROL_NOTE_X - CONTROL_PAD_X - 16,
       );
-      this.addCell(CONTROL_NOTE_X, y, row.note, 14, '#cccccc', 922 - CONTROL_NOTE_X);
+      this.addCell(CONTROL_NOTE_X, y, row.note, 14, '#cccccc', TABLE_RIGHT - CONTROL_NOTE_X);
     });
   }
 
   /** Spells tab (#327): icon | spell | Lv 2 | Lv 3 (max), an element to a page. */
   private drawSpells(): MenuItem[] {
     const pages = spellHelpPages();
-    this.spellPage = clampSpellPage(this.spellPage, pages.length);
+    this.spellPage = clampHelpPage(this.spellPage, pages.length);
     const rows = pages[this.spellPage]?.rows ?? [];
     const ys = this.drawTable(rows.length, SPELL_ROW_PITCH, [
       ['Spell', NAME_X],
@@ -383,7 +386,7 @@ export class HelpScene extends Phaser.Scene {
       addSpellIcon(this, ICON_X, y, row, 1);
       this.addCell(NAME_X, y, row.name, 18, '#eeeeee');
       this.addCell(SPELL_LV2_X, y, row.lv2, 14, '#dddddd', SPELL_LV3_X - SPELL_LV2_X - 16);
-      this.addCell(SPELL_LV3_X, y, row.lv3, 14, '#f0c674', 922 - SPELL_LV3_X);
+      this.addCell(SPELL_LV3_X, y, row.lv3, 14, '#f0c674', TABLE_RIGHT - SPELL_LV3_X);
     });
     return this.drawPager('spells', this.spellPage, pages);
   }
@@ -391,7 +394,7 @@ export class HelpScene extends Phaser.Scene {
   /** Passives tab (CO-238): icon | passive | per rank | max rank, eight to a page. */
   private drawPassives(): MenuItem[] {
     const pages = passiveHelpPages();
-    this.passivePage = clampSpellPage(this.passivePage, pages.length);
+    this.passivePage = clampHelpPage(this.passivePage, pages.length);
     const rows = pages[this.passivePage]?.rows ?? [];
     const ys = this.drawTable(rows.length, PASSIVE_ROW_PITCH, [
       ['Passive', NAME_X],
