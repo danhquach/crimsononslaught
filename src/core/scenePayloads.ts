@@ -140,7 +140,14 @@ export const CONTROLS_RESETS = ['keyboard', 'pad', 'all'] as const;
 export type ControlsReset = (typeof CONTROLS_RESETS)[number];
 
 /** What the Help screen shows (#226): a tab, or the About tab's feedback form. */
-export const HELP_VIEWS = ['pickups', 'spells', 'controls', 'about', 'feedback'] as const;
+export const HELP_VIEWS = [
+  'pickups',
+  'spells',
+  'passives',
+  'controls',
+  'about',
+  'feedback',
+] as const;
 
 export type HelpView = (typeof HELP_VIEWS)[number];
 
@@ -149,9 +156,14 @@ export interface HelpPayload {
   view: HelpView;
   /** Which Spells page (#328), 0-based; left out, the first. The scene clamps it to the pages there are. */
   spellPage?: number;
+  /** Which Passives page (CO-238), 0-based; left out, the first. The scene clamps it to the pages there are. */
+  passivePage?: number;
 }
 
-/** No table has anywhere near this many Spells pages; a larger `spellPage` is not one the scene sent. */
+/**
+ * No tab has anywhere near this many pages; a larger `spellPage` or `passivePage`
+ * (CO-238) is not one the scene sent.
+ */
 export const MAX_SPELL_PAGE = 64;
 
 /** `ended`: the player ended the run from the pause screen (#252), keeping what it earned. */
@@ -288,10 +300,16 @@ export function isHelpPayload(data: unknown): data is HelpPayload {
   return (
     isRecord(data) &&
     (HELP_VIEWS as readonly unknown[]).includes(data.view) &&
-    (data.spellPage === undefined ||
-      (Number.isInteger(data.spellPage) &&
-        (data.spellPage as number) >= 0 &&
-        (data.spellPage as number) <= MAX_SPELL_PAGE))
+    isHelpPage(data.spellPage) &&
+    isHelpPage(data.passivePage)
+  );
+}
+
+/** A Help page number as the scene sends it: left out, or a small non-negative integer. */
+function isHelpPage(page: unknown): boolean {
+  return (
+    page === undefined ||
+    (Number.isInteger(page) && (page as number) >= 0 && (page as number) <= MAX_SPELL_PAGE)
   );
 }
 
