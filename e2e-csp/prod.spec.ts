@@ -1,8 +1,22 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { E2E_FEEDBACK_KEY } from '../playwright.config';
 import { FEEDBACK_URL } from '../src/core/feedback';
 import { PAUSE_ACTIONS } from '../src/core/pauseModel';
 import { cardCenter } from '../e2e/game';
+import {
+  ABOUT_TAB,
+  boot,
+  CANCEL,
+  HELP_BACK,
+  HELP_ENTRY,
+  labelFontRenders,
+  litPixels,
+  pixelAt,
+  PLAY_AGAIN_BAR,
+  SEND,
+  SEND_FEEDBACK,
+  watch,
+} from './helpers';
 
 /**
  * #316 on the built site, served by `vite preview` (`playwright.csp.config.ts`):
@@ -21,132 +35,6 @@ import { cardCenter } from '../e2e/game';
  * Send and Cancel at y = 446; Back at y = 478) and `ResultScene` (the Play again
  * bar, the left of its two).
  */
-
-const HELP_ENTRY = { x: 480, y: 262 + 3 * 54 };
-/** The fifth of five tabs (Pickups | Spells | Passives | Controls | About, CO-238): 352 px right of centre. */
-const ABOUT_TAB = { x: 832, y: 92 };
-const SEND_FEEDBACK = { x: 480, y: 410 };
-const SEND = { x: 370, y: 446 };
-const CANCEL = { x: 590, y: 446 };
-const HELP_BACK = { x: 480, y: 478 };
-/** Inside the Play again bar's left end, clear of its label. */
-const PLAY_AGAIN_BAR = { x: 258, y: 468 };
-
-/**
- * Whether the row-label face is in use, not just fetched (the title is a
- * painted image now; the plates' labels are set in this face): the face is loaded,
- * and a canvas measures text in it differently from the same text in its
- * fallback (a missing face would draw both in the fallback, width for width).
- */
-async function labelFontRenders(page: Page): Promise<{ loaded: boolean; differs: boolean }> {
-  return page.evaluate(() => {
-    const loaded = [...document.fonts].some(
-      (face) => face.family.replaceAll('"', '') === 'GrenzeGotisch' && face.status === 'loaded',
-    );
-    const context = document.createElement('canvas').getContext('2d');
-    if (!context) throw new Error('no 2d context');
-    const width = (family: string): number => {
-      context.font = `26px ${family}`;
-      return context.measureText('Start Game').width;
-    };
-    return { loaded, differs: width('GrenzeGotisch, Georgia, serif') !== width('Georgia, serif') };
-  });
-}
-
-/** What a page reported against its policy, and everything that went wrong on it. */
-interface Watch {
-  violations: string[];
-  problems: string[];
-  logs: string[];
-}
-
-/**
- * Listen from before the page's own scripts run, so nothing is missed: the
- * `securitypolicyviolation` event through a function exposed to the page (it
- * survives navigations), and the console and page errors from this side.
- */
-async function watch(page: Page): Promise<Watch> {
-  const seen: Watch = { violations: [], problems: [], logs: [] };
-  await page.exposeFunction('reportViolation', (line: string) => seen.violations.push(line));
-  await page.addInitScript(() => {
-    document.addEventListener('securitypolicyviolation', (event) => {
-      const report = (window as unknown as { reportViolation(line: string): void }).reportViolation;
-      report(`${event.violatedDirective} blocked ${event.blockedURI} at ${event.sourceFile}`);
-    });
-  });
-  page.on('console', (message) => {
-    seen.logs.push(message.text());
-    if (message.type() === 'error' || /Content.Security.Policy|Refused/i.test(message.text())) {
-      seen.problems.push(`${message.type()}: ${message.text()}`);
-    }
-  });
-  page.on('pageerror', (error) => seen.problems.push(`pageerror: ${error.message}`));
-  return seen;
-}
-
-/** Wait for Boot to finish (it logs the seed last but for the hand-off to Intro) and Intro to draw. */
-async function boot(page: Page, query: string): Promise<void> {
-  const booted = page.waitForEvent('console', (m) => m.text().startsWith('[rng] seed='));
-  await page.goto(`/${query}`);
-  await booted;
-  await page.waitForTimeout(1500);
-}
-
-/** A pixel's colour from a page screenshot, decoded in a scratch page that has no policy. */
-async function pixelAt(
-  page: Page,
-  at: { x: number; y: number },
-): Promise<{ r: number; g: number; b: number }> {
-  const shot = (await page.screenshot()).toString('base64');
-  const scratch = await page.context().newPage();
-  try {
-    return await scratch.evaluate(
-      async ([data, x, y]) => {
-        const image = new Image();
-        image.src = `data:image/png;base64,${data}`;
-        await image.decode();
-        const canvas = document.createElement('canvas');
-        canvas.width = image.width;
-        canvas.height = image.height;
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('no 2d context');
-        context.drawImage(image, 0, 0);
-        const [r = 0, g = 0, b = 0] = context.getImageData(Number(x), Number(y), 1, 1).data;
-        return { r, g, b };
-      },
-      [shot, at.x, at.y] as const,
-    );
-  } finally {
-    await scratch.close();
-  }
-}
-
-/** How many of the 960x540 screenshot's sampled pixels are not black: a blank canvas has none. */
-async function litPixels(page: Page): Promise<number> {
-  const shot = (await page.screenshot()).toString('base64');
-  const scratch = await page.context().newPage();
-  try {
-    return await scratch.evaluate(async (data) => {
-      const image = new Image();
-      image.src = `data:image/png;base64,${data}`;
-      await image.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = image.width;
-      canvas.height = image.height;
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('no 2d context');
-      context.drawImage(image, 0, 0);
-      const pixels = context.getImageData(0, 0, image.width, image.height).data;
-      let lit = 0;
-      for (let i = 0; i < pixels.length; i += 4 * 16) {
-        if ((pixels[i] ?? 0) + (pixels[i + 1] ?? 0) + (pixels[i + 2] ?? 0) > 60) lit += 1;
-      }
-      return lit;
-    }, shot);
-  } finally {
-    await scratch.close();
-  }
-}
 
 test('the built page carries one policy meta first in the head, and no inline code', async ({
   request,
@@ -182,7 +70,7 @@ test('a full walk of the game under the policy logs no violation and no error', 
     });
   });
 
-  await boot(page, '?seed=7');
+  await boot(page, '/?seed=7');
   expect(await litPixels(page), 'Intro is drawn').toBeGreaterThan(50);
   expect(await labelFontRenders(page), 'the row-label face loads under the policy').toEqual({
     loaded: true,
@@ -283,7 +171,7 @@ test('on the built page only ?seed= has any effect', async ({ page }) => {
   const seen = await watch(page);
   await boot(
     page,
-    '?seed=7&timeScale=30&invulnerable=1&startAt=1170&loadout=fire_meteor&enemies=swarm&debug=textures',
+    '/?seed=7&timeScale=30&invulnerable=1&startAt=1170&loadout=fire_meteor&enemies=swarm&debug=textures',
   );
 
   expect(seen.logs).toContain('[rng] seed=7');

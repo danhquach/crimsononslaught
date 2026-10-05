@@ -10,7 +10,8 @@ import { E2E_FEEDBACK_KEY } from './playwright.config';
  *
  * Its own port, so a run never talks to a stale server from the main suite.
  */
-const PORT = 5178;
+export const PORT = 5178;
+const VIEWPORT = { width: 960, height: 540 };
 
 export default defineConfig({
   testDir: 'e2e-csp',
@@ -22,12 +23,30 @@ export default defineConfig({
   // The main suite's HTML report owns `playwright-report/`; this one would overwrite it.
   reporter: 'list',
   use: {
-    ...devices['Desktop Chrome'],
     baseURL: `http://localhost:${PORT}`,
-    // Same size as the Phaser canvas, so a page coordinate is a game coordinate.
-    viewport: { width: 960, height: 540 },
     trace: 'retain-on-failure',
   },
+  projects: [
+    // Same viewport size as the Phaser canvas, so a page coordinate is a game coordinate.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: VIEWPORT } },
+    // The itch.io embed runs in readers' browsers (#422): `npm run test:itch` adds the
+    // other two engines, for the iframe spec only. Off by default so `test:csp` and CI
+    // need no extra browser installs.
+    ...(process.env.CSP_ALL_BROWSERS
+      ? [
+          {
+            name: 'firefox',
+            testMatch: /itch-iframe/,
+            use: { ...devices['Desktop Firefox'], viewport: VIEWPORT },
+          },
+          {
+            name: 'webkit',
+            testMatch: /itch-iframe/,
+            use: { ...devices['Desktop Safari'], viewport: VIEWPORT, deviceScaleFactor: 1 },
+          },
+        ]
+      : []),
+  ],
   webServer: {
     command: `npx vite build --outDir dist-csp --emptyOutDir && npx vite preview --outDir dist-csp --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
