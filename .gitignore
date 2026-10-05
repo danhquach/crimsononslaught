@@ -2,6 +2,7 @@
 node_modules/
 dist/
 dist-csp/
+dist-itch/
 .vite/
 
 # Test output
